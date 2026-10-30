@@ -1,12 +1,58 @@
-import 'package:flutter/foundation.dart' show ChangeNotifier;
+// ignore_for_file: prefer_initializing_formals
+
+import 'dart:async';
+import 'dart:collection';
+
+import 'package:flutter/foundation.dart' show ChangeNotifier, debugPrint;
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/epg_store.dart';
 
 typedef Clock = DateTime Function();
 
+/// The in-memory guide.
+///
+/// Without a store (tests, and before one is attached) every fetched
+/// programme stays resident, as it always did. With an [EpgProgrammeStore]
+/// attached, the SQLite guide is the store of record and memory is bounded:
+///
+/// - every channel keeps a short *hot* list (the current programme and the
+///   next [hotSize] - 1), which is all the list/grid/Home/player/spotlight
+///   now-next lookups read;
+/// - full schedules (timeline rows, catchup, details) live in an LRU of
+///   [residentCapacity] channels, loaded from the store on first use;
+/// - every write is applied to the store as the same replace/merge op.
+///
+/// The sweep alone used to keep ~8 full programmes for every channel
+/// resident for the whole session.
 class EpgService extends ChangeNotifier {
-  EpgService({Clock? clock, this.cacheTtl = const Duration(minutes: 30)})
-    : _clock = clock ?? DateTime.now;
+  EpgService({
+    Clock? clock,
+    this.cacheTtl = const Duration(minutes: 30),
+    EpgProgrammeStore? store,
+    this.residentCapacity = 300,
+    this.hotSize = 3,
+  }) : _clock = clock ?? DateTime.now,
+       _store = store;
+
+  EpgProgrammeStore? _store;
+
+  /// Channels whose full schedule is kept in memory (store mode only).
+  final int residentCapacity;
+
+  /// Upcoming programmes kept per non-resident channel (store mode only).
+  final int hotSize;
+
+  /// Called when a channel's full schedule is evicted from memory, so the
+  /// owner can forget it fetched that channel's dated ranges and refetch
+  /// whatever only lived in memory (e.g. catchup history).
+  void Function(String channelId)? onEvicted;
+
+  bool get hasStore => _store != null;
+
+  /// Switches to bounded, store-backed mode. Call before any programmes are
+  /// loaded; what is already held stays resident.
+  void attachStore(EpgProgrammeStore store) => _store = store;
 
   /// Fallback catchup retention window (in days) used when a channel
   /// supports catchup but does not advertise an explicit [Channel.catchupDays].
@@ -56,8 +102,25 @@ class EpgService extends ChangeNotifier {
   /// this instead of `DateTime.now()` directly, so they stay consistent with
   /// this service's own current/next computation under a fake clock.
   DateTime get now => _clock();
-  final Map<String, List<EpgProgram>> _programsByChannel =
-      <String, List<EpgProgram>>{};
+  // Insertion-ordered, so in store mode the first key is the least recently
+  // used resident schedule.
+  final LinkedHashMap<String, List<EpgProgram>> _programsByChannel =
+      LinkedHashMap<String, List<EpgProgram>>();
+  final Map<String, List<EpgProgram>> _hot = <String, List<EpgProgram>>{};
+  final Map<String, int> _versions = <String, int>{};
+  final Generation _storeGeneration = Generation();
+  final SerialQueue _storeQueue = SerialQueue();
+  final List<EpgStoreOp> _pendingOps = <EpgStoreOp>[];
+  bool _flushScheduled = false;
+  final Set<String> _loadQueue = <String>{};
+  final Set<String> _loadsInFlight = <String>{};
+  bool _loadScheduled = false;
+  final Set<String> _hotRefillQueue = <String>{};
+  final Map<String, DateTime> _hotRefilledAt = <String, DateTime>{};
+  bool _hotRefillScheduled = false;
+  static const Duration _hotRefillCooldown = Duration(minutes: 5);
+  static const Duration _hotHorizon = Duration(hours: 12);
+  static const Duration _prunePastSlack = Duration(hours: 2);
   final Map<String, DateTime> _fetchedAtByChannel = <String, DateTime>{};
   final Map<String, DateTime> _failedAtByChannel = <String, DateTime>{};
   final Set<String> _fetchesInFlight = <String>{};
@@ -77,19 +140,48 @@ class EpgService extends ChangeNotifier {
     bool replaceExisting = true,
     bool markFresh = true,
   }) {
+    final replaced = <String>{};
     if (replaceExisting) {
-      final replacedChannelIds =
-          channelIds ??
-          programs
-              .map((program) => program.channelId)
-              .where((channelId) => channelId.isNotEmpty);
-      for (final channelId in replacedChannelIds) {
+      replaced.addAll(
+        (channelIds ??
+                programs
+                    .map((program) => program.channelId)
+                    .where((channelId) => channelId.isNotEmpty))
+            .toSet(),
+      );
+      for (final channelId in replaced) {
         _programsByChannel.remove(channelId);
+        _hot.remove(channelId);
+        _versions[channelId] = (_versions[channelId] ?? 0) + 1;
       }
     }
-    _storePrograms(programs, markFresh: markFresh);
+    _storePrograms(programs, markFresh: markFresh, replaced: replaced);
+    if (_store != null) _persist(programs, replaced);
     _loadedAt = _clock();
     notifyListeners();
+  }
+
+  /// Records [programs] for the store as the same ops just applied in
+  /// memory: [replaced] channels are replaced wholesale, anything else is
+  /// merged in.
+  void _persist(List<EpgProgram> programs, Set<String> replaced) {
+    final byChannel = <String, List<EpgProgram>>{};
+    for (final program in programs) {
+      if (program.channelId.isEmpty) continue;
+      byChannel.putIfAbsent(program.channelId, () => []).add(program);
+    }
+    if (replaced.isNotEmpty) {
+      _enqueue(
+        EpgReplaceChannels({
+          for (final id in replaced) id: byChannel[id] ?? const <EpgProgram>[],
+        }),
+      );
+    }
+    final merged = {
+      for (final entry in byChannel.entries)
+        if (!replaced.contains(entry.key)) entry.key: entry.value,
+    };
+    if (merged.isNotEmpty) _enqueue(EpgMergeIntoChannels(merged));
   }
 
   void applySuccessfulResponse(
@@ -198,6 +290,7 @@ class EpgService extends ChangeNotifier {
   void _storePrograms(
     List<EpgProgram> programs, {
     required bool markFresh,
+    Set<String> replaced = const <String>{},
   }) {
     // Keyed by slot so a repeat within the batch replaces the earlier copy
     // (the server's date + next-day reads can return a programme twice).
@@ -213,6 +306,27 @@ class EpgService extends ChangeNotifier {
         in incomingByChannel.entries) {
       final incoming = incomingBySlot.values.toList()
         ..sort((a, b) => a.start.compareTo(b.start));
+      if (_store != null &&
+          !_programsByChannel.containsKey(channelId) &&
+          replaced.contains(channelId)) {
+        // A full fetch for a channel whose schedule isn't resident: keep just
+        // the hot slice; the rest is in the store.
+        _hot[channelId] = _trimHot(incoming);
+        continue;
+      }
+      if (_store != null && !_programsByChannel.containsKey(channelId)) {
+        // A dated/catchup merge: the caller is about to show this channel's
+        // schedule, so make it resident now from what memory has, and fill
+        // in the rest from the store.
+        _programsByChannel[channelId] = _mergeNewerWins(
+          _hot[channelId] ?? const <EpgProgram>[],
+          incoming,
+        );
+        _hot[channelId] = _trimHot(_programsByChannel[channelId]!);
+        _queueLoad(channelId);
+        _evictOverCapacity();
+        continue;
+      }
       final channelPrograms = _programsByChannel.putIfAbsent(
         channelId,
         () => <EpgProgram>[],
@@ -231,7 +345,12 @@ class EpgService extends ChangeNotifier {
       channelPrograms
         ..clear()
         ..addAll(merged);
+      if (_store != null) {
+        _touch(channelId);
+        _hot[channelId] = _trimHot(channelPrograms);
+      }
     }
+    if (_store != null) _evictOverCapacity();
     if (markFresh) {
       markFetched(programs.map((program) => program.channelId));
     }
@@ -299,9 +418,11 @@ class EpgService extends ChangeNotifier {
   }
 
   EpgCurrentNext? lookup(String channelId) {
-    final programs = _programsByChannel[channelId];
+    final resident = _programsByChannel[channelId];
+    final programs = resident ?? _hot[channelId];
     if (programs == null || programs.isEmpty) return null;
     final now = _clock();
+    if (_store != null && resident == null) _maybeRefillHot(channelId, now);
     for (var index = 0; index < programs.length; index++) {
       final program = programs[index];
       if (!now.isBefore(program.start) && now.isBefore(program.end)) {
@@ -320,17 +441,48 @@ class EpgService extends ChangeNotifier {
   /// The held programmes for one EPG channel id, start-ordered (empty when
   /// none).
   List<EpgProgram> programsForId(String channelId) =>
-      _programsByChannel[channelId] ?? const <EpgProgram>[];
+      _programsByChannel[channelId] ?? _hot[channelId] ?? const <EpgProgram>[];
+
+  /// Whether any of [channel]'s identifiers has programmes in memory (hot or
+  /// resident). Unlike [programsForChannel] this never triggers a store load.
+  bool hasProgramsFor(Channel channel) {
+    for (final id in [channel.epgChannelId, channel.tvgName, channel.name]) {
+      if (id == null || id.isEmpty) continue;
+      if ((_programsByChannel[id] ?? _hot[id] ?? const []).isNotEmpty) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   /// Returns every known program for [channel], sorted by start time.
+  ///
+  /// In store mode a channel that isn't resident returns its hot slice now
+  /// and loads its full schedule from the store, notifying when it lands.
   List<EpgProgram> programsForChannel(Channel channel) {
     final ids = <String?>[channel.epgChannelId, channel.tvgName, channel.name];
+    String? loadId;
+    List<EpgProgram>? fallback;
     for (final id in ids) {
       if (id == null || id.isEmpty) continue;
       final programs = _programsByChannel[id];
-      if (programs != null && programs.isNotEmpty) return programs;
+      if (programs != null) {
+        if (_store != null) _touch(id);
+        if (programs.isNotEmpty) return programs;
+        continue;
+      }
+      if (_store == null) continue;
+      final hot = _hot[id];
+      if (fallback == null && hot != null && hot.isNotEmpty) {
+        fallback = hot;
+        loadId = id;
+      }
+      loadId ??= id;
     }
-    return const <EpgProgram>[];
+    // One load per channel: the identifier its hot data lives under, else
+    // its primary one, so a channel doesn't take several resident slots.
+    if (loadId != null) _queueLoad(loadId);
+    return fallback ?? const <EpgProgram>[];
   }
 
   /// Returns [channel]'s replayable catchup programs, most-recent-first.
@@ -362,10 +514,194 @@ class EpgService extends ChangeNotifier {
 
   void clear() {
     _programsByChannel.clear();
+    _hot.clear();
+    _versions.clear();
+    _pendingOps.clear();
+    _loadQueue.clear();
+    _hotRefillQueue.clear();
+    _hotRefilledAt.clear();
+    _storeGeneration.advance();
     _fetchedAtByChannel.clear();
     _failedAtByChannel.clear();
     _fetchesInFlight.clear();
     _loadedAt = null;
     notifyListeners();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Store mode
+  // ---------------------------------------------------------------------------
+
+  /// Fills the hot slices from the store on a cold start, so the grids can
+  /// paint now/next before the network prime lands. Not marked fresh, so the
+  /// prime and sweep still refresh every channel. Never writes back.
+  Future<void> restoreFromStore() async {
+    final store = _store;
+    if (store == null) return;
+    final generation = _storeGeneration.current;
+    final now = _clock();
+    final byChannel = await store.programmesBetween(now, now.add(_hotHorizon));
+    if (_storeGeneration.isStale(generation) || byChannel.isEmpty) return;
+    for (final MapEntry(key: id, value: programs) in byChannel.entries) {
+      if (_programsByChannel.containsKey(id) || _hot.containsKey(id)) continue;
+      _hot[id] = _trimHot(programs);
+    }
+    _loadedAt = _clock();
+    notifyListeners();
+  }
+
+  /// Writes every queued op to the store, in order. Loads await this first,
+  /// so a read always sees what memory already applied.
+  Future<void> flushStore() => _storeQueue.run(() async {
+    final store = _store;
+    if (store == null || _pendingOps.isEmpty) return;
+    final ops = [
+      ..._pendingOps,
+      EpgPruneBefore(_clock().subtract(_prunePastSlack)),
+    ];
+    _pendingOps.clear();
+    try {
+      await store.applyEpgOps(ops);
+    } on Object catch (error) {
+      debugPrint('[EPG] store write failed: $error');
+    }
+  });
+
+  void _enqueue(EpgStoreOp op) {
+    _pendingOps.add(op);
+    if (_flushScheduled) return;
+    _flushScheduled = true;
+    scheduleMicrotask(() {
+      _flushScheduled = false;
+      unawaited(flushStore());
+    });
+  }
+
+  List<EpgProgram> _trimHot(List<EpgProgram> startSorted) {
+    final now = _clock();
+    final hot = <EpgProgram>[];
+    for (final program in startSorted) {
+      if (!program.end.isAfter(now)) continue;
+      hot.add(program);
+      if (hot.length >= hotSize) break;
+    }
+    return hot;
+  }
+
+  void _touch(String channelId) {
+    final programs = _programsByChannel.remove(channelId);
+    if (programs != null) _programsByChannel[channelId] = programs;
+  }
+
+  void _evictOverCapacity() {
+    while (_programsByChannel.length > residentCapacity) {
+      final id = _programsByChannel.keys.first;
+      final programs = _programsByChannel.remove(id)!;
+      _hot[id] = _trimHot(programs);
+      // Dated-range freshness for this channel described data that is now
+      // only in the store (or, for catchup history, gone): forget it.
+      _fetchedAtByChannel.removeWhere((key, _) => key.startsWith('$id:'));
+      onEvicted?.call(id);
+    }
+  }
+
+  void _queueLoad(String channelId) {
+    if (_loadsInFlight.contains(channelId)) return;
+    _loadQueue.add(channelId);
+    if (_loadScheduled) return;
+    _loadScheduled = true;
+    scheduleMicrotask(() {
+      _loadScheduled = false;
+      unawaited(_runLoads());
+    });
+  }
+
+  Future<void> _runLoads() async {
+    final store = _store;
+    if (store == null || _loadQueue.isEmpty) return;
+    final ids = {..._loadQueue};
+    _loadQueue.clear();
+    _loadsInFlight.addAll(ids);
+    final generation = _storeGeneration.current;
+    final versions = {for (final id in ids) id: _versions[id] ?? 0};
+    try {
+      await flushStore();
+      final stored = await store.programmesForChannels(ids);
+      if (_storeGeneration.isStale(generation)) return;
+      final reload = <String>[];
+      for (final id in ids) {
+        if ((_versions[id] ?? 0) != versions[id]) {
+          reload.add(id);
+          continue;
+        }
+        // Memory wins over the store for overlapping slots: anything merged
+        // in since the read began is newer than what the store returned.
+        final memory = _programsByChannel[id] ?? _hot[id] ?? const [];
+        _programsByChannel.remove(id);
+        _programsByChannel[id] = _mergeNewerWins(
+          stored[id] ?? const <EpgProgram>[],
+          memory,
+        );
+        _hot[id] = _trimHot(_programsByChannel[id]!);
+      }
+      _evictOverCapacity();
+      notifyListeners();
+      reload.forEach(_queueLoad);
+    } on Object catch (error) {
+      debugPrint('[EPG] store load failed: $error');
+    } finally {
+      _loadsInFlight.removeAll(ids);
+    }
+  }
+
+  void _maybeRefillHot(String channelId, DateTime now) {
+    final hot = _hot[channelId];
+    if (hot == null) return;
+    var upcoming = 0;
+    for (final program in hot) {
+      if (program.end.isAfter(now)) upcoming += 1;
+    }
+    if (upcoming >= 2) return;
+    final last = _hotRefilledAt[channelId];
+    if (last != null && now.difference(last) < _hotRefillCooldown) return;
+    _hotRefilledAt[channelId] = now;
+    _hotRefillQueue.add(channelId);
+    if (_hotRefillScheduled) return;
+    _hotRefillScheduled = true;
+    scheduleMicrotask(() {
+      _hotRefillScheduled = false;
+      unawaited(_runHotRefills());
+    });
+  }
+
+  Future<void> _runHotRefills() async {
+    final store = _store;
+    if (store == null || _hotRefillQueue.isEmpty) return;
+    final ids = {..._hotRefillQueue};
+    _hotRefillQueue.clear();
+    final generation = _storeGeneration.current;
+    try {
+      await flushStore();
+      final now = _clock();
+      final stored = await store.programmesBetween(
+        now,
+        now.add(_hotHorizon),
+        channelIds: ids,
+      );
+      if (_storeGeneration.isStale(generation)) return;
+      var changed = false;
+      for (final id in ids) {
+        if (_programsByChannel.containsKey(id)) continue;
+        final rows = stored[id];
+        if (rows == null || rows.isEmpty) continue;
+        _hot[id] = _trimHot(
+          _mergeNewerWins(rows, _hot[id] ?? const <EpgProgram>[]),
+        );
+        changed = true;
+      }
+      if (changed) notifyListeners();
+    } on Object catch (error) {
+      debugPrint('[EPG] hot refill failed: $error');
+    }
   }
 }
