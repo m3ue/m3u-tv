@@ -11,6 +11,7 @@ import 'package:m3u_tv/features/epg/epg_program_details.dart'
 import 'package:m3u_tv/features/home/home_spotlight.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
+import 'package:m3u_tv/shared/auto_scroll_text.dart';
 import 'package:m3u_tv/shared/cached_backdrop_image.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -775,10 +776,9 @@ class _SpotlightDetails extends StatelessWidget {
             if (spotlight.plot != null) ...[
               const SizedBox(height: MediaBrowsingMetrics.itemGap),
               Flexible(
-                child: Text(
-                  spotlight.plot!,
+                child: AutoScrollText(
+                  text: spotlight.plot!,
                   maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyLarge?.copyWith(color: muted),
                 ),
               ),

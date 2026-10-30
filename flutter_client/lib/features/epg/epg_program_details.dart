@@ -11,6 +11,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/auto_scroll_text.dart';
 import 'package:m3u_tv/shared/cached_media_thumbnail.dart';
 import 'package:m3u_tv/shared/epg_icon_pill.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -371,7 +372,7 @@ class _ProgramInfo extends StatelessWidget {
 
   /// Fill a fixed height with the footer pinned at the bottom, for the TV
   /// panel: the description gets whatever height is left (see
-  /// [_AutoScrollText]). The details sheet sizes to its content and scrolls
+  /// [AutoScrollText]). The details sheet sizes to its content and scrolls
   /// instead.
   final bool expandDescription;
   final bool compact;
@@ -470,7 +471,7 @@ class _ProgramInfo extends StatelessWidget {
                 if (showDescription)
                   LayoutId(
                     id: _InfoSlot.description,
-                    child: _AutoScrollText(
+                    child: AutoScrollText(
                       // Fresh state (back at the top, waiting to rest) for
                       // each programme the cursor lands on.
                       key: ValueKey(
@@ -522,151 +523,6 @@ class _HeaderThenFillLayout extends MultiChildLayoutDelegate {
   @override
   bool shouldRelayout(_HeaderThenFillLayout oldDelegate) =>
       oldDelegate.gap != gap;
-}
-
-/// The preview's description in the height the panel leaves it. Shows whole
-/// lines only, fading out the last one when there is more. Once the cursor
-/// has rested on the programme it slowly scrolls through the rest, pauses at
-/// the end, returns to the top and starts over (the way Kodi shows plot
-/// text), unless the platform asks for reduced motion.
-class _AutoScrollText extends StatefulWidget {
-  const _AutoScrollText({super.key, required this.text, this.style});
-
-  final String text;
-  final TextStyle? style;
-
-  @override
-  State<_AutoScrollText> createState() => _AutoScrollTextState();
-}
-
-class _AutoScrollTextState extends State<_AutoScrollText> {
-  static const _restDelay = Duration(seconds: 3);
-  static const _endPause = Duration(seconds: 3);
-  static const _returnDuration = Duration(milliseconds: 700);
-  static const _millisecondsPerLine = 2500;
-
-  final _controller = ScrollController();
-  Timer? _timer;
-  bool _running = false;
-  double _lineHeight = 1;
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  /// Starts the scroll loop the first time the text is found to overflow.
-  void _startLoop() {
-    if (_running || MediaQuery.disableAnimationsOf(context)) return;
-    _running = true;
-    _timer = Timer(_restDelay, _scrollDown);
-  }
-
-  Future<void> _scrollDown() async {
-    if (!mounted || !_controller.hasClients) return;
-    final position = _controller.position;
-    final distance = position.maxScrollExtent - position.pixels;
-    if (distance <= 0) {
-      // A relayout gave the text room after all; build restarts the loop
-      // if it overflows again.
-      _running = false;
-      return;
-    }
-    await _controller.animateTo(
-      position.maxScrollExtent,
-      duration: Duration(
-        milliseconds: (distance / _lineHeight * _millisecondsPerLine).round(),
-      ),
-      curve: Curves.linear,
-    );
-    if (!mounted) return;
-    _timer = Timer(_endPause, _scrollUp);
-  }
-
-  Future<void> _scrollUp() async {
-    if (!mounted || !_controller.hasClients) return;
-    await _controller.animateTo(
-      0,
-      duration: _returnDuration,
-      curve: Curves.easeInOut,
-    );
-    if (!mounted) return;
-    _timer = Timer(_restDelay, _scrollDown);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Text(widget.text, style: widget.style);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final painter = TextPainter(
-          text: TextSpan(text: widget.text, style: widget.style),
-          textDirection: Directionality.of(context),
-          textScaler: MediaQuery.textScalerOf(context),
-        )..layout(maxWidth: constraints.maxWidth);
-        final textHeight = painter.height;
-        final lineHeight = painter.preferredLineHeight;
-        painter.dispose();
-        _lineHeight = lineHeight;
-
-        final lines = (constraints.maxHeight / lineHeight).floor();
-        if (lines < 1) return const SizedBox.shrink();
-        if (textHeight <= constraints.maxHeight) {
-          return Align(alignment: Alignment.topLeft, child: text);
-        }
-        _startLoop();
-
-        final viewportHeight = lines * lineHeight;
-        final fade = math.min(0.5, lineHeight * 0.9 / viewportHeight);
-        return Align(
-          alignment: Alignment.topLeft,
-          child: SizedBox(
-            height: viewportHeight,
-            child: ListenableBuilder(
-              listenable: _controller,
-              builder: (context, child) {
-                final position = _controller.hasClients
-                    ? _controller.position
-                    : null;
-                final atTop = position == null || position.pixels <= 0.5;
-                final atEnd =
-                    position != null &&
-                    position.hasContentDimensions &&
-                    position.pixels >= position.maxScrollExtent - 0.5;
-                return ShaderMask(
-                  blendMode: BlendMode.dstIn,
-                  shaderCallback: (bounds) => LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      if (atTop) Colors.white else Colors.transparent,
-                      Colors.white,
-                      Colors.white,
-                      if (atEnd) Colors.white else Colors.transparent,
-                    ],
-                    stops: [0, fade, 1 - fade, 1],
-                  ).createShader(bounds),
-                  child: child,
-                );
-              },
-              child: ScrollConfiguration(
-                behavior: ScrollConfiguration.of(
-                  context,
-                ).copyWith(scrollbars: false, overscroll: false),
-                child: SingleChildScrollView(
-                  controller: _controller,
-                  physics: const NeverScrollableScrollPhysics(),
-                  child: text,
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
 
 /// Status pill + time range + duration + time left / starts in.

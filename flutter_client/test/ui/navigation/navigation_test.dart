@@ -24,6 +24,7 @@ import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/epg_service.dart' show EpgService;
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
@@ -2548,6 +2549,15 @@ void main() {
       await _pumpAppFrame(tester);
     }
 
+    /// A resume re-primes the guide, which fails here (no EPG server), so
+    /// the controller schedules its one retry after
+    /// [EpgService.retryBackoff]. Let it fire (it never reschedules) so no
+    /// timer is left pending when the test ends.
+    Future<void> settleEpgRetry(WidgetTester tester) async {
+      await tester.pump(EpgService.retryBackoff);
+      await tester.pump();
+    }
+
     testWidgets(
       'resuming after a real background returns to the configured start page',
       (tester) async {
@@ -2580,6 +2590,7 @@ void main() {
         expect(find.text('Play movie'), findsNothing);
         expect(find.text('Route News'), findsAtLeast(1));
         await tester.pumpWidget(const SizedBox.shrink());
+        await settleEpgRetry(tester);
       },
     );
 
@@ -2604,6 +2615,7 @@ void main() {
 
       expect(find.text('Player route: Route News'), findsNothing);
       await tester.pumpWidget(const SizedBox.shrink());
+      await settleEpgRetry(tester);
     });
 
     testWidgets('a brief background keeps the user where they were', (
@@ -2629,7 +2641,58 @@ void main() {
 
       expect(find.text('Play movie'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
+      await settleEpgRetry(tester);
     });
+
+    for (final (deviceType, refreshes) in const [
+      (DeviceType.desktop, true),
+      (DeviceType.tv, false),
+    ]) {
+      testWidgets(
+        '${deviceType.name} ${refreshes ? 're-checks' : 'leaves'} the guide '
+        'when focus comes back without a pause',
+        (tester) async {
+          var now = DateTime(2026, 1, 1, 12);
+          final xtreamService = _NavigationXtreamService();
+          final appState = _testAppState(
+            xtreamService: xtreamService,
+            epgService: EpgService(clock: () => now),
+          );
+          addTearDown(appState.dispose);
+          await appState.connectXtream(
+            const UserCredentials(
+              server: 'http://example.com',
+              username: 'user',
+              password: 'pass',
+            ),
+          );
+          await tester.pumpWidget(
+            _TestApp(deviceType: deviceType, appState: appState),
+          );
+          await _pumpAppFrame(tester);
+
+          // Past the connect prime's failure backoff, so the guide is due.
+          now = now.add(const Duration(minutes: 2));
+          final before = xtreamService.epgBatchRequests;
+          // A desktop window behind other apps, then clicked again (on TV
+          // the same pair is a system overlay coming and going).
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.inactive,
+          );
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.resumed,
+          );
+          await _pumpAppFrame(tester);
+
+          expect(
+            xtreamService.epgBatchRequests > before,
+            refreshes,
+          );
+          await tester.pumpWidget(const SizedBox.shrink());
+          await settleEpgRetry(tester);
+        },
+      );
+    }
 
     testWidgets('desktop never resets on resume', (tester) async {
       final appState = await connectedAppState();
@@ -2652,6 +2715,7 @@ void main() {
 
       expect(find.text('Play movie'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
+      await settleEpgRetry(tester);
     });
   });
 }
@@ -2791,7 +2855,10 @@ class _TestAppState extends State<_TestApp> {
   }
 }
 
-AppStateController _testAppState({required XtreamService xtreamService}) {
+AppStateController _testAppState({
+  required XtreamService xtreamService,
+  EpgService? epgService,
+}) {
   final memory = <String, Object?>{};
   // CacheService and AppStateController must share one CatalogRepository -
   // each self-defaults its own private in-memory one otherwise (see
@@ -2813,6 +2880,7 @@ AppStateController _testAppState({required XtreamService xtreamService}) {
     resumeService: ResumeService(memory: memory),
     viewerService: ViewerService(memory: memory),
     viewSettingsService: ViewSettingsService(memory: memory),
+    epgService: epgService,
   );
 }
 
@@ -3000,6 +3068,22 @@ class _NavigationXtreamService extends XtreamService {
       m3uEditorVersion: 'test',
       features: features,
     );
+  }
+
+  /// Guide requests made. Each still fails, as the real one does here (no
+  /// EPG server), so no test picks up the guide's debounced save timer.
+  int epgBatchRequests = 0;
+
+  @override
+  Future<List<EpgProgram>> getEpgBatch(
+    List<Channel> channels, {
+    int limit = 8,
+    DateTime? startDate,
+    DateTime? endDate,
+    bool dropPlaceholders = false,
+  }) async {
+    epgBatchRequests += 1;
+    throw Exception('no EPG server in tests');
   }
 
   @override

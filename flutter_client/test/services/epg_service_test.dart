@@ -241,4 +241,87 @@ void main() {
     expect(service.lookup('bbc.one')?.current, same(retainedProgram));
     expect(service.programsForChannel(channel), <EpgProgram>[retainedProgram]);
   });
+
+  test('newer programmes replace overlapping ones on a merge', () {
+    final service = serviceAt(fixedNow);
+    final placeholder = program(
+      'bbc.one',
+      start: DateTime(2026, 8, 11, 12),
+      end: DateTime(2026, 8, 11, 13),
+      title: 'No information',
+    );
+    final unchanged = program(
+      'bbc.one',
+      start: DateTime(2026, 8, 11, 14),
+      end: DateTime(2026, 8, 11, 15),
+      title: 'Afternoon Film',
+    );
+    service.mergePrograms(<EpgProgram>[placeholder, unchanged]);
+
+    // A later dated fetch (merged, not a full-channel replace) brings the
+    // real schedule for the noon slot, at different boundaries.
+    final news = program(
+      'bbc.one',
+      start: DateTime(2026, 8, 11, 11, 45),
+      end: DateTime(2026, 8, 11, 12, 30),
+      title: 'News',
+    );
+    final quiz = program(
+      'bbc.one',
+      start: DateTime(2026, 8, 11, 12, 30),
+      end: DateTime(2026, 8, 11, 13, 15),
+      title: 'Quiz',
+    );
+    service.mergePrograms(
+      <EpgProgram>[news, quiz, news],
+      replaceExisting: false,
+      markFresh: false,
+    );
+
+    expect(service.programsForChannel(channel(name: 'bbc.one')), <EpgProgram>[
+      news,
+      quiz,
+      unchanged,
+    ]);
+    expect(service.lookup('bbc.one')?.current, same(news));
+  });
+
+  test('a merge keeps untouched programmes and start order', () {
+    final service = serviceAt(fixedNow);
+    DateTime at(int hour, [int minute = 0]) =>
+        DateTime(2026, 8, 11, hour, minute);
+    final held = [
+      for (var hour = 8; hour < 16; hour += 1)
+        program('bbc.one', start: at(hour), end: at(hour + 1), title: '$hour'),
+    ];
+    service.mergePrograms(held);
+
+    // Two separate replaced stretches, given out of order; the 10:00 slot
+    // repeats with the later copy winning.
+    final late = program('bbc.one', start: at(13, 30), end: at(14, 30));
+    final early = program('bbc.one', start: at(10), end: at(11), title: 'a');
+    final earlyAgain = program(
+      'bbc.one',
+      start: at(10),
+      end: at(11),
+      title: 'b',
+    );
+    final before = program('bbc.one', start: at(6), end: at(7));
+    service.mergePrograms(
+      <EpgProgram>[late, early, earlyAgain, before],
+      replaceExisting: false,
+      markFresh: false,
+    );
+
+    expect(service.programsForChannel(channel(name: 'bbc.one')), <EpgProgram>[
+      before,
+      held[0],
+      held[1],
+      earlyAgain,
+      held[3],
+      held[4],
+      late,
+      held[7],
+    ]);
+  });
 }

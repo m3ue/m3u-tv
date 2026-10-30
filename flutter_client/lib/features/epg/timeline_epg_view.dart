@@ -3,7 +3,8 @@ import 'dart:math' as math;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollCacheExtent;
+import 'package:flutter/rendering.dart'
+    show BoxParentData, PipelineOwner, RenderShiftedBox, ScrollCacheExtent;
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
@@ -55,6 +56,11 @@ const double _kMinHeightForPreview = 560;
 const double _kMinWidthForPreview = 720;
 
 const Duration _kClockTick = Duration(seconds: 30);
+
+// After midnight a guide showing "today" waits until the user has left it
+// alone this long before following the date over, so it never yanks the
+// cursor out from under someone browsing.
+const Duration _kRolloverIdle = Duration(minutes: 2);
 
 /// TV-guide style EPG: channels down the side, time across the top, the
 /// programme under the cursor previewed above (TV/desktop).
@@ -286,6 +292,13 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   Timer? _clockTimer;
   bool _revalidateScheduled = false;
 
+  // The calendar day the clock tick last saw, whether the guide was showing
+  // it when midnight passed (so it should follow into the new day once
+  // idle), and when the user last moved the cursor.
+  late DateTime _clockDay;
+  bool _rolloverPending = false;
+  DateTime? _lastUserMoveAt;
+
   // Pause-to-play countdown, restarted on every cursor move.
   Timer? _previewTimer;
 
@@ -307,9 +320,8 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
     _now = widget.clock();
     _selectedDate = _dateOnly(_now);
     _initWindow();
-    _clockTimer = Timer.periodic(_kClockTick, (_) {
-      if (mounted) setState(() {});
-    });
+    _clockDay = _selectedDate;
+    _clockTimer = Timer.periodic(_kClockTick, (_) => _onClockTick());
     _previewTimerCursor = _cursor.value;
     _cursor.addListener(_armPreviewTimer);
   }
@@ -427,6 +439,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
   );
 
   void _selectDate(DateTime date, {bool scrollToDayStart = false}) {
+    _rolloverPending = false;
     final today = _dateOnly(widget.clock());
     final earliest = _offsetDate(today, -_maxCatchupDays);
     final latest = _offsetDate(today, widget.futureDays);
@@ -449,6 +462,56 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
         _scrollToStart();
       }
       _revalidateCursor();
+    });
+  }
+
+  /// Past midnight a guide still showing "today" follows it into the new day
+  /// (instead of staying on yesterday with the now line off its end), once
+  /// the user has not moved the cursor for [_kRolloverIdle].
+  void _onClockTick() {
+    if (!mounted) return;
+    final now = widget.clock();
+    final today = _dateOnly(now);
+    if (today != _clockDay) {
+      if (_selectedDate == _clockDay) _rolloverPending = true;
+      _clockDay = today;
+    }
+    final lastMove = _lastUserMoveAt;
+    if (_rolloverPending &&
+        (lastMove == null || now.difference(lastMove) >= _kRolloverIdle)) {
+      _snapToNow();
+      return;
+    }
+    setState(() {});
+  }
+
+  /// Back to today, scrolled to the current time whatever the start-view
+  /// setting (prime time included), with the cursor on what is airing now in
+  /// its row so up/down keep tracking the present.
+  void _snapToNow() {
+    _rolloverPending = false;
+    final now = widget.clock();
+    final today = _dateOnly(now);
+    setState(() {
+      _now = now;
+      if (today != _selectedDate) {
+        _selectedDate = today;
+        _initWindow();
+      }
+    });
+    _anchor = now;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final m = _metrics;
+      if (!mounted || m == null) return;
+      _jumpHorizontal(
+        (_minutesFromStart(now) - _kStartLeadInMinutes) * m.pxPerMinute,
+      );
+      final cursor = _cursor.value;
+      if (cursor.onChannel) return;
+      final target = EpgGuideNavigation.at(_rowPrograms(cursor.row), now);
+      _setCursor(
+        cursor.copyWith(program: target, clearProgram: target == null),
+      );
     });
   }
 
@@ -774,6 +837,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
 
   bool _onDirection(TraversalDirection direction) {
     final before = _cursor.value;
+    _lastUserMoveAt = widget.clock();
     final handled = _moveCursor(direction);
     if (handled && _cursor.value != before) widget.onCursorMove?.call();
     return handled;
@@ -1173,10 +1237,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
               canGoPrevious: _canGoPrevious,
               canGoNext: _canGoNext,
               onPrevious: () => _selectDate(_offsetDate(_selectedDate, -1)),
-              onNow: () {
-                _anchor = null;
-                _selectDate(_dateOnly(widget.clock()));
-              },
+              onNow: _snapToNow,
               onNext: () => _selectDate(_offsetDate(_selectedDate, 1)),
             ),
             Expanded(child: _buildGuide(context, metrics)),
@@ -1800,6 +1861,8 @@ class _GuideRowState extends State<_GuideRow> {
             ),
             program: program,
             width: width - 4,
+            left: left + 2,
+            hCtrl: widget.hCtrl,
             now: widget.now,
             compact: m.compact,
             canReplay: EpgService.canReplay(catchupDays, program, widget.now),
@@ -1875,6 +1938,156 @@ class _GuideRowState extends State<_GuideRow> {
   }
 }
 
+/// A programme cell's text, held at the left edge of the view while the cell
+/// itself starts further left (the show already airing when the guide opens
+/// at "now", or a long one scrolled into), so its title stays readable
+/// instead of being cut off with the part of the cell out of view. Keeps at
+/// least [_minVisibleWidth] for the text so it ellipsizes rather than
+/// vanishing at the cell's right end.
+///
+/// A render object rather than a widget listening to the controller: every
+/// visible cell watches the shared horizontal scroll, and this way a scroll
+/// frame costs each one a clamp, with layout only redone by the few cells
+/// whose inset actually changes (those crossing the left edge).
+class _StickyCellText extends SingleChildRenderObjectWidget {
+  const _StickyCellText({
+    required this.controller,
+    required this.cellLeft,
+    required this.cellWidth,
+    required this.horizontalPadding,
+    required Widget super.child,
+  });
+
+  static const double _minVisibleWidth = 72;
+  static const double _verticalPadding = 4;
+
+  final ScrollController controller;
+  final double cellLeft;
+  final double cellWidth;
+  final double horizontalPadding;
+
+  double get _maxInset => math.max<double>(0, cellWidth - _minVisibleWidth);
+
+  @override
+  _RenderStickyCellText createRenderObject(BuildContext context) =>
+      _RenderStickyCellText(
+        controller: controller,
+        cellLeft: cellLeft,
+        maxInset: _maxInset,
+        horizontalPadding: horizontalPadding,
+      );
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderStickyCellText renderObject,
+  ) {
+    renderObject
+      ..controller = controller
+      ..cellLeft = cellLeft
+      ..maxInset = _maxInset
+      ..horizontalPadding = horizontalPadding;
+  }
+}
+
+class _RenderStickyCellText extends RenderShiftedBox {
+  _RenderStickyCellText({
+    required this._controller,
+    required this._cellLeft,
+    required this._maxInset,
+    required this._horizontalPadding,
+  }) : super(null);
+
+  ScrollController _controller;
+  ScrollController get controller => _controller;
+  set controller(ScrollController value) {
+    if (identical(value, _controller)) return;
+    if (attached) _controller.removeListener(_onScroll);
+    _controller = value;
+    if (attached) _controller.addListener(_onScroll);
+    markNeedsLayout();
+  }
+
+  double _cellLeft;
+  double get cellLeft => _cellLeft;
+  set cellLeft(double value) {
+    if (value == _cellLeft) return;
+    _cellLeft = value;
+    markNeedsLayout();
+  }
+
+  double _maxInset;
+  double get maxInset => _maxInset;
+  set maxInset(double value) {
+    if (value == _maxInset) return;
+    _maxInset = value;
+    markNeedsLayout();
+  }
+
+  double _horizontalPadding;
+  double get horizontalPadding => _horizontalPadding;
+  set horizontalPadding(double value) {
+    if (value == _horizontalPadding) return;
+    _horizontalPadding = value;
+    markNeedsLayout();
+  }
+
+  // The inset the last layout used.
+  double _inset = 0;
+
+  double _currentInset() {
+    final offset = _controller.hasClients
+        ? _controller.offset
+        : _controller.initialScrollOffset;
+    return (offset - _cellLeft).clamp(0.0, _maxInset).roundToDouble();
+  }
+
+  void _onScroll() {
+    if (_currentInset() != _inset) markNeedsLayout();
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _controller.addListener(_onScroll);
+  }
+
+  @override
+  void detach() {
+    _controller.removeListener(_onScroll);
+    super.detach();
+  }
+
+  EdgeInsets get _padding => EdgeInsets.fromLTRB(
+    _horizontalPadding + _inset,
+    _StickyCellText._verticalPadding,
+    _horizontalPadding,
+    _StickyCellText._verticalPadding,
+  );
+
+  @override
+  void performLayout() {
+    _inset = _currentInset();
+    final padding = _padding;
+    final child = this.child;
+    if (child == null) {
+      size = constraints.constrain(Size(padding.horizontal, padding.vertical));
+      return;
+    }
+    child.layout(constraints.deflate(padding), parentUsesSize: true);
+    (child.parentData! as BoxParentData).offset = Offset(
+      padding.left,
+      padding.top,
+    );
+    size = constraints.constrain(
+      Size(
+        padding.horizontal + child.size.width,
+        padding.vertical + child.size.height,
+      ),
+    );
+  }
+}
+
 /// The focused-cell outline: the same gradient ring D-pad focus draws
 /// everywhere else in the app.
 class _CursorRing extends StatelessWidget {
@@ -1907,6 +2120,8 @@ class _ProgramCell extends StatelessWidget {
     super.key,
     required this.program,
     required this.width,
+    required this.left,
+    required this.hCtrl,
     required this.now,
     required this.compact,
     required this.canReplay,
@@ -1919,6 +2134,12 @@ class _ProgramCell extends StatelessWidget {
 
   final EpgProgram program;
   final double width;
+
+  /// The cell's left edge in the row's programme strip, and the guide's
+  /// horizontal controller: together they say how much of the cell is
+  /// scrolled off the left of the view (see [_StickyCellText]).
+  final double left;
+  final ScrollController hCtrl;
   final DateTime now;
   final bool compact;
   final bool canReplay;
@@ -2000,11 +2221,11 @@ class _ProgramCell extends StatelessWidget {
               children: [
                 if (showText)
                   Positioned.fill(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: width < 80 ? 6 : 10,
-                        vertical: 4,
-                      ),
+                    child: _StickyCellText(
+                      controller: hCtrl,
+                      cellLeft: left,
+                      cellWidth: width,
+                      horizontalPadding: width < 80 ? 6 : 10,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,

@@ -2069,6 +2069,86 @@ void main() {
       );
     });
 
+    test('a resume re-primes the guide only once it is stale', () async {
+      var noDateBatches = 0;
+      var now = DateTime.now();
+      final base = _FakeXtreamTransport.success();
+      Future<Object?> transport(XtreamRequest request) async {
+        if (request.action == 'get_epg_batch' &&
+            request.params['date'] == null) {
+          noDateBatches += 1;
+        }
+        return base.call(request);
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+        epgService: EpgService(clock: () => now),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.connectXtream(credentials), isTrue);
+      expect(await _pollUntil(() => noDateBatches >= 1), isTrue);
+      final primed = noDateBatches;
+
+      controller.refreshEpgGuideIfStale();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(noDateBatches, primed, reason: 'a fresh guide is left alone');
+
+      now = now.add(controller.epgService.cacheTtl);
+      controller.refreshEpgGuideIfStale();
+      expect(
+        await _pollUntil(() => noDateBatches > primed),
+        isTrue,
+        reason: 'a stale guide re-primes on resume',
+      );
+    });
+
+    test('a failed resume prime does not count as fresh', () async {
+      var noDateBatches = 0;
+      var failEpg = false;
+      var now = DateTime.now();
+      final base = _FakeXtreamTransport.success();
+      Future<Object?> transport(XtreamRequest request) async {
+        if (request.action == 'get_epg_batch' &&
+            request.params['date'] == null) {
+          noDateBatches += 1;
+          if (failEpg) throw Exception('network unreachable');
+        }
+        return base.call(request);
+      }
+
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: transport,
+        epgService: EpgService(clock: () => now),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.connectXtream(credentials), isTrue);
+      expect(await _pollUntil(() => noDateBatches >= 1), isTrue);
+
+      // Waking from standby before Wi-Fi is back: the resume prime fails.
+      failEpg = true;
+      now = now.add(controller.epgService.cacheTtl);
+      var attempts = noDateBatches;
+      controller.refreshEpgGuideIfStale(retryOnFailure: false);
+      expect(await _pollUntil(() => noDateBatches > attempts), isTrue);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      // Once past the failure backoff, the next resume tries again.
+      failEpg = false;
+      now = now.add(EpgService.retryBackoff);
+      attempts = noDateBatches;
+      controller.refreshEpgGuideIfStale(retryOnFailure: false);
+      expect(
+        await _pollUntil(() => noDateBatches > attempts),
+        isTrue,
+        reason: 'the failed prime must not have marked the guide fresh',
+      );
+    });
+
     test('stops sweeping when the controller is disposed', () async {
       var noDateBatches = 0;
       final base = _FakeXtreamTransport.success().withResponse(

@@ -548,6 +548,13 @@ class AppStateController extends ChangeNotifier {
   // network round-trip. Only programmes still airing or upcoming are kept, and
   // the flat list is capped so the blob stays bounded on huge playlists.
   Timer? _epgGuidePersistDebounce;
+  // When the last guide prime succeeded, so a resume can tell whether the
+  // guide is older than [EpgService.cacheTtl]. Only set on success: a prime
+  // that fails (waking from standby before Wi-Fi is back) must not count as
+  // fresh, or every resume for the next TTL would skip the refresh.
+  DateTime? _epgGuideRefreshedAt;
+  int _epgPrimesInFlight = 0;
+  Timer? _epgPrimeRetry;
   static const _epgGuidePersistDelay = Duration(seconds: 12);
   static const _epgPersistProgramCap = 50000;
   static const _epgPersistPastSlack = Duration(hours: 2);
@@ -3535,18 +3542,68 @@ class AppStateController extends ChangeNotifier {
     unawaited(_primeAndSweepXtreamEpg(_channels));
   }
 
+  /// Re-primes the guide when the app returns from the background and the
+  /// last successful prime is older than [EpgService.cacheTtl]. TV apps are
+  /// usually resumed rather than relaunched, and only the guide rows a screen
+  /// happens to rebuild refresh lazily, so without this a long-resident app
+  /// keeps showing yesterday's guide until a manual clear.
+  ///
+  /// Unlike a manual clear this keeps the session: only channels whose data
+  /// has outlived the TTL are fetched, and in-flight dated (timeline) and
+  /// catch-up fetches carry on. A failed prime is retried once after
+  /// [EpgService.retryBackoff], the usual case being Wi-Fi still reconnecting
+  /// after standby.
+  void refreshEpgGuideIfStale({bool retryOnFailure = true}) {
+    if (_disposed ||
+        _sourceType != AppSourceType.xtream ||
+        _isLoadingContent ||
+        _epgPrimesInFlight > 0) {
+      return;
+    }
+    final refreshedAt = _epgGuideRefreshedAt;
+    if (refreshedAt != null &&
+        epgService.now.difference(refreshedAt) < epgService.cacheTtl) {
+      return;
+    }
+    _epgPrimeRetry?.cancel();
+    unawaited(
+      _primeAndSweepXtreamEpg(_channels, retryOnFailure: retryOnFailure),
+    );
+  }
+
   /// Primes EPG for the first [_epgPrimeCount] channels, then - once that
   /// response and the first frame have settled - sweeps the remaining channels
   /// in the background so the guide is fully populated without the user having
   /// to scroll each row into view.
-  Future<void> _primeAndSweepXtreamEpg(List<Channel> channels) async {
+  Future<void> _primeAndSweepXtreamEpg(
+    List<Channel> channels, {
+    bool retryOnFailure = false,
+  }) async {
     final generation = _epgRequestGeneration;
-    await _loadXtreamEpg(
-      channels.take(_epgPrimeCount).toList(growable: false),
-    );
-    if (_disposed ||
-        generation != _epgRequestGeneration ||
-        _sourceType != AppSourceType.xtream ||
+    final primeChannels = channels.take(_epgPrimeCount).toList(growable: false);
+    _epgPrimesInFlight += 1;
+    try {
+      await _loadXtreamEpg(primeChannels);
+    } finally {
+      _epgPrimesInFlight -= 1;
+    }
+    if (_disposed || generation != _epgRequestGeneration) return;
+    // Judged by the result, not the request: a prime that skipped channels
+    // still in their failure backoff (or mid-fetch elsewhere) didn't refresh
+    // them either.
+    final primed = primeChannels.every(epgService.hasFreshDataForChannel);
+    if (primed) {
+      _epgGuideRefreshedAt = epgService.now;
+    } else if (retryOnFailure) {
+      // The retry sweeps too; sweeping now would only fail chunk by chunk.
+      _epgPrimeRetry?.cancel();
+      _epgPrimeRetry = Timer(
+        EpgService.retryBackoff,
+        () => refreshEpgGuideIfStale(retryOnFailure: false),
+      );
+      return;
+    }
+    if (_sourceType != AppSourceType.xtream ||
         channels.length <= _epgPrimeCount) {
       return;
     }
@@ -3737,6 +3794,7 @@ class AppStateController extends ChangeNotifier {
   }
 
   void _resetEpgSession({bool clearGuide = true}) {
+    _epgPrimeRetry?.cancel();
     _epgRequestGeneration += 1;
     _epgSweepGeneration += 1;
     _epgFetchDebounce?.cancel();
@@ -3818,6 +3876,7 @@ class AppStateController extends ChangeNotifier {
     _epgSweepGeneration += 1;
     _epgFetchDebounce?.cancel();
     _epgGuidePersistDebounce?.cancel();
+    _epgPrimeRetry?.cancel();
     _dvrContentRefreshDebounce?.cancel();
     _pushTokenSubscription?.cancel().ignore();
     unawaited(_tvNotificationController.close());

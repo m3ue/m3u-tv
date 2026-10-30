@@ -264,6 +264,116 @@ void main() {
       expect(find.text('BBC One'), findsNothing);
     });
 
+    testWidgets('Now snaps to the current time from a prime-time start', (
+      tester,
+    ) async {
+      final now = DateTime(2026, 7, 31, 12);
+      await pumpGuide(
+        tester,
+        clock: () => now,
+        epgStartView: EpgStartView.primeTime,
+        channels: const [bbcOne],
+        epgService: EpgService(clock: () => now)
+          ..loadPrograms([
+            EpgProgram(
+              channelId: 'bbc.one',
+              title: 'Midday News',
+              description: '',
+              start: DateTime(2026, 7, 31, 11, 30),
+              end: DateTime(2026, 7, 31, 13),
+            ),
+            EpgProgram(
+              channelId: 'bbc.one',
+              title: 'Prime Show',
+              description: '',
+              start: DateTime(2026, 7, 31, 20),
+              end: DateTime(2026, 7, 31, 21),
+            ),
+          ]),
+      );
+      expect(find.text('Prime Show'), findsOneWidget);
+      expect(find.text('Midday News'), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('timeline-now')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Midday News'), findsOneWidget);
+      expect(find.text('Prime Show'), findsNothing);
+    });
+
+    testWidgets('keeps an airing programme title in view', (tester) async {
+      final now = DateTime(2026, 7, 31, 12);
+      final movie = EpgProgram(
+        channelId: 'bbc.one',
+        title: 'Long Movie',
+        description: '',
+        start: DateTime(2026, 7, 31, 10),
+        end: DateTime(2026, 7, 31, 14),
+      );
+      await pumpGuide(
+        tester,
+        clock: () => now,
+        channels: const [bbcOne],
+        epgService: EpgService(clock: () => now)..loadPrograms([movie]),
+      );
+
+      // The guide opens just before noon, two hours into the movie: its cell
+      // starts far off the left edge, but the title is held in view.
+      final cellLeft = tester.getTopLeft(programCell(movie)).dx;
+      final titleLeft = tester.getTopLeft(find.text('Long Movie')).dx;
+      expect(cellLeft, lessThan(0));
+      expect(titleLeft, greaterThan(0));
+      expect(titleLeft, lessThan(800));
+    });
+
+    testWidgets('follows today into the next day at midnight', (
+      tester,
+    ) async {
+      var now = DateTime(2026, 7, 31, 23, 59, 50);
+      await pumpGuide(
+        tester,
+        clock: () => now,
+        channels: const [bbcOne],
+        epgService: EpgService(clock: () => now),
+      );
+      expect(find.text('Jul 31, 2026'), findsOneWidget);
+
+      now = DateTime(2026, 8, 1, 0, 0, 20);
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Aug 1, 2026'), findsOneWidget);
+      expect(find.text('Today'), findsOneWidget);
+    });
+
+    testWidgets('waits for the user to go idle before following midnight', (
+      tester,
+    ) async {
+      var now = DateTime(2026, 7, 31, 23, 59, 50);
+      await pumpGuide(
+        tester,
+        clock: () => now,
+        channels: const [bbcOne],
+        epgService: EpgService(clock: () => now),
+      );
+      final grid = find.byWidgetPredicate(
+        (widget) => widget is DpadFocusable && widget.debugLabel == 'epg-guide',
+      );
+      tester.widget<DpadFocusable>(grid).focusNode!.requestFocus();
+      await tester.pumpAndSettle();
+
+      now = DateTime(2026, 8, 1, 0, 0, 10);
+      await press(tester, LogicalKeyboardKey.arrowDown);
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pumpAndSettle();
+      expect(find.text('Jul 31, 2026'), findsOneWidget);
+
+      now = now.add(const Duration(minutes: 2));
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pumpAndSettle();
+      expect(find.text('Aug 1, 2026'), findsOneWidget);
+    });
+
     testWidgets('navigates days, displays the date, and returns to now', (
       tester,
     ) async {

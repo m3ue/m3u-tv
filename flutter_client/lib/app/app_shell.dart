@@ -183,6 +183,9 @@ class AppShellState extends ConsumerState<AppShell>
   // resetting the user.
   static const Duration _tvForegroundResetGrace = Duration(seconds: 5);
   DateTime? _backgroundedAt;
+  // Whether the app left the foreground since the last `resumed`, so the
+  // return re-checks the guide (see didChangeAppLifecycleState).
+  bool _awayFromForeground = false;
   int _lastNavMs = 0;
   int _lastNavIndex = -1;
   StreamSubscription<TvNotificationItem>? _tvNotificationSub;
@@ -566,6 +569,18 @@ class AppShellState extends ConsumerState<AppShell>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     debugPrint('[Lifecycle] ${state.name}');
+    // What counts as leaving: TV/mobile need a real `paused`, since there
+    // `inactive` is a system overlay (the assistant panel, a permission
+    // dialog) and `resumed` can arrive at launch, where the content refresh
+    // already primes the guide. Desktop never pauses: a minimized window is
+    // `hidden`, and one sitting behind other apps is `inactive`, which still
+    // means the user went elsewhere and may come back to a stale guide.
+    if (state == AppLifecycleState.paused ||
+        (widget.deviceType == DeviceType.desktop &&
+            (state == AppLifecycleState.hidden ||
+                state == AppLifecycleState.inactive))) {
+      _awayFromForeground = true;
+    }
     if (state == AppLifecycleState.paused) {
       _backgroundedAt = clock.now();
       unawaited(_appState.suspendNotifications());
@@ -573,6 +588,12 @@ class AppShellState extends ConsumerState<AppShell>
     }
     if (state != AppLifecycleState.resumed) return;
     unawaited(_appState.resumeNotifications());
+    if (_awayFromForeground) {
+      _awayFromForeground = false;
+      // A no-op while the guide is younger than the EPG refresh interval, so
+      // frequent focus changes on desktop cost nothing.
+      _appState.refreshEpgGuideIfStale();
+    }
     unawaited(
       _playerArgs == null || _playerHasFailed
           ? _systemUiPolicy.applyBrowsing()

@@ -199,27 +199,84 @@ class EpgService extends ChangeNotifier {
     List<EpgProgram> programs, {
     required bool markFresh,
   }) {
+    // Keyed by slot so a repeat within the batch replaces the earlier copy
+    // (the server's date + next-day reads can return a programme twice).
+    final incomingByChannel = <String, Map<(DateTime, DateTime), EpgProgram>>{};
     for (final program in programs) {
+      incomingByChannel.putIfAbsent(program.channelId, () => {})[(
+            program.start,
+            program.end,
+          )] =
+          program;
+    }
+    for (final MapEntry(key: channelId, value: incomingBySlot)
+        in incomingByChannel.entries) {
+      final incoming = incomingBySlot.values.toList()
+        ..sort((a, b) => a.start.compareTo(b.start));
       final channelPrograms = _programsByChannel.putIfAbsent(
-        program.channelId,
+        channelId,
         () => <EpgProgram>[],
       );
-      final existingIndex = channelPrograms.indexWhere(
-        (existing) =>
-            existing.start == program.start && existing.end == program.end,
-      );
-      if (existingIndex == -1) {
-        channelPrograms.add(program);
-      } else {
-        channelPrograms[existingIndex] = program;
+      if (channelPrograms.isEmpty) {
+        channelPrograms.addAll(incoming);
+        continue;
       }
-    }
-    for (final entry in _programsByChannel.entries) {
-      entry.value.sort((a, b) => a.start.compareTo(b.start));
+      // Only touched channels are re-sorted, and in one linear pass: this
+      // runs on the UI isolate for every sweep batch, so re-sorting the whole
+      // guide each time (or comparing every held programme with every
+      // incoming one) shows up as jank on low-end TV boxes.
+      // Updated in place: callers may hold the list programsForChannel
+      // returned.
+      final merged = _mergeNewerWins(channelPrograms, incoming);
+      channelPrograms
+        ..clear()
+        ..addAll(merged);
     }
     if (markFresh) {
       markFetched(programs.map((program) => program.channelId));
     }
+  }
+
+  /// Merges two start-sorted lists, dropping every [existing] programme that
+  /// overlaps an [incoming] one so newer data wins: a rescheduled slot or a
+  /// "no data" placeholder from an earlier fetch can't linger beside its
+  /// replacement. Linear in the size of both lists.
+  static List<EpgProgram> _mergeNewerWins(
+    List<EpgProgram> existing,
+    List<EpgProgram> incoming,
+  ) {
+    // The incoming programmes as disjoint, start-sorted spans.
+    final spans = <(DateTime, DateTime)>[];
+    for (final program in incoming) {
+      final last = spans.isEmpty ? null : spans.last;
+      if (last != null && !program.start.isAfter(last.$2)) {
+        if (program.end.isAfter(last.$2)) {
+          spans[spans.length - 1] = (last.$1, program.end);
+        }
+      } else {
+        spans.add((program.start, program.end));
+      }
+    }
+    final merged = <EpgProgram>[];
+    var span = 0;
+    var next = 0;
+    for (final program in existing) {
+      // Both lists are start-sorted, so spans ending before this programme
+      // starts can't overlap any later one either.
+      while (span < spans.length && !spans[span].$2.isAfter(program.start)) {
+        span += 1;
+      }
+      if (span < spans.length && spans[span].$1.isBefore(program.end)) {
+        continue;
+      }
+      while (next < incoming.length &&
+          incoming[next].start.isBefore(program.start)) {
+        merged.add(incoming[next++]);
+      }
+      merged.add(program);
+    }
+    merged.addAll(incoming.skip(next));
+    return merged;
   }
 
   void loadBatch(Map<String, List<EpgProgram>> batch) {
