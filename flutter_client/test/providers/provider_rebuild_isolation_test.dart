@@ -13,7 +13,6 @@ import 'package:m3u_tv/services/app_state_controller.dart';
 /// call would rebuild every watcher on every unrelated notification.
 void main() {
   final providers = <String, ProviderListenable<Object?>>{
-    'liveChannelsProvider': liveChannelsProvider,
     'liveCategoriesProvider': liveCategoriesProvider,
     'vodCategoriesProvider': vodCategoriesProvider,
     'seriesCategoriesProvider': seriesCategoriesProvider,
@@ -51,7 +50,7 @@ void main() {
       // Stands in for any of the controller's notifications that leave these
       // values untouched (an EPG sweep chunk, a DVR poll with no change).
       controller.notifyListeners();
-      container.read(liveChannelsProvider);
+      container.read(liveCategoriesProvider);
     }
 
     expect(notified, isEmpty);

@@ -981,8 +981,8 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   // Stable tearoffs passed to PlayerScreen so PlaybackControls can offer
-  // channel-up/channel-down without PlayerScreen needing to know about
-  // liveChannelsProvider itself.
+  // channel-up/channel-down without PlayerScreen needing to know about the
+  // channel catalog itself.
   void _openNextChannel() => unawaited(_switchChannel(1));
   void _openPreviousChannel() => unawaited(_switchChannel(-1));
 
@@ -993,15 +993,12 @@ class AppShellState extends ConsumerState<AppShell>
     _playerChannelContext = context;
   }
 
-  /// Every live channel, for when no narrower context applies. The windowed
-  /// one is kept across presses so its row hint carries over.
-  ChannelContext get _allChannelsContext => ref.read(windowedLiveTvProvider)
-      ? _allCatalogChannels ??= CatalogChannelContext(
-          repository: ref.read(catalogRepositoryProvider),
-          length: 0,
-        )
-      : ListChannelContext(ref.read(liveChannelsProvider));
-  CatalogChannelContext? _allCatalogChannels;
+  /// Every live channel, for when no narrower context applies. Kept across
+  /// presses so its row hint carries over.
+  late final ChannelContext _allChannelsContext = CatalogChannelContext(
+    repository: ref.read(catalogRepositoryProvider),
+    length: 0,
+  );
 
   Future<void> _switchChannel(int direction) async {
     final args = _playerArgs;

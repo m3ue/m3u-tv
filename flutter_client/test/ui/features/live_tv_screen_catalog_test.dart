@@ -17,9 +17,9 @@ import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
-/// Live TV paging its channels from the SQLite catalog
-/// (`windowedLiveTvProvider`). Drift's real I/O needs a real async turn, so
-/// every step that queries the catalog settles through [settle].
+/// Live TV paging its channels from the SQLite catalog: category, Favorites,
+/// search and sort all run as queries. Each step settles through [settle],
+/// which gives the catalog's I/O a real async turn.
 
 /// Provider order differs from every sort under test.
 const _channels = [
@@ -263,13 +263,11 @@ class _TestApp extends StatelessWidget {
     final viewSettings = viewSettingsService ?? ViewSettingsService();
     return ProviderScope(
       overrides: [
-        windowedLiveTvProvider.overrideWith((_) => true),
         catalogRepositoryProvider.overrideWith((_) => repository),
         viewSettingsServiceProvider.overrideWith((_) => viewSettings),
         isBootstrappingProvider.overrideWith((_) => false),
         isConfiguredProvider.overrideWith((_) => true),
         isLoadingContentProvider.overrideWith((_) => false),
-        liveChannelsProvider.overrideWith((_) => const <Channel>[]),
         liveCategoriesProvider.overrideWith((_) => _categories),
         epgServiceProvider.overrideWith((_) => EpgService()),
         dvrRecordingsProvider.overrideWith((_) => const <DvrRecording>[]),

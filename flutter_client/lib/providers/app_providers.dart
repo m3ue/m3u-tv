@@ -15,7 +15,6 @@ import 'package:m3u_tv/services/tv_notification_service.dart'
 import 'package:m3u_tv/services/tv_notification_store.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart' show RequestsCapability;
-import 'package:m3u_tv/shared/feature_flags.dart';
 
 // ---------------------------------------------------------------------------
 // Proxy: wraps AppStateController and forwards ChangeNotifier notifications.
@@ -80,14 +79,6 @@ final epgServiceProvider = ChangeNotifierProvider<EpgService>((ref) {
 // so they subscribe to the proxy's notifications and rebuild whenever
 // AppStateController.notifyListeners() fires.
 // ---------------------------------------------------------------------------
-
-final liveChannelsProvider = Provider<List<Channel>>((ref) {
-  return ref.watch(appStateControllerProvider).appState.channels;
-});
-
-/// Whether the Live TV surfaces page channels from [catalogRepositoryProvider]
-/// rather than reading [liveChannelsProvider] (see `kWindowedLiveTv`).
-final windowedLiveTvProvider = Provider<bool>((ref) => kWindowedLiveTv);
 
 final liveCategoriesProvider = Provider<List<Category>>((ref) {
   return ref.watch(appStateControllerProvider).appState.liveCategories;

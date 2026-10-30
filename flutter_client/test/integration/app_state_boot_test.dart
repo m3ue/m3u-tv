@@ -116,19 +116,21 @@ void main() {
         expect(epgRequests, 1);
         expect(epgService.lookup('bbc.one')?.current.title, 'Loaded guide');
         controller
-          ..ensureEpgForChannels(controller.channels)
-          ..ensureEpgForChannels(controller.channels);
+          ..ensureEpgForChannels(await _liveChannels(controller))
+          ..ensureEpgForChannels(await _liveChannels(controller));
         await Future<void>.delayed(const Duration(milliseconds: 300));
         expect(epgRequests, 1);
 
         now = now.add(EpgService.retryBackoff);
-        controller.ensureEpgForChannels(controller.channels);
+        controller.ensureEpgForChannels(await _liveChannels(controller));
         await Future<void>.delayed(const Duration(milliseconds: 300));
 
         expect(epgRequests, 2);
         expect(epgService.lookup('bbc.one')?.current.title, 'Loaded guide');
         expect(
-          epgService.hasFreshDataForChannel(controller.channels.single),
+          epgService.hasFreshDataForChannel(
+            (await _liveChannels(controller)).single,
+          ),
           isFalse,
         );
       },
@@ -219,10 +221,12 @@ void main() {
         expect(epgService.lookup('bbc.one')?.current.title, 'Fresh BBC guide');
         expect(epgService.lookup('cnn'), isNull);
         expect(
-          controller.channels.every(epgService.hasFreshDataForChannel),
+          (await _liveChannels(
+            controller,
+          )).every(epgService.hasFreshDataForChannel),
           isTrue,
         );
-        controller.ensureEpgForChannels(controller.channels);
+        controller.ensureEpgForChannels(await _liveChannels(controller));
         await Future<void>.delayed(const Duration(milliseconds: 300));
         expect(epgRequests, 1);
       },
@@ -259,8 +263,8 @@ void main() {
       expect(epgRequests, 1);
 
       controller
-        ..ensureEpgForChannels(controller.channels)
-        ..ensureEpgForChannels(controller.channels);
+        ..ensureEpgForChannels(await _liveChannels(controller))
+        ..ensureEpgForChannels(await _liveChannels(controller));
       await Future<void>.delayed(const Duration(milliseconds: 300));
 
       expect(epgRequests, 1);
@@ -385,14 +389,14 @@ void main() {
 
         expect(controller.sourceType, AppSourceType.xtream);
         expect(controller.authNotifier.credentials, serverACredentials);
-        expect(controller.channels.single.name, 'BBC One');
+        expect((await _liveChannels(controller)).single.name, 'BBC One');
         expect(
           controller.epgService.lookup('bbc.one')?.current.title,
           'News at Noon',
         );
         expect(
           controller.epgService.hasFreshDataForChannel(
-            controller.channels.single,
+            (await _liveChannels(controller)).single,
           ),
           isTrue,
         );
@@ -453,7 +457,7 @@ void main() {
         );
 
         now = now.add(controller.epgService.cacheTtl);
-        controller.ensureEpgForChannels(controller.channels);
+        controller.ensureEpgForChannels(await _liveChannels(controller));
         await Future<void>.delayed(const Duration(milliseconds: 300));
 
         final persistedCredentials =
@@ -470,7 +474,7 @@ void main() {
           'password': serverACredentials.password,
         });
         expect(controller.sourceType, AppSourceType.xtream);
-        expect(controller.channels.single.name, 'BBC One');
+        expect((await _liveChannels(controller)).single.name, 'BBC One');
         expect(
           controller.epgService.lookup('bbc.one')?.current.title,
           'Server A guide',
@@ -530,13 +534,13 @@ void main() {
         expect(serverBEpgRequests, 1);
         expect(controller.epgService.lookup('bbc.one'), isNull);
         controller
-          ..ensureEpgForChannels(controller.channels)
-          ..ensureEpgForChannels(controller.channels);
+          ..ensureEpgForChannels(await _liveChannels(controller))
+          ..ensureEpgForChannels(await _liveChannels(controller));
         await Future<void>.delayed(const Duration(milliseconds: 300));
         expect(serverBEpgRequests, 1);
 
         now = now.add(EpgService.retryBackoff);
-        controller.ensureEpgForChannels(controller.channels);
+        controller.ensureEpgForChannels(await _liveChannels(controller));
         await Future<void>.delayed(const Duration(milliseconds: 300));
 
         expect(serverBEpgRequests, 2);
@@ -644,7 +648,7 @@ void main() {
       expect(epgRequests, 1);
 
       await controller.clearAndRefresh();
-      expect(controller.channels.single.epgChannelId, 'bbc.one');
+      expect((await _liveChannels(controller)).single.epgChannelId, 'bbc.one');
 
       oldEpg.complete(_epgBatch('Old guide', now));
       await Future<void>.delayed(Duration.zero);
@@ -845,7 +849,7 @@ void main() {
         expect(controller.sourceType, AppSourceType.xtream);
         expect(controller.isBootstrapping, isFalse);
         expect(controller.liveCategories.single.name, 'Cached Live');
-        expect(controller.channels.single.name, 'Cached BBC');
+        expect((await _liveChannels(controller)).single.name, 'Cached BBC');
         expect((await _vodItems(controller)).single.name, 'Cached Movie');
         expect((await _seriesList(controller)).single.name, 'Cached Show');
         expect(controller.activeViewer?.ulid, 'viewer-admin');
@@ -861,7 +865,7 @@ void main() {
         }
 
         expect(controller.liveCategories.single.name, 'News');
-        expect(controller.channels.single.name, 'BBC One');
+        expect((await _liveChannels(controller)).single.name, 'BBC One');
       },
     );
 
@@ -920,7 +924,7 @@ void main() {
         final boot = controller.boot();
         await Future<void>.delayed(Duration.zero);
         await Future<void>.delayed(Duration.zero);
-        expect(controller.channels.single.name, 'Cached BBC');
+        expect((await _liveChannels(controller)).single.name, 'Cached BBC');
         expect(controller.progressList, isEmpty);
 
         recentlyWatchedGate.complete(<Map<String, Object?>>[
@@ -938,7 +942,7 @@ void main() {
 
         expect(controller.progressList.single.streamId, 902);
         expect(controller.progressList.single.title, 'Remote Cached Movie');
-        expect(controller.channels.single.name, 'Cached BBC');
+        expect((await _liveChannels(controller)).single.name, 'Cached BBC');
 
         await boot;
         catalogGate.complete(
@@ -1089,13 +1093,22 @@ void main() {
         expect(controller.sourceType, AppSourceType.xtream);
         expect(controller.isBootstrapping, isFalse);
         expect(controller.liveCategories.single.name, 'News');
-        expect(controller.channels.single.name, 'BBC One');
+        expect((await _liveChannels(controller)).single.name, 'BBC One');
         expect((await _vodItems(controller)).single.name, 'Big Buck Bunny');
         expect((await _seriesList(controller)).single.name, 'Fixture Show');
         expect(await controller.favoritesService.isFavorite(101), isTrue);
 
         await _tapSidebarDestination(tester, 'Live TV');
         await _pumpAppState(tester);
+        // Live TV restores its remembered category and layout (real file
+        // reads here) before it asks the catalog for its first page.
+        for (var i = 0; i < 10; i++) {
+          if (find.byType(CircularProgressIndicator).evaluate().isEmpty) break;
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 50)),
+          );
+          await _pumpAppState(tester);
+        }
         expect(find.text('All Channels'), findsOneWidget);
         expect(find.text('BBC One'), findsWidgets);
 
@@ -1141,18 +1154,18 @@ void main() {
           wait: () => tester.pump(const Duration(milliseconds: 10)),
         );
 
-        expect(restarted.channels.single.name, 'BBC One');
-        expect(restarted.channels.single.epgChannelId, 'bbc.one');
+        expect((await _liveChannels(restarted)).single.name, 'BBC One');
+        expect((await _liveChannels(restarted)).single.epgChannelId, 'bbc.one');
         expect(
           restarted.epgService
-              .lookupForChannel(restarted.channels.single)
+              .lookupForChannel((await _liveChannels(restarted)).single)
               ?.current
               .title,
           'News at Noon',
         );
         expect(
           restarted.epgService
-              .lookupForChannel(restarted.channels.single)
+              .lookupForChannel((await _liveChannels(restarted)).single)
               ?.next
               ?.title,
           'Afternoon News',
@@ -1181,7 +1194,6 @@ void main() {
         final store = PersistentJsonStore(file: stateFile);
 
         final first = AppStateController(
-          windowedLiveTv: false,
           persistentStore: store,
           xtreamService: XtreamService(
             transport: _FakeXtreamTransport.success().call,
@@ -1213,7 +1225,6 @@ void main() {
         expect(cachedChannels?.data.single.name, 'BBC One');
 
         final restarted = AppStateController(
-          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           xtreamService: XtreamService(
             transport: _FakeXtreamTransport.success().withResponse(
@@ -1233,10 +1244,10 @@ void main() {
         await _waitForXtreamRefresh(restarted);
 
         expect(restarted.sourceType, AppSourceType.xtream);
-        expect(restarted.channels.single.name, 'BBC One');
+        expect((await _liveChannels(restarted)).single.name, 'BBC One');
         expect(
           restarted.epgService
-              .lookupForChannel(restarted.channels.single)
+              .lookupForChannel((await _liveChannels(restarted)).single)
               ?.current
               .title,
           'News at Noon',
@@ -1266,7 +1277,6 @@ void main() {
         // Pre-split install: one store, so the whole catalog lands in
         // app_state.json alongside credentials and resume progress.
         final legacy = AppStateController(
-          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           xtreamService: XtreamService(
             transport: _FakeXtreamTransport.success().call,
@@ -1294,7 +1304,6 @@ void main() {
         // Next launch has the split wired up: boot() moves the cache keys
         // into cache.json and the hydrate still succeeds off the new file.
         final migrated = AppStateController(
-          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           cacheStore: PersistentJsonStore(file: cacheFile),
           xtreamService: XtreamService(
@@ -1305,7 +1314,7 @@ void main() {
         await _waitForXtreamRefresh(migrated);
 
         expect(migrated.sourceType, AppSourceType.xtream);
-        expect(migrated.channels.single.name, 'BBC One');
+        expect((await _liveChannels(migrated)).single.name, 'BBC One');
 
         final stateAfter = await PersistentJsonStore(
           file: stateFile,
@@ -1336,7 +1345,6 @@ void main() {
         final cacheFile = io.File('${directory.path}/cache.json');
 
         final legacy = AppStateController(
-          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           xtreamService: XtreamService(
             transport: _FakeXtreamTransport.success().call,
@@ -1372,7 +1380,6 @@ void main() {
         );
 
         final migrated = AppStateController(
-          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           cacheStore: PersistentJsonStore(file: cacheFile),
           xtreamService: XtreamService(
@@ -1383,7 +1390,7 @@ void main() {
         await _waitForXtreamRefresh(migrated);
 
         expect(migrated.sourceType, AppSourceType.xtream);
-        expect(migrated.channels.single.name, 'BBC One');
+        expect((await _liveChannels(migrated)).single.name, 'BBC One');
         expect(
           (await PersistentJsonStore(file: stateFile).snapshot()).keys.any(
             (key) => key.startsWith('m3ue_cache_'),
@@ -1428,13 +1435,13 @@ void main() {
       );
 
       controller.ensureEpgForChannels(
-        controller.channels,
+        await _liveChannels(controller),
         startDate: DateTime.utc(2026),
         endDate: DateTime.utc(2026),
       );
       await Future<void>.delayed(const Duration(milliseconds: 300));
       controller.ensureEpgForChannels(
-        controller.channels,
+        await _liveChannels(controller),
         startDate: DateTime.utc(2026, 1, 2),
         endDate: DateTime.utc(2026, 1, 2),
       );
@@ -1443,12 +1450,14 @@ void main() {
       newRange.complete(_epgResponse('Newer day', DateTime.utc(2026, 1, 2)));
       await Future<void>.delayed(Duration.zero);
       expect(
-        controller.epgService.programsForChannel(controller.channels.single),
+        controller.epgService.programsForChannel(
+          (await _liveChannels(controller)).single,
+        ),
         hasLength(1),
       );
       expect(
         controller.epgService
-            .programsForChannel(controller.channels.single)
+            .programsForChannel((await _liveChannels(controller)).single)
             .single
             .title,
         'Newer day',
@@ -1458,7 +1467,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(
         controller.epgService
-            .programsForChannel(controller.channels.single)
+            .programsForChannel((await _liveChannels(controller)).single)
             .single
             .title,
         'Newer day',
@@ -1501,25 +1510,25 @@ void main() {
         );
         expect(
           controller.epgService
-              .lookupForChannel(controller.channels.single)
+              .lookupForChannel((await _liveChannels(controller)).single)
               ?.current
               .title,
           'Current guide',
         );
 
         controller.ensureEpgForChannels(
-          controller.channels,
+          await _liveChannels(controller),
           startDate: now.subtract(const Duration(days: 1)),
           endDate: now.subtract(const Duration(days: 1)),
         );
         await Future<void>.delayed(const Duration(milliseconds: 300));
-        controller.ensureEpgForChannels(controller.channels);
+        controller.ensureEpgForChannels(await _liveChannels(controller));
         await Future<void>.delayed(const Duration(milliseconds: 300));
 
         expect(currentGuideRequests, 1);
         expect(
           controller.epgService
-              .lookupForChannel(controller.channels.single)
+              .lookupForChannel((await _liveChannels(controller)).single)
               ?.current
               .title,
           'Current guide',
@@ -1561,25 +1570,25 @@ void main() {
 
       final date = DateTime.utc(2026, 7, 30);
       controller.ensureEpgForChannels(
-        controller.channels,
+        await _liveChannels(controller),
         startDate: date,
         endDate: date,
       );
       await Future<void>.delayed(const Duration(milliseconds: 300));
       controller.ensureEpgForChannels(
-        controller.channels,
+        await _liveChannels(controller),
         startDate: date,
         endDate: date,
       );
       await Future<void>.delayed(const Duration(milliseconds: 300));
 
       expect(rangedRequests, 1);
-      controller.ensureEpgForChannels(controller.channels);
+      controller.ensureEpgForChannels(await _liveChannels(controller));
       await Future<void>.delayed(const Duration(milliseconds: 300));
       expect(currentGuideRequests, 2);
       expect(
         controller.epgService.hasFreshDataForChannel(
-          controller.channels.single,
+          (await _liveChannels(controller)).single,
         ),
         isTrue,
       );
@@ -1618,9 +1627,9 @@ void main() {
           isTrue,
         );
 
+        final channel = (await _liveChannels(controller)).single;
         final firstRangePublished = Completer<void>();
         void onEpgChanged() {
-          final channel = controller.channels.single;
           if (!firstRangePublished.isCompleted &&
               epgService
                   .programsForChannel(channel)
@@ -1633,7 +1642,7 @@ void main() {
         addTearDown(() => epgService.removeListener(onEpgChanged));
         final date = DateTime.utc(2026, 7, 30);
         controller.ensureEpgForChannels(
-          controller.channels,
+          await _liveChannels(controller),
           startDate: date,
           endDate: date,
         );
@@ -1643,7 +1652,7 @@ void main() {
         epgService.markFetchFailed(<String>['bbc.one:2026-07-30:2026-07-30']);
         now = now.subtract(const Duration(minutes: 1));
         controller.ensureEpgForChannels(
-          controller.channels,
+          await _liveChannels(controller),
           startDate: date,
           endDate: date,
         );
@@ -1684,9 +1693,9 @@ void main() {
       );
       await controller.setEpgRefreshInterval(const Duration(minutes: 1));
 
+      final channel = (await _liveChannels(controller)).single;
       final firstRangePublished = Completer<void>();
       void onEpgChanged() {
-        final channel = controller.channels.single;
         if (!firstRangePublished.isCompleted &&
             controller.epgService
                 .programsForChannel(channel)
@@ -1701,7 +1710,7 @@ void main() {
       );
       final date = DateTime.utc(2026, 7, 30);
       controller.ensureEpgForChannels(
-        controller.channels,
+        await _liveChannels(controller),
         startDate: date,
         endDate: date,
       );
@@ -1715,7 +1724,7 @@ void main() {
       );
 
       controller.ensureEpgForChannels(
-        controller.channels,
+        await _liveChannels(controller),
         startDate: date,
         endDate: date,
       );
@@ -1777,7 +1786,7 @@ void main() {
           DateTime.utc(2026, 7, 31),
         ]) {
           controller.ensureEpgForChannels(
-            controller.channels,
+            await _liveChannels(controller),
             startDate: date,
             endDate: date,
           );
@@ -1785,7 +1794,7 @@ void main() {
         }
 
         final programs = controller.epgService.programsForChannel(
-          controller.channels.single,
+          (await _liveChannels(controller)).single,
         );
         expect(programs, hasLength(3));
         expect(
@@ -1830,14 +1839,14 @@ void main() {
 
       final date = DateTime.utc(2026, 7, 30);
       controller.ensureEpgForChannels(
-        controller.channels,
+        await _liveChannels(controller),
         startDate: date,
         endDate: date,
       );
       await Future<void>.delayed(const Duration(milliseconds: 300));
       expect(
         controller.epgService
-            .programsForChannel(controller.channels.single)
+            .programsForChannel((await _liveChannels(controller)).single)
             .single
             .title,
         'provider-a guide',
@@ -1854,12 +1863,14 @@ void main() {
         isTrue,
       );
       expect(
-        controller.epgService.programsForChannel(controller.channels.single),
+        controller.epgService.programsForChannel(
+          (await _liveChannels(controller)).single,
+        ),
         isEmpty,
       );
 
       controller.ensureEpgForChannels(
-        controller.channels,
+        await _liveChannels(controller),
         startDate: date,
         endDate: date,
       );
@@ -1868,7 +1879,7 @@ void main() {
       expect(rangedRequestUsers, <String>['provider-a', 'provider-b']);
       expect(
         controller.epgService
-            .programsForChannel(controller.channels.single)
+            .programsForChannel((await _liveChannels(controller)).single)
             .single
             .title,
         'provider-b guide',
@@ -1905,7 +1916,7 @@ void main() {
 
       final date = DateTime.utc(2026, 7, 30);
       controller.ensureEpgForChannels(
-        controller.channels,
+        await _liveChannels(controller),
         startDate: date,
         endDate: date,
       );
@@ -1922,7 +1933,7 @@ void main() {
         isTrue,
       );
       controller.ensureEpgForChannels(
-        controller.channels,
+        await _liveChannels(controller),
         startDate: date,
         endDate: date,
       );
@@ -1934,7 +1945,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(
         controller.epgService
-            .programsForChannel(controller.channels.single)
+            .programsForChannel((await _liveChannels(controller)).single)
             .single
             .title,
         'Provider B guide',
@@ -1946,7 +1957,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(
         controller.epgService
-            .programsForChannel(controller.channels.single)
+            .programsForChannel((await _liveChannels(controller)).single)
             .single
             .title,
         'Provider B guide',
@@ -1985,7 +1996,7 @@ void main() {
 
       final date = DateTime.utc(2026, 7, 30);
       controller.ensureEpgForChannels(
-        controller.channels,
+        await _liveChannels(controller),
         startDate: date,
         endDate: date,
       );
@@ -2005,7 +2016,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       controller.ensureEpgForChannels(
-        controller.channels,
+        await _liveChannels(controller),
         startDate: date,
         endDate: date,
       );
@@ -2014,7 +2025,7 @@ void main() {
       expect(newSessionRequests, 1);
       expect(
         controller.epgService
-            .programsForChannel(controller.channels.single)
+            .programsForChannel((await _liveChannels(controller)).single)
             .single
             .title,
         'Provider B guide',
@@ -2078,14 +2089,14 @@ void main() {
       );
       expect(swept, isTrue, reason: 'background sweep never covered the tail');
 
-      final tailChannel = controller.channels[200];
+      final tailChannel = (await _liveChannels(controller))[200];
       expect(
         controller.epgService.hasFreshDataForChannel(tailChannel),
         isTrue,
       );
     });
 
-    group('windowed live TV', () {
+    group('live lineup in the catalog', () {
       test(
         'keeps the lineup only in the catalog and sweeps it from there',
         () async {
@@ -2105,12 +2116,10 @@ void main() {
           final controller = _controller(
             storage: InMemorySecureStorage(),
             transport: transport,
-            windowedLiveTv: true,
           );
           addTearDown(controller.dispose);
 
           expect(await controller.connectXtream(credentials), isTrue);
-          expect(controller.channels, isEmpty);
           final repo = controller.catalogRepository;
           expect(await repo.countActiveItems(kind: kCatalogKindLive), 210);
 
@@ -2137,7 +2146,6 @@ void main() {
           transport: _FakeXtreamTransport.success().call,
           cacheMemory: cacheMemory,
           catalogRepository: repo,
-          windowedLiveTv: true,
         );
         expect(await first.connectXtream(credentials), isTrue);
 
@@ -2146,14 +2154,12 @@ void main() {
           transport: _FakeXtreamTransport.success().call,
           cacheMemory: cacheMemory,
           catalogRepository: repo,
-          windowedLiveTv: true,
         );
         addTearDown(restarted.dispose);
         await restarted.boot();
 
         expect(restarted.sourceType, AppSourceType.xtream);
         expect(restarted.liveCategories.single.name, 'News');
-        expect(restarted.channels, isEmpty);
         expect(await repo.countActiveItems(kind: kCatalogKindLive), 1);
       });
     });
@@ -2409,7 +2415,9 @@ void main() {
 
       expect(controller.epgService.lookup('bbc.one'), isNull);
       expect(
-        controller.epgService.programsForChannel(controller.channels.single),
+        controller.epgService.programsForChannel(
+          (await _liveChannels(controller)).single,
+        ),
         isEmpty,
       );
     });
@@ -2523,6 +2531,12 @@ Map<String, Object?> _epgResponse(String title, DateTime start) => {
 
 /// VOD/series content lives in the catalog repository now, not on the
 /// controller.
+Future<List<Channel>> _liveChannels(AppStateController controller) =>
+    controller.catalogRepository.allItems<Channel>(
+      CatalogRepository.activeSource,
+      kCatalogKindLive,
+    );
+
 Future<List<VodItem>> _vodItems(AppStateController controller) =>
     controller.catalogRepository.allItems<VodItem>(
       CatalogRepository.activeSource,
@@ -2542,7 +2556,6 @@ AppStateController _controller({
   Map<String, Object?>? localMemory,
   EpgService? epgService,
   CatalogRepository? catalogRepository,
-  bool windowedLiveTv = false,
 }) {
   final sharedLocalMemory = localMemory ?? <String, Object?>{};
   // Catalog keys live in SQLite; the two CacheService instances below must
@@ -2551,7 +2564,6 @@ AppStateController _controller({
   final sharedCatalogRepository =
       catalogRepository ?? CatalogRepository(CatalogDatabase.memory());
   return AppStateController(
-    windowedLiveTv: windowedLiveTv,
     xtreamService: XtreamService(
       transport: transport,
       cache: CacheService(
@@ -2624,10 +2636,10 @@ Future<void> _waitForXtreamRefresh(
   Future<void> Function()? wait,
 }) async {
   for (var attempt = 0; attempt < 100; attempt += 1) {
+    final channels = await _liveChannels(controller);
     final hasEpg =
-        controller.channels.isNotEmpty &&
-        controller.epgService.lookupForChannel(controller.channels.single) !=
-            null;
+        channels.isNotEmpty &&
+        controller.epgService.lookupForChannel(channels.single) != null;
     if (hasEpg &&
         controller.activeViewer != null &&
         controller.progressList.isNotEmpty) {
@@ -2684,9 +2696,6 @@ class _TestAppState extends State<_TestApp> {
     return ProviderScope(
       overrides: [
         overrideAppState(widget.controller),
-        windowedLiveTvProvider.overrideWith(
-          (_) => widget.controller.windowedLiveTv,
-        ),
       ],
       child: MaterialApp.router(
         localizationsDelegates: AppLocalizations.localizationsDelegates,

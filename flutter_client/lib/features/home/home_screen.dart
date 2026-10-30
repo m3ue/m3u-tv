@@ -529,8 +529,8 @@ typedef _LiveRowSlice = ({
 });
 
 class _LiveRowState extends ConsumerState<_LiveRow> {
-  // Windowed mode: the row is read from the catalog, refetched when the
-  // catalog reloads (a new category list) or the favorites change.
+  // The row is read from the catalog, refetched when the catalog reloads (a
+  // new category list) or the favorites change.
   (List<Category>, Set<int>, int)? _fetchedFor;
   _LiveRowSlice? _windowSlice;
 
@@ -569,45 +569,24 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
     }());
   }
 
-  _LiveRowSlice _listSlice(List<Channel> channels) {
-    final favoriteChannels = channels
-        .where((channel) => widget.favoriteChannelIds.contains(channel.id))
-        .toList(growable: false);
-    final liveSectionChannels = favoriteChannels.isEmpty
-        ? channels
-        : favoriteChannels;
-    return (
-      rowChannels: liveSectionChannels
-          .take(widget.rowItemLimit)
-          .toList(growable: false),
-      showsFavorites: favoriteChannels.isNotEmpty,
-      contextAt: (_) => ListChannelContext(liveSectionChannels),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final _LiveRowSlice slice;
-    if (ref.watch(windowedLiveTvProvider)) {
-      final catalog = ref.watch(liveCategoriesProvider);
-      if (_fetchedFor !=
-          (catalog, widget.favoriteChannelIds, widget.rowItemLimit)) {
-        _fetch(
-          catalog,
-          widget.favoriteChannelIds,
-          ref.read(catalogRepositoryProvider),
-        );
-      }
-      slice =
-          _windowSlice ??
-          (
-            rowChannels: const <Channel>[],
-            showsFavorites: false,
-            contextAt: (_) => ListChannelContext.empty,
-          );
-    } else {
-      slice = _listSlice(ref.watch(liveChannelsProvider));
+    final catalog = ref.watch(liveCategoriesProvider);
+    if (_fetchedFor !=
+        (catalog, widget.favoriteChannelIds, widget.rowItemLimit)) {
+      _fetch(
+        catalog,
+        widget.favoriteChannelIds,
+        ref.read(catalogRepositoryProvider),
+      );
     }
+    final slice =
+        _windowSlice ??
+        (
+          rowChannels: const <Channel>[],
+          showsFavorites: false,
+          contextAt: (_) => ListChannelContext.empty,
+        );
     final rowChannels = slice.rowChannels;
     final spotlight = widget.spotlight;
     final epgService = ref.watch(epgServiceProvider);

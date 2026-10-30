@@ -719,7 +719,10 @@ void main() {
         fixture.controller.seriesCategories.single.name,
         'Server B Series',
       );
-      expect(fixture.controller.channels.single.name, 'Server B Channel');
+      expect(
+        (await _liveChannels(fixture.controller)).single.name,
+        'Server B Channel',
+      );
       expect((await fixture.vodItems).single.name, 'Server B Movie');
       expect((await fixture.seriesList).single.name, 'Server B Show');
       expect(
@@ -780,7 +783,10 @@ void main() {
         await pumpEventQueue();
 
         expect(fixture.auth.credentials, _thirdCredentials);
-        expect(fixture.controller.channels.single.name, 'Server C Channel');
+        expect(
+          (await _liveChannels(fixture.controller)).single.name,
+          'Server C Channel',
+        );
         expect(fixture.controller.error, isNull);
         expect(notifications, 0);
       },
@@ -853,7 +859,10 @@ void main() {
         fixture.controller.seriesCategories.single.name,
         'Server A Series',
       );
-      expect(fixture.controller.channels.single.name, 'Server A Channel');
+      expect(
+        (await _liveChannels(fixture.controller)).single.name,
+        'Server A Channel',
+      );
       expect((await fixture.vodItems).single.name, 'Server A Movie');
       expect((await fixture.seriesList).single.name, 'Server A Show');
       expect(
@@ -930,10 +939,10 @@ void main() {
         );
         await _waitForGuide(fixture.controller, 'Server A guide');
         await reverb.firstConnected.future;
-        final observedChannels = <String>[];
+        final observedSources = <String>[];
         fixture.controller.addListener(() {
-          observedChannels.add(
-            fixture.controller.channels.firstOrNull?.name ?? 'none',
+          observedSources.add(
+            fixture.controller.liveCategories.firstOrNull?.name ?? 'none',
           );
         });
         transport.secondSourcePostCommitEvents.clear();
@@ -953,7 +962,10 @@ void main() {
           fixture.controller.seriesCategories.single.name,
           'Server A Series',
         );
-        expect(fixture.controller.channels.single.name, 'Server A Channel');
+        expect(
+          (await _liveChannels(fixture.controller)).single.name,
+          'Server A Channel',
+        );
         expect((await fixture.vodItems).single.name, 'Server A Movie');
         expect((await fixture.seriesList).single.name, 'Server A Show');
         expect(fixture.controller.viewers.single.name, 'Server A Viewer');
@@ -974,7 +986,7 @@ void main() {
           'Server A guide',
         );
         expect(fixture.controller.epgService.lookup('server-b'), isNull);
-        expect(observedChannels, isNot(contains('Server B Channel')));
+        expect(observedSources, isNot(contains('Server B Live')));
         expect(transport.secondSourcePostCommitEvents, isEmpty);
         expect(reverb.activeUser, 'first');
         expect(reverb.connectedUsers, <String>['first', 'first']);
@@ -996,7 +1008,6 @@ void main() {
         expect(persistedSource['type'], 'xtream');
 
         final restarted = AppStateController(
-          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           xtreamService: XtreamService(transport: transport.call),
           tvNotificationService: _EmptyTvNotificationService(),
@@ -1012,7 +1023,10 @@ void main() {
           _firstCredentials.username,
         );
         expect(restarted.sourceType, AppSourceType.xtream);
-        expect(restarted.channels.single.name, 'Server A Channel');
+        expect(
+          (await _liveChannels(restarted)).single.name,
+          'Server A Channel',
+        );
         expect(restarted.viewers.single.name, 'Server A Viewer');
       },
     );
@@ -1051,10 +1065,11 @@ void main() {
         var publishedSource = '';
         var sourceTransitions = 0;
         fixture.controller.addListener(() {
-          final source = fixture.controller.channels.firstOrNull?.name ?? '';
+          final source =
+              fixture.controller.liveCategories.firstOrNull?.name ?? '';
           if (source == publishedSource) return;
           publishedSource = source;
-          if (source == 'Server B Channel') sourceTransitions += 1;
+          if (source == 'Server B Live') sourceTransitions += 1;
         });
 
         expect(
@@ -1064,7 +1079,10 @@ void main() {
         await _waitForGuide(fixture.controller, 'Server B guide');
 
         expect(sourceTransitions, 1);
-        expect(fixture.controller.channels.single.name, 'Server B Channel');
+        expect(
+          (await _liveChannels(fixture.controller)).single.name,
+          'Server B Channel',
+        );
         expect(
           (await fixture.cache.get<List<Channel>>(
             'liveStreams',
@@ -1111,10 +1129,10 @@ void main() {
         );
         await _waitForGuide(fixture.controller, 'Server A guide');
         await fixture.controller.favoritesService.add(101);
-        final observedChannels = <String>[];
+        final observedSources = <String>[];
         fixture.controller.addListener(() {
-          observedChannels.add(
-            fixture.controller.channels.firstOrNull?.name ?? 'none',
+          observedSources.add(
+            fixture.controller.liveCategories.firstOrNull?.name ?? 'none',
           );
         });
 
@@ -1133,14 +1151,17 @@ void main() {
         expect(fixture.auth.credentials, _firstCredentials);
         expect(fixture.xtream.credentials?.username, 'first');
         expect(fixture.controller.sourceType, AppSourceType.xtream);
-        expect(fixture.controller.channels.single.name, 'Server A Channel');
+        expect(
+          (await _liveChannels(fixture.controller)).single.name,
+          'Server A Channel',
+        );
         expect(fixture.controller.activeViewer?.name, 'Server A Viewer');
         expect(
           fixture.controller.epgService.lookup('server-a')?.current.title,
           'Server A guide',
         );
         expect(fixture.controller.epgService.lookup('server-b'), isNull);
-        expect(observedChannels, isNot(contains('Server B Channel')));
+        expect(observedSources, isNot(contains('Server B Live')));
         expect(
           await fixture.controller.favoritesService.isFavorite(101),
           isTrue,
@@ -1167,7 +1188,6 @@ void main() {
         expect(persistedSource['type'], 'xtream');
 
         final restarted = AppStateController(
-          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           xtreamService: XtreamService(transport: transport.call),
           tvNotificationService: _EmptyTvNotificationService(),
@@ -1176,7 +1196,10 @@ void main() {
         await restarted.boot();
         expect(restarted.authNotifier.credentials?.username, 'first');
         expect(restarted.sourceType, AppSourceType.xtream);
-        expect(restarted.channels.single.name, 'Server A Channel');
+        expect(
+          (await _liveChannels(restarted)).single.name,
+          'Server A Channel',
+        );
         expect(restarted.activeViewer?.name, 'Server A Viewer');
         expect(await restarted.favoritesService.isFavorite(101), isTrue);
       },
@@ -1227,7 +1250,6 @@ void main() {
         final persisted = await PersistentJsonStore(file: stateFile).snapshot();
 
         final restarted = AppStateController(
-          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           xtreamService: XtreamService(transport: transport.call),
           tvNotificationService: _EmptyTvNotificationService(),
@@ -1247,7 +1269,7 @@ void main() {
             'cache source': (await fixture.cache.get<String>(
               'sourceType',
             ))?.data,
-            'channels': fixture.controller.channels.length,
+            'channels': (await _liveChannels(fixture.controller)).length,
             'active viewer': fixture.controller.activeViewer?.ulid,
             'push events': fixture.push.events,
             'reverb user': reverb.activeUser,
@@ -1299,10 +1321,10 @@ void main() {
           isTrue,
         );
         await _waitForGuide(fixture.controller, 'Server A guide');
-        final observedChannels = <String>[];
+        final observedSources = <String>[];
         fixture.controller.addListener(() {
-          observedChannels.add(
-            fixture.controller.channels.firstOrNull?.name ?? 'none',
+          observedSources.add(
+            fixture.controller.liveCategories.firstOrNull?.name ?? 'none',
           );
         });
 
@@ -1322,13 +1344,16 @@ void main() {
         expect(fixture.auth.credentials, _thirdCredentials);
         expect(fixture.xtream.credentials?.username, 'third');
         expect(fixture.controller.sourceType, AppSourceType.xtream);
-        expect(fixture.controller.channels.single.name, 'Server C Channel');
+        expect(
+          (await _liveChannels(fixture.controller)).single.name,
+          'Server C Channel',
+        );
         expect(fixture.controller.activeViewer?.name, 'Server C Viewer');
         expect(
           fixture.controller.epgService.lookup('server-c')?.current.title,
           'Server C guide',
         );
-        expect(observedChannels, isNot(contains('Server B Channel')));
+        expect(observedSources, isNot(contains('Server B Live')));
         expect(
           (await fixture.cache.get<List<Channel>>(
             'liveStreams',
@@ -1353,7 +1378,6 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 100));
         final restartedStore = _BlockingFavoritesStore(file: stateFile);
         final restarted = AppStateController(
-          windowedLiveTv: false,
           persistentStore: restartedStore,
           xtreamService: XtreamService(transport: transport.call),
           tvNotificationService: _EmptyTvNotificationService(),
@@ -1378,7 +1402,10 @@ void main() {
         await restartedBoot;
         expect(restarted.authNotifier.credentials?.username, 'third');
         expect(restarted.sourceType, AppSourceType.xtream);
-        expect(restarted.channels.single.name, 'Server C Channel');
+        expect(
+          (await _liveChannels(restarted)).single.name,
+          'Server C Channel',
+        );
         expect(restarted.activeViewer?.name, 'Server C Viewer');
       },
     );
@@ -1419,7 +1446,10 @@ void main() {
         );
 
         expect(fixture.auth.credentials, _firstCredentials);
-        expect(fixture.controller.channels.single.name, 'Server A Channel');
+        // The published state stays on A. (With the rollback itself failing,
+        // the catalog rows can't be restored; that was already so for movies
+        // and series.)
+        expect(fixture.controller.liveCategories.single.name, 'Server A Live');
         expect(fixture.controller.isLoadingContent, isFalse);
       },
     );
@@ -1463,7 +1493,10 @@ void main() {
 
         expect(fixture.auth.credentials, _thirdCredentials);
         expect(fixture.controller.activeViewer?.ulid, 'viewer-server-c');
-        expect(fixture.controller.channels.single.name, 'Server C Channel');
+        expect(
+          (await _liveChannels(fixture.controller)).single.name,
+          'Server C Channel',
+        );
         expect(
           fixture.controller.progressList.single.title,
           'Server C Progress',
@@ -2127,7 +2160,6 @@ class _Fixture {
           identical(auth.credentials, credentials),
     );
     controller = AppStateController(
-      windowedLiveTv: false,
       authNotifier: auth,
       xtreamService: xtream,
       secureStorage: storage,
@@ -3583,3 +3615,10 @@ Future<void> _waitForMigratedViewer(
   }
   fail('Timed out waiting for migrated viewer');
 }
+
+/// The live lineup as the catalog holds it.
+Future<List<Channel>> _liveChannels(AppStateController controller) =>
+    controller.catalogRepository.allItems<Channel>(
+      CatalogRepository.activeSource,
+      kCatalogKindLive,
+    );

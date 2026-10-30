@@ -1,7 +1,4 @@
-import 'dart:math' as math;
-
 import 'package:m3u_tv/services/domain_models.dart';
-import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/shared/catalog_window.dart';
 
 /// Row-indexed access to the channels a Live TV view (list, grid or guide)
@@ -22,32 +19,6 @@ abstract interface class ChannelRows {
 
   /// The deepest catchup retention, in days, across every row.
   int get maxCatchupDays;
-}
-
-/// [ChannelRows] over channels already in memory: every row is resolved.
-class ListChannelRows implements ChannelRows {
-  ListChannelRows(this.channels);
-
-  final List<Channel> channels;
-
-  @override
-  int get length => channels.length;
-
-  @override
-  Channel operator [](int index) => channels[index];
-
-  @override
-  void ensureLoaded(int index, int count) {}
-
-  @override
-  late final int maxCatchupDays = channels
-      .map(
-        (channel) => EpgService.effectiveCatchupRetentionDays(
-          channel.catchupSupported,
-          channel.catchupDays,
-        ),
-      )
-      .fold(0, math.max);
 }
 
 /// [ChannelRows] over a [CatalogWindow] paged from the SQLite catalog.

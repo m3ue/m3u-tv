@@ -40,4 +40,63 @@ void main() {
       -1,
     );
   });
+
+  group('compareNatural', () {
+    test('sorts symbols before digits before letters', () {
+      final names = ['Zebra', '&TV', '00s Replay']..sort(compareNatural);
+      expect(names, ['&TV', '00s Replay', 'Zebra']);
+    });
+
+    test('compares numeric runs by value, not lexically', () {
+      final names = ['Channel 10', 'Channel 2']..sort(compareNatural);
+      expect(names, ['Channel 2', 'Channel 10']);
+    });
+
+    test('is case-insensitive', () {
+      final names = ['bbc', 'ABC']..sort(compareNatural);
+      expect(names, ['ABC', 'bbc']);
+    });
+
+    test('compares a digit run too long for an int by value', () {
+      final names = [
+        'A 99999999999999999999 x',
+        'A 100000000000000000000 x',
+        'A 1 x',
+      ]..sort(compareNatural);
+      expect(names, [
+        'A 1 x',
+        'A 99999999999999999999 x',
+        'A 100000000000000000000 x',
+      ]);
+    });
+
+    test('a shorter prefix sorts first', () {
+      final names = ['ESPN 2 HD', 'ESPN 2', 'ESPN']..sort(compareNatural);
+      expect(names, ['ESPN', 'ESPN 2', 'ESPN 2 HD']);
+    });
+  });
+
+  group('sortByNatural', () {
+    test('matches compareNatural for every pair', () {
+      final names = [
+        'Channel 10',
+        'channel 2',
+        '&TV',
+        '00s Replay',
+        '007 Classics',
+        'Zebra',
+        'zebra 1',
+        'ABC',
+        '',
+        'News 24/7',
+        'News 24',
+      ];
+      final expected = [...names]..sort(compareNatural);
+      final sorted = [...names];
+      sortByNatural(sorted, (name) => name);
+      expect(sorted, expected);
+      sortByNatural(sorted, (name) => name, descending: true);
+      expect(sorted, expected.reversed.toList());
+    });
+  });
 }

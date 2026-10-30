@@ -9,7 +9,6 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
     show kCatalogKindLive, kCatalogKindSeries, kCatalogKindVod;
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
-import 'package:m3u_tv/shared/catalog_text_filter.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/epg_show_results.dart';
@@ -84,9 +83,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   Timer? _debounce;
 
   final _showSearchController = EpgShowSearchController();
-  final CatalogTextFilter<Channel> _channelFilter = CatalogTextFilter(
-    (c) => c.name,
-  );
 
   /// The query these results were fetched for - re-fetch only when
   /// [_appliedQuery] moves past this, not on every unrelated rebuild.
@@ -95,7 +91,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   List<VodItem> _vodResults = const [];
   List<Series> _seriesResults = const [];
 
-  /// Windowed mode: the On Now rows' channels, read from the catalog.
+  /// The On Now rows' channels, read from the catalog.
   final ShowResultChannelLookup _showResultChannels = ShowResultChannelLookup();
 
   @override
@@ -146,30 +142,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   String get _normalizedQuery => _query.trim().toLowerCase();
   bool get _hasQuery => _normalizedQuery.isNotEmpty;
 
-  List<Channel> _filterChannels(List<Channel> channels) =>
-      _channelFilter.filterWhole(channels, _appliedQuery);
-
-  List<Channel>? _channelsByIdSource;
-  Map<int, Channel> _channelsById = const <int, Channel>{};
-
-  /// Rebuilt only when the channel list itself changes, not on every
-  /// keystroke's build.
-  Map<int, Channel> _channelsByIdFor(List<Channel> channels) {
-    if (!identical(channels, _channelsByIdSource)) {
-      _channelsByIdSource = channels;
-      _channelsById = {for (final c in channels) c.id: c};
-    }
-    return _channelsById;
-  }
-
   /// Kicks off (or skips, if already resolved for [_appliedQuery]) the VOD/
   /// series catalog search. Called from [build] - `setState` inside is safe
   /// because it only fires from the async completion callback, never
   /// synchronously during the build that triggered it.
-  void _ensureCatalogResults(
-    CatalogRepository repo, {
-    required bool includeChannels,
-  }) {
+  void _ensureCatalogResults(CatalogRepository repo) {
     if (_catalogResultsFor == _appliedQuery) return;
     _catalogResultsFor = _appliedQuery;
     final query = _appliedQuery;
@@ -181,15 +158,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     }
     unawaited(
       Future.wait([
-        if (includeChannels)
-          repo.pageActiveItems<Channel>(
-            kind: kCatalogKindLive,
-            search: query,
-            offset: 0,
-            limit: _searchResultLimit,
-          )
-        else
-          Future.value(const <Channel>[]),
+        repo.pageActiveItems<Channel>(
+          kind: kCatalogKindLive,
+          search: query,
+          offset: 0,
+          limit: _searchResultLimit,
+        ),
         repo.pageActiveItems<VodItem>(
           kind: kCatalogKindVod,
           search: query,
@@ -224,7 +198,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   Widget build(BuildContext context) {
     final isBootstrapping = ref.watch(isBootstrappingProvider);
     final isConfigured = ref.watch(isConfiguredProvider);
-    final channels = ref.watch(liveChannelsProvider);
 
     if (isBootstrapping) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -241,26 +214,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       );
     }
 
-    final windowed = ref.watch(windowedLiveTvProvider);
     final repo = ref.watch(catalogRepositoryProvider);
-    _ensureCatalogResults(repo, includeChannels: windowed);
-    final filteredChannels = windowed
-        ? _channelResults
-        : _filterChannels(channels);
+    _ensureCatalogResults(repo);
+    final filteredChannels = _channelResults;
     final filteredVodItems = _vodResults;
     final filteredSeries = _seriesResults;
-    // Build from the FULL channel list (not the filtered one) - EPG
-    // show-result channel lookups must work even when the show's
-    // channel name doesn't match the current query.
-    final channelsById = windowed
-        ? _showResultChannels.channelsFor(
-            _showSearchController.results,
-            repo,
-            onResolved: () {
-              if (mounted) setState(() {});
-            },
-          )
-        : _channelsByIdFor(channels);
+    // Resolved by id from the whole catalog, not the name-filtered results:
+    // a show's channel needn't match the query.
+    final channelsById = _showResultChannels.channelsFor(
+      _showSearchController.results,
+      repo,
+      onResolved: () {
+        if (mounted) setState(() {});
+      },
+    );
     // Computed once per build and threaded through to both the All tab and
     // the Live TV tab's ShowSearchResultsView - both are built eagerly by
     // TabBarView on every keystroke, so without sharing this the On-Now/

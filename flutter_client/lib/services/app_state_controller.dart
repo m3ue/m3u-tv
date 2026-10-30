@@ -35,7 +35,6 @@ import 'package:m3u_tv/services/tv_notification_store.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
-import 'package:m3u_tv/shared/feature_flags.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 
@@ -77,7 +76,6 @@ class AppStateController extends ChangeNotifier {
     DevicePairingService? devicePairingService,
     DeviceIdentityService? deviceIdentityService,
     ViewSettingsService? viewSettingsService,
-    bool windowedLiveTv = kWindowedLiveTv,
   }) {
     final store = persistentStore ?? PersistentJsonStore();
     final resolvedSecureStorage =
@@ -154,7 +152,6 @@ class AppStateController extends ChangeNotifier {
           pushNotificationService ?? PushNotificationService(),
       viewSettingsService:
           viewSettingsService ?? ViewSettingsService(store: store),
-      windowedLiveTv: windowedLiveTv,
     );
   }
 
@@ -184,7 +181,6 @@ class AppStateController extends ChangeNotifier {
     required this.introDbSettings,
     required this._pushNotificationService,
     required this.viewSettingsService,
-    required this.windowedLiveTv,
   }) {
     epgService
       ..cacheTtl = cacheService.refreshInterval
@@ -248,11 +244,6 @@ class AppStateController extends ChangeNotifier {
   /// tests get a private in-memory database. Owned here so [dispose] can close
   /// it.
   final CatalogRepository _catalogRepository;
-
-  /// When true (see [kWindowedLiveTv]) the live lineup lives only in the
-  /// SQLite catalog: [channels] stays empty and the Live TV surfaces page
-  /// their rows from [catalogRepository].
-  final bool windowedLiveTv;
   final FavoritesService favoritesService;
   final FavoritesService vodFavoritesService;
   final FavoritesService seriesFavoritesService;
@@ -494,7 +485,6 @@ class AppStateController extends ChangeNotifier {
   List<Category> _liveCategories = const <Category>[];
   List<Category> _vodCategories = const <Category>[];
   List<Category> _seriesCategories = const <Category>[];
-  List<Channel> _channels = const <Channel>[];
   List<Progress> _progressList = const <Progress>[];
   Future<List<Progress>>? _recentlyWatchedRefresh;
   String? _recentlyWatchedRefreshViewerId;
@@ -556,12 +546,8 @@ class AppStateController extends ChangeNotifier {
   List<Category> get vodCategories => _vodCategories;
   List<Category> get seriesCategories => _seriesCategories;
 
-  /// The whole live lineup in memory, or empty when [windowedLiveTv].
-  List<Channel> get channels => _channels;
-
-  /// SQLite catalog store (always present). VOD/series content lives here
-  /// exclusively, and the live lineup too when [windowedLiveTv]; otherwise
-  /// [channels] is the one full in-memory catalog list left.
+  /// SQLite catalog store (always present). Channels, movies and series live
+  /// here exclusively; screens page or look up rows rather than hold lists.
   CatalogRepository get catalogRepository => _catalogRepository;
   List<DvrRecording> get dvrRecordings => _dvr.recordings;
   DvrStorageInfo? get dvrStorageInfo => _dvr.storageInfo;
@@ -1757,7 +1743,6 @@ class AppStateController extends ChangeNotifier {
     _liveCategories = const <Category>[];
     _vodCategories = const <Category>[];
     _seriesCategories = const <Category>[];
-    _channels = const <Channel>[];
     _dvr.reset();
     _requests.reset();
     _progressList = const <Progress>[];
@@ -2177,7 +2162,6 @@ class AppStateController extends ChangeNotifier {
           _liveCategories = liveCategories;
           _vodCategories = vodCategories;
           _seriesCategories = seriesCategories;
-          _channels = windowedLiveTv ? const <Channel>[] : channels;
           // DVR recordings/rules and media requests land via
           // [_applyDvrAndRequestExtras] after this commit. On a fresh
           // connection drop the previous account's values now; on a
@@ -2307,10 +2291,6 @@ class AppStateController extends ChangeNotifier {
       for (final key in const ['liveStreams', 'vodStreams', 'seriesStreams'])
         cacheService.itemCount(key),
     ]);
-    final channels = windowedLiveTv || (itemCounts[0] ?? 0) == 0
-        ? const <Channel>[]
-        : (await cacheService.get<List<Channel>>('liveStreams'))?.data ??
-              const <Channel>[];
     final viewers =
         (await cacheService.get<List<Viewer>>('viewers'))?.data ??
         const <Viewer>[];
@@ -2346,7 +2326,6 @@ class AppStateController extends ChangeNotifier {
     _liveCategories = liveCategories;
     _vodCategories = vodCategories;
     _seriesCategories = seriesCategories;
-    _channels = channels;
     _dvr.reset();
     _requests.reset();
     _viewers = viewers;

@@ -42,9 +42,9 @@ import 'package:m3u_tv/shared/show_search_results_view.dart';
 
 enum _ViewMode { list, logoGrid, epgGrid }
 
-/// Windowed mode re-queries the catalog only once typing pauses this long
-/// (VOD/Series use the same delay).
-const _windowSearchDebounce = Duration(milliseconds: 200);
+/// The catalog is re-queried only once typing pauses this long (VOD/Series
+/// use the same delay).
+const _searchDebounceDelay = Duration(milliseconds: 200);
 
 /// Live TV screen with category filtering, EPG info, and favorites.
 ///
@@ -185,20 +185,8 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   String _query = '';
   Set<int> _favoriteIds = {};
 
-  // build() runs on every EPG sweep batch and DVR/progress tick; re-filtering
-  // and natural-sorting thousands of channels each time was the screen's
-  // main source of D-pad jank. These memoize the derived lists until their
-  // inputs actually change.
-  List<Channel>? _visibleSource;
-  Object? _visibleInputs;
-  List<Channel> _visibleChannels = const <Channel>[];
-  ChannelRows _visibleRows = ListChannelRows(const <Channel>[]);
-  List<Channel>? _channelsByIdSource;
-  Map<int, Channel> _channelsById = const <int, Channel>{};
-
-  // Windowed mode (windowedLiveTvProvider): the visible slice is paged from
-  // the SQLite catalog instead of filtered and sorted from a list in memory.
-  late final bool _windowed = ref.read(windowedLiveTvProvider);
+  // The visible slice is paged from the SQLite catalog: category, Favorites,
+  // search and sort all run in the query rather than over a list in memory.
   late final CatalogRepository _repo = ref.read(catalogRepositoryProvider);
   // Reads [_windowQuery] at fetch time, so a refresh after a reorder (a
   // favorite toggled under favorites-first) runs the current query.
@@ -270,7 +258,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     widget.onBackHandlerReady?.call(_handleBackFromEpg);
     _showSearchController.addListener(_onShowSearchChanged);
     WidgetsBinding.instance.addObserver(this);
-    if (_windowed) _window.addListener(_onWindowChanged);
+    _window.addListener(_onWindowChanged);
   }
 
   // A plain observer rather than AppLifecycleListener, which asserts on
@@ -351,9 +339,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     if (!mounted) return;
     widget.onChannelContextChanged?.call(
       _channelContext(
-        index: _windowed
-            ? _window.indexWhere((row) => row.id == channel.id)
-            : null,
+        index: _window.indexWhere((row) => row.id == channel.id),
       ),
     );
     widget.onChannelSelect(channel);
@@ -516,7 +502,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     } finally {
       // Even if a stored setting failed to load: the window must still open,
       // or the screen would spin on its first count forever.
-      if (mounted && _windowed) {
+      if (mounted) {
         _windowReady = true;
         _reconfigureWindow();
       }
@@ -576,7 +562,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     setState(() {
       _favoriteIds = ids;
     });
-    if (!changed || !_windowed || !_windowReady) return;
+    if (!changed || !_windowReady) return;
     if (_selectedCategory == _favoritesCategoryId) {
       _reconfigureWindow();
     } else if (_favoritesFirst) {
@@ -606,7 +592,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
 
   /// Re-points the window at [_currentWindowQuery] and reloads it.
   void _reconfigureWindow() {
-    if (!_windowed || !_windowReady) return;
+    if (!_windowReady) return;
     final query = _windowQuery = _currentWindowQuery();
     final generation = ++_windowGeneration;
     unawaited(_window.load());
@@ -632,7 +618,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
 
   /// A catalog refresh landed: re-read the slice in place.
   void _onCatalogReloaded(List<Category>? previous, List<Category> next) {
-    if (_windowed && _windowReady && !identical(previous, next)) {
+    if (_windowReady && !identical(previous, next)) {
       unawaited(_window.refresh());
     }
   }
@@ -640,7 +626,6 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   void _onQueryChanged(String value) {
     setState(() => _query = value);
     _showSearchController.onQueryChanged(value, widget.onSearchShows);
-    if (!_windowed) return;
     _searchDebounce?.cancel();
     // Like VOD/Series: apply a cleared query or the first character of a
     // fresh one at once, and only throttle keystrokes while a filtered
@@ -650,32 +635,11 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       _reconfigureWindow();
       return;
     }
-    _searchDebounce = Timer(_windowSearchDebounce, () {
+    _searchDebounce = Timer(_searchDebounceDelay, () {
       if (!mounted || value == _appliedQuery) return;
       _appliedQuery = value;
       _reconfigureWindow();
     });
-  }
-
-  List<Channel> _filteredChannels(List<Channel> channels) {
-    final selectedCategory = _selectedCategory;
-    final categoryFiltered =
-        selectedCategory == null || selectedCategory.isEmpty
-        ? channels
-        : selectedCategory == _favoritesCategoryId
-        ? channels.where((channel) => _favoriteIds.contains(channel.id))
-        : channels.where(
-            (channel) => channel.categoryId == selectedCategory,
-          );
-    final normalizedQuery = _query.trim().toLowerCase();
-    if (normalizedQuery.isEmpty) {
-      return categoryFiltered.toList(growable: false);
-    }
-    return categoryFiltered
-        .where(
-          (channel) => channel.name.toLowerCase().contains(normalizedQuery),
-        )
-        .toList(growable: false);
   }
 
   static _ViewMode _layoutToViewMode(LiveTvLayout layout) => switch (layout) {
@@ -704,53 +668,15 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     ];
   }
 
-  List<Channel> _visibleChannelsFor(List<Channel> channels) {
-    final inputs = (
-      _selectedCategory,
-      _query.trim().toLowerCase(),
-      _sortOption,
-      _favoritesFirst,
-      _favoriteIds,
-    );
-    if (identical(channels, _visibleSource) && inputs == _visibleInputs) {
-      return _visibleChannels;
-    }
-    _visibleSource = channels;
-    _visibleInputs = inputs;
-    _visibleChannels = sortChannels(
-      _filteredChannels(channels),
-      _sortOption,
-      favoritesFirst: _favoritesFirst ? _favoriteIds : const {},
-    );
-    _visibleRows = ListChannelRows(_visibleChannels);
-    return _visibleChannels;
-  }
-
-  /// The visible channels as [ChannelRows], for the list, grid and guide.
-  ChannelRows _visibleRowsFor(List<Channel> channels) {
-    _visibleChannelsFor(channels);
-    return _visibleRows;
-  }
-
   /// What the player's channel up/down moves through after a channel is
   /// opened from this screen: the slice currently on screen. [index] is the
   /// opened row's position, when known.
-  ChannelContext _channelContext({int? index}) => _windowed
-      ? CatalogChannelContext(
-          repository: _repo,
-          query: _windowQuery,
-          length: _window.totalCount,
-          indexHint: index,
-        )
-      : ListChannelContext(_visibleChannels);
-
-  Map<int, Channel> _channelsByIdFor(List<Channel> channels) {
-    if (!identical(channels, _channelsByIdSource)) {
-      _channelsByIdSource = channels;
-      _channelsById = {for (final c in channels) c.id: c};
-    }
-    return _channelsById;
-  }
+  ChannelContext _channelContext({int? index}) => CatalogChannelContext(
+    repository: _repo,
+    query: _windowQuery,
+    length: _window.totalCount,
+    indexHint: index,
+  );
 
   Future<void> _toggleFavorite(Channel channel) async {
     await widget.favoritesService.toggle(channel.id);
@@ -992,7 +918,6 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     final isBootstrapping = ref.watch(isBootstrappingProvider);
     final isConfigured = ref.watch(isConfiguredProvider);
     final isLoading = ref.watch(isLoadingContentProvider);
-    final channels = ref.watch(liveChannelsProvider);
     final categories = ref.watch(liveCategoriesProvider);
     ref.listen<List<Category>>(liveCategoriesProvider, _onCatalogReloaded);
     final epgService = ref.watch(epgServiceProvider);
@@ -1014,11 +939,10 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       );
     }
 
-    final filtered = _windowed ? _windowRows : _visibleRowsFor(channels);
-    // Windowed: nothing to show until the first count lands (a failed read
-    // falls through to the empty state rather than spinning forever).
-    final awaitingWindow =
-        _windowed && !_window.hasLoadedOnce && _window.error == null;
+    final filtered = _windowRows;
+    // Nothing to show until the first count lands (a failed read falls
+    // through to the empty state rather than spinning forever).
+    final awaitingWindow = !_window.hasLoadedOnce && _window.error == null;
     final l = AppLocalizations.of(context);
     // Search results replace the channel list/grid entirely (rather than
     // stacking above it) once a qualifying show search is active - mirrors
@@ -1078,15 +1002,13 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
                   shows: _showSearchController.results,
                   isLoading: _showSearchController.isLoading,
                   error: _showSearchController.error,
-                  channelsById: _windowed
-                      ? _showResultChannels.channelsFor(
-                          _showSearchController.results,
-                          _repo,
-                          onResolved: () {
-                            if (mounted) setState(() {});
-                          },
-                        )
-                      : _channelsByIdFor(channels),
+                  channelsById: _showResultChannels.channelsFor(
+                    _showSearchController.results,
+                    _repo,
+                    onResolved: () {
+                      if (mounted) setState(() {});
+                    },
+                  ),
                   onChannelSelect: widget.onChannelSelect,
                   onChannelContextChanged: widget.onChannelContextChanged,
                   onShowSelect: widget.onShowSelect,

@@ -89,7 +89,6 @@ void main() {
     testWidgets('renders search field', (tester) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -101,7 +100,6 @@ void main() {
     testWidgets('renders All/Live TV/Movies/Series tabs', (tester) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -120,7 +118,6 @@ void main() {
     ) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -135,7 +132,6 @@ void main() {
     testWidgets('searching filters results case-insensitively', (tester) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -154,7 +150,6 @@ void main() {
     testWidgets('Live TV tab shows only channels', (tester) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -175,14 +170,12 @@ void main() {
       expect(find.text('The Matrix'), findsNothing);
     });
 
-    testWidgets('windowed: channel matches come from the catalog', (
+    testWidgets('channel matches come from the catalog', (
       tester,
     ) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: const [],
           catalogRepository: testRepo,
-          windowed: true,
         ),
       );
       await tester.pumpAndSettle();
@@ -204,7 +197,6 @@ void main() {
     testWidgets('Movies tab shows only VOD items', (tester) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -229,7 +221,6 @@ void main() {
     testWidgets('Series tab shows only series', (tester) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -256,7 +247,6 @@ void main() {
     ) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -278,7 +268,6 @@ void main() {
 
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
           onChannelSelect: (channel) => selectedChannel = channel,
           onVodSelect: (item) => selectedVod = item,
@@ -317,7 +306,6 @@ void main() {
 
         await tester.pumpWidget(
           _TestApp(
-            channels: testChannels,
             catalogRepository: testRepo,
             onChannelContextChanged: (channels) => reportedContext = channels,
           ),
@@ -337,7 +325,6 @@ void main() {
     testWidgets('shows empty state when no results match', (tester) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
         ),
       );
@@ -354,7 +341,6 @@ void main() {
     ) async {
       await tester.pumpWidget(
         _TestApp(
-          channels: testChannels,
           catalogRepository: testRepo,
           isConfigured: false,
         ),
@@ -425,7 +411,6 @@ void main() {
         (tester) async {
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               onSearchShows: staticShows(showResults),
             ),
@@ -471,7 +456,6 @@ void main() {
           // would silently render the empty-state.
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               onSearchShows: (query) async {
                 return query == 'bear' ? showResults : const [];
@@ -508,7 +492,6 @@ void main() {
         (tester) async {
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               onSearchShows: staticShows(showResults),
             ),
@@ -538,7 +521,6 @@ void main() {
           // the "all empty -> show empty state" early-return.
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               onSearchShows: (query) async {
                 return query == 'bear' ? showResults : const [];
@@ -566,7 +548,6 @@ void main() {
 
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               onSearchShows: staticShows(showResults),
               onChannelSelect: (channel) => selectedChannel = channel,
@@ -595,7 +576,6 @@ void main() {
 
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               onSearchShows: staticShows(showResults),
               onShowSelect: (show) => selectedShow = show,
@@ -621,7 +601,6 @@ void main() {
         (tester) async {
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               // No onSearchShows callback - the screen should behave
               // exactly like pre-#227.
@@ -648,7 +627,6 @@ void main() {
         (tester) async {
           await tester.pumpWidget(
             _TestApp(
-              channels: testChannels,
               catalogRepository: testRepo,
               onSearchShows: staticShows(showResults),
             ),
@@ -696,7 +674,6 @@ void main() {
 
 class _TestApp extends StatelessWidget {
   const _TestApp({
-    required this.channels,
     required this.catalogRepository,
     this.isConfigured = true,
     this.onChannelSelect,
@@ -705,11 +682,8 @@ class _TestApp extends StatelessWidget {
     this.onSeriesSelect,
     this.onSearchShows,
     this.onShowSelect,
-    this.windowed = false,
   });
 
-  final List<Channel> channels;
-  final bool windowed;
   final CatalogRepository catalogRepository;
   final bool isConfigured;
   final void Function(Channel)? onChannelSelect;
@@ -723,10 +697,8 @@ class _TestApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ProviderScope(
       overrides: [
-        windowedLiveTvProvider.overrideWith((_) => windowed),
         isBootstrappingProvider.overrideWith((_) => false),
         isConfiguredProvider.overrideWith((_) => isConfigured),
-        liveChannelsProvider.overrideWith((_) => channels),
         catalogRepositoryProvider.overrideWith((_) => catalogRepository),
       ],
       child: MaterialApp(

@@ -16,6 +16,8 @@ import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/channel_rows.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
 
+import '../../fixtures/list_channel_rows.dart';
+
 /// One [ListChannelRows] per list, so re-pumping the same list doesn't read
 /// as new content to the guide.
 final _rows = Expando<ListChannelRows>();
