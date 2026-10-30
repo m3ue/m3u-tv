@@ -11,6 +11,9 @@ import 'package:m3u_tv/features/player/epg_overlay.dart';
 import 'package:m3u_tv/features/player/episode_picker.dart';
 import 'package:m3u_tv/features/player/now_playing_overlay.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
+import 'package:m3u_tv/features/player/player_diagnostics_panel.dart';
+import 'package:m3u_tv/features/player/player_shortcuts.dart';
+import 'package:m3u_tv/features/player/player_skip_prompts.dart';
 import 'package:m3u_tv/features/player/up_next_overlay.dart';
 import 'package:m3u_tv/features/player/wakelock_controller.dart';
 import 'package:m3u_tv/features/series/episode_player_args.dart';
@@ -1072,7 +1075,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// localized labels.
   Widget? _buildSkipPrompt(BuildContext context) {
     if (_activeComskipSegment != null) {
-      return _SkipSegmentPrompt(
+      return SkipSegmentPrompt(
         label: AppLocalizations.of(context).playerSkipCommercial,
         onSkip: _confirmComskipSkip,
       );
@@ -1080,7 +1083,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // Once the "up next" card is up it takes over the end-of-episode moment;
     // a redundant "skip credits" button beside it just competes for focus.
     if (_introDbPromptVisible && !_upNextVisible) {
-      return _SkipSegmentPrompt(
+      return SkipSegmentPrompt(
         label: _introDbMatchedKind == _IntroDbSegmentKind.intro
             ? AppLocalizations.of(context).playerSkipIntro
             : AppLocalizations.of(context).playerSkipCredits,
@@ -2020,47 +2023,52 @@ class _PlayerScreenState extends State<PlayerScreen> {
           : Colors.black,
       body: Shortcuts(
         shortcuts: <LogicalKeySet, Intent>{
-          LogicalKeySet(LogicalKeyboardKey.escape): const _BackIntent(),
-          LogicalKeySet(LogicalKeyboardKey.goBack): const _BackIntent(),
+          LogicalKeySet(LogicalKeyboardKey.escape): const PlayerBackIntent(),
+          LogicalKeySet(LogicalKeyboardKey.goBack): const PlayerBackIntent(),
           LogicalKeySet(LogicalKeyboardKey.mediaPlayPause):
-              const _PlayPauseIntent(),
+              const PlayerPlayPauseIntent(),
           // Channel up/down and skip fwd/back are dedicated remote buttons,
           // distinct from the arrow keys dpad uses for spatial navigation,
           // so they're safe to claim regardless of overlay visibility.
-          // _ChannelChangeAction/_seekTo no-op when not applicable (e.g. a
+          // PlayerChannelChangeAction/_seekTo no-op when not applicable (e.g. a
           // skip key during live TV, or channel keys during VOD), so no
           // _isLive/_canSeek gating is needed here.
-          LogicalKeySet(LogicalKeyboardKey.channelUp): const _ChannelUpIntent(),
+          LogicalKeySet(LogicalKeyboardKey.channelUp):
+              const PlayerChannelUpIntent(),
           LogicalKeySet(LogicalKeyboardKey.channelDown):
-              const _ChannelDownIntent(),
+              const PlayerChannelDownIntent(),
           // Remotes vary on whether they send FF/rewind or dedicated skip
           // keys for VOD/series scrubbing, so both map to the same 10s seek
           // as the arrow keys below.
           LogicalKeySet(LogicalKeyboardKey.mediaFastForward):
-              const _SeekForwardIntent(),
+              const PlayerSeekForwardIntent(),
           LogicalKeySet(LogicalKeyboardKey.mediaRewind):
-              const _SeekBackIntent(),
+              const PlayerSeekBackIntent(),
           LogicalKeySet(LogicalKeyboardKey.mediaSkipForward):
-              const _SeekForwardIntent(),
+              const PlayerSeekForwardIntent(),
           LogicalKeySet(LogicalKeyboardKey.mediaSkipBackward):
-              const _SeekBackIntent(),
+              const PlayerSeekBackIntent(),
           // Only claim arrow keys when the overlay is hidden - when visible,
           // let dpad's root Shortcuts handle them for spatial navigation.
           if (!_overlayVisible) ...{
             LogicalKeySet(LogicalKeyboardKey.arrowLeft):
-                const _SeekBackIntent(),
+                const PlayerSeekBackIntent(),
             LogicalKeySet(LogicalKeyboardKey.arrowRight):
-                const _SeekForwardIntent(),
+                const PlayerSeekForwardIntent(),
           },
         },
         child: Actions(
           actions: <Type, Action<Intent>>{
-            _BackIntent: _BackAction(widget.onBackKey ?? _handleBack),
-            _PlayPauseIntent: _PlayPauseAction(_togglePlayPause),
-            _SeekBackIntent: _SeekAction(() => _adjustSkip(-1)),
-            _SeekForwardIntent: _SeekAction(() => _adjustSkip(1)),
-            _ChannelUpIntent: _ChannelChangeAction(_handleNextChannel),
-            _ChannelDownIntent: _ChannelChangeAction(_handlePreviousChannel),
+            PlayerBackIntent: PlayerBackAction(widget.onBackKey ?? _handleBack),
+            PlayerPlayPauseIntent: PlayerPlayPauseAction(_togglePlayPause),
+            PlayerSeekBackIntent: PlayerSeekAction(() => _adjustSkip(-1)),
+            PlayerSeekForwardIntent: PlayerSeekAction(() => _adjustSkip(1)),
+            PlayerChannelUpIntent: PlayerChannelChangeAction(
+              _handleNextChannel,
+            ),
+            PlayerChannelDownIntent: PlayerChannelChangeAction(
+              _handlePreviousChannel,
+            ),
           },
           child: Focus(
             focusNode: _screenFocusNode,
@@ -2469,7 +2477,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         // so the clock and "Ends at" above it stay visible.
                         top: overlayTop + 44.0 * fontScale + 12,
                         right: mediaQuery.padding.right + edgePadding,
-                        child: _PlaybackDiagnosticsPanel(
+                        child: PlaybackDiagnosticsPanel(
                           compact: isCompact,
                           width: diagnosticsWidth,
                           fontScale: fontScale,
@@ -2530,7 +2538,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       Positioned(
                         top: edgePadding,
                         left: edgePadding,
-                        child: _ComskipSkippedBadge(
+                        child: ComskipSkippedBadge(
                           label: AppLocalizations.of(
                             context,
                           ).playerCommercialSkipped,
@@ -2569,440 +2577,5 @@ class _PlayerScreenState extends State<PlayerScreen> {
         ),
       ),
     );
-  }
-}
-
-class _PlaybackDiagnosticsPanel extends StatelessWidget {
-  const _PlaybackDiagnosticsPanel({
-    required this.activeBackend,
-    required this.diagnostics,
-    this.compact = false,
-    this.width = 360,
-    this.fontScale = 1.0,
-  });
-
-  final PlaybackBackend? activeBackend;
-  final List<String> diagnostics;
-
-  /// Shrinks padding/fonts/label width for phones/tablets, where the fixed
-  /// 360px panel used to run off the edge of the screen in portrait and
-  /// collide with the title overlay in the short landscape orientation.
-  final bool compact;
-
-  /// Caller-supplied width (see `PlayerScreen`'s `diagnosticsWidth`), so this
-  /// panel and the title overlay it sits beside can agree on how much of the
-  /// screen each one gets instead of overlapping.
-  final double width;
-
-  /// TV display-size scale (see `FontSizeScope`) so the label column and
-  /// text keep pace with `width`, which is already scaled by the caller --
-  /// without this, larger scale factors squeeze the same fixed label/font
-  /// sizes into a wider box and the text still wraps.
-  final double fontScale;
-
-  @override
-  Widget build(BuildContext context) {
-    final snapshot = _PlaybackDiagnosticsSnapshot.from(
-      activeBackend: activeBackend,
-      diagnostics: diagnostics,
-    );
-    final rows = <Widget>[
-      _DiagnosticsRow(
-        label: AppLocalizations.of(context).playerDiagBackend,
-        value: snapshot.backendLabel,
-        compact: compact,
-        fontScale: fontScale,
-      ),
-      if (snapshot.fallbackReason != null)
-        _DiagnosticsRow(
-          label: AppLocalizations.of(context).playerDiagFallback,
-          value: snapshot.fallbackReason!,
-          compact: compact,
-          fontScale: fontScale,
-        ),
-      if (snapshot.codecDecision != null)
-        _DiagnosticsRow(
-          label: AppLocalizations.of(context).playerDiagCodec,
-          value: snapshot.codecDecision!,
-          compact: compact,
-          fontScale: fontScale,
-        ),
-      if (snapshot.transcodeSession != null)
-        _DiagnosticsRow(
-          label: AppLocalizations.of(context).playerDiagTranscode,
-          value: snapshot.transcodeSession!,
-          compact: compact,
-          fontScale: fontScale,
-        ),
-      if (snapshot.cleanupStatus != null)
-        _DiagnosticsRow(
-          label: AppLocalizations.of(context).playerDiagCleanup,
-          value: snapshot.cleanupStatus!,
-          compact: compact,
-          fontScale: fontScale,
-        ),
-    ];
-
-    return IgnorePointer(
-      child: Container(
-        width: width,
-        padding: EdgeInsets.all((compact ? 8 : 14) * fontScale),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.78),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-          borderRadius: BorderRadius.circular(compact ? 10 : 14),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: Colors.black54,
-              blurRadius: 24,
-              offset: Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: rows,
-        ),
-      ),
-    );
-  }
-}
-
-class _DiagnosticsRow extends StatelessWidget {
-  const _DiagnosticsRow({
-    required this.label,
-    required this.value,
-    this.compact = false,
-    this.fontScale = 1.0,
-  });
-
-  final String label;
-  final String value;
-  final bool compact;
-  final double fontScale;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: (compact ? 2 : 3) * fontScale),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: (compact ? 72 : 118) * fontScale,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: Colors.white60,
-                fontSize: compact ? 10 : 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: compact ? 10 : 12,
-                fontWeight: FontWeight.w600,
-                height: 1.25,
-              ),
-              maxLines: compact ? 2 : 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PlaybackDiagnosticsSnapshot {
-  const _PlaybackDiagnosticsSnapshot({
-    required this.backendLabel,
-    this.fallbackReason,
-    this.codecDecision,
-    this.transcodeSession,
-    this.cleanupStatus,
-  });
-
-  final String backendLabel;
-  final String? fallbackReason;
-  final String? codecDecision;
-  final String? transcodeSession;
-  final String? cleanupStatus;
-
-  static _PlaybackDiagnosticsSnapshot from({
-    required PlaybackBackend? activeBackend,
-    required List<String> diagnostics,
-  }) {
-    var backendLabel = _backendLabel(activeBackend);
-    String? fallbackReason;
-    String? codecDecision;
-    String? transcodeSession;
-    String? cleanupStatus;
-
-    for (final item in diagnostics) {
-      if (item.startsWith('active-backend:')) {
-        final backend = _backendFromDiagnostic(item);
-        if (backend != null) backendLabel = _backendLabel(backend);
-      } else if (item.startsWith('fallback-reason:')) {
-        final parsed = _parseKeyValueDiagnostic(item, 'fallback-reason:');
-        codecDecision = parsed.key;
-        fallbackReason = parsed.value;
-      } else if (item.startsWith('server-transcode:')) {
-        final parts = item.split(':');
-        final streamId = parts.length > 1 ? parts[1] : 'unknown stream';
-        final sessionId = parts.length > 2 ? parts[2] : 'no session';
-        transcodeSession = sessionId == 'null'
-            ? streamId
-            : '$streamId / $sessionId';
-      } else if (item.startsWith('cleanup:server-transcode:stopped:')) {
-        final payload = item.substring(
-          'cleanup:server-transcode:stopped:'.length,
-        );
-        cleanupStatus = 'server transcode stopped ($payload)';
-      }
-    }
-
-    return _PlaybackDiagnosticsSnapshot(
-      backendLabel: backendLabel,
-      fallbackReason: fallbackReason,
-      codecDecision: codecDecision,
-      transcodeSession: transcodeSession,
-      cleanupStatus: cleanupStatus,
-    );
-  }
-
-  static ({String key, String value}) _parseKeyValueDiagnostic(
-    String item,
-    String prefix,
-  ) {
-    final payload = item.substring(prefix.length);
-    final separator = payload.indexOf(':');
-    if (separator < 0) return (key: payload, value: payload);
-    return (
-      key: payload.substring(0, separator),
-      value: payload.substring(separator + 1),
-    );
-  }
-
-  static PlaybackBackend? _backendFromDiagnostic(String item) {
-    final parts = item.split(':');
-    if (parts.length < 2) return null;
-    return switch (parts[1]) {
-      'androidExoPlayer' => PlaybackBackend.androidExoPlayer,
-      'androidMpv' => PlaybackBackend.androidMpv,
-      'appleMpvNative' => PlaybackBackend.appleMpvNative,
-      'appleAvKit' => PlaybackBackend.appleAvKit,
-      'desktopLibmpv' => PlaybackBackend.desktopLibmpv,
-      'macMpvNative' => PlaybackBackend.macMpvNative,
-      'serverTranscode' => PlaybackBackend.serverTranscode,
-      'webVideo' => PlaybackBackend.webVideo,
-      _ => null,
-    };
-  }
-
-  static String _backendLabel(PlaybackBackend? backend) {
-    return switch (backend) {
-      PlaybackBackend.androidExoPlayer => 'Android ExoPlayer',
-      PlaybackBackend.androidMpv => 'Android native mpv',
-      PlaybackBackend.appleMpvNative => 'Apple native mpv',
-      PlaybackBackend.appleAvKit => 'Apple AVKit fallback',
-      PlaybackBackend.desktopLibmpv => 'Desktop libmpv',
-      PlaybackBackend.macMpvNative => 'macOS native mpv',
-      PlaybackBackend.serverTranscode => 'Server transcode fallback',
-      PlaybackBackend.webVideo => 'Web browser video',
-      null => 'Selecting backend',
-    };
-  }
-}
-
-/// Badge showing the reason for backend fallback.
-class FallbackReasonBadge extends StatelessWidget {
-  const FallbackReasonBadge({required this.reason, super.key});
-
-  final String reason;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.orange.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        reason,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-/// Brief, non-interactive indicator shown when a commercial segment was
-/// auto-skipped. Self-dismisses via [_PlayerScreenState._flashComskipSkippedBadge].
-class _ComskipSkippedBadge extends StatelessWidget {
-  const _ComskipSkippedBadge({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.75),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.fast_forward, color: Colors.white, size: 16),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Confirm-to-skip control shown while playback is inside a commercial,
-/// intro, or credits window — comskip's and TheIntroDB's prompts share this
-/// one look. Renders as the app's `primaryInverted` [AppButton] (the same
-/// hero-action pill used for the resume/play button on detail screens) so it
-/// reads as a real UI control instead of a floating overlay chip, and always
-/// autofocuses so a D-pad user can hit Select the instant it appears.
-///
-/// When [countdownShownAt]/[countdownDuration] are both provided (TheIntroDB
-/// only — comskip's prompt has no auto-hide), a slim bar under the button
-/// counts down to when the prompt will fade. Comskip passes neither and the
-/// bar is simply omitted.
-class _SkipSegmentPrompt extends StatelessWidget {
-  const _SkipSegmentPrompt({
-    required this.label,
-    required this.onSkip,
-    this.countdownShownAt,
-    this.countdownDuration,
-  });
-
-  final String label;
-  final VoidCallback onSkip;
-  final DateTime? countdownShownAt;
-  final Duration? countdownDuration;
-
-  @override
-  Widget build(BuildContext context) {
-    final shownAt = countdownShownAt;
-    final total = countdownDuration;
-    Widget? footer;
-    if (shownAt != null && total != null) {
-      final remaining = total - DateTime.now().difference(shownAt);
-      final startFraction = remaining.isNegative
-          ? 0.0
-          : remaining.inMilliseconds / total.inMilliseconds;
-      footer = ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: SizedBox(
-          height: 3,
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: startFraction, end: 0),
-            duration: remaining.isNegative ? Duration.zero : remaining,
-            builder: (context, value, _) => LinearProgressIndicator(
-              value: value,
-              backgroundColor: Colors.black12,
-              valueColor: const AlwaysStoppedAnimation(Colors.black87),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return AppButton(
-      label: label,
-      icon: Icons.fast_forward,
-      variant: AppButtonVariant.primaryInverted,
-      autofocus: true,
-      onPressed: onSkip,
-      footer: footer,
-    );
-  }
-}
-
-class _BackIntent extends Intent {
-  const _BackIntent();
-}
-
-class _PlayPauseIntent extends Intent {
-  const _PlayPauseIntent();
-}
-
-class _SeekBackIntent extends Intent {
-  const _SeekBackIntent();
-}
-
-class _SeekForwardIntent extends Intent {
-  const _SeekForwardIntent();
-}
-
-class _ChannelUpIntent extends Intent {
-  const _ChannelUpIntent();
-}
-
-class _ChannelDownIntent extends Intent {
-  const _ChannelDownIntent();
-}
-
-class _BackAction extends Action<_BackIntent> {
-  _BackAction(this.onBack);
-  final VoidCallback onBack;
-  @override
-  Object? invoke(_BackIntent intent) {
-    onBack();
-    return null;
-  }
-}
-
-class _PlayPauseAction extends Action<_PlayPauseIntent> {
-  _PlayPauseAction(this.onToggle);
-  final VoidCallback onToggle;
-  @override
-  Object? invoke(_PlayPauseIntent intent) {
-    onToggle();
-    return null;
-  }
-}
-
-class _ChannelChangeAction extends Action<Intent> {
-  _ChannelChangeAction(this.onChange);
-  final VoidCallback? onChange;
-  @override
-  Object? invoke(Intent intent) {
-    onChange?.call();
-    return null;
-  }
-}
-
-class _SeekAction extends Action<Intent> {
-  _SeekAction(this.onSeek);
-  final VoidCallback onSeek;
-  @override
-  Object? invoke(Intent intent) {
-    onSeek();
-    return null;
   }
 }
