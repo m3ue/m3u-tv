@@ -32,9 +32,17 @@ void main() {
       expect(names, ['ABC', 'bbc']);
     });
 
-    test('compares a digit run too long for an int as text', () {
-      final names = ['A 99999999999999999999 x', 'A 1 x']..sort(compareNatural);
-      expect(names, ['A 1 x', 'A 99999999999999999999 x']);
+    test('compares a digit run too long for an int by value', () {
+      final names = [
+        'A 99999999999999999999 x',
+        'A 100000000000000000000 x',
+        'A 1 x',
+      ]..sort(compareNatural);
+      expect(names, [
+        'A 1 x',
+        'A 99999999999999999999 x',
+        'A 100000000000000000000 x',
+      ]);
     });
 
     test('a shorter prefix sorts first', () {

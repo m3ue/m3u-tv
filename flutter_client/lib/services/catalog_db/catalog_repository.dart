@@ -5,8 +5,10 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/epg_store.dart';
 import 'package:m3u_tv/services/json_isolate.dart';
+import 'package:m3u_tv/shared/natural_sort.dart';
 
 /// Which promoted column (if any) a windowed page/count query orders by,
 /// beyond the provider's own [CatalogItems.sortIndex]. A dedicated enum
@@ -22,6 +24,16 @@ enum CatalogSort {
 
   /// [CatalogItems.recency], newest first.
   recentDesc,
+
+  /// [CatalogItems.channelNumber] ascending, unnumbered rows last, then
+  /// natural name order.
+  channelNumber,
+
+  /// [CatalogItems.nameSortKey]: `compareNatural` order, A-Z.
+  nameNatural,
+
+  /// [CatalogItems.nameSortKey] reversed: Z-A.
+  nameNaturalDesc,
 }
 
 /// Domain-facing wrapper over [CatalogDatabase]. Encodes/decodes rows through
@@ -57,6 +69,7 @@ class CatalogRepository implements EpgProgrammeStore {
     required String kind,
     String? categoryId,
     String? search,
+    Set<int>? ids,
     CatalogSort sort = CatalogSort.providerOrder,
     Set<int> favoritesFirst = const {},
     required int offset,
@@ -66,6 +79,7 @@ class CatalogRepository implements EpgProgrammeStore {
     kind: kind,
     categoryId: categoryId,
     search: search,
+    ids: ids,
     sort: sort,
     favoritesFirst: favoritesFirst,
     offset: offset,
@@ -76,12 +90,39 @@ class CatalogRepository implements EpgProgrammeStore {
     required String kind,
     String? categoryId,
     String? search,
+    Set<int>? ids,
   }) => countItems(
     sourceKey: activeSource,
     kind: kind,
     categoryId: categoryId,
     search: search,
+    ids: ids,
   );
+
+  /// The deepest catchup retention, in days, among the active live channels
+  /// matching the same filters as [pageActiveItems]. 0 when none has catchup.
+  Future<int> maxActiveCatchupDays({
+    String? categoryId,
+    String? search,
+    Set<int>? ids,
+  }) async {
+    final table = _db.catalogItems;
+    final max = table.catchupDays.max();
+    final query = _db.selectOnly(table)
+      ..addColumns([max])
+      ..where(
+        _itemFilter(
+          table,
+          activeSource,
+          kCatalogKindLive,
+          categoryId,
+          search,
+          ids,
+        ),
+      );
+    final row = await query.getSingle();
+    return row.read(max) ?? 0;
+  }
 
   /// A single active-source row by id, or null if it isn't in the current
   /// catalog. For resolving a bare id (a deep link, a push notification, a
@@ -211,13 +252,22 @@ class CatalogRepository implements EpgProgrammeStore {
     switch (kind) {
       case kCatalogKindLive:
         final channel = item as Channel;
+        final number = channel.channelNumber;
         return CatalogItemsCompanion.insert(
           sourceKey: sourceKey,
           kind: kind,
           streamId: channel.id,
           name: channel.name,
           nameFold: channel.name.toLowerCase(),
+          nameSortKey: Value(NaturalSortKey.of(channel.name).encode()),
           categoryId: Value(channel.categoryId),
+          channelNumber: Value(number == 0 ? null : number),
+          catchupDays: Value(
+            EpgService.effectiveCatchupRetentionDays(
+              channel.catchupSupported,
+              channel.catchupDays,
+            ),
+          ),
           sortIndex: sortIndex,
           json: jsonEncode(encodeChannel(channel)),
         );
@@ -229,6 +279,7 @@ class CatalogRepository implements EpgProgrammeStore {
           streamId: vod.id,
           name: vod.name,
           nameFold: vod.name.toLowerCase(),
+          nameSortKey: Value(NaturalSortKey.of(vod.name).encode()),
           categoryId: Value(vod.categoryId),
           categoryIdsJson: Value(
             vod.categoryIds.isEmpty ? null : jsonEncode(vod.categoryIds),
@@ -247,6 +298,7 @@ class CatalogRepository implements EpgProgrammeStore {
           streamId: series.id,
           name: series.name,
           nameFold: series.name.toLowerCase(),
+          nameSortKey: Value(NaturalSortKey.of(series.name).encode()),
           categoryId: Value(series.categoryId),
           categoryIdsJson: Value(
             series.categoryIds.isEmpty ? null : jsonEncode(series.categoryIds),
@@ -313,22 +365,25 @@ class CatalogRepository implements EpgProgrammeStore {
   }
 
   /// A windowed slice of [kind], provider order, optionally filtered to
-  /// [categoryId] and/or a case-insensitive [search] substring of the name,
-  /// ordered per [sort] (see [_orderingFor]). Rows whose id is in
-  /// [favoritesFirst] are ordered ahead of the rest, each group still in
-  /// [sort] order.
+  /// [categoryId], a case-insensitive [search] substring of the name and/or
+  /// the rows whose id is in [ids], ordered per [sort] (see [_orderingFor]).
+  /// Rows whose id is in [favoritesFirst] are ordered ahead of the rest, each
+  /// group still in [sort] order.
   Future<List<T>> pageItems<T>({
     required String sourceKey,
     required String kind,
     String? categoryId,
     String? search,
+    Set<int>? ids,
     CatalogSort sort = CatalogSort.providerOrder,
     Set<int> favoritesFirst = const {},
     required int offset,
     required int limit,
   }) async {
     final query = _db.select(_db.catalogItems)
-      ..where((t) => _itemFilter(t, sourceKey, kind, categoryId, search))
+      ..where(
+        (t) => _itemFilter(t, sourceKey, kind, categoryId, search, ids),
+      )
       ..orderBy([
         if (favoritesFirst.isNotEmpty)
           (t) => OrderingTerm(
@@ -376,6 +431,25 @@ class CatalogRepository implements EpgProgrammeStore {
         (t) => OrderingTerm(expression: t.recency, mode: OrderingMode.desc),
         tiebreaker,
       ],
+      CatalogSort.channelNumber => [
+        (t) => OrderingTerm(
+          expression: t.channelNumber,
+          nulls: NullsOrder.last,
+        ),
+        (t) => OrderingTerm(expression: t.nameSortKey),
+        tiebreaker,
+      ],
+      CatalogSort.nameNatural => [
+        (t) => OrderingTerm(expression: t.nameSortKey),
+        tiebreaker,
+      ],
+      CatalogSort.nameNaturalDesc => [
+        (t) => OrderingTerm(
+          expression: t.nameSortKey,
+          mode: OrderingMode.desc,
+        ),
+        tiebreaker,
+      ],
     };
   }
 
@@ -384,12 +458,13 @@ class CatalogRepository implements EpgProgrammeStore {
     required String kind,
     String? categoryId,
     String? search,
+    Set<int>? ids,
   }) async {
     final count = _db.catalogItems.streamId.count();
     final query = _db.selectOnly(_db.catalogItems)
       ..addColumns([count])
       ..where(
-        _itemFilter(_db.catalogItems, sourceKey, kind, categoryId, search),
+        _itemFilter(_db.catalogItems, sourceKey, kind, categoryId, search, ids),
       );
     final row = await query.getSingle();
     return row.read(count) ?? 0;
@@ -400,12 +475,14 @@ class CatalogRepository implements EpgProgrammeStore {
     String sourceKey,
     String kind,
     String? categoryId,
-    String? search,
-  ) {
+    String? search, [
+    Set<int>? ids,
+  ]) {
     var predicate = t.sourceKey.equals(sourceKey) & t.kind.equals(kind);
     if (categoryId != null) {
       predicate = predicate & _categoryPredicate(t, categoryId);
     }
+    if (ids != null) predicate = predicate & t.streamId.isIn(ids);
     final trimmed = search?.trim() ?? '';
     if (trimmed.isNotEmpty) {
       predicate = predicate & _likeContains(t.nameFold, trimmed);

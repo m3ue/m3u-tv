@@ -10,6 +10,10 @@ part 'catalog_database.g.dart';
 /// the promoted columns exist only so the app can page, sort, filter, and
 /// search in SQLite instead of materializing the whole catalog in Dart.
 @DataClassName('CatalogItemRow')
+@TableIndex(
+  name: 'catalog_items_name_sort',
+  columns: {#sourceKey, #kind, #nameSortKey},
+)
 class CatalogItems extends Table {
   /// Which configured source this row belongs to (Xtream server + account,
   /// hashed). Lets a future multi-source setup share one database.
@@ -49,6 +53,21 @@ class CatalogItems extends Table {
   /// Position in the provider's original ordering, so the default sort is
   /// stable without a name comparison.
   IntColumn get sortIndex => integer()();
+
+  /// `NaturalSortKey.encode()` of [name], so an `ORDER BY` on it matches the
+  /// in-memory `compareNatural` order (Live TV's A-Z / Z-A sorts).
+  TextColumn get nameSortKey => text().withDefault(const Constant(''))();
+
+  /// Live channels only: the provider-assigned channel number, null when the
+  /// provider left it blank or reported 0, so unnumbered channels sink below
+  /// numbered ones under the channel-number sort.
+  IntColumn get channelNumber => integer().nullable()();
+
+  /// Live channels only: catchup retention in days (0 when the channel has
+  /// no catchup), as `EpgService.effectiveCatchupRetentionDays` resolves it,
+  /// so the guide can find the deepest retention in a slice without loading
+  /// every channel.
+  IntColumn get catchupDays => integer().nullable()();
 
   /// The full serialized domain object (`Channel` / `VodItem` / `Series`),
   /// same shape `CacheService` used to persist.
@@ -146,7 +165,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   ];
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(

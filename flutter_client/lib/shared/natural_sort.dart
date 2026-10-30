@@ -58,18 +58,69 @@ class NaturalSortKey implements Comparable<NaturalSortKey> {
     for (var i = 0; i < length; i++) {
       final aChunk = a[i];
       final bChunk = b[i];
-      final aNum = aChunk.number;
-      final bNum = bChunk.number;
-      final chunkCompare = aNum != null && bNum != null
-          ? aNum.compareTo(bNum)
+      final aDigits = aChunk.digits;
+      final bDigits = bChunk.digits;
+      final chunkCompare = aDigits != null && bDigits != null
+          ? _compareDigits(aDigits, bDigits)
           : aChunk.lower.compareTo(bChunk.lower);
       if (chunkCompare != 0) return chunkCompare;
     }
     return a.length.compareTo(b.length);
   }
+
+  /// This key as a string whose plain binary order (SQLite's default `BINARY`
+  /// collation, which compares UTF-8 bytes) matches [compareTo], so a
+  /// promoted column can carry the natural sort into an `ORDER BY`.
+  ///
+  /// Layout: the lead group as one digit, then each chunk in turn. A digit
+  /// run is its length (as one character) followed by its digits, so a
+  /// longer number sorts later without padding. A text run is its lowercased
+  /// text followed by U+0001, which sorts below every other character so a
+  /// shorter run comes first, as in [compareTo]. Same-group keys always hold
+  /// the same chunk kind at each position, so a digit chunk is only ever
+  /// compared with another digit chunk.
+  ///
+  /// Two approximations, both outside what channel names realistically hold:
+  /// U+0000 and U+0001 in a name encode as U+0002, and UTF-8 orders
+  /// characters above U+FFFF (most emoji) after U+E000-U+FFFF, where Dart's
+  /// UTF-16 comparison puts them before.
+  String encode() {
+    final out = StringBuffer()..writeCharCode(_zero + _group);
+    for (final chunk in _chunks) {
+      final digits = chunk.digits;
+      if (digits != null) {
+        out
+          ..writeCharCode(_zero + digits.length)
+          ..write(digits);
+        continue;
+      }
+      final text = chunk.lower;
+      if (text.codeUnits.any((unit) => unit < _textEnd + 1)) {
+        for (final unit in text.codeUnits) {
+          out.writeCharCode(unit < _textEnd + 1 ? _textEnd + 1 : unit);
+        }
+      } else {
+        out.write(text);
+      }
+      out.writeCharCode(_textEnd);
+    }
+    return out.toString();
+  }
 }
 
-typedef _Chunk = ({int? number, String lower});
+/// Orders digit runs (leading zeros already stripped) by numeric value, at
+/// any length.
+int _compareDigits(String a, String b) {
+  final lengthCompare = a.length.compareTo(b.length);
+  return lengthCompare != 0 ? lengthCompare : a.compareTo(b);
+}
+
+/// [NaturalSortKey.encode]'s end-of-text-run marker.
+const _textEnd = 0x01;
+
+/// `digits` is set for a digit run (leading zeros stripped, `"0"` for all
+/// zeros); `lower` is the run's text, lowercased.
+typedef _Chunk = ({String? digits, String lower});
 
 const _zero = 0x30;
 const _nine = 0x39;
@@ -94,8 +145,7 @@ int _leadGroup(String s) {
 }
 
 /// Splits [s] into alternating runs of ASCII digits and non-digits (the
-/// `\d+|\D+` chunking). A digit run too long for an int compares as text,
-/// as `int.tryParse` returning null did.
+/// `\d+|\D+` chunking).
 List<_Chunk> _tokenize(String s) {
   final chunks = <_Chunk>[];
   var start = 0;
@@ -107,10 +157,18 @@ List<_Chunk> _tokenize(String s) {
     }
     final text = s.substring(start, end);
     chunks.add((
-      number: digits ? int.tryParse(text) : null,
+      digits: digits ? _stripLeadingZeros(text) : null,
       lower: digits ? text : text.toLowerCase(),
     ));
     start = end;
   }
   return chunks;
+}
+
+String _stripLeadingZeros(String digits) {
+  var start = 0;
+  while (start < digits.length - 1 && digits.codeUnitAt(start) == _zero) {
+    start++;
+  }
+  return start == 0 ? digits : digits.substring(start);
 }

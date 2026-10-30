@@ -4,6 +4,9 @@ import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_store.dart';
+import 'package:m3u_tv/shared/natural_sort.dart';
+
+import '../../fixtures/generated_channel_names.dart';
 
 VodItem _vod(
   int id,
@@ -23,11 +26,21 @@ VodItem _vod(
   addedAt: addedAt,
 );
 
-Channel _channel(int id, String name, {String? category}) => Channel(
+Channel _channel(
+  int id,
+  String name, {
+  String? category,
+  int? number,
+  bool catchup = false,
+  int? catchupDays,
+}) => Channel(
   id: id,
   name: name,
   streamUrl: 'http://host/live/$id.m3u8',
   categoryId: category,
+  channelNumber: number,
+  catchupSupported: catchup,
+  catchupDays: catchupDays,
 );
 
 void main() {
@@ -375,6 +388,115 @@ void main() {
       expect(await page(0), ['DDDD Third', 'AAAA Highest']);
       expect(await page(2), ['BBBB Mid', 'CCCC Unrated']);
     });
+  });
+
+  group('live channel sorts', () {
+    Future<List<String>> liveNames(
+      CatalogSort sort, {
+      Set<int>? ids,
+      int limit = 5000,
+    }) async {
+      final rows = await repo.pageActiveItems<Channel>(
+        kind: kCatalogKindLive,
+        sort: sort,
+        ids: ids,
+        offset: 0,
+        limit: limit,
+      );
+      return rows.map((c) => c.name).toList();
+    }
+
+    test('nameNatural matches compareNatural over generated names', () async {
+      final names = generateNames(3000);
+      await repo.replaceItems(
+        sourceKey: CatalogRepository.activeSource,
+        kind: kCatalogKindLive,
+        items: [
+          for (var i = 0; i < names.length; i++) _channel(i + 1, names[i]),
+        ],
+      );
+      final keyOf = {for (final name in names) name: NaturalSortKey.of(name)};
+
+      void expectNaturalOrder(List<String> sorted, {required int sign}) {
+        expect(sorted, hasLength(names.length));
+        for (var i = 1; i < sorted.length; i++) {
+          final cmp = keyOf[sorted[i - 1]]!.compareTo(keyOf[sorted[i]]!);
+          expect(
+            cmp == 0 || cmp.sign == sign,
+            isTrue,
+            reason: '"${sorted[i - 1]}" before "${sorted[i]}"',
+          );
+        }
+      }
+
+      expectNaturalOrder(await liveNames(CatalogSort.nameNatural), sign: -1);
+      expectNaturalOrder(
+        await liveNames(CatalogSort.nameNaturalDesc),
+        sign: 1,
+      );
+    });
+
+    test(
+      'channelNumber orders numbered channels first, then by name',
+      () async {
+        await repo.replaceItems(
+          sourceKey: CatalogRepository.activeSource,
+          kind: kCatalogKindLive,
+          items: [
+            _channel(1, 'Zed', number: 0),
+            _channel(2, 'Ten', number: 10),
+            _channel(3, 'Alpha'),
+            _channel(4, 'Two B', number: 2),
+            _channel(5, 'Two A', number: 2),
+          ],
+        );
+        expect(await liveNames(CatalogSort.channelNumber), [
+          'Two A',
+          'Two B',
+          'Ten',
+          'Alpha',
+          'Zed',
+        ]);
+      },
+    );
+
+    test('ids limits a page and its count to those rows', () async {
+      await repo.replaceItems(
+        sourceKey: CatalogRepository.activeSource,
+        kind: kCatalogKindLive,
+        items: [_channel(1, 'One'), _channel(2, 'Two'), _channel(3, 'Three')],
+      );
+      expect(await liveNames(CatalogSort.providerOrder, ids: {1, 3}), [
+        'One',
+        'Three',
+      ]);
+      expect(
+        await repo.countActiveItems(kind: kCatalogKindLive, ids: {1, 3}),
+        2,
+      );
+      expect(
+        await repo.countActiveItems(kind: kCatalogKindLive, ids: {}),
+        0,
+      );
+    });
+
+    test(
+      'maxActiveCatchupDays reads the deepest retention in a slice',
+      () async {
+        await repo.replaceItems(
+          sourceKey: CatalogRepository.activeSource,
+          kind: kCatalogKindLive,
+          items: [
+            _channel(1, 'None', category: 'a'),
+            _channel(2, 'Three', category: 'a', catchup: true, catchupDays: 3),
+            _channel(3, 'Seven', category: 'b', catchup: true, catchupDays: 7),
+          ],
+        );
+        expect(await repo.maxActiveCatchupDays(), 7);
+        expect(await repo.maxActiveCatchupDays(categoryId: 'a'), 3);
+        expect(await repo.maxActiveCatchupDays(ids: {1}), 0);
+      },
+    );
   });
 
   test('categories round-trip in provider order', () async {
