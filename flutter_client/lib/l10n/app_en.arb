@@ -1063,5 +1063,43 @@
   },
   "trailerWatch": "Watch Trailer",
   "mediaSortRecentlyAdded": "Recently Added",
-  "mediaSortRecentlyUpdated": "Recently Updated"
+  "mediaSortRecentlyUpdated": "Recently Updated",
+  "playerTrackAudio": "Audio",
+  "playerTrackSubtitles": "Subtitles",
+  "playerTrackAudioTitle": "Audio Track",
+  "playerTrackSubtitleTitle": "Subtitle Track",
+  "playerTrackAudioDisabled": "Disable",
+  "playerTrackSubtitlesOff": "Off",
+  "playerHdrOn": "HDR On",
+  "playerHdrOff": "HDR Off",
+  "playerStartOver": "Start Over",
+  "playerDiagBackend": "Backend",
+  "playerDiagFallback": "Fallback",
+  "playerDiagCodec": "Codec",
+  "playerDiagTranscode": "Transcode",
+  "playerDiagCleanup": "Cleanup",
+  "metaWriter": "Writer",
+  "mediaClearSearch": "Clear search",
+  "seriesEpisodesLoadFailed": "Could not load episodes: {error}",
+  "@seriesEpisodesLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "seriesNoEpisodes": "No episodes available",
+  "settingsConnecting": "Connecting...",
+  "favoritesNoChannels": "No favorite channels",
+  "favoritesNoMovies": "No favorite movies",
+  "favoritesNoSeries": "No favorite series",
+  "seriesLoadFailed": "Unable to load series",
+  "vodLoadFailed": "Unable to load movies",
+  "vodNoSynopsis": "No synopsis available.",
+  "settingsConnectionFailed": "Connection failed. Please check your credentials.",
+  "settingsConnectingSubtitle": "Please wait while we connect to your service",
+  "settingsCreateViewerFailed": "Failed to create viewer. Please try again.",
+  "searchNoResults": "No results found",
+  "playerLoadTimedOut": "Stream loading timed out. The server may be unreachable or the stream URL is invalid.",
+  "playerErrorTitle": "Playback error"
 }

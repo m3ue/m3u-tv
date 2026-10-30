@@ -1825,4 +1825,99 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mediaSortRecentlyUpdated => '最近更新';
+
+  @override
+  String get playerTrackAudio => '音频';
+
+  @override
+  String get playerTrackSubtitles => '字幕';
+
+  @override
+  String get playerTrackAudioTitle => '音轨';
+
+  @override
+  String get playerTrackSubtitleTitle => '字幕轨道';
+
+  @override
+  String get playerTrackAudioDisabled => '禁用';
+
+  @override
+  String get playerTrackSubtitlesOff => '关闭';
+
+  @override
+  String get playerHdrOn => 'HDR 开';
+
+  @override
+  String get playerHdrOff => 'HDR 关';
+
+  @override
+  String get playerStartOver => '从头开始';
+
+  @override
+  String get playerDiagBackend => '后端';
+
+  @override
+  String get playerDiagFallback => '回退';
+
+  @override
+  String get playerDiagCodec => '编解码器';
+
+  @override
+  String get playerDiagTranscode => '转码';
+
+  @override
+  String get playerDiagCleanup => '清理';
+
+  @override
+  String get metaWriter => '编剧';
+
+  @override
+  String get mediaClearSearch => '清除搜索';
+
+  @override
+  String seriesEpisodesLoadFailed(String error) {
+    return '无法加载剧集：$error';
+  }
+
+  @override
+  String get seriesNoEpisodes => '暂无剧集';
+
+  @override
+  String get settingsConnecting => '正在连接...';
+
+  @override
+  String get favoritesNoChannels => '没有收藏的频道';
+
+  @override
+  String get favoritesNoMovies => '没有收藏的电影';
+
+  @override
+  String get favoritesNoSeries => '没有收藏的剧集';
+
+  @override
+  String get seriesLoadFailed => '无法加载剧集';
+
+  @override
+  String get vodLoadFailed => '无法加载电影';
+
+  @override
+  String get vodNoSynopsis => '暂无简介。';
+
+  @override
+  String get settingsConnectionFailed => '连接失败。请检查您的凭据。';
+
+  @override
+  String get settingsConnectingSubtitle => '正在连接到您的服务，请稍候';
+
+  @override
+  String get settingsCreateViewerFailed => '无法创建观看者。请重试。';
+
+  @override
+  String get searchNoResults => '未找到结果';
+
+  @override
+  String get playerLoadTimedOut => '流加载超时。服务器可能无法访问，或流地址无效。';
+
+  @override
+  String get playerErrorTitle => '播放错误';
 }

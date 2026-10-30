@@ -1902,4 +1902,103 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get mediaSortRecentlyUpdated => 'Mis à jour récemment';
+
+  @override
+  String get playerTrackAudio => 'Audio';
+
+  @override
+  String get playerTrackSubtitles => 'Sous-titres';
+
+  @override
+  String get playerTrackAudioTitle => 'Piste audio';
+
+  @override
+  String get playerTrackSubtitleTitle => 'Piste de sous-titres';
+
+  @override
+  String get playerTrackAudioDisabled => 'Désactiver';
+
+  @override
+  String get playerTrackSubtitlesOff => 'Désactivés';
+
+  @override
+  String get playerHdrOn => 'HDR activé';
+
+  @override
+  String get playerHdrOff => 'HDR désactivé';
+
+  @override
+  String get playerStartOver => 'Recommencer';
+
+  @override
+  String get playerDiagBackend => 'Moteur';
+
+  @override
+  String get playerDiagFallback => 'Repli';
+
+  @override
+  String get playerDiagCodec => 'Codec';
+
+  @override
+  String get playerDiagTranscode => 'Transcodage';
+
+  @override
+  String get playerDiagCleanup => 'Nettoyage';
+
+  @override
+  String get metaWriter => 'Scénario';
+
+  @override
+  String get mediaClearSearch => 'Effacer la recherche';
+
+  @override
+  String seriesEpisodesLoadFailed(String error) {
+    return 'Impossible de charger les épisodes : $error';
+  }
+
+  @override
+  String get seriesNoEpisodes => 'Aucun épisode disponible';
+
+  @override
+  String get settingsConnecting => 'Connexion...';
+
+  @override
+  String get favoritesNoChannels => 'Aucune chaîne favorite';
+
+  @override
+  String get favoritesNoMovies => 'Aucun film favori';
+
+  @override
+  String get favoritesNoSeries => 'Aucune série favorite';
+
+  @override
+  String get seriesLoadFailed => 'Impossible de charger les séries';
+
+  @override
+  String get vodLoadFailed => 'Impossible de charger les films';
+
+  @override
+  String get vodNoSynopsis => 'Aucun synopsis disponible.';
+
+  @override
+  String get settingsConnectionFailed =>
+      'Échec de la connexion. Vérifiez vos identifiants.';
+
+  @override
+  String get settingsConnectingSubtitle =>
+      'Veuillez patienter pendant la connexion à votre service';
+
+  @override
+  String get settingsCreateViewerFailed =>
+      'Impossible de créer le spectateur. Veuillez réessayer.';
+
+  @override
+  String get searchNoResults => 'Aucun résultat trouvé';
+
+  @override
+  String get playerLoadTimedOut =>
+      'Le chargement du flux a expiré. Le serveur est peut-être injoignable ou l\'URL du flux est invalide.';
+
+  @override
+  String get playerErrorTitle => 'Erreur de lecture';
 }

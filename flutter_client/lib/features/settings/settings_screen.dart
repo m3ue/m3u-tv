@@ -142,7 +142,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _connectionError =
             widget.sourceError ??
             widget.authNotifier.error ??
-            'Connection failed. Please check your credentials.';
+            AppLocalizations.of(context).settingsConnectionFailed;
       });
     }
   }
@@ -220,10 +220,13 @@ class _ConnectingScreen extends StatelessWidget {
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: 24),
-            Text('Connecting...', style: theme.textTheme.titleLarge),
+            Text(
+              AppLocalizations.of(context).settingsConnecting,
+              style: theme.textTheme.titleLarge,
+            ),
             const SizedBox(height: 8),
             Text(
-              'Please wait while we connect to your service',
+              AppLocalizations.of(context).settingsConnectingSubtitle,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -2137,7 +2140,7 @@ class _ViewerManagementDialogState extends State<_ViewerManagementDialog> {
     } else {
       setState(() {
         _isCreating = false;
-        _createError = 'Failed to create viewer. Please try again.';
+        _createError = AppLocalizations.of(context).settingsCreateViewerFailed;
       });
     }
   }

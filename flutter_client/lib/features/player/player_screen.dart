@@ -1294,9 +1294,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           mounted &&
           (_status == PlaybackStatus.loading ||
               _status == PlaybackStatus.idle)) {
-        _setErrorMessage(
-          'Stream loading timed out. The server may be unreachable or the stream URL is invalid.',
-        );
+        _setErrorMessage(AppLocalizations.of(context).playerLoadTimedOut);
       }
     });
   }
@@ -2328,7 +2326,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'Playback error',
+                                AppLocalizations.of(context).playerErrorTitle,
                                 style: Theme.of(context).textTheme.headlineSmall
                                     ?.copyWith(
                                       color: Colors.white,
@@ -2610,35 +2608,35 @@ class _PlaybackDiagnosticsPanel extends StatelessWidget {
     );
     final rows = <Widget>[
       _DiagnosticsRow(
-        label: 'Backend',
+        label: AppLocalizations.of(context).playerDiagBackend,
         value: snapshot.backendLabel,
         compact: compact,
         fontScale: fontScale,
       ),
       if (snapshot.fallbackReason != null)
         _DiagnosticsRow(
-          label: 'Fallback',
+          label: AppLocalizations.of(context).playerDiagFallback,
           value: snapshot.fallbackReason!,
           compact: compact,
           fontScale: fontScale,
         ),
       if (snapshot.codecDecision != null)
         _DiagnosticsRow(
-          label: 'Codec',
+          label: AppLocalizations.of(context).playerDiagCodec,
           value: snapshot.codecDecision!,
           compact: compact,
           fontScale: fontScale,
         ),
       if (snapshot.transcodeSession != null)
         _DiagnosticsRow(
-          label: 'Transcode',
+          label: AppLocalizations.of(context).playerDiagTranscode,
           value: snapshot.transcodeSession!,
           compact: compact,
           fontScale: fontScale,
         ),
       if (snapshot.cleanupStatus != null)
         _DiagnosticsRow(
-          label: 'Cleanup',
+          label: AppLocalizations.of(context).playerDiagCleanup,
           value: snapshot.cleanupStatus!,
           compact: compact,
           fontScale: fontScale,

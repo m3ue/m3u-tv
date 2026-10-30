@@ -276,7 +276,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
       return Scaffold(
         body: Center(
           child: Text(
-            'Please connect to your service in Settings',
+            AppLocalizations.of(context).appNotConfigured,
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
@@ -324,7 +324,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
     if (_favoriteItems.isEmpty) {
       return Center(
         child: Text(
-          'No series available',
+          AppLocalizations.of(context).homeNoSeries,
           style: Theme.of(context).textTheme.bodyLarge,
         ),
       );
@@ -410,7 +410,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
         if (window.error != null && !window.hasLoadedOnce) {
           return Center(
             child: Text(
-              'Unable to load series',
+              AppLocalizations.of(context).seriesLoadFailed,
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           );
@@ -418,7 +418,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
         if (window.totalCount == 0) {
           return Center(
             child: Text(
-              'No series available',
+              AppLocalizations.of(context).homeNoSeries,
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           );

@@ -1796,7 +1796,7 @@ class AppShellState extends ConsumerState<AppShell>
           onHandleTopLevelBack: handleBackFromTopLevelRoute,
         ),
       ),
-      _ => const PlaceholderScreen(title: 'Home'),
+      _ => PlaceholderScreen(title: AppLocalizations.of(context).navHome),
     };
   }
 

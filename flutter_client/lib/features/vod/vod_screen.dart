@@ -281,7 +281,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
       return Scaffold(
         body: Center(
           child: Text(
-            'Please connect to your service in Settings',
+            AppLocalizations.of(context).appNotConfigured,
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
@@ -329,7 +329,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
     if (_favoriteItems.isEmpty) {
       return Center(
         child: Text(
-          'No movies available',
+          AppLocalizations.of(context).homeNoMovies,
           style: Theme.of(context).textTheme.bodyLarge,
         ),
       );
@@ -414,7 +414,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
         if (window.error != null && !window.hasLoadedOnce) {
           return Center(
             child: Text(
-              'Unable to load movies',
+              AppLocalizations.of(context).vodLoadFailed,
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           );
@@ -422,7 +422,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
         if (window.totalCount == 0) {
           return Center(
             child: Text(
-              'No movies available',
+              AppLocalizations.of(context).homeNoMovies,
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           );

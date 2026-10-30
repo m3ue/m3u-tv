@@ -176,14 +176,20 @@ class _VodDetailsBody extends StatelessWidget {
         if (details.containerExtension != null)
           details.containerExtension!.toUpperCase(),
       ],
-      plot: details.plot ?? 'No synopsis available.',
+      plot: details.plot ?? AppLocalizations.of(context).vodNoSynopsis,
       credits: [
         if (details.director != null)
-          MetaCreditLine(label: 'Director', value: details.director!),
+          MetaCreditLine(
+            label: AppLocalizations.of(context).vodDirector,
+            value: details.director!,
+          ),
         // The comma-separated `cast` string only earns a credit line when
         // there is no rich cast row - otherwise it just repeats it.
         if (details.cast != null && (richCast == null || richCast.isEmpty))
-          MetaCreditLine(label: 'Cast', value: details.cast!),
+          MetaCreditLine(
+            label: AppLocalizations.of(context).vodCast,
+            value: details.cast!,
+          ),
       ],
       richCast: richCast,
       castSemanticLabel: l.vodCast,

@@ -202,7 +202,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       return Scaffold(
         body: Center(
           child: Text(
-            'Please connect to your service in Settings',
+            AppLocalizations.of(context).appNotConfigured,
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
@@ -288,7 +288,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         seriesList.isEmpty &&
         onNowEntries.isEmpty &&
         upcomingEntries.isEmpty) {
-      return _buildEmptyState('No results found');
+      return _buildEmptyState(AppLocalizations.of(context).searchNoResults);
     }
 
     final l = AppLocalizations.of(context);
@@ -390,7 +390,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         precomputedResult: showResult,
       );
     }
-    if (channels.isEmpty) return _buildEmptyState('No results found');
+    if (channels.isEmpty) {
+      return _buildEmptyState(AppLocalizations.of(context).searchNoResults);
+    }
     return DpadRegion(
       memoryKey: 'search/live-tv',
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -415,7 +417,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
 
   Widget _buildMoviesTab(List<VodItem> vodItems) {
     if (!_hasQuery) return _buildPromptState();
-    if (vodItems.isEmpty) return _buildEmptyState('No results found');
+    if (vodItems.isEmpty) {
+      return _buildEmptyState(AppLocalizations.of(context).searchNoResults);
+    }
     return DpadRegion(
       memoryKey: 'search/movies',
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -437,7 +441,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
 
   Widget _buildSeriesTab(List<Series> seriesList) {
     if (!_hasQuery) return _buildPromptState();
-    if (seriesList.isEmpty) return _buildEmptyState('No results found');
+    if (seriesList.isEmpty) {
+      return _buildEmptyState(AppLocalizations.of(context).searchNoResults);
+    }
     return DpadRegion(
       memoryKey: 'search/series',
       horizontalEdge: DpadEdgeBehavior.stop,

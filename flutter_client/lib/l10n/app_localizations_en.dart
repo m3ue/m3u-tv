@@ -1881,4 +1881,103 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mediaSortRecentlyUpdated => 'Recently Updated';
+
+  @override
+  String get playerTrackAudio => 'Audio';
+
+  @override
+  String get playerTrackSubtitles => 'Subtitles';
+
+  @override
+  String get playerTrackAudioTitle => 'Audio Track';
+
+  @override
+  String get playerTrackSubtitleTitle => 'Subtitle Track';
+
+  @override
+  String get playerTrackAudioDisabled => 'Disable';
+
+  @override
+  String get playerTrackSubtitlesOff => 'Off';
+
+  @override
+  String get playerHdrOn => 'HDR On';
+
+  @override
+  String get playerHdrOff => 'HDR Off';
+
+  @override
+  String get playerStartOver => 'Start Over';
+
+  @override
+  String get playerDiagBackend => 'Backend';
+
+  @override
+  String get playerDiagFallback => 'Fallback';
+
+  @override
+  String get playerDiagCodec => 'Codec';
+
+  @override
+  String get playerDiagTranscode => 'Transcode';
+
+  @override
+  String get playerDiagCleanup => 'Cleanup';
+
+  @override
+  String get metaWriter => 'Writer';
+
+  @override
+  String get mediaClearSearch => 'Clear search';
+
+  @override
+  String seriesEpisodesLoadFailed(String error) {
+    return 'Could not load episodes: $error';
+  }
+
+  @override
+  String get seriesNoEpisodes => 'No episodes available';
+
+  @override
+  String get settingsConnecting => 'Connecting...';
+
+  @override
+  String get favoritesNoChannels => 'No favorite channels';
+
+  @override
+  String get favoritesNoMovies => 'No favorite movies';
+
+  @override
+  String get favoritesNoSeries => 'No favorite series';
+
+  @override
+  String get seriesLoadFailed => 'Unable to load series';
+
+  @override
+  String get vodLoadFailed => 'Unable to load movies';
+
+  @override
+  String get vodNoSynopsis => 'No synopsis available.';
+
+  @override
+  String get settingsConnectionFailed =>
+      'Connection failed. Please check your credentials.';
+
+  @override
+  String get settingsConnectingSubtitle =>
+      'Please wait while we connect to your service';
+
+  @override
+  String get settingsCreateViewerFailed =>
+      'Failed to create viewer. Please try again.';
+
+  @override
+  String get searchNoResults => 'No results found';
+
+  @override
+  String get playerLoadTimedOut =>
+      'Stream loading timed out. The server may be unreachable or the stream URL is invalid.';
+
+  @override
+  String get playerErrorTitle => 'Playback error';
 }

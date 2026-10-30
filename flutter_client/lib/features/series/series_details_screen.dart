@@ -199,12 +199,18 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
           }
           if (snapshot.hasError) {
             return Center(
-              child: Text('Could not load episodes: ${snapshot.error}'),
+              child: Text(
+                AppLocalizations.of(
+                  context,
+                ).seriesEpisodesLoadFailed('${snapshot.error}'),
+              ),
             );
           }
           final info = snapshot.data;
           if (info == null) {
-            return const Center(child: Text('No episodes available'));
+            return Center(
+              child: Text(AppLocalizations.of(context).seriesNoEpisodes),
+            );
           }
           return _SeriesDetailsBody(
             info: info,
@@ -622,7 +628,7 @@ class _SeriesDetailsBody extends StatelessWidget {
       onTapMember: onTapMember,
       progressList: progressList,
       canMarkWatched: canMarkWatched,
-      emptyEpisodesLabel: 'No episodes available',
+      emptyEpisodesLabel: AppLocalizations.of(context).seriesNoEpisodes,
       dominantColor: dominantColor,
       colorMatchReady: colorMatchReady,
       autofocusFirstEpisode: target == null,

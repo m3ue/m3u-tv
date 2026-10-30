@@ -168,7 +168,9 @@ class CastMemberRow extends StatelessWidget {
                       height: _cardHeight,
                       child: _ShowAllCastCard(
                         hiddenCount: hiddenCount,
-                        label: allCastSemanticLabel ?? 'Show all',
+                        label:
+                            allCastSemanticLabel ??
+                            AppLocalizations.of(context).castShowAll,
                         onTap: onShowAll!,
                       ),
                     ),
