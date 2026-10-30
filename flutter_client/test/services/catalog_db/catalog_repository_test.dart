@@ -434,6 +434,46 @@ void main() {
     },
   );
 
+  group('large writes and reads run on a database worker isolate', () {
+    test('replaceItems keeps every row, order and clashing ids', () async {
+      final channels = [
+        for (var i = 0; i < 1200; i++)
+          // Every 100th id repeats, exercising the surrogate-id path.
+          _channel(i % 100 == 0 ? 7 : i + 1, 'Channel $i'),
+      ];
+      await repo.replaceItems(
+        sourceKey: CatalogRepository.activeSource,
+        kind: kCatalogKindLive,
+        items: channels,
+      );
+      final stored = await repo.allItems<Channel>(
+        CatalogRepository.activeSource,
+        kCatalogKindLive,
+      );
+      expect(stored.map((c) => c.name), channels.map((c) => c.name));
+    });
+
+    test('replaceProgrammes and programmesEndingAfter round-trip', () async {
+      final base = DateTime.utc(2026);
+      final programmes = [
+        for (var i = 0; i < 900; i++)
+          EpgProgram(
+            channelId: 'c${i % 30}',
+            title: 'Show $i',
+            description: '',
+            start: base.add(Duration(minutes: 30 * i)),
+            end: base.add(Duration(minutes: 30 * (i + 1))),
+          ),
+      ];
+      await repo.replaceProgrammes(programmes);
+      final all = await repo.programmesEndingAfter(DateTime.utc(2000));
+      expect(all, hasLength(900));
+      expect(all.first.title, 'Show 0');
+      expect(all.last.title, 'Show 899');
+      expect(all.first.start, base);
+    });
+  });
+
   test('kv slots round-trip and delete', () async {
     await repo.kvPut('sourceType', 'xtream');
     expect(await repo.kvGet('sourceType'), 'xtream');

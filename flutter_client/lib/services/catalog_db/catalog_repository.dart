@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -151,9 +152,30 @@ class CatalogRepository {
     required String sourceKey,
     required String kind,
     required List<Object> items,
-  }) async {
-    await _db.transaction(() async {
-      await (_db.delete(_db.catalogItems)
+  }) {
+    // Every row is a jsonEncode plus a companion; for a large library that
+    // per-row work (not the SQL, which drift already runs off-thread) blocked
+    // the UI isolate for the length of a catalog refresh.
+    if (!_offloadWrites || items.length < _offloadThresholdRows) {
+      return _replaceItemsOn(_db, sourceKey, kind, items);
+    }
+    return _db.computeWithDatabase(
+      connect: CatalogDatabase.new,
+      computation: (db) => _replaceItemsOn(db, sourceKey, kind, items),
+    );
+  }
+
+  /// No isolates (and so no `computeWithDatabase`) on the web.
+  static const bool _offloadWrites = !kIsWeb;
+
+  static Future<void> _replaceItemsOn(
+    CatalogDatabase db,
+    String sourceKey,
+    String kind,
+    List<Object> items,
+  ) async {
+    await db.transaction(() async {
+      await (db.delete(db.catalogItems)
             ..where((t) => t.sourceKey.equals(sourceKey) & t.kind.equals(kind)))
           .go();
       // The PK is (sourceKey, kind, streamId). Provider payloads are not
@@ -165,7 +187,7 @@ class CatalogRepository {
       // Nothing reads a row back by this column; the decoded `.id` comes from
       // the json payload.
       final usedIds = <int>{};
-      await _db.batch((batch) {
+      await db.batch((batch) {
         for (var i = 0; i < items.length; i++) {
           var row = _rowFor(sourceKey, kind, items[i], i);
           if (row.streamId.value <= 0 || !usedIds.add(row.streamId.value)) {
@@ -173,13 +195,13 @@ class CatalogRepository {
             usedIds.add(surrogate);
             row = row.copyWith(streamId: Value(surrogate));
           }
-          batch.insert(_db.catalogItems, row, mode: InsertMode.insertOrReplace);
+          batch.insert(db.catalogItems, row, mode: InsertMode.insertOrReplace);
         }
       });
     });
   }
 
-  CatalogItemsCompanion _rowFor(
+  static CatalogItemsCompanion _rowFor(
     String sourceKey,
     String kind,
     Object item,
@@ -241,7 +263,8 @@ class CatalogRepository {
 
   /// Parses a domain object's four-digit `year` string into the promoted
   /// column's int, or null for anything absent/malformed.
-  int? _parseYear(String? year) => year == null ? null : int.tryParse(year);
+  static int? _parseYear(String? year) =>
+      year == null ? null : int.tryParse(year);
 
   static Object _decodeRow(String kind, String json) {
     final map = asMap(jsonDecode(json));
@@ -471,12 +494,47 @@ class CatalogRepository {
   // EPG programmes
   // -------------------------------------------------------------------------
 
-  Future<void> upsertProgrammes(List<EpgProgram> programmes) async {
+  Future<void> upsertProgrammes(List<EpgProgram> programmes) {
+    if (programmes.isEmpty) return Future.value();
+    if (!_offloadWrites || programmes.length < _offloadThresholdRows) {
+      return _upsertProgrammesOn(_db, programmes);
+    }
+    return _db.computeWithDatabase(
+      connect: CatalogDatabase.new,
+      computation: (db) => _upsertProgrammesOn(db, programmes),
+    );
+  }
+
+  /// Replace the entire programme table with [programmes] (clear + insert),
+  /// matching the "wipe and rewrite" semantics the persisted `epgGuide` blob
+  /// had.
+  Future<void> replaceProgrammes(List<EpgProgram> programmes) {
+    if (!_offloadWrites || programmes.length < _offloadThresholdRows) {
+      return _replaceProgrammesOn(_db, programmes);
+    }
+    return _db.computeWithDatabase(
+      connect: CatalogDatabase.new,
+      computation: (db) => _replaceProgrammesOn(db, programmes),
+    );
+  }
+
+  static Future<void> _replaceProgrammesOn(
+    CatalogDatabase db,
+    List<EpgProgram> programmes,
+  ) => db.transaction(() async {
+    await db.delete(db.epgProgrammes).go();
+    await _upsertProgrammesOn(db, programmes);
+  });
+
+  static Future<void> _upsertProgrammesOn(
+    CatalogDatabase db,
+    List<EpgProgram> programmes,
+  ) async {
     if (programmes.isEmpty) return;
-    await _db.batch((batch) {
+    await db.batch((batch) {
       for (final program in programmes) {
         batch.insert(
-          _db.epgProgrammes,
+          db.epgProgrammes,
           EpgProgrammesCompanion.insert(
             channelId: program.channelId,
             startMs: program.start.millisecondsSinceEpoch,
@@ -503,19 +561,41 @@ class CatalogRepository {
     });
   }
 
-  /// Replace the entire programme table with [programmes] (clear + insert),
-  /// matching the "wipe and rewrite" semantics the persisted `epgGuide` blob
-  /// had.
-  Future<void> replaceProgrammes(List<EpgProgram> programmes) async {
-    await _db.transaction(() async {
-      await _db.delete(_db.epgProgrammes).go();
-      await upsertProgrammes(programmes);
-    });
+  /// Every programme ending at or after [cutoff], start-ordered. A full-guide
+  /// read (boot hydration) can be 100k+ rows, so above the offload threshold
+  /// both the query and the row mapping run on a background isolate.
+  Future<List<EpgProgram>> programmesEndingAfter(DateTime cutoff) async {
+    if (_offloadWrites &&
+        await _countProgrammesEndingAfter(cutoff) >= _offloadThresholdRows) {
+      // The computation must capture only sendable values (not `this` or a
+      // drift expression), so it is built apart from the count query.
+      return _db.computeWithDatabase(
+        connect: CatalogDatabase.new,
+        computation: (db) => _programmesEndingAfterOn(db, cutoff),
+      );
+    }
+    return _programmesEndingAfterOn(_db, cutoff);
   }
 
-  Future<List<EpgProgram>> programmesEndingAfter(DateTime cutoff) async {
+  Future<int> _countProgrammesEndingAfter(DateTime cutoff) {
+    final count = _db.epgProgrammes.channelId.count();
+    return (_db.selectOnly(_db.epgProgrammes)
+          ..addColumns([count])
+          ..where(
+            _db.epgProgrammes.endMs.isBiggerOrEqualValue(
+              cutoff.millisecondsSinceEpoch,
+            ),
+          ))
+        .map((row) => row.read(count) ?? 0)
+        .getSingle();
+  }
+
+  static Future<List<EpgProgram>> _programmesEndingAfterOn(
+    CatalogDatabase db,
+    DateTime cutoff,
+  ) async {
     final rows =
-        await (_db.select(_db.epgProgrammes)
+        await (db.select(db.epgProgrammes)
               ..where(
                 (t) => t.endMs.isBiggerOrEqualValue(
                   cutoff.millisecondsSinceEpoch,
@@ -535,7 +615,7 @@ class CatalogRepository {
         .go();
   }
 
-  EpgProgram _programFromRow(EpgProgrammeRow row) => EpgProgram(
+  static EpgProgram _programFromRow(EpgProgrammeRow row) => EpgProgram(
     channelId: row.channelId,
     title: row.title,
     description: row.description,
