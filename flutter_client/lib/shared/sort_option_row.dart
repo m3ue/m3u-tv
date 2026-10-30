@@ -4,8 +4,8 @@ import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 
 /// A single row in a "Sort By" modal (see `showMediaSortDialog` /
-/// `showChannelSortDialog`) - the active option is bold, tinted, and
-/// checked.
+/// `showChannelSortDialog`) or any other pick-one list (the player's track
+/// picker) - the active option is bold, tinted, and checked.
 class SortOptionRow extends StatelessWidget {
   const SortOptionRow({
     super.key,

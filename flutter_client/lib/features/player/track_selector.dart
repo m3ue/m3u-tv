@@ -1,15 +1,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:m3u_tv/features/player/playback_controls.dart'
+    show isHandheldLayout;
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:m3u_tv/shared/list_picker_sheet.dart';
+import 'package:m3u_tv/shared/sort_option_row.dart';
 
-/// Track selector widget for audio and subtitle track selection.
-///
-/// Mirrors the RN PlayerScreen track selectors that show native
-/// ActionSheet/Alert dialogs. In Flutter, we use a simple dialog
-/// with track options.
+/// Track selector widget for audio and subtitle track selection: buttons
+/// that open the shared [ListPickerSheet] with one checked row per track.
 class TrackSelector extends StatelessWidget {
   const TrackSelector({
     required this.audioTracks,
@@ -87,6 +89,7 @@ class TrackSelector extends StatelessWidget {
     // height here would clip that growth instead of fitting it.
     final scale = FontSizeScope.scaleOf(context);
     final scaledButtonHeight = buttonHeight * scale;
+    final l = AppLocalizations.of(context);
     final row = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -101,7 +104,7 @@ class TrackSelector extends StatelessWidget {
               height: scaledButtonHeight,
               child: AppButton(
                 icon: Icons.hdr_on,
-                label: hdrEnabled ? 'HDR On' : 'HDR Off',
+                label: hdrEnabled ? l.playerHdrOn : l.playerHdrOff,
                 onPressed: () => onHdrEnabledChanged?.call(!hdrEnabled),
               ),
             ),
@@ -111,7 +114,7 @@ class TrackSelector extends StatelessWidget {
             height: scaledButtonHeight,
             child: AppButton(
               icon: Icons.audiotrack,
-              label: 'Audio',
+              label: l.playerTrackAudio,
               onPressed: () => _showAudioDialog(context),
             ),
           ),
@@ -122,7 +125,7 @@ class TrackSelector extends StatelessWidget {
             height: scaledButtonHeight,
             child: AppButton(
               icon: Icons.subtitles,
-              label: 'Subtitles',
+              label: l.playerTrackSubtitles,
               onPressed: () => _showSubtitleDialog(context),
             ),
           ),
@@ -142,100 +145,81 @@ class TrackSelector extends StatelessWidget {
       : selectedAudioTrackId ?? audioTracks.firstOrNull?.id;
 
   void _showAudioDialog(BuildContext context) {
-    onDialogVisibilityChanged?.call(true);
-    unawaited(
-      showDialog<void>(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Audio Track'),
-            content: _TrackDialogList(
-              children: [
-                ListTile(
-                  title: const Text('Disable'),
-                  selected: _effectiveAudioTrackId == null,
-                  onTap: () {
-                    onAudioTrackSelected(null);
-                    Navigator.of(context).pop();
-                  },
-                ),
-                ...audioTracks.map(
-                  (track) => ListTile(
-                    title: Text(track.label),
-                    selected: track.id == _effectiveAudioTrackId,
-                    onTap: () {
-                      onAudioTrackSelected(track.id);
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ).whenComplete(() => onDialogVisibilityChanged?.call(false)),
+    final l = AppLocalizations.of(context);
+    final selectedId = _effectiveAudioTrackId;
+    _showTrackPicker(
+      context,
+      title: l.playerTrackAudioTitle,
+      options: [
+        (id: null, label: l.playerTrackAudioDisabled, icon: Icons.volume_off),
+        for (final track in audioTracks)
+          (id: track.id, label: track.label, icon: Icons.language),
+      ],
+      selectedId: selectedId,
+      hasSelection: true,
+      onSelected: onAudioTrackSelected,
     );
   }
 
   void _showSubtitleDialog(BuildContext context) {
-    onDialogVisibilityChanged?.call(true);
-    unawaited(
-      showDialog<void>(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Subtitle Track'),
-            content: _TrackDialogList(
-              children: [
-                ListTile(
-                  title: const Text('Off'),
-                  selected:
-                      isSubtitleTrackSelectionKnown &&
-                      selectedSubtitleTrackId == null,
-                  onTap: () {
-                    onSubtitleTrackSelected(null);
-                    Navigator.of(context).pop();
-                  },
-                ),
-                ...subtitleTracks.map(
-                  (track) => ListTile(
-                    title: Text(track.label),
-                    selected: track.id == selectedSubtitleTrackId,
-                    onTap: () {
-                      onSubtitleTrackSelected(track.id);
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ).whenComplete(() => onDialogVisibilityChanged?.call(false)),
+    final l = AppLocalizations.of(context);
+    _showTrackPicker(
+      context,
+      title: l.playerTrackSubtitleTitle,
+      options: [
+        (
+          id: null,
+          label: l.playerTrackSubtitlesOff,
+          icon: Icons.subtitles_off,
+        ),
+        for (final track in subtitleTracks)
+          (id: track.id, label: track.label, icon: Icons.closed_caption),
+      ],
+      selectedId: selectedSubtitleTrackId,
+      // An unknown selection with no id must not tick "Off".
+      hasSelection:
+          isSubtitleTrackSelectionKnown || selectedSubtitleTrackId != null,
+      onSelected: onSubtitleTrackSelected,
     );
   }
-}
 
-class _TrackDialogList extends StatelessWidget {
-  const _TrackDialogList({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.55;
-    return SizedBox(
-      width: double.maxFinite,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        child: Scrollbar(
-          thumbVisibility: true,
-          child: ListView(
-            shrinkWrap: true,
-            children: children,
-          ),
-        ),
-      ),
+  void _showTrackPicker(
+    BuildContext context, {
+    required String title,
+    required List<({String? id, String label, IconData icon})> options,
+    required String? selectedId,
+    required bool hasSelection,
+    required ValueChanged<String?> onSelected,
+  }) {
+    final l = AppLocalizations.of(context);
+    onDialogVisibilityChanged?.call(true);
+    unawaited(
+      ListPickerSheet.show(
+        context,
+        title: title,
+        cancelLabel: l.cancel,
+        asDialog: !isHandheldLayout(context),
+        // The active row takes focus itself (below), wherever it sits.
+        autofocusIndex: -1,
+        children: [
+          for (final (index, option) in options.indexed)
+            Builder(
+              builder: (rowContext) {
+                final isActive = hasSelection && option.id == selectedId;
+                return SortOptionRow(
+                  icon: option.icon,
+                  label: option.label,
+                  isActive: isActive,
+                  autofocus: isActive || (!hasSelection && index == 0),
+                  onTap: () {
+                    onSelected(option.id);
+                    Navigator.of(rowContext).pop();
+                  },
+                );
+              },
+            ),
+        ],
+      ).whenComplete(() => onDialogVisibilityChanged?.call(false)),
     );
   }
 }

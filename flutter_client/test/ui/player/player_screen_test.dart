@@ -623,14 +623,14 @@ void main() {
         await tester.tap(find.byIcon(Icons.audiotrack));
         await tester.pumpAndSettle();
 
-        final disableTile = tester.widget<ListTile>(
-          find.widgetWithText(ListTile, 'Disable'),
+        final disableTile = tester.widget<SortOptionRow>(
+          find.widgetWithText(SortOptionRow, 'Disable'),
         );
-        final deTile = tester.widget<ListTile>(
-          find.widgetWithText(ListTile, 'de'),
+        final deTile = tester.widget<SortOptionRow>(
+          find.widgetWithText(SortOptionRow, 'de'),
         );
-        expect(disableTile.selected, isFalse);
-        expect(deTile.selected, isTrue);
+        expect(disableTile.isActive, isFalse);
+        expect(deTile.isActive, isTrue);
       },
     );
 
@@ -929,14 +929,14 @@ void main() {
       await tester.tap(find.byIcon(Icons.audiotrack));
       await tester.pumpAndSettle();
 
-      final disableTile = tester.widget<ListTile>(
-        find.widgetWithText(ListTile, 'Disable'),
+      final disableTile = tester.widget<SortOptionRow>(
+        find.widgetWithText(SortOptionRow, 'Disable'),
       );
-      final englishTile = tester.widget<ListTile>(
-        find.widgetWithText(ListTile, 'English'),
+      final englishTile = tester.widget<SortOptionRow>(
+        find.widgetWithText(SortOptionRow, 'English'),
       );
-      expect(disableTile.selected, isTrue);
-      expect(englishTile.selected, isFalse);
+      expect(disableTile.isActive, isTrue);
+      expect(englishTile.isActive, isFalse);
     });
 
     testWidgets('opens subtitle track dialog on tap', (tester) async {
@@ -987,14 +987,14 @@ void main() {
         await tester.tap(find.byIcon(Icons.subtitles));
         await tester.pumpAndSettle();
 
-        final offTile = tester.widget<ListTile>(
-          find.widgetWithText(ListTile, 'Off'),
+        final offTile = tester.widget<SortOptionRow>(
+          find.widgetWithText(SortOptionRow, 'Off'),
         );
-        final englishTile = tester.widget<ListTile>(
-          find.widgetWithText(ListTile, 'English CC'),
+        final englishTile = tester.widget<SortOptionRow>(
+          find.widgetWithText(SortOptionRow, 'English CC'),
         );
-        expect(offTile.selected, isFalse);
-        expect(englishTile.selected, isFalse);
+        expect(offTile.isActive, isFalse);
+        expect(englishTile.isActive, isFalse);
       },
     );
 
@@ -1022,14 +1022,14 @@ void main() {
       await tester.tap(find.byIcon(Icons.subtitles));
       await tester.pumpAndSettle();
 
-      final offTile = tester.widget<ListTile>(
-        find.widgetWithText(ListTile, 'Off'),
+      final offTile = tester.widget<SortOptionRow>(
+        find.widgetWithText(SortOptionRow, 'Off'),
       );
-      final englishTile = tester.widget<ListTile>(
-        find.widgetWithText(ListTile, 'English CC'),
+      final englishTile = tester.widget<SortOptionRow>(
+        find.widgetWithText(SortOptionRow, 'English CC'),
       );
-      expect(offTile.selected, isTrue);
-      expect(englishTile.selected, isFalse);
+      expect(offTile.isActive, isTrue);
+      expect(englishTile.isActive, isFalse);
     });
 
     testWidgets('calls onAudioTrackSelected when track chosen', (tester) async {
@@ -2922,8 +2922,10 @@ void main() {
 
           expect(
             tester
-                .widget<ListTile>(find.widgetWithText(ListTile, 'Disable'))
-                .selected,
+                .widget<SortOptionRow>(
+                  find.widgetWithText(SortOptionRow, 'Disable'),
+                )
+                .isActive,
             isTrue,
           );
           expect(find.text('English'), findsOneWidget);
@@ -2960,8 +2962,10 @@ void main() {
 
           expect(
             tester
-                .widget<ListTile>(find.widgetWithText(ListTile, 'Off'))
-                .selected,
+                .widget<SortOptionRow>(
+                  find.widgetWithText(SortOptionRow, 'Off'),
+                )
+                .isActive,
             isTrue,
           );
           expect(find.text('English CC'), findsOneWidget);

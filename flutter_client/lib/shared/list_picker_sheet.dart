@@ -1,6 +1,7 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 
@@ -116,6 +117,24 @@ class ListPickerSheet extends StatelessWidget {
         ? const EdgeInsets.fromLTRB(12, 4, 12, 4)
         : const EdgeInsets.fromLTRB(12, 4, 12, 12);
 
+    final list = ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxListHeight),
+      child: Scrollbar(
+        thumbVisibility: asDialog,
+        child: ListView(
+          shrinkWrap: true,
+          padding: listPadding,
+          children: [
+            for (var i = 0; i < children.length; i++)
+              if (i == autofocusIndex)
+                Focus(autofocus: true, child: children[i])
+              else
+                children[i],
+          ],
+        ),
+      ),
+    );
+
     return DpadRegion(
       verticalEdge: DpadEdgeBehavior.stop,
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -131,29 +150,17 @@ class ListPickerSheet extends StatelessWidget {
                 AppIconButton(
                   icon: Icons.close,
                   dense: true,
-                  tooltip: cancelLabel ?? 'Cancel',
+                  tooltip: cancelLabel ?? AppLocalizations.of(context).cancel,
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
           ),
-          ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: maxListHeight),
-            child: Scrollbar(
-              thumbVisibility: asDialog,
-              child: ListView(
-                shrinkWrap: true,
-                padding: listPadding,
-                children: [
-                  for (var i = 0; i < children.length; i++)
-                    if (i == autofocusIndex)
-                      Focus(autofocus: true, child: children[i])
-                    else
-                      children[i],
-                ],
-              ),
-            ),
-          ),
+          // The cap is an upper bound; in the dialog form the list may also
+          // shrink to fit, since a short landscape phone leaves the
+          // AlertDialog less room than the cap plus the title row. (The
+          // sheet form keeps the plain cap - see the class doc.)
+          if (asDialog) Flexible(child: list) else list,
         ],
       ),
     );
