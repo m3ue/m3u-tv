@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:m3u_tv/services/device_performance.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 
 /// Provides image quality settings (oversample factor and filter quality)
@@ -47,6 +48,15 @@ class ImageQualityScope extends InheritedWidget {
   /// Falls back to [FilterQuality.high] if no scope is found.
   static FilterQuality filterQualityOf(BuildContext context) =>
       of(context)?.filterQuality ?? FilterQuality.high;
+
+  /// Whether live blur effects (`BackdropFilter`, `ImageFilter.blur`) are
+  /// worth their cost: each forces an offscreen layer and re-blurs whatever
+  /// is behind it every frame, which low-end TV GPUs feel. Off on
+  /// reduced-tier hardware and in Speed mode; callers fall back to a more
+  /// opaque tint.
+  static bool allowsBlurOf(BuildContext context) =>
+      !DevicePerformance.isReduced &&
+      (of(context)?.optimizeFor ?? OptimizeFor.quality) == OptimizeFor.quality;
 
   @override
   bool updateShouldNotify(ImageQualityScope oldWidget) =>
