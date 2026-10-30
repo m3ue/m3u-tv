@@ -102,6 +102,24 @@ class CacheService {
     }
   }
 
+  /// Incremental counterpart of `set('epgGuide', ...)`: rewrites only the
+  /// given channels' programmes (see
+  /// [CatalogRepository.replaceChannelProgrammes]) and refreshes the guide's
+  /// age marker, so a sweep batch doesn't rewrite the whole guide.
+  Future<void> updateEpgChannels(
+    Map<String, List<EpgProgram>> byChannel, {
+    DateTime? pruneBefore,
+  }) async {
+    final repo = _repo;
+    if (repo.isClosed) return;
+    await repo.replaceChannelProgrammes(byChannel, pruneBefore: pruneBefore);
+    await repo.kvPut(
+      _tsKey(_epgKey),
+      '',
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
   Future<CacheEntry<T>?> get<T>(String key) async {
     if (_isRepoKey(key)) return _readRepoKey<T>(key);
 

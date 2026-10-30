@@ -434,6 +434,39 @@ void main() {
     },
   );
 
+  test('replaceChannelProgrammes rewrites only the given channels and '
+      'prunes ended programmes', () async {
+    final base = DateTime.utc(2026, 3, 1, 12);
+    EpgProgram show(String channel, String title, int startHour) => EpgProgram(
+      channelId: channel,
+      title: title,
+      description: '',
+      start: base.add(Duration(hours: startHour)),
+      end: base.add(Duration(hours: startHour + 1)),
+    );
+    await repo.replaceProgrammes([
+      show('a', 'A old 10:00', -2),
+      show('a', 'A old 13:00', 1),
+      show('b', 'B keep 13:00', 1),
+      show('c', 'C dropped 13:00', 1),
+    ]);
+
+    await repo.replaceChannelProgrammes(
+      {
+        // A rescheduled slot replaces the old rows wholesale.
+        'a': [show('a', 'A new 14:00', 2)],
+        // An empty schedule clears the channel.
+        'c': const [],
+      },
+      pruneBefore: base,
+    );
+
+    final titles = (await repo.programmesEndingAfter(
+      DateTime.utc(2000),
+    )).map((p) => p.title);
+    expect(titles, unorderedEquals(['A new 14:00', 'B keep 13:00']));
+  });
+
   group('large writes and reads run on a database worker isolate', () {
     test('replaceItems keeps every row, order and clashing ids', () async {
       final channels = [

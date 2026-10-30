@@ -548,6 +548,10 @@ class AppStateController extends ChangeNotifier {
   // network round-trip. Only programmes still airing or upcoming are kept, and
   // the flat list is capped so the blob stays bounded on huge playlists.
   Timer? _epgGuidePersistDebounce;
+
+  /// EPG channel ids whose in-memory schedule changed since the last
+  /// persist; only these are rewritten on disk.
+  final Set<String> _dirtyEpgChannelIds = <String>{};
   // When the last guide prime succeeded, so a resume can tell whether the
   // guide is older than [EpgService.cacheTtl]. Only set on success: a prime
   // that fails (waking from standby before Wi-Fi is back) must not count as
@@ -3446,6 +3450,9 @@ class AppStateController extends ChangeNotifier {
           replaceExisting: false,
           markFresh: false,
         );
+      // Written with the next scheduled persist, as the full-guide rewrite
+      // used to pick these up.
+      _markEpgDirty([_epgChannelId(channel)], programs);
       _catchupEpgFetchedAt[channel.id] = DateTime.now();
     } on Object catch (_) {
       _catchupEpgFetchedAt.remove(channel.id);
@@ -3513,6 +3520,7 @@ class AppStateController extends ChangeNotifier {
           )
           ..markFetched(fetchIds);
       }
+      _markEpgDirty(channelIds, programs);
       _scheduleEpgGuidePersist();
       if (kDebugMode) {
         debugPrint(
@@ -3705,6 +3713,7 @@ class AppStateController extends ChangeNotifier {
         programs,
         sourceGeneration: sourceGeneration,
       );
+      _markEpgDirty(channelIds, programs);
       _scheduleEpgGuidePersist();
     } on Object catch (e) {
       epgService.markFetchFailed(
@@ -3735,11 +3744,33 @@ class AppStateController extends ChangeNotifier {
     );
   }
 
+  void _markEpgDirty(Iterable<String> channelIds, List<EpgProgram> programs) {
+    _dirtyEpgChannelIds
+      ..addAll(channelIds.where((id) => id.isNotEmpty))
+      ..addAll(programs.map((p) => p.channelId).where((id) => id.isNotEmpty));
+  }
+
+  /// Rewrites only the channels whose schedule changed since the last
+  /// persist (the debounce coalesces a burst of sweep batches), and prunes
+  /// programmes that have ended. The whole-guide rewrite this replaced copied
+  /// up to [_epgPersistProgramCap] programmes every few seconds of a sweep.
   Future<void> _persistEpgGuide() async {
     if (_disposed || _sourceType != AppSourceType.xtream) return;
+    if (_dirtyEpgChannelIds.isEmpty) return;
+    final cutoff = epgService.now.subtract(_epgPersistPastSlack);
+    final dirty = _dirtyEpgChannelIds.toList(growable: false);
+    _dirtyEpgChannelIds.clear();
     try {
-      await cacheService.set('epgGuide', _epgGuideForPersist());
+      await cacheService.updateEpgChannels({
+        for (final id in dirty)
+          id: [
+            for (final program in epgService.programsForId(id))
+              if (program.end.isAfter(cutoff)) program,
+          ],
+      }, pruneBefore: cutoff);
     } on Object catch (e) {
+      // Retry these channels with the next persist.
+      _dirtyEpgChannelIds.addAll(dirty);
       if (kDebugMode) debugPrint('[EPG] guide persist failed: $e');
     }
   }
@@ -3799,6 +3830,7 @@ class AppStateController extends ChangeNotifier {
     _epgSweepGeneration += 1;
     _epgFetchDebounce?.cancel();
     _epgGuidePersistDebounce?.cancel();
+    _dirtyEpgChannelIds.clear();
     _epgFetchDebounce = null;
     _pendingEpgChannelIds.clear();
     _pendingForcedEpgChannelIds.clear();

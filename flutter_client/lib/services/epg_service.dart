@@ -317,6 +317,11 @@ class EpgService extends ChangeNotifier {
     return null;
   }
 
+  /// The held programmes for one EPG channel id, start-ordered (empty when
+  /// none).
+  List<EpgProgram> programsForId(String channelId) =>
+      _programsByChannel[channelId] ?? const <EpgProgram>[];
+
   /// Returns every known program for [channel], sorted by start time.
   List<EpgProgram> programsForChannel(Channel channel) {
     final ids = <String?>[channel.epgChannelId, channel.tvgName, channel.name];
