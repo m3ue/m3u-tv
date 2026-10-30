@@ -21,6 +21,7 @@ import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/channel_grid_tile.dart';
 import 'package:m3u_tv/shared/channel_sort.dart';
 import 'package:m3u_tv/shared/channel_sort_dialog.dart';
@@ -91,7 +92,7 @@ class LiveTvScreen extends ConsumerStatefulWidget {
   /// Called with the filtered channel list (category/favorites/search) right
   /// before [onChannelSelect], so the player's skip-previous/skip-next stays
   /// within this view instead of the full unfiltered channel list.
-  final void Function(List<Channel>)? onChannelContextChanged;
+  final void Function(ChannelContext)? onChannelContextChanged;
   final CatchupProgramSelect? onCatchupProgramSelect;
   final VoidCallback? onSidebarActivate;
   final void Function(Channel, EpgProgram)? onScheduleProgram;
@@ -319,7 +320,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       _resumePreviewChannel = channel;
     }
     if (!mounted) return;
-    widget.onChannelContextChanged?.call(channels);
+    widget.onChannelContextChanged?.call(ListChannelContext(channels));
     widget.onChannelSelect(channel);
   }
 
@@ -1132,7 +1133,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: index == 0,
             onTap: () {
-              widget.onChannelContextChanged?.call(channels);
+              widget.onChannelContextChanged?.call(
+                ListChannelContext(channels),
+              );
               widget.onChannelSelect(channel);
             },
             onLongPress: () => unawaited(
@@ -1235,7 +1238,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: index == 0,
             onTap: () {
-              widget.onChannelContextChanged?.call(channels);
+              widget.onChannelContextChanged?.call(
+                ListChannelContext(channels),
+              );
               widget.onChannelSelect(channel);
             },
             onLongPress: () => unawaited(

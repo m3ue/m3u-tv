@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -146,7 +147,7 @@ class ShowResultRow extends StatelessWidget {
   final Channel? channel;
   final List<Channel> onNowChannels;
   final void Function(Channel) onChannelSelect;
-  final void Function(List<Channel>)? onChannelContextChanged;
+  final void Function(ChannelContext)? onChannelContextChanged;
   final void Function(EpgShow)? onShowSelect;
   final String languageTag;
   final bool autofocus;
@@ -187,7 +188,9 @@ class ShowResultRow extends StatelessWidget {
         ? (onNowChannel == null
               ? null
               : () {
-                  onChannelContextChanged?.call(onNowChannels);
+                  onChannelContextChanged?.call(
+                    ListChannelContext(onNowChannels),
+                  );
                   onChannelSelect(onNowChannel);
                 })
         : () => onShowSelect?.call(entry.show);

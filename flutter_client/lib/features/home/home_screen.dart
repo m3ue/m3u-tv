@@ -16,6 +16,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
+import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/channel_grid_tile.dart';
 import 'package:m3u_tv/shared/continue_watching_items.dart';
 import 'package:m3u_tv/shared/formatters.dart';
@@ -49,7 +50,7 @@ class HomeScreen extends ConsumerStatefulWidget {
   });
 
   final void Function(Channel) onChannelSelect;
-  final void Function(List<Channel>)? onChannelContextChanged;
+  final void Function(ChannelContext)? onChannelContextChanged;
   final void Function(VodItem) onVodSelect;
   final void Function(Series) onSeriesSelect;
   final void Function(Progress) onProgressSelect;
@@ -508,7 +509,7 @@ class _LiveRow extends ConsumerWidget {
 
   final Set<int> favoriteChannelIds;
   final void Function(Channel) onChannelSelect;
-  final void Function(List<Channel>)? onChannelContextChanged;
+  final void Function(ChannelContext)? onChannelContextChanged;
   final Future<void> Function(Channel) onToggleFavorite;
   final int rowItemLimit;
   final bool useSidebarLayout;
@@ -552,7 +553,9 @@ class _LiveRow extends ConsumerWidget {
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: autofocus,
             onTap: () {
-              onChannelContextChanged?.call(liveSectionChannels);
+              onChannelContextChanged?.call(
+                ListChannelContext(liveSectionChannels),
+              );
               onChannelSelect(channel);
             },
             onLongPress: () => onToggleFavorite(channel),

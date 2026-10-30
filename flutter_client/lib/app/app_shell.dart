@@ -39,6 +39,7 @@ import 'package:m3u_tv/services/dvr_actions.dart';
 import 'package:m3u_tv/services/memory_watchdog.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/shared/app_background.dart';
+import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/dvr_schedule_feedback.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
@@ -209,7 +210,8 @@ class AppShellState extends ConsumerState<AppShell>
   // PlaybackControls stays within that view instead of always cycling the
   // full unfiltered live channel list. Set by feature screens right before
   // they invoke onChannelSelect.
-  List<Channel> _playerChannelContext = const <Channel>[];
+  ChannelContext _playerChannelContext = ListChannelContext.empty;
+  int _channelSwitchGeneration = 0;
 
   final List<FocusNode> _sidebarFocusNodes = [];
   final FocusScopeNode _contentFocusNode = FocusScopeNode();
@@ -907,7 +909,7 @@ class AppShellState extends ConsumerState<AppShell>
       _playerHasFailed = false;
       _playerModalDialogVisible = false;
     });
-    _playerChannelContext = const <Channel>[];
+    _playerChannelContext = ListChannelContext.empty;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (savedFocus != null && savedFocus.canRequestFocus) {
@@ -981,41 +983,51 @@ class AppShellState extends ConsumerState<AppShell>
   // Stable tearoffs passed to PlayerScreen so PlaybackControls can offer
   // channel-up/channel-down without PlayerScreen needing to know about
   // liveChannelsProvider itself.
-  void _openNextChannel() => _switchChannel(1);
-  void _openPreviousChannel() => _switchChannel(-1);
+  void _openNextChannel() => unawaited(_switchChannel(1));
+  void _openPreviousChannel() => unawaited(_switchChannel(-1));
 
   // Set by feature screens right before they call onChannelSelect, so
   // skip-previous/skip-next in the player can stay within the filtered view
   // (category, favorites, search) the user was browsing.
-  void _setChannelContext(List<Channel> channels) {
-    _playerChannelContext = channels;
+  void _setChannelContext(ChannelContext context) {
+    _playerChannelContext = context;
   }
 
-  void _switchChannel(int direction) {
+  /// Every live channel, for when no narrower context applies.
+  ChannelContext get _allChannelsContext =>
+      ListChannelContext(ref.read(liveChannelsProvider));
+
+  Future<void> _switchChannel(int direction) async {
     final args = _playerArgs;
-    if (args == null || args.type != 'live') return;
+    final streamId = args?.streamId;
+    if (args == null || args.type != 'live' || streamId == null) return;
     // A context of exactly one channel (e.g. the On Now rail's set of
     // channels airing the searched show) can't skip anywhere - fall back to
-    // the full channel list rather than silently no-op on `% 1 == 0`.
+    // the full channel list rather than silently no-op.
     final channels = _playerChannelContext.length > 1
         ? _playerChannelContext
-        : ref.read(liveChannelsProvider);
-    if (channels.isEmpty) return;
-    final currentIndex = channels.indexWhere((c) => c.id == args.streamId);
-    if (currentIndex == -1) return;
-    final nextIndex =
-        (currentIndex + direction + channels.length) % channels.length;
-    _openChannel(channels[nextIndex]);
+        : _allChannelsContext;
+    // Rapid presses each resolve asynchronously; only the latest opens.
+    final generation = ++_channelSwitchGeneration;
+    final next = await channels.neighbour(streamId, direction);
+    if (!mounted ||
+        next == null ||
+        generation != _channelSwitchGeneration ||
+        !identical(args, _playerArgs)) {
+      return;
+    }
+    _openChannel(next);
   }
 
   Future<void> _handleRecordButtonTap(EpgProgram program) async {
     final args = _playerArgs;
-    if (args == null || args.type != 'live') return;
-    final channels = _playerChannelContext.isNotEmpty
+    final streamId = args?.streamId;
+    if (args == null || args.type != 'live' || streamId == null) return;
+    final channels = _playerChannelContext.length > 0
         ? _playerChannelContext
-        : ref.read(liveChannelsProvider);
-    final channel = channels.firstWhereOrNull((c) => c.id == args.streamId);
-    if (channel == null) return;
+        : _allChannelsContext;
+    final channel = await channels.byId(streamId);
+    if (!mounted || channel == null || !identical(args, _playerArgs)) return;
 
     final activeRecording = _appState.dvrRecordings.firstWhereOrNull(
       (r) => r.channelId == channel.id && r.isInProgress,

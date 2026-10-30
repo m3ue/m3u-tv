@@ -8,6 +8,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 
@@ -699,7 +700,11 @@ class _TestApp extends StatelessWidget {
         theme: ThemeData.dark(useMaterial3: true),
         home: SearchScreen(
           onChannelSelect: onChannelSelect ?? (_) {},
-          onChannelContextChanged: onChannelContextChanged,
+          onChannelContextChanged: onChannelContextChanged == null
+              ? null
+              : (context) => onChannelContextChanged!(
+                  (context as ListChannelContext).channels,
+                ),
           onVodSelect: onVodSelect ?? (_) {},
           onSeriesSelect: onSeriesSelect ?? (_) {},
           onSearchShows: onSearchShows,

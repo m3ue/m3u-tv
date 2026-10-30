@@ -10,6 +10,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/catalog_text_filter.dart';
+import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/epg_show_results.dart';
 import 'package:m3u_tv/shared/epg_show_search_controller.dart';
@@ -47,7 +48,7 @@ class SearchScreen extends ConsumerStatefulWidget {
   /// Called with the current search-result channel list right before
   /// [onChannelSelect], so the player's skip-previous/skip-next stays within
   /// these search results instead of the full unfiltered channel list.
-  final void Function(List<Channel>)? onChannelContextChanged;
+  final void Function(ChannelContext)? onChannelContextChanged;
   final void Function(VodItem) onVodSelect;
   final void Function(Series) onSeriesSelect;
   final VoidCallback? onSidebarActivate;
@@ -350,7 +351,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             return _ChannelListTile(
               channel: row,
               onTap: () {
-                widget.onChannelContextChanged?.call(channels);
+                widget.onChannelContextChanged?.call(
+                  ListChannelContext(channels),
+                );
                 widget.onChannelSelect(row);
               },
             );
@@ -420,7 +423,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
           channel: channels[index],
           autofocus: index == 0,
           onTap: () {
-            widget.onChannelContextChanged?.call(channels);
+            widget.onChannelContextChanged?.call(ListChannelContext(channels));
             widget.onChannelSelect(channels[index]);
           },
         ),
