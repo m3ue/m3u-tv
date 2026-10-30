@@ -47,22 +47,23 @@ List<Channel> _sortChannelsBy(
       // Channels without a provider-assigned number (null or 0) sink below
       // every numbered one, then fall back to natural name order so they're
       // still browsable rather than left in an arbitrary clump.
-      list.sort((a, b) {
-        final an = a.channelNumber;
-        final bn = b.channelNumber;
-        final aHas = an != null && an != 0;
-        final bHas = bn != null && bn != 0;
-        if (aHas && bHas) {
-          final cmp = an.compareTo(bn);
-          return cmp != 0 ? cmp : compareNatural(a.name, b.name);
-        }
-        if (aHas != bHas) return aHas ? -1 : 1;
-        return compareNatural(a.name, b.name);
-      });
+      sortByNatural(
+        list,
+        (channel) => channel.name,
+        tieBreak: (a, b) {
+          final an = a.channelNumber;
+          final bn = b.channelNumber;
+          final aHas = an != null && an != 0;
+          final bHas = bn != null && bn != 0;
+          if (aHas && bHas) return an.compareTo(bn);
+          if (aHas != bHas) return aHas ? -1 : 1;
+          return 0;
+        },
+      );
     case ChannelSortOption.alphabeticalAsc:
-      list.sort((a, b) => compareNatural(a.name, b.name));
+      sortByNatural(list, (channel) => channel.name);
     case ChannelSortOption.alphabeticalDesc:
-      list.sort((a, b) => compareNatural(b.name, a.name));
+      sortByNatural(list, (channel) => channel.name, descending: true);
   }
   return list;
 }

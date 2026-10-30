@@ -174,7 +174,16 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   String? _selectedCategory;
   String _query = '';
   Set<int> _favoriteIds = {};
-  final Map<int, EpgCurrentNext?> _epgMap = {};
+
+  // build() runs on every EPG sweep batch and DVR/progress tick; re-filtering
+  // and natural-sorting thousands of channels each time was the screen's
+  // main source of D-pad jank. These memoize the derived lists until their
+  // inputs actually change.
+  List<Channel>? _visibleSource;
+  Object? _visibleInputs;
+  List<Channel> _visibleChannels = const <Channel>[];
+  List<Channel>? _channelsByIdSource;
+  Map<int, Channel> _channelsById = const <int, Channel>{};
   _ViewMode _viewMode = _ViewMode.list;
   ChannelSortOption _sortOption = ChannelSortOption.playlistOrder;
   bool _favoritesFirst = true;
@@ -563,11 +572,32 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     ];
   }
 
-  void _loadEpgForChannels(List<Channel> channels, EpgService epgService) {
-    for (final channel in channels) {
-      final result = epgService.lookupForChannel(channel);
-      _epgMap[channel.id] = result;
+  List<Channel> _visibleChannelsFor(List<Channel> channels) {
+    final inputs = (
+      _selectedCategory,
+      _query.trim().toLowerCase(),
+      _sortOption,
+      _favoritesFirst,
+      _favoriteIds,
+    );
+    if (identical(channels, _visibleSource) && inputs == _visibleInputs) {
+      return _visibleChannels;
     }
+    _visibleSource = channels;
+    _visibleInputs = inputs;
+    return _visibleChannels = sortChannels(
+      _filteredChannels(channels),
+      _sortOption,
+      favoritesFirst: _favoritesFirst ? _favoriteIds : const {},
+    );
+  }
+
+  Map<int, Channel> _channelsByIdFor(List<Channel> channels) {
+    if (!identical(channels, _channelsByIdSource)) {
+      _channelsByIdSource = channels;
+      _channelsById = {for (final c in channels) c.id: c};
+    }
+    return _channelsById;
   }
 
   Future<void> _toggleFavorite(Channel channel) async {
@@ -824,20 +854,14 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       return Scaffold(
         body: Center(
           child: Text(
-            'Please connect to your service in Settings',
+            AppLocalizations.of(context).appNotConfigured,
             style: Theme.of(context).textTheme.titleMedium,
           ),
         ),
       );
     }
 
-    final filtered = sortChannels(
-      _filteredChannels(channels),
-      _sortOption,
-      favoritesFirst: _favoritesFirst ? _favoriteIds : const {},
-    );
-    final channelsById = {for (final c in channels) c.id: c};
-    _loadEpgForChannels(filtered, epgService);
+    final filtered = _visibleChannelsFor(channels);
     final l = AppLocalizations.of(context);
     // Search results replace the channel list/grid entirely (rather than
     // stacking above it) once a qualifying show search is active - mirrors
@@ -899,7 +923,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
                   shows: _showSearchController.results,
                   isLoading: _showSearchController.isLoading,
                   error: _showSearchController.error,
-                  channelsById: channelsById,
+                  channelsById: _channelsByIdFor(channels),
                   onChannelSelect: widget.onChannelSelect,
                   onChannelContextChanged: widget.onChannelContextChanged,
                   onShowSelect: widget.onShowSelect,
@@ -935,10 +959,12 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
                         ),
                         _ViewMode.logoGrid => _buildGridView(
                           filtered,
+                          epgService,
                           recordingChannelIds,
                         ),
                         _ViewMode.list => _buildListView(
                           filtered,
+                          epgService,
                           recordingChannelIds,
                         ),
                       },
@@ -1082,7 +1108,11 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     }
   }
 
-  Widget _buildListView(List<Channel> channels, Set<int> recordingChannelIds) {
+  Widget _buildListView(
+    List<Channel> channels,
+    EpgService epgService,
+    Set<int> recordingChannelIds,
+  ) {
     return DpadRegion(
       memoryKey: 'live-tv/list',
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -1093,7 +1123,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
         itemBuilder: (context, index) {
           final channel = channels[index];
           widget.onEnsureEpg?.call([channel]);
-          final epg = _epgMap[channel.id];
+          final epg = epgService.lookupForChannel(channel);
           final isFav = _favoriteIds.contains(channel.id);
           return _ChannelRow(
             channel: channel,
@@ -1164,7 +1194,11 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     );
   }
 
-  Widget _buildGridView(List<Channel> channels, Set<int> recordingChannelIds) {
+  Widget _buildGridView(
+    List<Channel> channels,
+    EpgService epgService,
+    Set<int> recordingChannelIds,
+  ) {
     return DpadRegion(
       memoryKey: 'live-tv/grid',
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -1192,7 +1226,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
         itemBuilder: (context, index) {
           final channel = channels[index];
           widget.onEnsureEpg?.call([channel]);
-          final epg = _epgMap[channel.id];
+          final epg = epgService.lookupForChannel(channel);
           final isFav = _favoriteIds.contains(channel.id);
           return ChannelGridTile(
             channel: channel,

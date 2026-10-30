@@ -31,6 +31,40 @@ void main() {
       final names = ['bbc', 'ABC']..sort(compareNatural);
       expect(names, ['ABC', 'bbc']);
     });
+
+    test('compares a digit run too long for an int as text', () {
+      final names = ['A 99999999999999999999 x', 'A 1 x']..sort(compareNatural);
+      expect(names, ['A 1 x', 'A 99999999999999999999 x']);
+    });
+
+    test('a shorter prefix sorts first', () {
+      final names = ['ESPN 2 HD', 'ESPN 2', 'ESPN']..sort(compareNatural);
+      expect(names, ['ESPN', 'ESPN 2', 'ESPN 2 HD']);
+    });
+  });
+
+  group('sortByNatural', () {
+    test('matches compareNatural for every pair', () {
+      final names = [
+        'Channel 10',
+        'channel 2',
+        '&TV',
+        '00s Replay',
+        '007 Classics',
+        'Zebra',
+        'zebra 1',
+        'ABC',
+        '',
+        'News 24/7',
+        'News 24',
+      ];
+      final expected = [...names]..sort(compareNatural);
+      final sorted = [...names];
+      sortByNatural(sorted, (name) => name);
+      expect(sorted, expected);
+      sortByNatural(sorted, (name) => name, descending: true);
+      expect(sorted, expected.reversed.toList());
+    });
   });
 
   group('sortChannels', () {
