@@ -157,6 +157,58 @@ void main() {
     },
   );
 
+  test('a full refresh keeps a resident schedule whole', () async {
+    service.applySuccessfulResponse(['a'], day('a'));
+    await settle();
+    service.programsForChannel(channel('a'));
+    await settle();
+    expect(service.programsForChannel(channel('a')), hasLength(8));
+
+    // A sweep or re-prime replacing the channel on screen.
+    service.applySuccessfulResponse(['a'], day('a'));
+    expect(service.programsForChannel(channel('a')), hasLength(8));
+    await settle();
+  });
+
+  test(
+    'a channel with no stored guide takes no resident slot and is not '
+    'reloaded',
+    () async {
+      final evicted = <String>[];
+      service
+        ..onEvicted = evicted.add
+        ..applySuccessfulResponse(['a'], day('a'));
+      await settle();
+      service.programsForChannel(channel('a'));
+      await settle();
+
+      var notified = 0;
+      service.addListener(() => notified++);
+      for (final id in ['none1', 'none2', 'none3']) {
+        service.programsForChannel(channel(id));
+        await settle();
+      }
+      expect(evicted, isEmpty);
+      expect(notified, 0);
+      expect(service.programsForChannel(channel('a')), hasLength(8));
+
+      // Programmes arriving later are picked up as usual.
+      service.applySuccessfulResponse(['none1'], day('none1'));
+      expect(service.lookup('none1'), isNotNull);
+      await settle();
+    },
+  );
+
+  test('wipeStore drops writes that landed before it', () async {
+    service.applySuccessfulResponse(['a'], day('a'));
+    await settle();
+    service
+      ..applySuccessfulResponse(['b'], day('b'))
+      ..wipeStore();
+    await settle();
+    expect(await repo.programmesForChannels({'a', 'b'}), isEmpty);
+  });
+
   test('clear drops queued writes for the old source', () async {
     service
       ..applySuccessfulResponse(['a'], day('a'))

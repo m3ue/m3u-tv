@@ -96,6 +96,7 @@ class CatalogCategories extends Table {
 /// EPG programmes, keyed by `(channelId, startMs)`. Replaces the capped
 /// `epgGuide` JSON blob `CacheService` persisted.
 @DataClassName('EpgProgrammeRow')
+@TableIndex(name: 'epg_programmes_end', columns: {#endMs})
 class EpgProgrammes extends Table {
   TextColumn get channelId => text()();
   IntColumn get startMs => integer()();

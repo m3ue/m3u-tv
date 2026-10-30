@@ -106,7 +106,7 @@ class EpgCoordinator {
   int _epgPrimesInFlight = 0;
   Timer? _epgPrimeRetry;
 
-  /// Queues [channels] for a lazy, debounced EPG fetch — only channels
+  /// Queues [channels] for a lazy, debounced EPG fetch - only channels
   /// without fresh cached data are requested. Call this from a screen's
   /// `itemBuilder` (list/grid) so only currently visible channels get fetched
   /// as the user scrolls, instead of fetching the whole channel list upfront.
@@ -557,7 +557,9 @@ class EpgCoordinator {
     }
   }
 
-  void resetSession({bool clearGuide = true}) {
+  /// [wipeStore] also drops the stored guide, behind any write already in
+  /// flight (see [EpgService.wipeStore]): for a source switch or sign-out.
+  void resetSession({bool clearGuide = true, bool wipeStore = false}) {
     _epgPrimeRetry?.cancel();
     _epgRequestGeneration += 1;
     _epgSweepGeneration += 1;
@@ -574,6 +576,7 @@ class EpgCoordinator {
     _activeEpgRangeKey = '';
     epgService.invalidateSourceFetchState();
     if (clearGuide) epgService.clear();
+    if (wipeStore) epgService.wipeStore();
   }
 
   void dispose() {

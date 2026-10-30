@@ -24,6 +24,11 @@ final class EpgMergeIntoChannels extends EpgStoreOp {
   final Map<String, List<EpgProgram>> byChannel;
 }
 
+/// Drop every stored programme.
+final class EpgClearAll extends EpgStoreOp {
+  const EpgClearAll();
+}
+
 /// Drop every programme that ended before [cutoff].
 final class EpgPruneBefore extends EpgStoreOp {
   const EpgPruneBefore(this.cutoff);

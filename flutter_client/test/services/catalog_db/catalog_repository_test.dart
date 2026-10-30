@@ -657,6 +657,28 @@ void main() {
       ]);
       expect(await titles('ch69'), [for (var h = 0; h < 8; h++) 'P$h']);
     });
+
+    test('a guide-wide window read above the threshold matches', () async {
+      await repo.applyEpgOps([
+        EpgReplaceChannels({
+          for (var c = 0; c < 70; c++)
+            'ch$c': [for (var h = 0; h < 8; h++) show('ch$c', 'P$h', h)],
+        }),
+      ]);
+      // Hours 2-5 overlap the window: 4 of 8 per channel, 280 in all...
+      final window = await repo.programmesBetween(
+        base.add(const Duration(hours: 2)),
+        base.add(const Duration(hours: 6)),
+      );
+      expect(window, hasLength(70));
+      expect(window['ch0']!.map((p) => p.title), ['P2', 'P3', 'P4', 'P5']);
+      // ...and the whole day, 560 rows, goes through the worker.
+      final day = await repo.programmesBetween(
+        base,
+        base.add(const Duration(hours: 8)),
+      );
+      expect(day.values.fold<int>(0, (n, list) => n + list.length), 560);
+    });
   });
 
   group('large writes and reads run on a database worker isolate', () {

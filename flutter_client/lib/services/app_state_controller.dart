@@ -1747,7 +1747,7 @@ class AppStateController extends ChangeNotifier {
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     await secureStorage.delete(_sourceKey);
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
-    _epg.resetSession();
+    _epg.resetSession(wipeStore: true);
     _sourceType = AppSourceType.none;
     _viewers = const <Viewer>[];
     _viewerOperationGeneration.advance();
@@ -2164,8 +2164,11 @@ class AppStateController extends ChangeNotifier {
           }
 
           if (invalidateEpgFreshness) {
+            // The replace above already emptied the stored guide; wipe it
+            // again behind any old-source write that landed since.
             _epg.resetSession(
               clearGuide: _sourceType != AppSourceType.none,
+              wipeStore: true,
             );
           }
           _sourceType = AppSourceType.xtream;

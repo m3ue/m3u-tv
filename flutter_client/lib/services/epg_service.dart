@@ -114,6 +114,11 @@ class EpgService extends ChangeNotifier {
   bool _flushScheduled = false;
   final Set<String> _loadQueue = <String>{};
   final Set<String> _loadsInFlight = <String>{};
+
+  /// Ids whose store load found nothing (a channel without guide data). Kept
+  /// out of the LRU so they don't evict real schedules, and not loaded again
+  /// until programmes arrive for them.
+  final Set<String> _knownEmpty = <String>{};
   bool _loadScheduled = false;
   final Set<String> _hotRefillQueue = <String>{};
   final Map<String, DateTime> _hotRefilledAt = <String, DateTime>{};
@@ -150,7 +155,14 @@ class EpgService extends ChangeNotifier {
             .toSet(),
       );
       for (final channelId in replaced) {
-        _programsByChannel.remove(channelId);
+        // A resident schedule (a guide row on screen, an open catchup list)
+        // is emptied in place rather than dropped, so the incoming programmes
+        // land in full below instead of being trimmed to the hot slice.
+        if (_store != null && _programsByChannel.containsKey(channelId)) {
+          _programsByChannel[channelId] = <EpgProgram>[];
+        } else {
+          _programsByChannel.remove(channelId);
+        }
         _hot.remove(channelId);
         _versions[channelId] = (_versions[channelId] ?? 0) + 1;
       }
@@ -304,6 +316,7 @@ class EpgService extends ChangeNotifier {
     }
     for (final MapEntry(key: channelId, value: incomingBySlot)
         in incomingByChannel.entries) {
+      _knownEmpty.remove(channelId);
       final incoming = incomingBySlot.values.toList()
         ..sort((a, b) => a.start.compareTo(b.start));
       if (_store != null &&
@@ -333,6 +346,7 @@ class EpgService extends ChangeNotifier {
       );
       if (channelPrograms.isEmpty) {
         channelPrograms.addAll(incoming);
+        if (_store != null) _hot[channelId] = _trimHot(channelPrograms);
         continue;
       }
       // Only touched channels are re-sorted, and in one linear pass: this
@@ -471,7 +485,7 @@ class EpgService extends ChangeNotifier {
         if (programs.isNotEmpty) return programs;
         continue;
       }
-      if (_store == null) continue;
+      if (_store == null || _knownEmpty.contains(id)) continue;
       final hot = _hot[id];
       if (fallback == null && hot != null && hot.isNotEmpty) {
         fallback = hot;
@@ -499,17 +513,13 @@ class EpgService extends ChangeNotifier {
     return programs.reversed.toList();
   }
 
-  /// A flat snapshot of every known program whose [EpgProgram.end] is at or
-  /// after [from], for offline persistence. Grouped by channel (map iteration
-  /// order), each channel's programs already sorted by start.
-  List<EpgProgram> programsEndingAfter(DateTime from) {
-    final result = <EpgProgram>[];
-    for (final programs in _programsByChannel.values) {
-      for (final program in programs) {
-        if (!program.end.isBefore(from)) result.add(program);
-      }
-    }
-    return result;
+  /// Drops every stored programme, ordered after any write already queued or
+  /// in flight, so a write-through from a source being replaced can't land
+  /// after the switch wiped the store and resurface under a shared id.
+  void wipeStore() {
+    if (_store == null) return;
+    _pendingOps.clear();
+    _enqueue(const EpgClearAll());
   }
 
   void clear() {
@@ -518,6 +528,7 @@ class EpgService extends ChangeNotifier {
     _versions.clear();
     _pendingOps.clear();
     _loadQueue.clear();
+    _knownEmpty.clear();
     _hotRefillQueue.clear();
     _hotRefilledAt.clear();
     _storeGeneration.advance();
@@ -629,6 +640,7 @@ class EpgService extends ChangeNotifier {
       final stored = await store.programmesForChannels(ids);
       if (_storeGeneration.isStale(generation)) return;
       final reload = <String>[];
+      var changed = false;
       for (final id in ids) {
         if ((_versions[id] ?? 0) != versions[id]) {
           reload.add(id);
@@ -637,15 +649,18 @@ class EpgService extends ChangeNotifier {
         // Memory wins over the store for overlapping slots: anything merged
         // in since the read began is newer than what the store returned.
         final memory = _programsByChannel[id] ?? _hot[id] ?? const [];
+        final rows = stored[id] ?? const <EpgProgram>[];
+        if (rows.isEmpty && memory.isEmpty) {
+          _knownEmpty.add(id);
+          continue;
+        }
         _programsByChannel.remove(id);
-        _programsByChannel[id] = _mergeNewerWins(
-          stored[id] ?? const <EpgProgram>[],
-          memory,
-        );
+        _programsByChannel[id] = _mergeNewerWins(rows, memory);
         _hot[id] = _trimHot(_programsByChannel[id]!);
+        changed = true;
       }
       _evictOverCapacity();
-      notifyListeners();
+      if (changed) notifyListeners();
       reload.forEach(_queueLoad);
     } on Object catch (error) {
       debugPrint('[EPG] store load failed: $error');

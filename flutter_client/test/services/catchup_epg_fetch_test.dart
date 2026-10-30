@@ -105,8 +105,23 @@ void main() {
       expect(await controller.connectXtream(_credentials), isTrue);
       await controller.ensureCatchupEpgForChannel(_catchupChannel);
 
-      // Viewing another channel's schedule pushes this one out of memory.
-      epgService.programsForChannel(_plainChannel);
+      // Another channel's schedule becoming resident (a guide row scrolled
+      // to a dated range) pushes this one out of memory.
+      final now = DateTime.now().toUtc();
+      epgService.mergePrograms(
+        [
+          EpgProgram(
+            channelId: 'plain.epg',
+            title: 'Other',
+            description: '',
+            start: now,
+            end: now.add(const Duration(hours: 1)),
+          ),
+        ],
+        channelIds: ['plain.epg'],
+        replaceExisting: false,
+        markFresh: false,
+      );
       for (var i = 0; i < 4; i++) {
         await pumpEventQueue();
         await epgService.flushStore();

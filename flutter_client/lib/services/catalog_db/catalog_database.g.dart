@@ -2617,6 +2617,10 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
     'catalog_items_name_sort',
     'CREATE INDEX catalog_items_name_sort ON catalog_items (source_key, kind, name_sort_key)',
   );
+  late final Index epgProgrammesEnd = Index(
+    'epg_programmes_end',
+    'CREATE INDEX epg_programmes_end ON epg_programmes (end_ms)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2627,6 +2631,7 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
     epgProgrammes,
     kvCache,
     catalogItemsNameSort,
+    epgProgrammesEnd,
   ];
 }
 

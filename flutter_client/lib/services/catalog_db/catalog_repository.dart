@@ -704,7 +704,7 @@ class CatalogRepository implements EpgProgrammeStore {
           0,
           (n, list) => n + list.length,
         ),
-        EpgPruneBefore() => 0,
+        EpgPruneBefore() || EpgClearAll() => 0,
       };
     }
     if (!_offloadWrites || rows < _offloadThresholdRows) {
@@ -748,6 +748,8 @@ class CatalogRepository implements EpgProgrammeStore {
             }
             await _upsertProgrammesOn(db, programmes);
           }
+        case EpgClearAll():
+          await db.delete(db.epgProgrammes).go();
         case EpgPruneBefore(:final cutoff):
           await (db.delete(db.epgProgrammes)..where(
                 (t) =>
@@ -771,6 +773,10 @@ class CatalogRepository implements EpgProgrammeStore {
     return _groupByChannel(rows);
   }
 
+  /// Without [channelIds] this is the cold-start restore of every channel's
+  /// next hours (tens of thousands of rows on a large guide), so above the
+  /// offload threshold the query and the row mapping run on a database
+  /// worker.
   @override
   Future<Map<String, List<EpgProgram>>> programmesBetween(
     DateTime endAfter,
@@ -778,14 +784,46 @@ class CatalogRepository implements EpgProgrammeStore {
     Set<String>? channelIds,
   }) async {
     if (channelIds != null && channelIds.isEmpty) return const {};
+    final endAfterMs = endAfter.millisecondsSinceEpoch;
+    final startBeforeMs = startBefore.millisecondsSinceEpoch;
+    if (_offloadWrites &&
+        channelIds == null &&
+        await _countProgrammesBetween(endAfterMs, startBeforeMs) >=
+            _offloadThresholdRows) {
+      return _db.computeWithDatabase(
+        connect: CatalogDatabase.new,
+        computation: (db) =>
+            _programmesBetweenOn(db, endAfterMs, startBeforeMs, null),
+      );
+    }
+    return _programmesBetweenOn(_db, endAfterMs, startBeforeMs, channelIds);
+  }
+
+  Future<int> _countProgrammesBetween(int endAfterMs, int startBeforeMs) {
+    final table = _db.epgProgrammes;
+    final count = table.channelId.count();
+    return (_db.selectOnly(table)
+          ..addColumns([count])
+          ..where(
+            table.endMs.isBiggerThanValue(endAfterMs) &
+                table.startMs.isSmallerThanValue(startBeforeMs),
+          ))
+        .map((row) => row.read(count) ?? 0)
+        .getSingle();
+  }
+
+  static Future<Map<String, List<EpgProgram>>> _programmesBetweenOn(
+    CatalogDatabase db,
+    int endAfterMs,
+    int startBeforeMs,
+    Set<String>? channelIds,
+  ) async {
     final rows =
-        await (_db.select(_db.epgProgrammes)
+        await (db.select(db.epgProgrammes)
               ..where((t) {
                 final window =
-                    t.endMs.isBiggerThanValue(endAfter.millisecondsSinceEpoch) &
-                    t.startMs.isSmallerThanValue(
-                      startBefore.millisecondsSinceEpoch,
-                    );
+                    t.endMs.isBiggerThanValue(endAfterMs) &
+                    t.startMs.isSmallerThanValue(startBeforeMs);
                 return channelIds == null
                     ? window
                     : window & t.channelId.isIn(channelIds);
