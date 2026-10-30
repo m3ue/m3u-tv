@@ -384,20 +384,50 @@ class CatalogRepository implements EpgProgrammeStore {
       ..where(
         (t) => _itemFilter(t, sourceKey, kind, categoryId, search, ids),
       )
-      ..orderBy([
-        if (favoritesFirst.isNotEmpty)
-          (t) => OrderingTerm(
-            expression: t.streamId.isIn(favoritesFirst),
-            mode: OrderingMode.desc,
-          ),
-        ..._orderingFor(sort),
-      ])
+      ..orderBy(_orderingWithFavorites(sort, favoritesFirst))
       ..limit(limit, offset: offset);
     final rows = await query.get();
     return rows
         .map((r) => _decodeRow(kind, r.json) as T)
         .toList(growable: false);
   }
+
+  /// The stored ids of the active rows [pageActiveItems] would return for
+  /// the same arguments, in the same order, without decoding a single row:
+  /// for finding where one row sits in a slice.
+  Future<List<int>> activeIdsInOrder({
+    required String kind,
+    String? categoryId,
+    String? search,
+    Set<int>? ids,
+    CatalogSort sort = CatalogSort.providerOrder,
+    Set<int> favoritesFirst = const {},
+  }) async {
+    final table = _db.catalogItems;
+    final query = _db.selectOnly(table)
+      ..addColumns([table.streamId])
+      ..where(
+        _itemFilter(table, activeSource, kind, categoryId, search, ids),
+      )
+      ..orderBy([
+        for (final term in _orderingWithFavorites(sort, favoritesFirst))
+          term(table),
+      ]);
+    final rows = await query.get();
+    return [for (final row in rows) row.read(table.streamId)!];
+  }
+
+  List<OrderingTerm Function($CatalogItemsTable)> _orderingWithFavorites(
+    CatalogSort sort,
+    Set<int> favoritesFirst,
+  ) => [
+    if (favoritesFirst.isNotEmpty)
+      (t) => OrderingTerm(
+        expression: t.streamId.isIn(favoritesFirst),
+        mode: OrderingMode.desc,
+      ),
+    ..._orderingFor(sort),
+  ];
 
   /// Ordering terms for [sort], always ending in [CatalogItems.sortIndex] as
   /// a stable tiebreaker. `ratingDesc`/`yearDesc`/`recentDesc` rely on SQLite's default

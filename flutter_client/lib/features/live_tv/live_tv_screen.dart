@@ -349,7 +349,13 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       _resumePreviewChannel = channel;
     }
     if (!mounted) return;
-    widget.onChannelContextChanged?.call(_channelContext());
+    widget.onChannelContextChanged?.call(
+      _channelContext(
+        index: _windowed
+            ? _window.indexWhere((row) => row.id == channel.id)
+            : null,
+      ),
+    );
     widget.onChannelSelect(channel);
   }
 
@@ -505,6 +511,19 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   }
 
   Future<void> _initCategory() async {
+    try {
+      await _restoreCategoryAndLayout();
+    } finally {
+      // Even if a stored setting failed to load: the window must still open,
+      // or the screen would spin on its first count forever.
+      if (mounted && _windowed) {
+        _windowReady = true;
+        _reconfigureWindow();
+      }
+    }
+  }
+
+  Future<void> _restoreCategoryAndLayout() async {
     final lastCat = await widget.favoritesService.getLastCategory();
     final viewSettings = widget.viewSettingsService;
     if (viewSettings != null) {
@@ -548,9 +567,6 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       }
     }
     await _loadFavorites();
-    if (!mounted || !_windowed) return;
-    _windowReady = true;
-    _reconfigureWindow();
   }
 
   Future<void> _loadFavorites() async {

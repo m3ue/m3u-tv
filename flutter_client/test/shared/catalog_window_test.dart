@@ -71,6 +71,13 @@ void main() {
     },
   );
 
+  test('indexWhere finds a resident row, or null when none matches', () async {
+    final window = windowFor(_FakeSource(125));
+    await window.load();
+    expect(window.indexWhere((item) => item == 40), 4);
+    expect(window.indexWhere((item) => item == 500), isNull);
+  });
+
   test('a resident page is not re-fetched', () async {
     final source = _FakeSource(100);
     final window = windowFor(source, pageSize: 10);

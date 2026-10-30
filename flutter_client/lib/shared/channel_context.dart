@@ -41,6 +41,16 @@ class LiveChannelQuery {
     limit: limit,
   );
 
+  /// Every matching channel id, in [page] order.
+  Future<List<int>> idsInOrder(CatalogRepository repo) => repo.activeIdsInOrder(
+    kind: kCatalogKindLive,
+    categoryId: categoryId,
+    search: search,
+    ids: ids,
+    sort: sort,
+    favoritesFirst: favoritesFirst,
+  );
+
   Future<int> count(CatalogRepository repo) => repo.countActiveItems(
     kind: kCatalogKindLive,
     categoryId: categoryId,
@@ -116,9 +126,6 @@ class CatalogChannelContext implements ChannelContext {
   int _length;
   int? _indexHint;
 
-  /// Rows read per page while scanning for a channel the hint missed.
-  static const int _scanPageSize = 500;
-
   @override
   int get length => _length;
 
@@ -140,7 +147,8 @@ class CatalogChannelContext implements ChannelContext {
       _repo.activeItemById<Channel>(kind: kCatalogKindLive, id: channelId);
 
   /// [channelId]'s row index under [query]: checked around the hint first,
-  /// then by scanning (the catalog can have changed under the hint).
+  /// then looked up in the slice's id order (the catalog can have changed
+  /// under the hint), which reads ids only, never whole rows.
   Future<int?> _indexOf(int channelId) async {
     final hint = _indexHint;
     if (hint != null) {
@@ -149,12 +157,8 @@ class CatalogChannelContext implements ChannelContext {
       final found = rows.indexWhere((c) => c.id == channelId);
       if (found != -1) return start + found;
     }
-    for (var offset = 0; ; offset += _scanPageSize) {
-      final rows = await query.page(_repo, offset, _scanPageSize);
-      final found = rows.indexWhere((c) => c.id == channelId);
-      if (found != -1) return offset + found;
-      if (rows.length < _scanPageSize) return null;
-    }
+    final index = (await query.idsInOrder(_repo)).indexOf(channelId);
+    return index == -1 ? null : index;
   }
 }
 
