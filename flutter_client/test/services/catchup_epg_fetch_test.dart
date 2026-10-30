@@ -94,6 +94,30 @@ void main() {
     },
   );
 
+  test(
+    'evicting a channel schedule forgets its catchup fetch, so the next '
+    'open fetches again',
+    () async {
+      final transport = _CatchupTransport();
+      final epgService = EpgService(residentCapacity: 1);
+      final controller = _controller(transport, epgService: epgService);
+      addTearDown(controller.dispose);
+      expect(await controller.connectXtream(_credentials), isTrue);
+      await controller.ensureCatchupEpgForChannel(_catchupChannel);
+
+      // Viewing another channel's schedule pushes this one out of memory.
+      epgService.programsForChannel(_plainChannel);
+      for (var i = 0; i < 4; i++) {
+        await pumpEventQueue();
+        await epgService.flushStore();
+      }
+
+      transport.epgDates.clear();
+      await controller.ensureCatchupEpgForChannel(_catchupChannel);
+      expect(transport.epgDates, isNotEmpty);
+    },
+  );
+
   test('channels without catchup never trigger a fetch', () async {
     final transport = _CatchupTransport();
     final controller = _controller(transport);
@@ -267,7 +291,10 @@ String _ymd(DateTime value) {
       '${two(value.month)}-${two(value.day)}';
 }
 
-AppStateController _controller(_CatchupTransport transport) {
+AppStateController _controller(
+  _CatchupTransport transport, {
+  EpgService? epgService,
+}) {
   final memory = <String, Object?>{};
   return AppStateController(
     xtreamService: XtreamService(
@@ -276,7 +303,7 @@ AppStateController _controller(_CatchupTransport transport) {
     ),
     secureStorage: InMemorySecureStorage(),
     cacheService: CacheService(memory: <String, Object?>{}),
-    epgService: EpgService(),
+    epgService: epgService ?? EpgService(),
     favoritesService: FavoritesService(memory: memory),
     vodFavoritesService: FavoritesService(memory: memory, namespace: 'vod'),
     seriesFavoritesService: FavoritesService(

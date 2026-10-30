@@ -1,6 +1,7 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:m3u_tv/services/async_lifecycle.dart';
@@ -24,12 +25,14 @@ class EpgCoordinator {
     required this.cacheService,
     required Generation sourceOperationGeneration,
     required bool Function() isXtreamSource,
-    required List<Channel> Function() channels,
+    required Future<List<Channel>> Function(int offset, int limit) channelPage,
+    required Future<int> Function() channelCount,
     required bool Function() isLoadingContent,
     required VoidCallback notifyListeners,
   }) : _sourceOperationGeneration = sourceOperationGeneration,
        _isXtreamSource = isXtreamSource,
-       _channelsOf = channels,
+       _channelPage = channelPage,
+       _channelCount = channelCount,
        _isLoadingContentOf = isLoadingContent,
        _notifyListeners = notifyListeners {
     epgService.onEvicted = _onScheduleEvicted;
@@ -40,12 +43,15 @@ class EpgCoordinator {
   final CacheService cacheService;
   final Generation _sourceOperationGeneration;
   final bool Function() _isXtreamSource;
-  final List<Channel> Function() _channelsOf;
+
+  /// The live lineup in provider order, read a page at a time from the
+  /// catalog so the prime and sweep never hold every channel at once.
+  final Future<List<Channel>> Function(int offset, int limit) _channelPage;
+  final Future<int> Function() _channelCount;
   final bool Function() _isLoadingContentOf;
   final VoidCallback _notifyListeners;
 
   bool get _isXtream => _isXtreamSource();
-  List<Channel> get _channels => _channelsOf();
   bool get _isLoadingContent => _isLoadingContentOf();
   bool _disposed = false;
 
@@ -56,10 +62,15 @@ class EpgCoordinator {
   Stream<EpgSweepProgress?> get sweepProgress =>
       _epgSweepProgressController.stream;
 
-  final Set<int> _pendingEpgChannelIds = <int>{};
+  final Map<int, Channel> _pendingEpgChannels = <int, Channel>{};
   final Set<int> _pendingForcedEpgChannelIds = <int>{};
   final Map<String, DateTime> _fetchedEpgRanges = <String, DateTime>{};
   final Map<int, DateTime> _catchupEpgFetchedAt = <int, DateTime>{};
+
+  /// The EPG id of every channel with an entry in [_fetchedEpgRanges] or
+  /// [_catchupEpgFetchedAt], so an eviction (which names the EPG id) can
+  /// find them.
+  final Map<int, String> _trackedEpgIds = <int, String>{};
   final Map<int, Completer<void>> _inFlightCatchupEpgFetches =
       <int, Completer<void>>{};
   Timer? _epgFetchDebounce;
@@ -112,7 +123,7 @@ class EpgCoordinator {
       _activeEpgRangeKey = rangeKey;
       _pendingEpgStartDate = startDate;
       _pendingEpgEndDate = endDate;
-      _pendingEpgChannelIds.clear();
+      _pendingEpgChannels.clear();
       _pendingForcedEpgChannelIds.clear();
       _epgFetchDebounce?.cancel();
       _epgRequestGeneration += 1;
@@ -132,7 +143,9 @@ class EpgCoordinator {
           continue;
         }
       }
-      if (_pendingEpgChannelIds.add(channel.id)) added = true;
+      if (_pendingEpgChannels.containsKey(channel.id)) continue;
+      _pendingEpgChannels[channel.id] = channel;
+      added = true;
     }
     if (!added) return;
     _epgFetchDebounce?.cancel();
@@ -226,23 +239,24 @@ class EpgCoordinator {
           markFresh: false,
         );
       _catchupEpgFetchedAt[channel.id] = DateTime.now();
+      _trackedEpgIds[channel.id] = _epgChannelId(channel);
     } on Object catch (_) {
       _catchupEpgFetchedAt.remove(channel.id);
     }
   }
 
   Future<void> _flushPendingEpgFetch() async {
-    if (_pendingEpgChannelIds.isEmpty) return;
-    final ids = _pendingEpgChannelIds.toSet();
-    _pendingEpgChannelIds.clear();
+    if (_pendingEpgChannels.isEmpty) return;
+    final pending = _pendingEpgChannels.values.toList(growable: false);
+    _pendingEpgChannels.clear();
+    final ids = {for (final channel in pending) channel.id};
     final forcedIds = _pendingForcedEpgChannelIds.intersection(ids);
     _pendingForcedEpgChannelIds.removeAll(ids);
     final startDate = _pendingEpgStartDate;
     final endDate = _pendingEpgEndDate;
     final rangeKey = _activeEpgRangeKey;
     final generation = _epgRequestGeneration;
-    final channels = _channels
-        .where((channel) => ids.contains(channel.id))
+    final channels = pending
         .where(
           (channel) => rangeKey.isEmpty
               ? forcedIds.contains(channel.id) ||
@@ -317,7 +331,7 @@ class EpgCoordinator {
     if (!_isXtream) return;
     resetSession(clearGuide: false);
     _notifyListeners();
-    unawaited(primeAndSweep(_channels));
+    unawaited(primeAndSweep());
   }
 
   /// Re-primes the guide when the app returns from the background and the
@@ -344,21 +358,25 @@ class EpgCoordinator {
       return;
     }
     _epgPrimeRetry?.cancel();
-    unawaited(
-      primeAndSweep(_channels, retryOnFailure: retryOnFailure),
-    );
+    unawaited(primeAndSweep(retryOnFailure: retryOnFailure));
   }
 
   /// Primes EPG for the first [_epgPrimeCount] channels, then - once that
   /// response and the first frame have settled - sweeps the remaining channels
   /// in the background so the guide is fully populated without the user having
   /// to scroll each row into view.
-  Future<void> primeAndSweep(
-    List<Channel> channels, {
+  ///
+  /// [lineup], when the caller already holds the freshly fetched channels,
+  /// starts the prime without a catalog read; only its first page is kept.
+  Future<void> primeAndSweep({
+    List<Channel>? lineup,
     bool retryOnFailure = false,
   }) async {
     final generation = _epgRequestGeneration;
-    final primeChannels = channels.take(_epgPrimeCount).toList(growable: false);
+    final primeChannels =
+        lineup?.take(_epgPrimeCount).toList(growable: false) ??
+        await _channelPage(0, _epgPrimeCount);
+    if (_disposed || generation != _epgRequestGeneration) return;
     _epgPrimesInFlight += 1;
     try {
       await _loadXtreamEpg(primeChannels);
@@ -381,28 +399,26 @@ class EpgCoordinator {
       );
       return;
     }
-    if (!_isXtream || channels.length <= _epgPrimeCount) {
-      return;
-    }
-    unawaited(
-      _sweepXtreamEpgInBackground(
-        channels.skip(_epgPrimeCount).toList(growable: false),
-      ),
-    );
+    if (!_isXtream || primeChannels.length < _epgPrimeCount) return;
+    unawaited(_sweepXtreamEpgInBackground(from: _epgPrimeCount));
   }
 
-  /// Walks [channels] in [_epgSweepChunkSize] batches, spaced out so the sweep
+  /// Walks the lineup from offset [from] in [_epgSweepChunkSize] batches,
+  /// read from the catalog one batch at a time, spaced out so the sweep
   /// never competes hard with foreground work. Bails between chunks on dispose,
   /// a source/guide reset, or a newer sweep; yields to in-flight lazy fetches
   /// (a user actively scrolling the guide) so those stay responsive.
-  Future<void> _sweepXtreamEpgInBackground(List<Channel> channels) async {
+  Future<void> _sweepXtreamEpgInBackground({required int from}) async {
     final sweepGeneration = ++_epgSweepGeneration;
     final requestGeneration = _epgRequestGeneration;
-    if (channels.isNotEmpty) {
-      _epgSweepProgressController.add(
-        EpgSweepProgress(loaded: 0, total: channels.length),
-      );
+    final total = math.max(0, await _channelCount() - from);
+    if (_disposed || sweepGeneration != _epgSweepGeneration) return;
+    if (total == 0) {
+      // Clears any progress a superseded sweep left showing.
+      _epgSweepProgressController.add(null);
+      return;
     }
+    _epgSweepProgressController.add(EpgSweepProgress(loaded: 0, total: total));
     await Future<void>.delayed(_epgSweepStartDelay);
 
     void bail() {
@@ -412,7 +428,7 @@ class EpgCoordinator {
     }
 
     var start = 0;
-    while (start < channels.length) {
+    while (start < total) {
       if (_disposed ||
           sweepGeneration != _epgSweepGeneration ||
           requestGeneration != _epgRequestGeneration ||
@@ -422,30 +438,25 @@ class EpgCoordinator {
       }
       // A foreground lazy fetch is queued or running - let it go first and
       // re-check this same window on the next pass.
-      if (_pendingEpgChannelIds.isNotEmpty ||
+      if (_pendingEpgChannels.isNotEmpty ||
           (_epgFetchDebounce?.isActive ?? false)) {
         await Future<void>.delayed(_epgSweepChunkDelay);
         continue;
       }
-      final chunk = channels
-          .skip(start)
-          .take(_epgSweepChunkSize)
-          .toList(growable: false);
+      final chunk = await _channelPage(from + start, _epgSweepChunkSize);
+      if (chunk.isEmpty) break;
       await _loadXtreamEpg(chunk);
       start += _epgSweepChunkSize;
       if (!_disposed && sweepGeneration == _epgSweepGeneration) {
         _epgSweepProgressController.add(
-          EpgSweepProgress(
-            loaded: start.clamp(0, channels.length),
-            total: channels.length,
-          ),
+          EpgSweepProgress(loaded: start.clamp(0, total), total: total),
         );
       }
       await Future<void>.delayed(_epgSweepChunkDelay);
     }
     if (kDebugMode) {
       debugPrint(
-        '[EPG] background sweep complete (${channels.length} channels)',
+        '[EPG] background sweep complete ($total channels)',
       );
     }
     if (!_disposed && sweepGeneration == _epgSweepGeneration) {
@@ -504,12 +515,14 @@ class EpgCoordinator {
   /// next time its timeline row or catchup dialog asks, fetch again rather
   /// than trust data that may only have lived in memory.
   void _onScheduleEvicted(String epgChannelId) {
-    for (final channel in _channels) {
-      if (_epgChannelId(channel) != epgChannelId) continue;
-      _fetchedEpgRanges.removeWhere(
-        (key, _) => key.startsWith('${channel.id}:'),
-      );
-      _catchupEpgFetchedAt.remove(channel.id);
+    final channelIds = [
+      for (final MapEntry(:key, :value) in _trackedEpgIds.entries)
+        if (value == epgChannelId) key,
+    ];
+    for (final channelId in channelIds) {
+      _fetchedEpgRanges.removeWhere((key, _) => key.startsWith('$channelId:'));
+      _catchupEpgFetchedAt.remove(channelId);
+      _trackedEpgIds.remove(channelId);
     }
   }
 
@@ -540,6 +553,7 @@ class EpgCoordinator {
     final now = epgService.now;
     for (final channel in channels) {
       _fetchedEpgRanges['${channel.id}:$rangeKey'] = now;
+      _trackedEpgIds[channel.id] = _epgChannelId(channel);
     }
   }
 
@@ -549,10 +563,11 @@ class EpgCoordinator {
     _epgSweepGeneration += 1;
     _epgFetchDebounce?.cancel();
     _epgFetchDebounce = null;
-    _pendingEpgChannelIds.clear();
+    _pendingEpgChannels.clear();
     _pendingForcedEpgChannelIds.clear();
     _fetchedEpgRanges.clear();
     _catchupEpgFetchedAt.clear();
+    _trackedEpgIds.clear();
     _inFlightCatchupEpgFetches.clear();
     _pendingEpgStartDate = null;
     _pendingEpgEndDate = null;

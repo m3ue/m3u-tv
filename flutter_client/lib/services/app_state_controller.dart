@@ -9,6 +9,7 @@ import 'package:m3u_tv/services/app_log_buffer.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
@@ -523,7 +524,13 @@ class AppStateController extends ChangeNotifier {
     cacheService: cacheService,
     sourceOperationGeneration: _sourceOperationGeneration,
     isXtreamSource: () => _sourceType == AppSourceType.xtream,
-    channels: () => _channels,
+    channelPage: (offset, limit) => _catalogRepository.pageActiveItems<Channel>(
+      kind: kCatalogKindLive,
+      offset: offset,
+      limit: limit,
+    ),
+    channelCount: () =>
+        _catalogRepository.countActiveItems(kind: kCatalogKindLive),
     isLoadingContent: () => _isLoadingContent,
     notifyListeners: notifyListeners,
   );
@@ -2195,7 +2202,7 @@ class AppStateController extends ChangeNotifier {
           // rest in the background so scrolling a large playlist lands on
           // already-loaded EPG. [ensureEpgForChannels] still fills any gaps the
           // sweep has not reached yet as rows scroll into view.
-          unawaited(_epg.primeAndSweep(channels));
+          unawaited(_epg.primeAndSweep(lineup: channels));
           return true;
         } on Object {
           await rollbackSource?.call();
