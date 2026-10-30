@@ -161,7 +161,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
   static const Duration _overlayTimeout = Duration(seconds: 8);
 
   PlaybackStatus _status = PlaybackStatus.idle;
-  Duration _currentPosition = Duration.zero;
+
+  // The position the controls display ([_skipScrubPosition] while a skip
+  // scrub is pending, else [_currentPosition]). Position ticks only update
+  // this notifier, so they rebuild the seek bar and "ends at" label instead
+  // of the whole player overlay twice a second.
+  final ValueNotifier<Duration> _displayPosition = ValueNotifier(
+    Duration.zero,
+  );
+  Duration _positionValue = Duration.zero;
+  Duration get _currentPosition => _positionValue;
+  set _currentPosition(Duration value) {
+    _positionValue = value;
+    _syncDisplayPosition();
+  }
+
+  void _syncDisplayPosition() {
+    _displayPosition.value = _skipScrubPositionValue ?? _positionValue;
+  }
+
   Duration _duration = Duration.zero;
   String? _errorMessage;
   String? _fallbackReason;
@@ -639,12 +657,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
           _catchupSeekTarget != null) {
         return;
       }
-      setState(() {
-        final next = _currentPosition + const Duration(milliseconds: 500);
-        _currentPosition = (_duration > Duration.zero && next > _duration)
-            ? _duration
-            : next;
-      });
+      final next = _currentPosition + const Duration(milliseconds: 500);
+      _currentPosition = (_duration > Duration.zero && next > _duration)
+          ? _duration
+          : next;
       _checkComskip();
       _checkIntroDb();
       _checkUpNext();
@@ -1223,6 +1239,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _controlsFocusNode.dispose();
     _errorButtonFocusNode.dispose();
     _upNextFocusNode.dispose();
+    _displayPosition.dispose();
     unawaited(_stateSubscription?.cancel());
     unawaited(_errorSubscription?.cancel());
     unawaited(_nativePlaneSubscription?.cancel());
@@ -1723,18 +1740,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // - and only commits a single real seek once the repeats go quiet.
   static const Duration _skipStep = Duration(seconds: 10);
   static const Duration _skipCommitDebounce = Duration(milliseconds: 700);
-  Duration? _skipScrubPosition;
+  Duration? _skipScrubPositionValue;
+  Duration? get _skipScrubPosition => _skipScrubPositionValue;
+  set _skipScrubPosition(Duration? value) {
+    _skipScrubPositionValue = value;
+    _syncDisplayPosition();
+  }
+
   Timer? _skipCommitTimer;
 
   void _adjustSkip(int direction) {
     if (!_canSeek) return;
     final current = _skipScrubPosition ?? _currentPosition;
     final next = current + (_skipStep * direction);
-    setState(() {
-      _skipScrubPosition = next < Duration.zero
-          ? Duration.zero
-          : (next > _duration ? _duration : next);
-    });
+    _skipScrubPosition = next < Duration.zero
+        ? Duration.zero
+        : (next > _duration ? _duration : next);
     _skipCommitTimer?.cancel();
     _skipCommitTimer = Timer(_skipCommitDebounce, _commitSkip);
   }
@@ -1744,7 +1765,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _skipCommitTimer = null;
     final pos = _skipScrubPosition;
     if (pos == null) return;
-    setState(() => _skipScrubPosition = null);
+    _skipScrubPosition = null;
     _seekTo(pos);
   }
 
@@ -2431,6 +2452,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 : null,
                             currentPosition:
                                 _skipScrubPosition ?? _currentPosition,
+                            positionListenable: _displayPosition,
                             duration: _duration,
                             onPlayPause: _togglePlayPause,
                             onSeek: _seekTo,

@@ -116,6 +116,35 @@ void main() {
   });
 
   group('PlaybackControls', () {
+    testWidgets('seek bar follows positionListenable without a parent '
+        'rebuild', (tester) async {
+      final position = ValueNotifier(const Duration(minutes: 1));
+      addTearDown(position.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlaybackControls(
+            isPlaying: true,
+            isLive: false,
+            canSeek: true,
+            currentPosition: Duration.zero,
+            positionListenable: position,
+            duration: const Duration(hours: 1),
+            onPlayPause: () {},
+            onSeek: (_) {},
+            onBack: () {},
+          ),
+        ),
+      );
+      expect(find.text('1:00'), findsOneWidget);
+
+      position.value = const Duration(minutes: 2, seconds: 5);
+      await tester.pump();
+      expect(find.text('2:05'), findsOneWidget);
+      expect(find.text('1:00'), findsNothing);
+    });
+
     testWidgets('shows play button when paused', (tester) async {
       await tester.pumpWidget(
         MaterialApp(

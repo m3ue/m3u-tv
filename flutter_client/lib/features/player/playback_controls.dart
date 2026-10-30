@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/features/player/track_selector.dart';
@@ -50,6 +51,7 @@ class PlaybackControls extends StatelessWidget {
     required this.canSeek,
     this.seekUnavailableMessage,
     required this.currentPosition,
+    this.positionListenable,
     required this.duration,
     required this.onPlayPause,
     required this.onSeek,
@@ -93,6 +95,11 @@ class PlaybackControls extends StatelessWidget {
   /// [canSeek] is true.
   final String? seekUnavailableMessage;
   final Duration currentPosition;
+
+  /// Live playback position. When set, it supersedes [currentPosition] and
+  /// only the seek bar and "ends at" label rebuild on each tick, so the
+  /// parent can advance the position without rebuilding the whole overlay.
+  final ValueListenable<Duration>? positionListenable;
   final Duration duration;
   final VoidCallback onPlayPause;
   final ValueChanged<Duration> onSeek;
@@ -305,10 +312,12 @@ class PlaybackControls extends StatelessWidget {
       return _EndsAtText(time: end);
     }
     if (duration <= Duration.zero) return null;
-    return _EndsAtLabel(
-      position: currentPosition,
-      duration: duration,
-      isPlaying: isPlaying,
+    return _withPosition(
+      (position) => _EndsAtLabel(
+        position: position,
+        duration: duration,
+        isPlaying: isPlaying,
+      ),
     );
   }
 
@@ -445,10 +454,23 @@ class PlaybackControls extends StatelessWidget {
   static const double _fullscreenToggleWidth = 52;
 
   Widget _buildProgressBar(ColorScheme colorScheme) {
-    return _SeekBar(
-      currentPosition: currentPosition,
-      duration: duration,
-      onSeek: onSeek,
+    return _withPosition(
+      (position) => _SeekBar(
+        currentPosition: position,
+        duration: duration,
+        onSeek: onSeek,
+      ),
+    );
+  }
+
+  Duration get _latestPosition => positionListenable?.value ?? currentPosition;
+
+  Widget _withPosition(Widget Function(Duration position) builder) {
+    final listenable = positionListenable;
+    if (listenable == null) return builder(currentPosition);
+    return ValueListenableBuilder<Duration>(
+      valueListenable: listenable,
+      builder: (context, position, _) => builder(position),
     );
   }
 
@@ -583,7 +605,7 @@ class PlaybackControls extends StatelessWidget {
             child: AppIconButton(
               icon: Icons.replay_10,
               onPressed: () {
-                final target = currentPosition - seekStep;
+                final target = _latestPosition - seekStep;
                 final clamped = Duration(
                   milliseconds: target.inMilliseconds.clamp(
                     0,
@@ -639,7 +661,7 @@ class PlaybackControls extends StatelessWidget {
             child: AppIconButton(
               icon: Icons.forward_10,
               onPressed: () {
-                final target = currentPosition + seekStep;
+                final target = _latestPosition + seekStep;
                 final clamped = Duration(
                   milliseconds: target.inMilliseconds.clamp(
                     0,
