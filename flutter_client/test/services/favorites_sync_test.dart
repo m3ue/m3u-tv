@@ -1406,6 +1406,7 @@ AppStateController _controller({
 }) {
   final sharedMemory = memory ?? <String, Object?>{};
   return AppStateController(
+    windowedLiveTv: false,
     xtreamService: XtreamService(
       transport: transport.call,
       cache: CacheService(memory: <String, Object?>{}),

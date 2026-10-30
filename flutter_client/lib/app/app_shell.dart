@@ -994,8 +994,12 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   /// Every live channel, for when no narrower context applies.
-  ChannelContext get _allChannelsContext =>
-      ListChannelContext(ref.read(liveChannelsProvider));
+  ChannelContext get _allChannelsContext => ref.read(windowedLiveTvProvider)
+      ? CatalogChannelContext(
+          repository: ref.read(catalogRepositoryProvider),
+          length: 0,
+        )
+      : ListChannelContext(ref.read(liveChannelsProvider));
 
   Future<void> _switchChannel(int direction) async {
     final args = _playerArgs;

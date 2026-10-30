@@ -2016,6 +2016,8 @@ class _TestApp extends StatelessWidget {
     final epg = epgService ?? EpgService();
     return ProviderScope(
       overrides: [
+        // The in-memory list path; see the windowed group for the paged one.
+        windowedLiveTvProvider.overrideWith((_) => false),
         isBootstrappingProvider.overrideWith((_) => false),
         isConfiguredProvider.overrideWith((_) => isConfigured),
         isLoadingContentProvider.overrideWith((_) => isLoading),

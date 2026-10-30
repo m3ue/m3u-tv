@@ -77,6 +77,11 @@ void main() {
         kind: kCatalogKindSeries,
         items: testSeriesList,
       );
+      await testRepo.replaceItems(
+        sourceKey: CatalogRepository.activeSource,
+        kind: kCatalogKindLive,
+        items: testChannels,
+      );
     });
 
     tearDown(() => testDb.close());
@@ -168,6 +173,32 @@ void main() {
 
       expect(find.text('BBC News'), findsOneWidget);
       expect(find.text('The Matrix'), findsNothing);
+    });
+
+    testWidgets('windowed: channel matches come from the catalog', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          channels: const [],
+          catalogRepository: testRepo,
+          windowed: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'news');
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(DpadTabBar),
+          matching: find.text('Live TV'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('BBC News'), findsOneWidget);
+      expect(find.text('CNN International'), findsNothing);
     });
 
     testWidgets('Movies tab shows only VOD items', (tester) async {
@@ -674,9 +705,11 @@ class _TestApp extends StatelessWidget {
     this.onSeriesSelect,
     this.onSearchShows,
     this.onShowSelect,
+    this.windowed = false,
   });
 
   final List<Channel> channels;
+  final bool windowed;
   final CatalogRepository catalogRepository;
   final bool isConfigured;
   final void Function(Channel)? onChannelSelect;
@@ -690,6 +723,7 @@ class _TestApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ProviderScope(
       overrides: [
+        windowedLiveTvProvider.overrideWith((_) => windowed),
         isBootstrappingProvider.overrideWith((_) => false),
         isConfiguredProvider.overrideWith((_) => isConfigured),
         liveChannelsProvider.overrideWith((_) => channels),

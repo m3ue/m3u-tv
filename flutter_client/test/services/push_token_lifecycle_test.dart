@@ -996,6 +996,7 @@ void main() {
         expect(persistedSource['type'], 'xtream');
 
         final restarted = AppStateController(
+          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           xtreamService: XtreamService(transport: transport.call),
           tvNotificationService: _EmptyTvNotificationService(),
@@ -1166,6 +1167,7 @@ void main() {
         expect(persistedSource['type'], 'xtream');
 
         final restarted = AppStateController(
+          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           xtreamService: XtreamService(transport: transport.call),
           tvNotificationService: _EmptyTvNotificationService(),
@@ -1225,6 +1227,7 @@ void main() {
         final persisted = await PersistentJsonStore(file: stateFile).snapshot();
 
         final restarted = AppStateController(
+          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           xtreamService: XtreamService(transport: transport.call),
           tvNotificationService: _EmptyTvNotificationService(),
@@ -1350,6 +1353,7 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 100));
         final restartedStore = _BlockingFavoritesStore(file: stateFile);
         final restarted = AppStateController(
+          windowedLiveTv: false,
           persistentStore: restartedStore,
           xtreamService: XtreamService(transport: transport.call),
           tvNotificationService: _EmptyTvNotificationService(),
@@ -2123,6 +2127,7 @@ class _Fixture {
           identical(auth.credentials, credentials),
     );
     controller = AppStateController(
+      windowedLiveTv: false,
       authNotifier: auth,
       xtreamService: xtream,
       secureStorage: storage,

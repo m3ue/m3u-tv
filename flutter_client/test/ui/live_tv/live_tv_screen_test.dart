@@ -27,6 +27,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          windowedLiveTvProvider.overrideWith((_) => false),
           isBootstrappingProvider.overrideWith((_) => false),
           isConfiguredProvider.overrideWith((_) => true),
           isLoadingContentProvider.overrideWith((_) => false),
@@ -90,6 +91,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            windowedLiveTvProvider.overrideWith((_) => false),
             isBootstrappingProvider.overrideWith((_) => false),
             isConfiguredProvider.overrideWith((_) => true),
             isLoadingContentProvider.overrideWith((_) => false),
@@ -152,6 +154,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            windowedLiveTvProvider.overrideWith((_) => false),
             isBootstrappingProvider.overrideWith((_) => false),
             isConfiguredProvider.overrideWith((_) => true),
             isLoadingContentProvider.overrideWith((_) => false),
@@ -218,6 +221,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            windowedLiveTvProvider.overrideWith((_) => false),
             isBootstrappingProvider.overrideWith((_) => false),
             isConfiguredProvider.overrideWith((_) => true),
             isLoadingContentProvider.overrideWith((_) => false),
@@ -285,6 +289,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          windowedLiveTvProvider.overrideWith((_) => false),
           isBootstrappingProvider.overrideWith((_) => false),
           isConfiguredProvider.overrideWith((_) => true),
           isLoadingContentProvider.overrideWith((_) => false),
@@ -344,6 +349,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            windowedLiveTvProvider.overrideWith((_) => false),
             isBootstrappingProvider.overrideWith((_) => false),
             isConfiguredProvider.overrideWith((_) => true),
             isLoadingContentProvider.overrideWith((_) => false),
@@ -407,6 +413,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            windowedLiveTvProvider.overrideWith((_) => false),
             isBootstrappingProvider.overrideWith((_) => false),
             isConfiguredProvider.overrideWith((_) => true),
             isLoadingContentProvider.overrideWith((_) => false),
@@ -460,6 +467,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            windowedLiveTvProvider.overrideWith((_) => false),
             isBootstrappingProvider.overrideWith((_) => false),
             isConfiguredProvider.overrideWith((_) => true),
             isLoadingContentProvider.overrideWith((_) => false),
@@ -518,6 +526,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            windowedLiveTvProvider.overrideWith((_) => false),
             isBootstrappingProvider.overrideWith((_) => false),
             isConfiguredProvider.overrideWith((_) => true),
             isLoadingContentProvider.overrideWith((_) => false),

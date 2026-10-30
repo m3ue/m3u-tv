@@ -1181,6 +1181,7 @@ void main() {
         final store = PersistentJsonStore(file: stateFile);
 
         final first = AppStateController(
+          windowedLiveTv: false,
           persistentStore: store,
           xtreamService: XtreamService(
             transport: _FakeXtreamTransport.success().call,
@@ -1212,6 +1213,7 @@ void main() {
         expect(cachedChannels?.data.single.name, 'BBC One');
 
         final restarted = AppStateController(
+          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           xtreamService: XtreamService(
             transport: _FakeXtreamTransport.success().withResponse(
@@ -1264,6 +1266,7 @@ void main() {
         // Pre-split install: one store, so the whole catalog lands in
         // app_state.json alongside credentials and resume progress.
         final legacy = AppStateController(
+          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           xtreamService: XtreamService(
             transport: _FakeXtreamTransport.success().call,
@@ -1291,6 +1294,7 @@ void main() {
         // Next launch has the split wired up: boot() moves the cache keys
         // into cache.json and the hydrate still succeeds off the new file.
         final migrated = AppStateController(
+          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           cacheStore: PersistentJsonStore(file: cacheFile),
           xtreamService: XtreamService(
@@ -1332,6 +1336,7 @@ void main() {
         final cacheFile = io.File('${directory.path}/cache.json');
 
         final legacy = AppStateController(
+          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           xtreamService: XtreamService(
             transport: _FakeXtreamTransport.success().call,
@@ -1367,6 +1372,7 @@ void main() {
         );
 
         final migrated = AppStateController(
+          windowedLiveTv: false,
           persistentStore: PersistentJsonStore(file: stateFile),
           cacheStore: PersistentJsonStore(file: cacheFile),
           xtreamService: XtreamService(
@@ -2079,6 +2085,79 @@ void main() {
       );
     });
 
+    group('windowed live TV', () {
+      test(
+        'keeps the lineup only in the catalog and sweeps it from there',
+        () async {
+          var noDateBatches = 0;
+          final base = _FakeXtreamTransport.success().withResponse(
+            'get_live_streams',
+            manyLiveStreams(210),
+          );
+          Future<Object?> transport(XtreamRequest request) async {
+            if (request.action == 'get_epg_batch' &&
+                request.params['date'] == null) {
+              noDateBatches += 1;
+            }
+            return base.call(request);
+          }
+
+          final controller = _controller(
+            storage: InMemorySecureStorage(),
+            transport: transport,
+            windowedLiveTv: true,
+          );
+          addTearDown(controller.dispose);
+
+          expect(await controller.connectXtream(credentials), isTrue);
+          expect(controller.channels, isEmpty);
+          final repo = controller.catalogRepository;
+          expect(await repo.countActiveItems(kind: kCatalogKindLive), 210);
+
+          final swept = await _pollUntil(
+            () => noDateBatches >= 3,
+            timeout: const Duration(seconds: 8),
+          );
+          expect(swept, isTrue, reason: 'background sweep never ran');
+          final tail = await repo.activeItemById<Channel>(
+            kind: kCatalogKindLive,
+            id: 201,
+          );
+          expect(controller.epgService.hasFreshDataForChannel(tail!), isTrue);
+        },
+      );
+
+      test('a cached boot comes up without loading the lineup', () async {
+        final storage = InMemorySecureStorage();
+        final cacheMemory = <String, Object?>{};
+        final repo = CatalogRepository(CatalogDatabase.memory());
+        addTearDown(repo.close);
+        final first = _controller(
+          storage: storage,
+          transport: _FakeXtreamTransport.success().call,
+          cacheMemory: cacheMemory,
+          catalogRepository: repo,
+          windowedLiveTv: true,
+        );
+        expect(await first.connectXtream(credentials), isTrue);
+
+        final restarted = _controller(
+          storage: storage,
+          transport: _FakeXtreamTransport.success().call,
+          cacheMemory: cacheMemory,
+          catalogRepository: repo,
+          windowedLiveTv: true,
+        );
+        addTearDown(restarted.dispose);
+        await restarted.boot();
+
+        expect(restarted.sourceType, AppSourceType.xtream);
+        expect(restarted.liveCategories.single.name, 'News');
+        expect(restarted.channels, isEmpty);
+        expect(await repo.countActiveItems(kind: kCatalogKindLive), 1);
+      });
+    });
+
     test('a resume re-primes the guide only once it is stale', () async {
       var noDateBatches = 0;
       var now = DateTime.now();
@@ -2463,6 +2542,7 @@ AppStateController _controller({
   Map<String, Object?>? localMemory,
   EpgService? epgService,
   CatalogRepository? catalogRepository,
+  bool windowedLiveTv = false,
 }) {
   final sharedLocalMemory = localMemory ?? <String, Object?>{};
   // Catalog keys live in SQLite; the two CacheService instances below must
@@ -2471,6 +2551,7 @@ AppStateController _controller({
   final sharedCatalogRepository =
       catalogRepository ?? CatalogRepository(CatalogDatabase.memory());
   return AppStateController(
+    windowedLiveTv: windowedLiveTv,
     xtreamService: XtreamService(
       transport: transport,
       cache: CacheService(
@@ -2601,7 +2682,12 @@ class _TestAppState extends State<_TestApp> {
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
-      overrides: [overrideAppState(widget.controller)],
+      overrides: [
+        overrideAppState(widget.controller),
+        windowedLiveTvProvider.overrideWith(
+          (_) => widget.controller.windowedLiveTv,
+        ),
+      ],
       child: MaterialApp.router(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         theme: ThemeData.dark(useMaterial3: true),

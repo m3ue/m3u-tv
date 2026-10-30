@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/foundation.dart' show ValueListenable, kIsWeb;
+import 'package:flutter/foundation.dart'
+    show ValueListenable, kIsWeb, setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemSound, SystemSoundType;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,12 +16,14 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart'
     show buildMultiviewTilePlayer;
 import 'package:m3u_tv/providers/app_providers.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/catalog_window.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/channel_grid_tile.dart';
 import 'package:m3u_tv/shared/channel_rows.dart';
@@ -28,6 +31,7 @@ import 'package:m3u_tv/shared/channel_sort.dart';
 import 'package:m3u_tv/shared/channel_sort_dialog.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
+import 'package:m3u_tv/shared/epg_show_results.dart';
 import 'package:m3u_tv/shared/epg_show_search_controller.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -37,6 +41,10 @@ import 'package:m3u_tv/shared/recording_dot.dart';
 import 'package:m3u_tv/shared/show_search_results_view.dart';
 
 enum _ViewMode { list, logoGrid, epgGrid }
+
+/// Windowed mode re-queries the catalog only once typing pauses this long
+/// (VOD/Series use the same delay).
+const _windowSearchDebounce = Duration(milliseconds: 200);
 
 /// Live TV screen with category filtering, EPG info, and favorites.
 ///
@@ -187,6 +195,27 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   ChannelRows _visibleRows = ListChannelRows(const <Channel>[]);
   List<Channel>? _channelsByIdSource;
   Map<int, Channel> _channelsById = const <int, Channel>{};
+
+  // Windowed mode (windowedLiveTvProvider): the visible slice is paged from
+  // the SQLite catalog instead of filtered and sorted from a list in memory.
+  late final bool _windowed = ref.read(windowedLiveTvProvider);
+  late final CatalogRepository _repo = ref.read(catalogRepositoryProvider);
+  // Reads [_windowQuery] at fetch time, so a refresh after a reorder (a
+  // favorite toggled under favorites-first) runs the current query.
+  late final CatalogWindow<Channel> _window = CatalogWindow<Channel>(
+    fetchPage: (offset, limit) => _windowQuery.page(_repo, offset, limit),
+    fetchCount: () => _windowQuery.count(_repo),
+  );
+  LiveChannelQuery _windowQuery = const LiveChannelQuery();
+  int _windowMaxCatchupDays = 0;
+  late ChannelRows _windowRows = WindowChannelRows(_window, maxCatchupDays: 0);
+  // Set once the remembered category has loaded, so the first page isn't
+  // fetched for "All channels" only to be replaced a moment later.
+  bool _windowReady = false;
+  int _windowGeneration = 0;
+  String _appliedQuery = '';
+  Timer? _searchDebounce;
+  final ShowResultChannelLookup _showResultChannels = ShowResultChannelLookup();
   _ViewMode _viewMode = _ViewMode.list;
   ChannelSortOption _sortOption = ChannelSortOption.playlistOrder;
   bool _favoritesFirst = true;
@@ -241,6 +270,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     widget.onBackHandlerReady?.call(_handleBackFromEpg);
     _showSearchController.addListener(_onShowSearchChanged);
     WidgetsBinding.instance.addObserver(this);
+    if (_windowed) _window.addListener(_onWindowChanged);
   }
 
   // A plain observer rather than AppLifecycleListener, which asserts on
@@ -406,6 +436,10 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     _showSearchController
       ..removeListener(_onShowSearchChanged)
       ..dispose();
+    _searchDebounce?.cancel();
+    _window
+      ..removeListener(_onWindowChanged)
+      ..dispose();
     super.dispose();
   }
 
@@ -514,15 +548,97 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       }
     }
     await _loadFavorites();
+    if (!mounted || !_windowed) return;
+    _windowReady = true;
+    _reconfigureWindow();
   }
 
   Future<void> _loadFavorites() async {
     final ids = await widget.favoritesService.all();
-    if (mounted) {
-      setState(() {
-        _favoriteIds = ids;
-      });
+    if (!mounted) return;
+    final changed = !setEquals(ids, _favoriteIds);
+    setState(() {
+      _favoriteIds = ids;
+    });
+    if (!changed || !_windowed || !_windowReady) return;
+    if (_selectedCategory == _favoritesCategoryId) {
+      _reconfigureWindow();
+    } else if (_favoritesFirst) {
+      // Same slice, new order: keep the rows on screen while they reorder.
+      _windowQuery = _currentWindowQuery();
+      unawaited(_window.refresh());
     }
+  }
+
+  /// The catalog query for the current category, search and sort.
+  LiveChannelQuery _currentWindowQuery() {
+    final category = _selectedCategory;
+    final search = _appliedQuery.trim();
+    final favoritesTab = category == _favoritesCategoryId;
+    return LiveChannelQuery(
+      categoryId: category == null || category.isEmpty || favoritesTab
+          ? null
+          : category,
+      search: search.isEmpty ? null : search,
+      ids: favoritesTab ? _favoriteIds : null,
+      sort: catalogSortForChannels(_sortOption),
+      favoritesFirst: _favoritesFirst && !favoritesTab
+          ? _favoriteIds
+          : const <int>{},
+    );
+  }
+
+  /// Re-points the window at [_currentWindowQuery] and reloads it.
+  void _reconfigureWindow() {
+    if (!_windowed || !_windowReady) return;
+    final query = _windowQuery = _currentWindowQuery();
+    final generation = ++_windowGeneration;
+    unawaited(_window.load());
+    unawaited(
+      query.maxCatchupDays(_repo).then((days) {
+        if (!mounted || generation != _windowGeneration) return;
+        _windowMaxCatchupDays = days;
+        _onWindowChanged();
+      }),
+    );
+  }
+
+  /// Hands the views a fresh [ChannelRows] snapshot (see [WindowChannelRows]).
+  void _onWindowChanged() {
+    if (!mounted) return;
+    setState(() {
+      _windowRows = WindowChannelRows(
+        _window,
+        maxCatchupDays: _windowMaxCatchupDays,
+      );
+    });
+  }
+
+  /// A catalog refresh landed: re-read the slice in place.
+  void _onCatalogReloaded(List<Category>? previous, List<Category> next) {
+    if (_windowed && _windowReady && !identical(previous, next)) {
+      unawaited(_window.refresh());
+    }
+  }
+
+  void _onQueryChanged(String value) {
+    setState(() => _query = value);
+    _showSearchController.onQueryChanged(value, widget.onSearchShows);
+    if (!_windowed) return;
+    _searchDebounce?.cancel();
+    // Like VOD/Series: apply a cleared query or the first character of a
+    // fresh one at once, and only throttle keystrokes while a filtered
+    // result is already on screen.
+    if (value.trim().isEmpty || _appliedQuery.trim().isEmpty) {
+      _appliedQuery = value;
+      _reconfigureWindow();
+      return;
+    }
+    _searchDebounce = Timer(_windowSearchDebounce, () {
+      if (!mounted || value == _appliedQuery) return;
+      _appliedQuery = value;
+      _reconfigureWindow();
+    });
   }
 
   List<Channel> _filteredChannels(List<Channel> channels) {
@@ -601,8 +717,16 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   }
 
   /// What the player's channel up/down moves through after a channel is
-  /// opened from this screen: the slice currently on screen.
-  ChannelContext _channelContext() => ListChannelContext(_visibleChannels);
+  /// opened from this screen: the slice currently on screen. [index] is the
+  /// opened row's position, when known.
+  ChannelContext _channelContext({int? index}) => _windowed
+      ? CatalogChannelContext(
+          repository: _repo,
+          query: _windowQuery,
+          length: _window.totalCount,
+          indexHint: index,
+        )
+      : ListChannelContext(_visibleChannels);
 
   Map<int, Channel> _channelsByIdFor(List<Channel> channels) {
     if (!identical(channels, _channelsByIdSource)) {
@@ -854,6 +978,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     final isLoading = ref.watch(isLoadingContentProvider);
     final channels = ref.watch(liveChannelsProvider);
     final categories = ref.watch(liveCategoriesProvider);
+    ref.listen<List<Category>>(liveCategoriesProvider, _onCatalogReloaded);
     final epgService = ref.watch(epgServiceProvider);
     final recordingChannelIds = ref.watch(recordingChannelIdsProvider);
     ref.listen<bool>(playerOverlayActiveProvider, _onPlayerOverlayChanged);
@@ -873,7 +998,11 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       );
     }
 
-    final filtered = _visibleRowsFor(channels);
+    final filtered = _windowed ? _windowRows : _visibleRowsFor(channels);
+    // Windowed: nothing to show until the first count lands (a failed read
+    // falls through to the empty state rather than spinning forever).
+    final awaitingWindow =
+        _windowed && !_window.hasLoadedOnce && _window.error == null;
     final l = AppLocalizations.of(context);
     // Search results replace the channel list/grid entirely (rather than
     // stacking above it) once a qualifying show search is active - mirrors
@@ -886,15 +1015,13 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       key: _navKey,
       useSidebarLayout: widget.useSidebarLayout,
       query: _query,
-      onQueryChanged: (value) {
-        setState(() => _query = value);
-        _showSearchController.onQueryChanged(value, widget.onSearchShows);
-      },
+      onQueryChanged: _onQueryChanged,
       searchHint: l.liveTvSearchHint,
       tabs: _categoryTabs(categories),
       selectedId: _selectedCategory ?? '',
       onSelected: (id) {
         setState(() => _selectedCategory = id);
+        _reconfigureWindow();
         // The list/grid views reset via the ValueKey below, but
         // TimelineEpgView is addressed by a fixed GlobalKey (see
         // _timelineEpgViewKey) so its state - and vertical scroll offset -
@@ -935,7 +1062,15 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
                   shows: _showSearchController.results,
                   isLoading: _showSearchController.isLoading,
                   error: _showSearchController.error,
-                  channelsById: _channelsByIdFor(channels),
+                  channelsById: _windowed
+                      ? _showResultChannels.channelsFor(
+                          _showSearchController.results,
+                          _repo,
+                          onResolved: () {
+                            if (mounted) setState(() {});
+                          },
+                        )
+                      : _channelsByIdFor(channels),
                   onChannelSelect: widget.onChannelSelect,
                   onChannelContextChanged: widget.onChannelContextChanged,
                   onShowSelect: widget.onShowSelect,
@@ -949,7 +1084,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
             Expanded(
               // Only show the spinner when there is nothing to display yet.
               // During a background refresh the populated list stays visible.
-              child: isLoading && channels.isEmpty
+              child: awaitingWindow || (isLoading && filtered.length == 0)
                   ? const Center(child: CircularProgressIndicator())
                   : filtered.length == 0
                   ? Center(
@@ -1113,6 +1248,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       _sortOption = selected ?? _sortOption;
       _favoritesFirst = favoritesFirst;
     });
+    _reconfigureWindow();
     if (!remember) return;
     if (selected != null) unawaited(service!.setLiveTvSortOption(selected));
     if (favoritesFirstChanged) {
@@ -1146,7 +1282,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: index == 0,
             onTap: () {
-              widget.onChannelContextChanged?.call(_channelContext());
+              widget.onChannelContextChanged?.call(
+                _channelContext(index: index),
+              );
               widget.onChannelSelect(channel);
             },
             onLongPress: () => unawaited(
@@ -1250,7 +1388,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: index == 0,
             onTap: () {
-              widget.onChannelContextChanged?.call(_channelContext());
+              widget.onChannelContextChanged?.call(
+                _channelContext(index: index),
+              );
               widget.onChannelSelect(channel);
             },
             onLongPress: () => unawaited(

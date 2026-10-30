@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
-    show kCatalogKindSeries, kCatalogKindVod;
+    show kCatalogKindLive, kCatalogKindSeries, kCatalogKindVod;
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/catalog_text_filter.dart';
@@ -91,8 +91,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   /// The query these results were fetched for - re-fetch only when
   /// [_appliedQuery] moves past this, not on every unrelated rebuild.
   String? _catalogResultsFor;
+  List<Channel> _channelResults = const [];
   List<VodItem> _vodResults = const [];
   List<Series> _seriesResults = const [];
+
+  /// Windowed mode: the On Now rows' channels, read from the catalog.
+  final ShowResultChannelLookup _showResultChannels = ShowResultChannelLookup();
 
   @override
   void initState() {
@@ -162,17 +166,30 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   /// series catalog search. Called from [build] - `setState` inside is safe
   /// because it only fires from the async completion callback, never
   /// synchronously during the build that triggered it.
-  void _ensureCatalogResults(CatalogRepository repo) {
+  void _ensureCatalogResults(
+    CatalogRepository repo, {
+    required bool includeChannels,
+  }) {
     if (_catalogResultsFor == _appliedQuery) return;
     _catalogResultsFor = _appliedQuery;
     final query = _appliedQuery;
     if (query.trim().isEmpty) {
+      _channelResults = const [];
       _vodResults = const [];
       _seriesResults = const [];
       return;
     }
     unawaited(
       Future.wait([
+        if (includeChannels)
+          repo.pageActiveItems<Channel>(
+            kind: kCatalogKindLive,
+            search: query,
+            offset: 0,
+            limit: _searchResultLimit,
+          )
+        else
+          Future.value(const <Channel>[]),
         repo.pageActiveItems<VodItem>(
           kind: kCatalogKindVod,
           search: query,
@@ -188,8 +205,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       ]).then((results) {
         if (mounted && _catalogResultsFor == query) {
           setState(() {
-            _vodResults = results[0] as List<VodItem>;
-            _seriesResults = results[1] as List<Series>;
+            _channelResults = results[0] as List<Channel>;
+            _vodResults = results[1] as List<VodItem>;
+            _seriesResults = results[2] as List<Series>;
           });
         }
       }),
@@ -223,14 +241,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       );
     }
 
-    _ensureCatalogResults(ref.watch(catalogRepositoryProvider));
-    final filteredChannels = _filterChannels(channels);
+    final windowed = ref.watch(windowedLiveTvProvider);
+    final repo = ref.watch(catalogRepositoryProvider);
+    _ensureCatalogResults(repo, includeChannels: windowed);
+    final filteredChannels = windowed
+        ? _channelResults
+        : _filterChannels(channels);
     final filteredVodItems = _vodResults;
     final filteredSeries = _seriesResults;
     // Build from the FULL channel list (not the filtered one) - EPG
     // show-result channel lookups must work even when the show's
     // channel name doesn't match the current query.
-    final channelsById = _channelsByIdFor(channels);
+    final channelsById = windowed
+        ? _showResultChannels.channelsFor(
+            _showSearchController.results,
+            repo,
+            onResolved: () {
+              if (mounted) setState(() {});
+            },
+          )
+        : _channelsByIdFor(channels);
     // Computed once per build and threaded through to both the All tab and
     // the Live TV tab's ShowSearchResultsView - both are built eagerly by
     // TabBarView on every keystroke, so without sharing this the On-Now/

@@ -1,4 +1,5 @@
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/natural_sort.dart';
@@ -14,9 +15,19 @@ String channelSortButtonLabel(AppLocalizations l, ChannelSortOption option) =>
       ChannelSortOption.alphabeticalDesc => l.channelSortAlphabeticalDesc,
     };
 
-/// Sorts the Live TV channel list/grid per [option]. Channels are a plain
-/// in-memory list (unlike VOD/Series' windowed SQL-backed catalog), so this
-/// sorts client-side rather than pushing an `ORDER BY` down to a repository.
+/// The catalog ordering for [option] when Live TV pages from SQLite: the
+/// same order [sortChannels] produces in memory.
+CatalogSort catalogSortForChannels(ChannelSortOption option) =>
+    switch (option) {
+      ChannelSortOption.playlistOrder => CatalogSort.providerOrder,
+      ChannelSortOption.channelNumber => CatalogSort.channelNumber,
+      ChannelSortOption.alphabeticalAsc => CatalogSort.nameNatural,
+      ChannelSortOption.alphabeticalDesc => CatalogSort.nameNaturalDesc,
+    };
+
+/// Sorts the Live TV channel list/grid per [option] when the channels are a
+/// plain in-memory list; [catalogSortForChannels] is the windowed
+/// counterpart.
 ///
 /// Channels whose id is in [favoritesFirst] are moved ahead of the rest,
 /// each group keeping [option]'s order - the in-memory counterpart of
