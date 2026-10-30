@@ -166,7 +166,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   ];
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(

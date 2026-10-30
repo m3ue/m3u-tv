@@ -1747,6 +1747,8 @@ class AppStateController extends ChangeNotifier {
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     await secureStorage.delete(_sourceKey);
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
+    // cacheService.clear() above emptied the stored guide, but a sweep write
+    // can still land during the awaits since; wipe again behind it.
     _epg.resetSession(wipeStore: true);
     _sourceType = AppSourceType.none;
     _viewers = const <Viewer>[];

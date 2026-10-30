@@ -1188,12 +1188,12 @@ void main() {
           home: NowPlayingOverlay(
             badgeLabel: 'Series',
             title: 'Some Show',
-            subtitle: 'S2 · E5 — Episode Title',
+            subtitle: 'S2 · E5 - Episode Title',
           ),
         ),
       );
       expect(find.text('Some Show'), findsOneWidget);
-      expect(find.text('S2 · E5 — Episode Title'), findsOneWidget);
+      expect(find.text('S2 · E5 - Episode Title'), findsOneWidget);
     });
 
     testWidgets('shows description when present', (tester) async {
@@ -3115,7 +3115,7 @@ void main() {
         setArgs(() => args = channelB);
         await tester.pump();
 
-        // Same URL, but a genuinely different channel — must still re-open.
+        // Same URL, but a genuinely different channel - must still re-open.
         expect(adapter.loadCalls, hasLength(2));
       },
     );
@@ -3237,7 +3237,7 @@ void main() {
           expect(adapter.seekCalls, [const Duration(seconds: 20)]);
           expect(find.text('Skipped commercial'), findsOneWidget);
 
-          // Orchestrator confirms the seek — clears the pending guard.
+          // Orchestrator confirms the seek - clears the pending guard.
           adapter.emitState(
             const PlaybackState(
               backend: PlaybackBackend.desktopLibmpv,
@@ -3248,7 +3248,7 @@ void main() {
           );
           await tester.pump();
 
-          // Re-entry into the same segment after confirmation — must
+          // Re-entry into the same segment after confirmation - must
           // RE-fire seek. The mechanism is stateless once the guard
           // clears: position is the source of truth.
           adapter.emitState(
@@ -3406,7 +3406,7 @@ void main() {
                 args: recordingArgs,
                 orchestrator: orchestrator,
                 epgService: EpgService(clock: () => DateTime.utc(2026)),
-                // comskipSettings intentionally omitted — null fallback,
+                // comskipSettings intentionally omitted - null fallback,
                 comskipService: edl.comskipService,
               ),
             ),
@@ -3467,7 +3467,7 @@ void main() {
           );
           await tester.pump();
 
-          // Enter segment A (10–20) → auto-skip to 20.
+          // Enter segment A (10-20) → auto-skip to 20.
           adapter.emitState(
             const PlaybackState(
               backend: PlaybackBackend.desktopLibmpv,
@@ -3479,7 +3479,7 @@ void main() {
           await tester.pump();
           expect(adapter.seekCalls, [const Duration(seconds: 20)]);
 
-          // Orchestrator confirms the seek — clears the pending guard.
+          // Orchestrator confirms the seek - clears the pending guard.
           adapter.emitState(
             const PlaybackState(
               backend: PlaybackBackend.desktopLibmpv,
@@ -3490,7 +3490,7 @@ void main() {
           );
           await tester.pump();
 
-          // User scrubs back to 15s — still inside segment A — must
+          // User scrubs back to 15s - still inside segment A - must
           // RE-fire auto-skip. The mechanism is stateless once the guard
           // clears: position is the source of truth, no persistent
           // already-skipped tracking. Matches the web reference.
@@ -3519,7 +3519,7 @@ void main() {
           );
           await tester.pump();
 
-          // Advance into segment B (30–40) — must auto-skip to 40.
+          // Advance into segment B (30-40) - must auto-skip to 40.
           adapter.emitState(
             const PlaybackState(
               backend: PlaybackBackend.desktopLibmpv,
@@ -3567,7 +3567,7 @@ void main() {
           );
           await tester.pump();
 
-          // Enter segment A (10–20) → auto-skip fires.
+          // Enter segment A (10-20) → auto-skip fires.
           adapter.emitState(
             const PlaybackState(
               backend: PlaybackBackend.desktopLibmpv,
@@ -3579,7 +3579,7 @@ void main() {
           await tester.pump();
           expect(adapter.seekCalls, [const Duration(seconds: 20)]);
 
-          // Orchestrator confirms seek — position now AT segment end.
+          // Orchestrator confirms seek - position now AT segment end.
           // _checkComskip reads _currentPosition=20, no segment matched,
           // no extra seek. This is the optimistic-bump mechanism: the
           // next [start, end) half-open interval check naturally
@@ -3629,7 +3629,7 @@ void main() {
           );
           await tester.pump();
 
-          // Enter segment A (10–20) → prompt appears.
+          // Enter segment A (10-20) → prompt appears.
           adapter.emitState(
             const PlaybackState(
               backend: PlaybackBackend.desktopLibmpv,
@@ -3652,7 +3652,7 @@ void main() {
 
           // Orchestrator's mid-seek stale report (still inside the
           // segment). The pending guard must keep _currentPosition at
-          // the optimistic 20 — _checkComskip reads 20, the half-open
+          // the optimistic 20 - _checkComskip reads 20, the half-open
           // interval [10, 20) doesn't match, and the prompt does NOT
           // reappear. Pre-fix the prompt flickered back because the
           // old confirm path never set the pending guard.
@@ -3702,7 +3702,7 @@ void main() {
           );
           await tester.pump();
 
-          // Segment ends at 20.08 — sub-second precision. Pre-fix the
+          // Segment ends at 20.08 - sub-second precision. Pre-fix the
           // prompt path used round() and seeked to Duration(seconds: 20),
           // i.e. 20.000s, which is still inside [10, 20.08) and would
           // re-match on the next tick. The shared _fireComskipSeek
@@ -3791,9 +3791,9 @@ void main() {
 
           // Orchestrator's confirmation of the manual seek arrives at
           // 5s (mid-seek buffering). With the fix, _currentPosition is
-          // accepted as 5 — display '0:05'. Pre-fix, 5 < pending(20)
+          // accepted as 5 - display '0:05'. Pre-fix, 5 < pending(20)
           // would suppress the emit and the manual seek would silently
-          // snap back to 0 from _seekTo — display '0:00'.
+          // snap back to 0 from _seekTo - display '0:00'.
           adapter.emitState(
             const PlaybackState(
               backend: PlaybackBackend.desktopLibmpv,
@@ -3838,7 +3838,7 @@ void main() {
           );
           await tester.pump();
 
-          // First playthrough: enter segment A (10–20) → auto-skip fires.
+          // First playthrough: enter segment A (10-20) → auto-skip fires.
           adapter.emitState(
             const PlaybackState(
               backend: PlaybackBackend.desktopLibmpv,
@@ -3861,7 +3861,7 @@ void main() {
           );
           await tester.pump();
 
-          // User restarts from beginning — position now at 5s (outside).
+          // User restarts from beginning - position now at 5s (outside).
           adapter.emitState(
             const PlaybackState(
               backend: PlaybackBackend.desktopLibmpv,
@@ -3873,7 +3873,7 @@ void main() {
           await tester.pump();
           expect(adapter.seekCalls, [const Duration(seconds: 20)]);
 
-          // Forward playback re-enters segment A — must auto-skip AGAIN.
+          // Forward playback re-enters segment A - must auto-skip AGAIN.
           adapter.emitState(
             const PlaybackState(
               backend: PlaybackBackend.desktopLibmpv,
@@ -3920,7 +3920,7 @@ void main() {
           );
           await tester.pump();
 
-          // Segment ends at 2284.08s — sub-second precision like a real
+          // Segment ends at 2284.08s - sub-second precision like a real
           // comskip EDL. Pre-fix this caused an infinite stuck loop
           // because round(2284.08) = 2284 → bump-to-2284 was still
           // inside [start, 2284.08) → re-match every tick. With ceil()
@@ -3939,7 +3939,7 @@ void main() {
             const Duration(milliseconds: 2284080),
           ]);
 
-          // Position 2285 confirmed — guard clears.
+          // Position 2285 confirmed - guard clears.
           adapter.emitState(
             const PlaybackState(
               backend: PlaybackBackend.desktopLibmpv,
@@ -3949,7 +3949,7 @@ void main() {
             ),
           );
           await tester.pump();
-          // No additional seek — stuck-loop is gone.
+          // No additional seek - stuck-loop is gone.
           expect(adapter.seekCalls, [
             const Duration(milliseconds: 2284080),
           ]);
@@ -3986,7 +3986,7 @@ void main() {
           );
           await tester.pump();
 
-          // Enter segment A (10–20) → seek to 20, pending guard = 20.
+          // Enter segment A (10-20) → seek to 20, pending guard = 20.
           adapter.emitState(
             const PlaybackState(
               backend: PlaybackBackend.desktopLibmpv,
@@ -4000,7 +4000,7 @@ void main() {
 
           // Orchestrator's mid-seek position report LAGS back to 15s
           // (real seek hasn't completed yet). The pending-seek-target
-          // guard must reject this — _currentPosition stays at the
+          // guard must reject this - _currentPosition stays at the
           // bumped 20s and no second seek fires. Pre-fix this would
           // re-fire because the clobber pulled _currentPosition back
           // inside the segment.
@@ -4015,7 +4015,7 @@ void main() {
           await tester.pump();
           expect(adapter.seekCalls, [const Duration(seconds: 20)]);
 
-          // Another stale report — still no re-fire.
+          // Another stale report - still no re-fire.
           adapter.emitState(
             const PlaybackState(
               backend: PlaybackBackend.desktopLibmpv,
@@ -4060,7 +4060,7 @@ void main() {
           );
           await tester.pump();
 
-          // Enter segment A (10–20) → seek to 20, pending = 20.
+          // Enter segment A (10-20) → seek to 20, pending = 20.
           adapter.emitState(
             const PlaybackState(
               backend: PlaybackBackend.desktopLibmpv,
@@ -4072,7 +4072,7 @@ void main() {
           await tester.pump();
           expect(adapter.seekCalls, [const Duration(seconds: 20)]);
 
-          // Orchestrator genuinely catches up past the target —
+          // Orchestrator genuinely catches up past the target -
           // 20 >= 20, guard clears, position is accepted.
           adapter.emitState(
             const PlaybackState(
@@ -4085,7 +4085,7 @@ void main() {
           await tester.pump();
           expect(adapter.seekCalls, [const Duration(seconds: 20)]);
 
-          // Advance into segment B (30–40) — must auto-skip to 40.
+          // Advance into segment B (30-40) - must auto-skip to 40.
           // If the guard were stuck or the mechanism broken, this
           // wouldn't fire.
           adapter.emitState(
