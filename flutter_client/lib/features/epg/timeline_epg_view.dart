@@ -1147,8 +1147,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
     final end = math.min(rows.length, index + 1 + ahead);
     onEnsureEpg(
       [
-        for (var i = index; i < end; i++)
-          ?rows[i],
+        for (var i = index; i < end; i++) ?rows[i],
       ],
       startDate: _selectedDate,
       endDate: _selectedDate,
