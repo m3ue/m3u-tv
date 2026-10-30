@@ -1,7 +1,5 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:m3u_tv/services/api_client.dart';
 
 /// Result of comparing the installed app version against the latest
 /// version published in `pubspec.yaml` on the repo's master branch.
@@ -28,8 +26,7 @@ class AppVersionCheck {
 /// plugin would silently no-op there. Asset loading works identically on
 /// every platform.
 class AppVersionService {
-  AppVersionService({HttpClient? httpClient})
-    : _injectedHttpClient = httpClient;
+  AppVersionService({ApiClient? apiClient}) : _injectedApi = apiClient;
 
   static const _pubspecUrl =
       'https://raw.githubusercontent.com/m3ue/m3u-tv/master/flutter_client/pubspec.yaml';
@@ -38,9 +35,9 @@ class AppVersionService {
     multiLine: true,
   );
 
-  final HttpClient? _injectedHttpClient;
-  // Lazy: dart:io's HttpClient can't even be constructed in a web build.
-  late final HttpClient _httpClient = _injectedHttpClient ?? HttpClient();
+  final ApiClient? _injectedApi;
+  // Lazy: most instances only ever read the bundled version.
+  late final ApiClient _api = _injectedApi ?? ApiClient();
 
   Future<String?> currentVersion() async {
     final pubspec = await rootBundle.loadString('pubspec.yaml');
@@ -65,13 +62,13 @@ class AppVersionService {
 
   Future<String?> _fetchLatestVersion() async {
     try {
-      final request = await _httpClient.getUrl(Uri.parse(_pubspecUrl));
-      final response = await request.close().timeout(
-        const Duration(seconds: 8),
+      final response = await _api.send(
+        'GET',
+        Uri.parse(_pubspecUrl),
+        timeout: const Duration(seconds: 8),
       );
-      if (response.statusCode != HttpStatus.ok) return null;
-      final body = await utf8.decodeStream(response);
-      final match = _versionPattern.firstMatch(body);
+      if (response.statusCode != 200) return null;
+      final match = _versionPattern.firstMatch(response.text);
       return match?.group(1);
     } on Exception catch (_) {
       return null;

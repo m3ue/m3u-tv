@@ -1,7 +1,8 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:m3u_tv/services/api_client.dart';
+import 'package:m3u_tv/services/json_isolate.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// One published GitHub release of the `m3u-tv` repo.
@@ -69,7 +70,7 @@ class ReleaseNotesService {
     http.Client? httpClient,
     Directory? cacheDirectory,
     this.cacheTtl = const Duration(hours: 6),
-  }) : _httpClient = httpClient ?? http.Client(),
+  }) : _api = ApiClient(client: httpClient),
        _cacheDirectoryOverride = cacheDirectory;
 
   static final Uri _releasesUrl = Uri.parse(
@@ -78,7 +79,7 @@ class ReleaseNotesService {
 
   static const _cacheFileName = 'm3u_tv_releases.json';
 
-  final http.Client _httpClient;
+  final ApiClient _api;
   final Directory? _cacheDirectoryOverride;
   final Duration cacheTtl;
 
@@ -101,18 +102,18 @@ class ReleaseNotesService {
     }
 
     try {
-      final response = await _httpClient
-          .get(
-            _releasesUrl,
-            headers: const {
-              'Accept': 'application/vnd.github+json',
-              'User-Agent': 'm3u-tv',
-            },
-          )
-          .timeout(const Duration(seconds: 10));
+      final response = await _api.send(
+        'GET',
+        _releasesUrl,
+        headers: const {
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'm3u-tv',
+        },
+        timeout: const Duration(seconds: 10),
+      );
 
-      if (response.statusCode == HttpStatus.ok) {
-        final decoded = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        final decoded = await response.json();
         if (decoded is List) {
           final releases = decoded
               .whereType<Map<String, dynamic>>()
@@ -145,7 +146,9 @@ class ReleaseNotesService {
     try {
       final file = await _cacheFile();
       if (!file.existsSync()) return null;
-      final decoded = jsonDecode(await file.readAsString());
+      final decoded = await decodeJsonOffMainIsolate(
+        await file.readAsString(),
+      );
       if (decoded is! Map<String, dynamic>) return null;
       final fetchedAt = DateTime.tryParse(
         decoded['fetched_at'] as String? ?? '',
@@ -166,10 +169,10 @@ class ReleaseNotesService {
     try {
       final file = await _cacheFile();
       await file.writeAsString(
-        jsonEncode({
+        await encodeJsonOffMainIsolate({
           'fetched_at': DateTime.now().toUtc().toIso8601String(),
           'releases': releases.map((r) => r.toJson()).toList(),
-        }),
+        }, forceOffload: true),
       );
     } on Exception catch (_) {
       // A non-writable cache dir (e.g. a locked-down TV) just means no cache.

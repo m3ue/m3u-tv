@@ -2,12 +2,11 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-
+import 'package:m3u_tv/services/api_client.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 
@@ -96,9 +95,8 @@ class TraktService extends ChangeNotifier {
   final String _clientId;
   final TraktTransport? _transport;
   final TraktCodeVerifierFactory _codeVerifierFactory;
-  // Lazy: dart:io's HttpClient can't even be constructed in a web build.
-  HttpClient? _httpInstance;
-  HttpClient get _http => _httpInstance ??= HttpClient();
+  ApiClient? _apiInstance;
+  ApiClient get _api => _apiInstance ??= ApiClient();
 
   TraktAuthStatus _status = TraktAuthStatus.disconnected;
   TraktPendingAuth? _pending;
@@ -415,23 +413,19 @@ class TraktService extends ChangeNotifier {
         isPollEndpoint: isPollEndpoint,
       );
     }
-    final encoded = utf8.encode(jsonEncode(body));
-    final req = await _http.postUrl(Uri.parse('$_kApi$path'));
-    req
-      ..headers.contentType = ContentType.json
-      ..headers.set('trakt-api-version', '2')
-      ..headers.set('trakt-api-key', _clientId);
-    if (accessToken != null) {
-      req.headers.set('Authorization', 'Bearer $accessToken');
-    }
-    req
-      ..contentLength = encoded.length
-      ..add(encoded);
-    final res = await req.close();
-    final text = await utf8.decodeStream(res);
-    final bodyJson = text.isEmpty
+    final res = await _api.send(
+      'POST',
+      Uri.parse('$_kApi$path'),
+      json: body,
+      headers: {
+        'trakt-api-version': '2',
+        'trakt-api-key': _clientId,
+        'authorization': ?(accessToken == null ? null : 'Bearer $accessToken'),
+      },
+    );
+    final bodyJson = res.bytes.isEmpty
         ? const <String, Object?>{}
-        : jsonDecode(text) as Map<String, Object?>;
+        : (await res.json())! as Map<String, Object?>;
     return _handleResponse(
       statusCode: res.statusCode,
       body: bodyJson,
@@ -464,7 +458,7 @@ class TraktService extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _clearPendingAttempt();
-    _httpInstance?.close();
+    _apiInstance?.close();
     super.dispose();
   }
 }

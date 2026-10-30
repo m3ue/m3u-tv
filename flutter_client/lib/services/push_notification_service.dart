@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:m3u_tv/services/api_client.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart'
-    show TvApiException, canonicalNotificationId;
+    show canonicalNotificationId;
 
 typedef PushMessageHandler = FutureOr<void> Function(PushMessage message);
 
@@ -98,14 +97,12 @@ class FirebasePushMessagingClient implements PushMessagingClient {
 /// [init] throws.
 class PushNotificationService {
   PushNotificationService({
-    HttpClient? httpClient,
+    ApiClient? apiClient,
     PushMessagingClient? messagingClient,
-  }) : _injectedClient = httpClient,
+  }) : _api = apiClient ?? ApiClient(),
        _messagingClient = messagingClient ?? FirebasePushMessagingClient();
 
-  final HttpClient? _injectedClient;
-  // Lazy: dart:io's HttpClient can't even be constructed in a web build.
-  late final HttpClient _client = _injectedClient ?? HttpClient();
+  final ApiClient _api;
   final PushMessagingClient _messagingClient;
   Future<String?>? _initialization;
   StreamSubscription<PushMessage>? _foregroundSubscription;
@@ -198,31 +195,9 @@ class PushNotificationService {
     return uri.replace(path: path, queryParameters: <String, String>{});
   }
 
-  Future<void> _post(Uri uri, Map<String, String> body) async {
-    final request = await _client.postUrl(uri);
-    final bytes = utf8.encode(jsonEncode(body));
-    request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-    request
-      ..contentLength = bytes.length
-      ..add(bytes);
-    final response = await request.close();
-    final text = await utf8.decodeStream(response);
-    if (response.statusCode >= HttpStatus.badRequest) {
-      throw TvApiException(response.statusCode, text, uri);
-    }
-  }
+  Future<void> _post(Uri uri, Map<String, String> body) async =>
+      (await _api.send('POST', uri, json: body)).throwIfError();
 
-  Future<void> _delete(Uri uri, Map<String, String> body) async {
-    final request = await _client.deleteUrl(uri);
-    final bytes = utf8.encode(jsonEncode(body));
-    request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-    request
-      ..contentLength = bytes.length
-      ..add(bytes);
-    final response = await request.close();
-    final text = await utf8.decodeStream(response);
-    if (response.statusCode >= HttpStatus.badRequest) {
-      throw TvApiException(response.statusCode, text, uri);
-    }
-  }
+  Future<void> _delete(Uri uri, Map<String, String> body) async =>
+      (await _api.send('DELETE', uri, json: body)).throwIfError();
 }

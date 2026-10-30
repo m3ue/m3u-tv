@@ -1,14 +1,10 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-
-// Hide the app's own ContentType enum (live/vod/episode/aiostreams) so it
-// doesn't shadow dart:io's ContentType class used below for HTTP headers.
-import 'package:m3u_tv/services/domain_models.dart' hide ContentType;
+import 'package:m3u_tv/services/api_client.dart';
+import 'package:m3u_tv/services/domain_models.dart';
 
 enum DevicePairingStatus { idle, pending, approved, error }
 
@@ -59,9 +55,8 @@ class DevicePairingService extends ChangeNotifier {
     : _transport = transport;
 
   final DevicePairingTransport? _transport;
-  // Lazy: dart:io's HttpClient can't even be constructed in a web build.
-  HttpClient? _httpInstance;
-  HttpClient get _http => _httpInstance ??= HttpClient();
+  ApiClient? _apiInstance;
+  ApiClient get _api => _apiInstance ??= ApiClient();
 
   DevicePairingStatus _status = DevicePairingStatus.idle;
   DevicePairingPending? _pending;
@@ -212,24 +207,19 @@ class DevicePairingService extends ChangeNotifier {
       );
       return res.body;
     }
-    final encoded = utf8.encode(jsonEncode(body));
-    final req = await _http.postUrl(Uri.parse('$server$path'));
-    req.headers.contentType = ContentType.json;
-    req
-      ..contentLength = encoded.length
-      ..add(encoded);
-    final res = await req.close();
-    final text = await utf8.decodeStream(res);
-    return text.isEmpty
+    // Status is deliberately not checked: the poll endpoint reports
+    // `authorization_pending` and friends as 4xx bodies the caller reads.
+    final res = await _api.send('POST', Uri.parse('$server$path'), json: body);
+    return res.bytes.isEmpty
         ? const <String, Object?>{}
-        : jsonDecode(text) as Map<String, Object?>;
+        : (await res.json())! as Map<String, Object?>;
   }
 
   @override
   void dispose() {
     _disposed = true;
     _pollTimer?.cancel();
-    _httpInstance?.close();
+    _apiInstance?.close();
     super.dispose();
   }
 }

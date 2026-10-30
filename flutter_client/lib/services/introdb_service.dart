@@ -1,9 +1,7 @@
 // ignore_for_file: prefer_initializing_formals
 
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:m3u_tv/services/api_client.dart';
 import 'package:m3u_tv/services/app_version_service.dart';
 
 /// A single segment range (start/end in milliseconds) as returned by
@@ -71,17 +69,15 @@ const _kUserAgentProduct = 'm3u-tv';
 /// `User-Agent` (see [userAgentFor]) so TheIntroDB can attribute traffic.
 class IntroDbService {
   IntroDbService({
-    HttpClient? httpClient,
+    ApiClient? apiClient,
     Future<String?> Function()? appVersionResolver,
     @visibleForTesting String baseUrl = _kBaseUrl,
-  }) : _injectedHttpClient = httpClient,
+  }) : _api = apiClient ?? ApiClient(),
        _appVersionResolver =
            appVersionResolver ?? AppVersionService().currentVersion,
        _baseUrl = baseUrl;
 
-  final HttpClient? _injectedHttpClient;
-  // Lazy: dart:io's HttpClient can't even be constructed in a web build.
-  late final HttpClient _httpClient = _injectedHttpClient ?? HttpClient();
+  final ApiClient _api;
   final Future<String?> Function() _appVersionResolver;
   final String _baseUrl;
   final Map<String, _IntroDbCacheEntry> _cache = {};
@@ -139,20 +135,18 @@ class IntroDbService {
     final userAgent = await (_userAgent ??= _resolveUserAgent());
     IntroDbSegments? result;
     try {
-      final request = await _httpClient.getUrl(uri);
-      request.headers.set(HttpHeaders.userAgentHeader, userAgent);
-      final response = await request.close().timeout(
-        const Duration(seconds: 8),
+      final response = await _api.send(
+        'GET',
+        uri,
+        headers: {'user-agent': userAgent},
+        timeout: const Duration(seconds: 8),
       );
-      if (response.statusCode == HttpStatus.ok) {
-        final body = await utf8.decodeStream(response);
-        final decoded = jsonDecode(body);
+      if (response.statusCode == 200) {
+        final decoded = await response.json();
         if (decoded is Map<String, dynamic>) {
           final segments = IntroDbSegments.fromJson(decoded);
           result = segments.isEmpty ? null : segments;
         }
-      } else {
-        await response.drain<void>();
       }
     } on Exception catch (_) {
       result = null;
