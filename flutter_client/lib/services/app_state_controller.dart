@@ -179,7 +179,11 @@ class AppStateController extends ChangeNotifier {
     required this._pushNotificationService,
     required this.viewSettingsService,
   }) {
-    epgService.cacheTtl = cacheService.refreshInterval;
+    epgService
+      ..cacheTtl = cacheService.refreshInterval
+      // SQLite is the guide's store of record; memory keeps now/next for
+      // every channel and full schedules only for recently viewed ones.
+      ..attachStore(_catalogRepository);
     favoritesService.onChanged = (streamId, {required favorited}) =>
         _pushFavoriteChange('live', streamId, favorited: favorited);
     vodFavoritesService.onChanged = (streamId, {required favorited}) =>
@@ -2075,12 +2079,13 @@ class AppStateController extends ChangeNotifier {
             'vodStreams': vodItems,
             'seriesStreams': seriesList,
             'viewers': viewers,
-            // replace() wipes every cache key not in this map, so carry the
-            // guide across a same-source refresh; drop it when the EPG source
-            // itself is changing (the reset below clears the in-memory guide).
+            // replace() wipes every cache key not in this map, so keep the
+            // stored guide across a same-source refresh (EpgService writes it
+            // through as it goes); drop it when the EPG source itself is
+            // changing (the reset below clears the in-memory guide).
             'epgGuide': invalidateEpgFreshness
                 ? const <EpgProgram>[]
-                : _epg.guideForPersist(),
+                : CacheService.keepExisting,
           });
           if (_sourceOperationGeneration.isStale(sourceGeneration)) {
             await rollbackSource?.call();

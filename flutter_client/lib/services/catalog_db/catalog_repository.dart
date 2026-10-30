@@ -519,50 +519,6 @@ class CatalogRepository implements EpgProgrammeStore {
     );
   }
 
-  /// Replaces the stored programmes of just the channels in [byChannel]
-  /// (deleting a channel's rows even when its new list is empty), then drops
-  /// every programme that ended before [pruneBefore]. Mirrors how the
-  /// in-memory guide replaces a fetched channel's schedule, so a rescheduled
-  /// slot doesn't linger beside its replacement, without rewriting channels
-  /// that didn't change.
-  Future<void> replaceChannelProgrammes(
-    Map<String, List<EpgProgram>> byChannel, {
-    DateTime? pruneBefore,
-  }) {
-    final rows = byChannel.values.fold<int>(0, (n, list) => n + list.length);
-    if (!_offloadWrites || rows < _offloadThresholdRows) {
-      return _replaceChannelProgrammesOn(_db, byChannel, pruneBefore);
-    }
-    return _db.computeWithDatabase(
-      connect: CatalogDatabase.new,
-      computation: (db) =>
-          _replaceChannelProgrammesOn(db, byChannel, pruneBefore),
-    );
-  }
-
-  static Future<void> _replaceChannelProgrammesOn(
-    CatalogDatabase db,
-    Map<String, List<EpgProgram>> byChannel,
-    DateTime? pruneBefore,
-  ) => db.transaction(() async {
-    if (byChannel.isNotEmpty) {
-      await (db.delete(
-        db.epgProgrammes,
-      )..where((t) => t.channelId.isIn(byChannel.keys))).go();
-      await _upsertProgrammesOn(db, [
-        for (final programmes in byChannel.values) ...programmes,
-      ]);
-    }
-    if (pruneBefore != null) {
-      await (db.delete(db.epgProgrammes)..where(
-            (t) => t.endMs.isSmallerThanValue(
-              pruneBefore.millisecondsSinceEpoch,
-            ),
-          ))
-          .go();
-    }
-  });
-
   static Future<void> _replaceProgrammesOn(
     CatalogDatabase db,
     List<EpgProgram> programmes,

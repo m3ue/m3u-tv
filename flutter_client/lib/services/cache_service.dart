@@ -102,24 +102,6 @@ class CacheService {
     }
   }
 
-  /// Incremental counterpart of `set('epgGuide', ...)`: rewrites only the
-  /// given channels' programmes (see
-  /// [CatalogRepository.replaceChannelProgrammes]) and refreshes the guide's
-  /// age marker, so a sweep batch doesn't rewrite the whole guide.
-  Future<void> updateEpgChannels(
-    Map<String, List<EpgProgram>> byChannel, {
-    DateTime? pruneBefore,
-  }) async {
-    final repo = _repo;
-    if (repo.isClosed) return;
-    await repo.replaceChannelProgrammes(byChannel, pruneBefore: pruneBefore);
-    await repo.kvPut(
-      _tsKey(_epgKey),
-      '',
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch,
-    );
-  }
-
   Future<CacheEntry<T>?> get<T>(String key) async {
     if (_isRepoKey(key)) return _readRepoKey<T>(key);
 
@@ -145,11 +127,17 @@ class CacheService {
     return CacheSnapshot._(memory, persisted, await _repo.snapshot());
   }
 
+  /// A [replace] value meaning "leave this key's stored data as it is"
+  /// (rather than wiping it, as [replace] does to keys it isn't given). Used
+  /// for the guide, which `EpgService` writes through on its own.
+  static const Object keepExisting = _KeepExisting();
+
   Future<void> replace(Map<String, Object?> values) async {
     final timestamp = DateTime.now();
     final memory = <String, Object?>{};
     final persisted = <String, Object?>{};
     for (final entry in values.entries) {
+      if (identical(entry.value, keepExisting)) continue;
       if (_isRepoKey(entry.key)) {
         await _writeRepoKey(entry.key, entry.value, timestamp);
         continue;
@@ -335,4 +323,8 @@ Object? _decodeCacheData(String key, Object? raw) {
       list?.map((item) => Viewer.fromJson(asMap(item))).toList(growable: false),
     _ => raw,
   };
+}
+
+class _KeepExisting {
+  const _KeepExisting();
 }

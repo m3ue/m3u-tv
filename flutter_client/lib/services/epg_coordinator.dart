@@ -31,7 +31,9 @@ class EpgCoordinator {
        _isXtreamSource = isXtreamSource,
        _channelsOf = channels,
        _isLoadingContentOf = isLoadingContent,
-       _notifyListeners = notifyListeners;
+       _notifyListeners = notifyListeners {
+    epgService.onEvicted = _onScheduleEvicted;
+  }
 
   final EpgService epgService;
   final XtreamService xtreamService;
@@ -85,15 +87,6 @@ class EpgCoordinator {
   static const _epgSweepChunkSize = 100;
   static const _epgSweepStartDelay = Duration(seconds: 2);
   static const _epgSweepChunkDelay = Duration(milliseconds: 350);
-  // The guide is written to the on-disk cache (debounced) as prime/sweep/lazy
-  // fetches land, so a cold start can paint the last-known EPG before any
-  // network round-trip. Only programmes still airing or upcoming are kept, and
-  // the flat list is capped so the blob stays bounded on huge playlists.
-  Timer? _epgGuidePersistDebounce;
-
-  /// EPG channel ids whose in-memory schedule changed since the last
-  /// persist; only these are rewritten on disk.
-  final Set<String> _dirtyEpgChannelIds = <String>{};
   // When the last guide prime succeeded, so a resume can tell whether the
   // guide is older than [EpgService.cacheTtl]. Only set on success: a prime
   // that fails (waking from standby before Wi-Fi is back) must not count as
@@ -101,9 +94,6 @@ class EpgCoordinator {
   DateTime? _epgGuideRefreshedAt;
   int _epgPrimesInFlight = 0;
   Timer? _epgPrimeRetry;
-  static const _epgGuidePersistDelay = Duration(seconds: 12);
-  static const _epgPersistProgramCap = 50000;
-  static const _epgPersistPastSlack = Duration(hours: 2);
 
   /// Queues [channels] for a lazy, debounced EPG fetch — only channels
   /// without fresh cached data are requested. Call this from a screen's
@@ -131,8 +121,7 @@ class EpgCoordinator {
     for (final channel in channels) {
       if (rangeKey.isEmpty) {
         final forceRefresh =
-            returningToCurrentGuide &&
-            epgService.programsForChannel(channel).isEmpty;
+            returningToCurrentGuide && !epgService.hasProgramsFor(channel);
         if (!forceRefresh && !epgService.shouldFetchDataForChannel(channel)) {
           continue;
         }
@@ -236,9 +225,6 @@ class EpgCoordinator {
           replaceExisting: false,
           markFresh: false,
         );
-      // Written with the next scheduled persist, as the full-guide rewrite
-      // used to pick these up.
-      _markEpgDirty([_epgChannelId(channel)], programs);
       _catchupEpgFetchedAt[channel.id] = DateTime.now();
     } on Object catch (_) {
       _catchupEpgFetchedAt.remove(channel.id);
@@ -306,8 +292,6 @@ class EpgCoordinator {
           )
           ..markFetched(fetchIds);
       }
-      _markEpgDirty(channelIds, programs);
-      _scheduleEpgGuidePersist();
       if (kDebugMode) {
         debugPrint(
           '[EPG] lazy fetch → ${programs.length} programs for ${channels.length} channels',
@@ -498,8 +482,6 @@ class EpgCoordinator {
         programs,
         sourceGeneration: sourceGeneration,
       );
-      _markEpgDirty(channelIds, programs);
-      _scheduleEpgGuidePersist();
     } on Object catch (e) {
       epgService.markFetchFailed(
         channelIds,
@@ -511,72 +493,24 @@ class EpgCoordinator {
     }
   }
 
-  /// The airing/upcoming slice of the in-memory guide, capped, for the on-disk
-  /// cache. Stale (already-ended) programmes are dropped so an old blob shrinks
-  /// to nothing on its own rather than restoring a guide full of dead air.
-  List<EpgProgram> guideForPersist() {
-    final cutoff = epgService.now.subtract(_epgPersistPastSlack);
-    final programs = epgService.programsEndingAfter(cutoff);
-    if (programs.length <= _epgPersistProgramCap) return programs;
-    return programs.sublist(0, _epgPersistProgramCap);
-  }
+  /// Fills the guide's now/next from the store on a cold start so the grids
+  /// can paint before the network prime lands. Not marked fresh, so the prime
+  /// and background sweep still refresh every channel. ([EpgService] writes
+  /// every fetch through to the store itself.)
+  Future<void> restoreCachedGuide() => epgService.restoreFromStore();
 
-  void _scheduleEpgGuidePersist() {
-    _epgGuidePersistDebounce?.cancel();
-    _epgGuidePersistDebounce = Timer(
-      _epgGuidePersistDelay,
-      () => unawaited(_persistEpgGuide()),
-    );
-  }
-
-  void _markEpgDirty(Iterable<String> channelIds, List<EpgProgram> programs) {
-    _dirtyEpgChannelIds
-      ..addAll(channelIds.where((id) => id.isNotEmpty))
-      ..addAll(programs.map((p) => p.channelId).where((id) => id.isNotEmpty));
-  }
-
-  /// Rewrites only the channels whose schedule changed since the last
-  /// persist (the debounce coalesces a burst of sweep batches), and prunes
-  /// programmes that have ended. The whole-guide rewrite this replaced copied
-  /// up to [_epgPersistProgramCap] programmes every few seconds of a sweep.
-  Future<void> _persistEpgGuide() async {
-    if (_disposed || !_isXtream) return;
-    if (_dirtyEpgChannelIds.isEmpty) return;
-    final cutoff = epgService.now.subtract(_epgPersistPastSlack);
-    final dirty = _dirtyEpgChannelIds.toList(growable: false);
-    _dirtyEpgChannelIds.clear();
-    try {
-      await cacheService.updateEpgChannels({
-        for (final id in dirty)
-          id: [
-            for (final program in epgService.programsForId(id))
-              if (program.end.isAfter(cutoff)) program,
-          ],
-      }, pruneBefore: cutoff);
-    } on Object catch (e) {
-      // Retry these channels with the next persist.
-      _dirtyEpgChannelIds.addAll(dirty);
-      if (kDebugMode) debugPrint('[EPG] guide persist failed: $e');
+  /// [EpgService.onEvicted]: the channel's full schedule left memory, so
+  /// forget which dated ranges and catchup windows were fetched for it - the
+  /// next time its timeline row or catchup dialog asks, fetch again rather
+  /// than trust data that may only have lived in memory.
+  void _onScheduleEvicted(String epgChannelId) {
+    for (final channel in _channels) {
+      if (_epgChannelId(channel) != epgChannelId) continue;
+      _fetchedEpgRanges.removeWhere(
+        (key, _) => key.startsWith('${channel.id}:'),
+      );
+      _catchupEpgFetchedAt.remove(channel.id);
     }
-  }
-
-  /// Merges the last-persisted guide into [epgService] on a cold start so the
-  /// grids can paint "now/next" before the network prime lands. Marked not
-  /// fresh, so the prime and background sweep still refresh every channel.
-  Future<void> restoreCachedGuide() async {
-    final cached = await cacheService.get<List<EpgProgram>>('epgGuide');
-    final programs = cached?.data;
-    if (programs == null || programs.isEmpty) return;
-    final cutoff = epgService.now.subtract(_epgPersistPastSlack);
-    final live = programs
-        .where((program) => program.end.isAfter(cutoff))
-        .toList(growable: false);
-    if (live.isEmpty) return;
-    epgService.mergePrograms(
-      live,
-      replaceExisting: false,
-      markFresh: false,
-    );
   }
 
   String _epgChannelId(Channel channel) =>
@@ -614,8 +548,6 @@ class EpgCoordinator {
     _epgRequestGeneration += 1;
     _epgSweepGeneration += 1;
     _epgFetchDebounce?.cancel();
-    _epgGuidePersistDebounce?.cancel();
-    _dirtyEpgChannelIds.clear();
     _epgFetchDebounce = null;
     _pendingEpgChannelIds.clear();
     _pendingForcedEpgChannelIds.clear();
@@ -634,7 +566,6 @@ class EpgCoordinator {
     _epgRequestGeneration += 1;
     _epgSweepGeneration += 1;
     _epgFetchDebounce?.cancel();
-    _epgGuidePersistDebounce?.cancel();
     _epgPrimeRetry?.cancel();
     unawaited(_epgSweepProgressController.close());
   }

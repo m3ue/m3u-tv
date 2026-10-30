@@ -182,31 +182,6 @@ void main() {
   });
 
   group('with a CatalogRepository', () {
-    test('updateEpgChannels makes the guide readable and fresh', () async {
-      final store = await newStore('m3u-tv-cache-epg-');
-      final cache = CacheService(store: store, catalogRepository: newRepo());
-      final now = DateTime.now().toUtc();
-
-      // Nothing persisted yet: no entry at all.
-      expect(await cache.get<List<EpgProgram>>('epgGuide'), isNull);
-
-      await cache.updateEpgChannels({
-        'bbc.one': [
-          EpgProgram(
-            channelId: 'bbc.one',
-            title: 'News',
-            description: '',
-            start: now,
-            end: now.add(const Duration(hours: 1)),
-          ),
-        ],
-      });
-
-      final guide = await cache.get<List<EpgProgram>>('epgGuide');
-      expect(guide!.data.single.title, 'News');
-      expect(guide.isStale, isFalse);
-    });
-
     test(
       'catalog keys round-trip through SQLite, non-catalog keys do not',
       () async {

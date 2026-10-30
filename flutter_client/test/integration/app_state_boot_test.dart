@@ -2017,6 +2017,15 @@ void main() {
   });
 
   group('EPG background sweep', () {
+    test('the guide is backed by the SQLite catalog store', () {
+      final controller = _controller(
+        storage: InMemorySecureStorage(),
+        transport: _FakeXtreamTransport.success().call,
+      );
+      addTearDown(controller.dispose);
+      expect(controller.epgService.hasStore, isTrue);
+    });
+
     const credentials = UserCredentials(
       server: 'https://fixture.example',
       username: 'fixture-user',
