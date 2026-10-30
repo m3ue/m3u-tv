@@ -27,6 +27,7 @@ class NativeVideoSurface extends StatelessWidget {
     this.nativePlane,
     this.wrapInBlackBackground = true,
     this.clearAncestorPaintForNativePlane = false,
+    this.surfaceKey,
   });
 
   /// Picks the surface off whichever provider interface [backend]
@@ -74,6 +75,13 @@ class NativeVideoSurface extends StatelessWidget {
   /// those ancestors transparent directly.
   final bool clearAncestorPaintForNativePlane;
 
+  /// Put on the innermost native view widget (the platform view, texture,
+  /// or native-plane reporter) rather than on this widget, so a
+  /// [GlobalKey] here moves the live native view between two differently
+  /// wrapped surfaces (the EPG preview and the full-screen player) without
+  /// Flutter disposing and recreating it, which would restart playback.
+  final Key? surfaceKey;
+
   @override
   Widget build(BuildContext context) {
     final plane = nativePlane;
@@ -86,7 +94,7 @@ class NativeVideoSurface extends StatelessWidget {
             children: [
               if (clearAncestorPaintForNativePlane)
                 const CustomPaint(painter: _NativePlaneHolePainter()),
-              _NativePlaneReporter(plane: plane),
+              _NativePlaneReporter(key: surfaceKey, plane: plane),
             ],
           ),
         ),
@@ -98,7 +106,10 @@ class NativeVideoSurface extends StatelessWidget {
         Center(
           child: AspectRatio(
             aspectRatio: aspectRatio,
-            child: HtmlElementView(viewType: html.platformViewType),
+            child: HtmlElementView(
+              key: surfaceKey,
+              viewType: html.platformViewType,
+            ),
           ),
         ),
       );
@@ -107,6 +118,7 @@ class NativeVideoSurface extends StatelessWidget {
     if (view != null) {
       final child = HostPlatform.isMacOS
           ? AppKitView(
+              key: surfaceKey,
               viewType: view.platformViewType,
               creationParams: view.platformViewCreationParams,
               creationParamsCodec: const StandardMessageCodec(),
@@ -114,6 +126,7 @@ class NativeVideoSurface extends StatelessWidget {
           : HostPlatform.isAndroid
           ? _androidHybridCompositionView(view)
           : UiKitView(
+              key: surfaceKey,
               viewType: view.platformViewType,
               creationParams: view.platformViewCreationParams,
               creationParamsCodec: const StandardMessageCodec(),
@@ -139,7 +152,7 @@ class NativeVideoSurface extends StatelessWidget {
       Center(
         child: AspectRatio(
           aspectRatio: aspectRatio,
-          child: Texture(textureId: id),
+          child: Texture(key: surfaceKey, textureId: id),
         ),
       ),
     );
@@ -160,6 +173,7 @@ class NativeVideoSurface extends StatelessWidget {
   /// documented mechanism for embedding a `SurfaceView` correctly.
   Widget _androidHybridCompositionView(PlatformViewProvider view) {
     return PlatformViewLink(
+      key: surfaceKey,
       viewType: view.platformViewType,
       surfaceFactory: (context, controller) {
         return AndroidViewSurface(
@@ -204,7 +218,7 @@ class _NativePlaneHolePainter extends CustomPainter {
 /// `wl_subsurface`) stacked outside Flutter's own compositor, which only
 /// shows through where Flutter itself paints nothing.
 class _NativePlaneReporter extends StatefulWidget {
-  const _NativePlaneReporter({required this.plane});
+  const _NativePlaneReporter({super.key, required this.plane});
 
   final NativePlaneProvider plane;
 

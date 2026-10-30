@@ -265,6 +265,10 @@ class _MinuteSpan {
 }
 
 class TimelineEpgViewState extends State<TimelineEpgView> {
+  /// Whether the preview panel is on screen, so a player handed back to
+  /// the preview (see `EpgPreviewPlayerController.adoptBack`) is shown.
+  bool get previewPanelShown => _previewPanelShown;
+
   final FocusNode _gridFocusNode = FocusNode(debugLabel: 'epg-guide');
   final ScrollController _vCtrl = ScrollController();
   // Created on the first layout, once the start offset (which depends on
@@ -1220,7 +1224,8 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
                           _okPreviews(selection.channel),
                       canOpenOptions: _canOpenOptions(cursor),
                       artwork:
-                          previewPlayer != null && previewPlayer.backend != null
+                          previewPlayer != null &&
+                              previewPlayer.surfaceOrchestrator != null
                           ? EpgPreviewVideo(
                               controller: previewPlayer,
                               onTap: _openPreviewFullscreen,

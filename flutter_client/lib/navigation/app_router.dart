@@ -50,6 +50,18 @@ class PlayerArgs {
     this.transcoded = false,
   });
 
+  /// Live playback of [channel]. Shared by the full-screen player and the
+  /// EPG preview so both request the same stream with the same metadata.
+  factory PlayerArgs.liveChannel(Channel channel) => PlayerArgs(
+    streamUrl: channel.streamUrl,
+    title: channel.name,
+    type: 'live',
+    streamId: channel.id,
+    epgChannelId: channel.epgChannelId ?? channel.tvgName ?? channel.name,
+    logoUrl: channel.logoUrl,
+    headers: channel.headers,
+  );
+
   final String streamUrl;
   final String title;
   final String type; // 'live' | 'vod' | 'series' | 'catchup'
@@ -134,8 +146,13 @@ class SeriesDetailsArgs {
   final String seriesName;
 }
 
+/// [playerId] keys the Android Media3 and Apple AVKit native players. The
+/// full-screen player uses their default; the EPG preview passes its own so
+/// a preview still tearing down can never release a full-screen player that
+/// has just started under the same id.
 PlaybackOrchestrator buildPlaybackOrchestrator({
   PlaybackStreamSessionGateway? streamSessionGateway,
+  String? playerId,
 }) {
   final platform = _playbackPlatformForCurrentTarget();
   final adapters = <PlaybackBackend, PlayerAdapter>{};
@@ -152,6 +169,7 @@ PlaybackOrchestrator buildPlaybackOrchestrator({
     // why.
     adapters[PlaybackBackend.androidMpv] = AndroidMpvBackend();
     adapters[PlaybackBackend.androidExoPlayer] = AndroidPlaybackAdapter(
+      playerId: playerId ?? AndroidPlaybackAdapter.defaultPlayerId,
       probe: const AndroidPlaybackProbe(
         hardwareCodecs: <VideoCodec>{VideoCodec.h264},
         passthroughAudioCodecs: <AudioCodec>{AudioCodec.aac, AudioCodec.mp3},
@@ -171,7 +189,9 @@ PlaybackOrchestrator buildPlaybackOrchestrator({
     // is not a dependency of this project at all (see the desktop branch
     // below for why).
     adapters[PlaybackBackend.appleMpvNative] = AppleMpvNativeBackend();
-    adapters[PlaybackBackend.appleAvKit] = AppleAvKitBackend();
+    adapters[PlaybackBackend.appleAvKit] = AppleAvKitBackend(
+      playerId: playerId ?? AppleAvKitBackend.defaultPlayerId,
+    );
   } else if (platform == PlaybackPlatform.desktop) {
     // `media_kit`/`media_kit_video`/`media_kit_libs_*` are not a dependency
     // of this project at all -- removed entirely (not just left

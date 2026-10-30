@@ -12,9 +12,10 @@ import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
 import 'package:m3u_tv/features/live_tv/catchup_shows_dialog.dart';
 import 'package:m3u_tv/features/multiview/multiview_manage_dialog.dart';
 import 'package:m3u_tv/features/multiview/multiview_screen.dart';
+import 'package:m3u_tv/features/player/player_source_settings.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart'
-    show buildMultiviewTilePlayer;
+    show PlayerArgs, buildPlaybackOrchestrator;
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -76,6 +77,7 @@ class LiveTvScreen extends ConsumerStatefulWidget {
     this.onBackHandlerReady,
     this.onSearchShows,
     this.onShowSelect,
+    this.onPreviewHandoff,
   });
 
   final FavoritesService favoritesService;
@@ -155,6 +157,11 @@ class LiveTvScreen extends ConsumerStatefulWidget {
   /// a no-op when the callback is null.
   final void Function(EpgShow)? onShowSelect;
 
+  /// Opens the guide preview's playing channel full screen by taking over
+  /// its player, so playback carries on instead of restarting. Wired by
+  /// AppShell; when null, [onChannelSelect] opens a new player instead.
+  final EpgPreviewHandoff? onPreviewHandoff;
+
   @override
   ConsumerState<LiveTvScreen> createState() => _LiveTvScreenState();
 }
@@ -216,9 +223,10 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   int _viewSettingsGeneration = 0;
 
   // The guide's preview player; null unless EPG preview playback is on.
-  // Built on the same per-platform embedded player as a Multiview tile, so
-  // it's offered exactly where Multiview is.
+  // Offered exactly where Multiview is, the platforms whose native backends
+  // run several players.
   EpgPreviewPlayerController? _previewPlayer;
+  int _previewPlayerSeq = 0;
 
   // The live channel last opened full-screen from the guide, resumed in the
   // preview once that player closes. Shared with AppShell, which keeps that
@@ -306,13 +314,30 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     if (wanted && current == null) {
       setState(() {
         final applyProxyPlayback = ref.read(applyProxyPlaybackProvider);
+        final settings = widget.viewSettingsService;
+        // The full-screen player's own orchestrator and source, since a
+        // preview going full screen is handed over as-is.
         _previewPlayer = EpgPreviewPlayerController(
-          buildPlayer: (playerId) => buildMultiviewTilePlayer(
-            playerId,
+          buildPlayer: () => buildPlaybackOrchestrator(
             streamSessionGateway: ref.read(streamSessionGatewayProvider),
+            playerId: 'epg-preview-${_previewPlayerSeq++}',
           ),
-          streamUrlFor: (channel) =>
-              applyProxyPlayback(channel.streamUrl, type: 'live'),
+          sourceFor: (channel) {
+            final args = PlayerArgs.liveChannel(channel);
+            return applyPlayerSourceSettings(
+              args
+                  .copyWith(
+                    streamUrl: applyProxyPlayback(args.streamUrl, type: 'live'),
+                  )
+                  .toPlaybackSource(),
+              settings,
+            );
+          },
+          onOpened: (orchestrator) => applyPlayerOpenedSettings(
+            orchestrator,
+            hdrEnabled: settings?.hdrEnabledSync ?? true,
+            volume: settings?.volumeSync ?? 1.0,
+          ),
         );
       });
     } else if (!wanted && current != null) {
@@ -325,13 +350,32 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     }
   }
 
-  /// Opens [channel] full-screen from the guide. The preview player is torn
-  /// down first so two native players are never alive at once, and
-  /// remembered so Back from the player resumes it in the preview. When the
-  /// preview was already on this channel its proxy stream is left running,
-  /// so the full-screen player joins it rather than restarting it.
+  /// Opens [channel] full-screen from the guide. When the preview is
+  /// playing it, its player is handed to the full-screen player and back
+  /// again on close, so playback never restarts. Otherwise the preview
+  /// player is torn down first so two native players are never alive at
+  /// once, and remembered so Back from the player resumes it in the
+  /// preview; when the preview was already on this channel its proxy stream
+  /// is left running, so the full-screen player joins it rather than
+  /// restarting it.
   Future<void> _watchLiveFromGuide(Channel channel) async {
     final player = _previewPlayer;
+    final handoff = widget.onPreviewHandoff;
+    if (player != null && handoff != null && player.isPlaying(channel)) {
+      // Lent and opened in one synchronous step: the native view moves to
+      // the full-screen player in the same frame it leaves the guide.
+      final lease = player.lend();
+      if (lease != null) {
+        _resumePreviewChannel = null;
+        widget.onChannelContextChanged?.call(
+          _channelContext(
+            index: _window.indexWhere((row) => row.id == channel.id),
+          ),
+        );
+        handoff(lease, _adoptPreviewBack);
+        return;
+      }
+    }
     if (player != null) {
       await player.stop(keepStreamWarm: player.isPlaying(channel));
       _resumePreviewChannel = channel;
@@ -343,6 +387,21 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       ),
     );
     widget.onChannelSelect(channel);
+  }
+
+  /// Takes back a player the full-screen player borrowed through
+  /// [LiveTvScreen.onPreviewHandoff], when the guide is still where it can
+  /// show it.
+  bool _adoptPreviewBack(EpgPreviewLease lease) {
+    final player = _previewPlayer;
+    if (!mounted ||
+        player == null ||
+        _viewMode != _ViewMode.epgGrid ||
+        !_isTabVisible ||
+        _timelineEpgViewKey.currentState?.previewPanelShown != true) {
+      return false;
+    }
+    return player.adoptBack(lease);
   }
 
   Future<void> _watchReplayFromGuide(
@@ -359,6 +418,9 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     if (wasActive != true || isActive) return;
     final channel = _resumePreviewChannel;
     final player = _previewPlayer;
+    // A player handed back has already been adopted; one that wasn't is
+    // gone, and the preview may play again.
+    player?.forgetLent();
     _resumePreviewChannel = null;
     if (channel == null ||
         player == null ||
@@ -885,6 +947,11 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   }
 
   Future<void> _openMultiview(BuildContext context) async {
+    // Multiview's tiles must not start while the preview's player is still
+    // alive (see EpgPreviewPlayerController).
+    _resumePreviewChannel = null;
+    await _previewPlayer?.stop();
+    if (!context.mounted) return;
     widget.onEnterFullScreenDetail?.call();
     try {
       await Navigator.of(context).push<void>(

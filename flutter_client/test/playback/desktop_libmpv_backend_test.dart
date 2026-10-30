@@ -260,6 +260,7 @@ void main() {
           'headers': <String, String>{'Referer': 'https://provider.test'},
           'hdrEnabled': true,
           'matchRefreshRate': false,
+          'allowDisplayModeChanges': true,
           'deinterlace': false,
           'prebufferLive': false,
           'externalSubtitles': <Map<String, Object?>>[],

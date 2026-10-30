@@ -124,6 +124,7 @@ class MpvPlayerPlugin(
                         headers = headers,
                         externalSubtitles = parseExternalSubtitles(args["externalSubtitles"]),
                         matchDisplayRefreshRate = args["matchRefreshRate"] as? Boolean ?: false,
+                        allowDisplayModeChanges = args["allowDisplayModeChanges"] as? Boolean ?: true,
                         posterUrl = args["posterUrl"] as? String,
                     )
                     result.success(mapOf("ok" to true))
@@ -153,6 +154,10 @@ class MpvPlayerPlugin(
             }
             "stop" -> {
                 core(viewId)?.stop()
+                result.success(null)
+            }
+            "setAllowDisplayModeChanges" -> {
+                core(viewId)?.setAllowDisplayModeChanges(args["allowed"] as? Boolean ?: true)
                 result.success(null)
             }
             "setHdrEnabled" -> {

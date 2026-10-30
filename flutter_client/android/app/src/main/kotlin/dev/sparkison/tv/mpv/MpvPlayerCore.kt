@@ -126,6 +126,12 @@ class MpvPlayerCore(
     // Android toggle, `matchContentFrameRate`, default off).
     private var matchDisplayRefreshRate: Boolean = false
 
+    // False while this player is embedded (the EPG guide preview), so
+    // browsing the guide never switches the display mode. Set on every
+    // load() and by [setAllowDisplayModeChanges]; scope-confined like
+    // [matchDisplayRefreshRate].
+    private var allowDisplayModeChanges: Boolean = true
+
     // HDR GL surface -- see [applyHdrSurfaceIfNeeded]. User-facing toggle
     // (mirrored from the app's HDR setting via [setHdrEnabled], default on);
     // whether this core has already engaged a BT.2020 PQ surface, which is
@@ -162,7 +168,12 @@ class MpvPlayerCore(
                 refreshVideoOutput("surfaceCreated")
             }
 
-            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
+            // A resize without a new surface (the EPG preview growing to full
+            // screen, PiP): mpv's Android GPU context only learns the new size
+            // from this, as mpv-android and Plezy do it.
+            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+                setProperty("android-surface-size", "${width}x$height")
+            }
 
             override fun surfaceDestroyed(holder: SurfaceHolder) {
                 pendingSurface = null
@@ -407,6 +418,7 @@ class MpvPlayerCore(
         headers: Map<String, String>?,
         externalSubtitles: List<Triple<String, String?, String?>>,
         matchDisplayRefreshRate: Boolean = false,
+        allowDisplayModeChanges: Boolean = true,
         posterUrl: String? = null,
     ) {
         scope.launch {
@@ -421,7 +433,8 @@ class MpvPlayerCore(
                 // body, so it's only ever touched from this single-threaded
                 // scope -- same invariant [readyEmitted]/[lastErrorLogText] rely on.
                 this@MpvPlayerCore.matchDisplayRefreshRate = matchDisplayRefreshRate
-                if (matchDisplayRefreshRate) {
+                this@MpvPlayerCore.allowDisplayModeChanges = allowDisplayModeChanges
+                if (matchDisplayRefreshRate && allowDisplayModeChanges) {
                     mainHandler.post { frameRateManager.log("mpv load: Auto Frame Rate on") }
                 }
                 try {
@@ -670,7 +683,7 @@ class MpvPlayerCore(
     // Window mutation in [FrameRateManager] must happen on the main thread,
     // same as [emit]/[emitError] below.
     private suspend fun applyFrameRateFromContainer(player: MpvPlayer) {
-        if (!matchDisplayRefreshRate) return
+        if (!matchDisplayRefreshRate || !allowDisplayModeChanges) return
         val fps = runCatching { player.getDouble("container-fps") }.getOrNull()
         if (fps == null || fps <= 0.0) {
             if (!reportedMissingFps && lastAppliedFps == 0.0) {
@@ -725,6 +738,27 @@ class MpvPlayerCore(
             // Best-effort upgrade: a libmpv build missing one of these keeps
             // the default sRGB surface and tone-maps HDR as it always did.
             Log.w(TAG, "HDR GL surface not applied: ${error.message}")
+        }
+    }
+
+    /**
+     * Turns display mode changes on or off for the stream already playing
+     * (the EPG preview going full screen, and back): off restores the mode,
+     * on applies the stream's Auto Frame Rate decision straight away.
+     */
+    fun setAllowDisplayModeChanges(allowed: Boolean) {
+        scope.launch {
+            mutex.withLock {
+                if (allowDisplayModeChanges == allowed) return@withLock
+                allowDisplayModeChanges = allowed
+                lastAppliedFps = 0.0
+                if (!matchDisplayRefreshRate) return@withLock
+                if (allowed) {
+                    player?.let { applyFrameRateFromContainer(it) }
+                } else {
+                    mainHandler.post { frameRateManager.restore() }
+                }
+            }
         }
     }
 

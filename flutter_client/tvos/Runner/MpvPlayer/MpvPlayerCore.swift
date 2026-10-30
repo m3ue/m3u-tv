@@ -104,6 +104,12 @@ final class MpvPlayerCore {
   // behavior.
   private var matchRefreshRateEnabled = true
 
+  // False while this player is embedded (the EPG guide preview): no display
+  // criteria at all, so browsing the guide never switches the TV's mode.
+  // Set on every `load()` and by `setAllowDisplayModeChanges`, read only on
+  // `queue`, same as `matchRefreshRateEnabled`.
+  private var allowDisplayModeChanges = true
+
   private static let maximumSideDataDimension: Int64 = 16384
   private static let maximumSideDataPixels: Int64 = 16384 * 16384
 
@@ -234,6 +240,7 @@ final class MpvPlayerCore {
     headers: [String: String]?,
     externalSubtitles: [(uri: String, title: String?, language: String?)] = [],
     matchRefreshRate: Bool = true,
+    allowDisplayModeChanges: Bool = true,
     deinterlace: Bool = false,
     prebufferLive: Bool = false
   ) {
@@ -241,6 +248,7 @@ final class MpvPlayerCore {
       guard let self, let handle = self.mpv else { return }
       self.readyEmitted = false
       self.matchRefreshRateEnabled = matchRefreshRate
+      self.allowDisplayModeChanges = allowDisplayModeChanges
 
       // Set on every load, like the options below: this handle persists across loads, so
       // a stream without its own headers or user agent must not inherit the previous
@@ -712,6 +720,13 @@ final class MpvPlayerCore {
   /// `AVDisplayManager` must be touched). Runs on `queue`; never while held.
   private func commitDisplayCriteria() {
     guard !displayCriteriaHeld, !displayCriteriaAwaitingMeasuredRate else { return }
+    guard allowDisplayModeChanges else {
+      DispatchQueue.main.async { [weak self] in
+        guard let self, !Self.isSimulator, let window = self.hostView?.window else { return }
+        self.clearDisplayCriteria(window.avDisplayManager, reason: "display mode changes held off")
+      }
+      return
+    }
     let inputs = displayCriteriaInputs
     let fps: Double
     if inputs.containerFps > 0 {
@@ -780,6 +795,17 @@ final class MpvPlayerCore {
       return nil
     }
     return abs(nearest - fps) / nearest < 0.01 ? nearest : nil
+  }
+
+  /// Turns display criteria on or off for the stream already playing (the
+  /// EPG preview going full screen, and back): off clears them, on commits
+  /// the current stream's criteria straight away.
+  func setAllowDisplayModeChanges(_ allowed: Bool) {
+    queue.async { [weak self] in
+      guard let self, !self.disposed, self.allowDisplayModeChanges != allowed else { return }
+      self.allowDisplayModeChanges = allowed
+      self.commitDisplayCriteria()
+    }
   }
 
   /// Reads `estimated-vf-fps` once mpv has averaged it over about a second of

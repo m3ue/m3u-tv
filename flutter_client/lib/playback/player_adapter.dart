@@ -95,6 +95,19 @@ abstract class HdrToggleProvider {
   );
 }
 
+/// A [PlayerAdapter] whose native side can change the display's mode (see
+/// [PlaybackSource.allowDisplayModeChanges]) and can turn that on or off
+/// for the stream already playing, without reloading it. Turning it off
+/// restores any mode it already switched to; turning it on applies the
+/// playing stream's own decision straight away.
+// ignore: one_member_abstracts
+abstract class DisplayModeController {
+  Future<void> setAllowDisplayModeChanges(
+    // ignore: avoid_positional_boolean_parameters
+    bool allowed,
+  );
+}
+
 /// A [PlayerAdapter] that can report which stream positions it has buffered,
 /// so a seek can be planned around data the player already has. Implemented
 /// by the mpv backends, from mpv's demuxer cache (see `mpvSeekWindow`).
@@ -264,6 +277,7 @@ class PlaybackSource {
     this.matchDisplayRefreshRate = false,
     this.deinterlace = false,
     this.prebufferLive = false,
+    this.allowDisplayModeChanges = true,
   });
 
   final String uri;
@@ -314,6 +328,14 @@ class PlaybackSource {
   /// setting is hidden there. Mirrors `ViewSettingsService.prebufferLive`.
   final bool prebufferLive;
 
+  /// Whether the backend may change the display's own mode for this source:
+  /// a refresh-rate match ([matchDisplayRefreshRate]), tvOS display criteria
+  /// (frame rate and HDR/Dolby Vision range), or the Windows OS HDR switch.
+  /// False for an embedded player (the EPG guide preview) so browsing never
+  /// blanks the screen; flipped at runtime via [DisplayModeController] when
+  /// that player goes full screen.
+  final bool allowDisplayModeChanges;
+
   double? get videoAspectRatio => playbackAspectRatioFromMetadata(metadata);
 
   PlaybackSource copyWith({
@@ -332,6 +354,7 @@ class PlaybackSource {
     bool? matchDisplayRefreshRate,
     bool? deinterlace,
     bool? prebufferLive,
+    bool? allowDisplayModeChanges,
   }) {
     return PlaybackSource(
       uri: uri ?? this.uri,
@@ -350,6 +373,8 @@ class PlaybackSource {
           matchDisplayRefreshRate ?? this.matchDisplayRefreshRate,
       deinterlace: deinterlace ?? this.deinterlace,
       prebufferLive: prebufferLive ?? this.prebufferLive,
+      allowDisplayModeChanges:
+          allowDisplayModeChanges ?? this.allowDisplayModeChanges,
     );
   }
 }

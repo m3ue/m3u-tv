@@ -223,6 +223,10 @@ class Media3PlaybackPlugin(
                     requirePlayer(playerId).playbackParameters = playbackParameters
                     result.success(null)
                 }
+                "setAllowDisplayModeChanges" -> {
+                    setAllowDisplayModeChanges(playerId, call.argument<Boolean>("allowed") ?: true)
+                    result.success(null)
+                }
                 "setVolume" -> {
                     val volume = (call.argument<Number>("volume"))?.toFloat() ?: 1f
                     requirePlayer(playerId).volume = volume
@@ -301,6 +305,7 @@ class Media3PlaybackPlugin(
         val startPositionMs = (source["startPositionMs"] as? Number)?.toLong() ?: 0L
         val handleAudioFocus = arguments["handleAudioFocus"] as? Boolean ?: true
         val matchDisplayRefreshRate = source["matchDisplayRefreshRate"] as? Boolean ?: false
+        val allowDisplayModeChanges = source["allowDisplayModeChanges"] as? Boolean ?: true
 
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setDefaultRequestProperties(headers)
@@ -336,13 +341,14 @@ class Media3PlaybackPlugin(
             uri = uri,
             subtitleConfigurations = subtitleConfigurations,
             matchDisplayRefreshRate = matchDisplayRefreshRate,
+            allowDisplayModeChanges = allowDisplayModeChanges,
         )
         state.mediaSession = MediaSession.Builder(context, player).setId(playerId).build()
         states[playerId] = state
 
         player.setVideoSurfaceView(surfaceView)
         player.addListener(Media3Listener(playerId))
-        if (matchDisplayRefreshRate) {
+        if (matchDisplayRefreshRate && allowDisplayModeChanges) {
             frameRateManager.log("ExoPlayer load: Auto Frame Rate on")
             player.setVideoFrameMetadataListener(FrameRateProbe(playerId, player))
         }
@@ -478,9 +484,35 @@ class Media3PlaybackPlugin(
         return null
     }
 
+    /**
+     * Turns display mode changes on or off for the stream already playing
+     * (the EPG preview going full screen, and back): off restores the mode,
+     * on applies the stream's Auto Frame Rate decision straight away.
+     */
+    @OptIn(UnstableApi::class)
+    private fun setAllowDisplayModeChanges(playerId: String, allowed: Boolean) {
+        val state = states[playerId] ?: return
+        if (state.allowDisplayModeChanges == allowed) return
+        state.allowDisplayModeChanges = allowed
+        state.lastAppliedFps = 0f
+        if (!state.matchDisplayRefreshRate) return
+        if (!allowed) {
+            frameRateManager.restore()
+            return
+        }
+        frameRateManager.log("ExoPlayer: Auto Frame Rate on for the playing stream")
+        val fps = state.player.videoFormat?.frameRate ?: 0f
+        if (fps > 0f) {
+            applyFrameRate(state, fps, "container")
+        } else {
+            state.player.setVideoFrameMetadataListener(FrameRateProbe(playerId, state.player))
+        }
+    }
+
     /** Auto Frame Rate: asks for a display mode once per distinct rate. [source] is for the log only. */
     private fun applyFrameRate(state: PlayerState, fps: Float, source: String) {
-        if (!state.matchDisplayRefreshRate || fps <= 0f || fps == state.lastAppliedFps) return
+        if (!state.matchDisplayRefreshRate || !state.allowDisplayModeChanges) return
+        if (fps <= 0f || fps == state.lastAppliedFps) return
         state.lastAppliedFps = fps
         frameRateManager.applyForFrameRate(fps.toDouble(), source)
     }
@@ -726,6 +758,7 @@ class Media3PlaybackPlugin(
         var lastVideoWidth: Int = 0,
         var lastVideoHeight: Int = 0,
         val matchDisplayRefreshRate: Boolean = false,
+        var allowDisplayModeChanges: Boolean = true,
         var lastAppliedFps: Float = 0f,
         var resumeStallRunnable: Runnable? = null,
         var resumeStallBaselineFrames: Int = 0,
