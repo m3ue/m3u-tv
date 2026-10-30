@@ -79,9 +79,9 @@ epg,playlist,guide,live,player,dvr,recorder,catchup,multiview,trakt,movies,serie
 #### Description (4000)
 
 ```
-M3U TV is the Apple TV app for m3u editor, the open-source, self-hosted platform for managing your IPTV playlists, guides and media. Connect it to your own m3u editor server and your live channels, movies and series come together in one fast interface designed around the Siri Remote.
+M3U TV is the Apple TV app for M3U Editor, the open-source, self-hosted platform for managing your IPTV playlists, guides and media. Connect it to your own M3U Editor server and your live channels, movies and series come together in one fast interface designed around the Siri Remote.
 
-M3U TV does not include any channels, playlists or content. You need your own m3u editor server and your own lawful sources.
+M3U TV does not include any channels, playlists or content. You need your own M3U Editor server and your own lawful sources.
 
 HOME
 • Continue Watching with Up Next episodes, so you can pick up right where you left off.
@@ -123,7 +123,7 @@ MADE FOR YOUR HOUSEHOLD
 • Adjustable display scale, remote button mapping and navigation sounds.
 
 OPEN SOURCE
-M3U TV and m3u editor are open source. Bring your own server, your own playlists and your own sources.
+M3U TV and M3U Editor are open source. Bring your own server, your own playlists and your own sources.
 ```
 
 #### Apple TV Privacy Policy (plain text)
@@ -134,7 +134,7 @@ Required for tvOS: the App Store on Apple TV can't open links, so it shows this 
 M3U TV PRIVACY POLICY
 Last updated: October 20, 2026
 
-M3U TV is a client for your own self-hosted m3u editor server. It is not a hosted service, and the developer does not operate a backend that stores your content or personal data.
+M3U TV is a client for your own self-hosted M3U Editor server. It is not a hosted service, and the developer does not operate a backend that stores your content or personal data.
 
 INFORMATION THE APP STORES OR SENDS
 
@@ -186,9 +186,9 @@ epg,playlist,guide,live,player,dvr,recorder,catchup,multiview,trakt,movies,serie
 #### Description (4000)
 
 ```
-M3U TV is the iPhone and iPad app for m3u editor, the open-source, self-hosted platform for managing your IPTV playlists, guides and media. Connect it to your own m3u editor server and your live channels, movies and series come together in one fast, touch-friendly app. It's also available on Apple TV, built around the Siri Remote.
+M3U TV is the iPhone and iPad app for M3U Editor, the open-source, self-hosted platform for managing your IPTV playlists, guides and media. Connect it to your own M3U Editor server and your live channels, movies and series come together in one fast, touch-friendly app. It's also available on Apple TV, built around the Siri Remote.
 
-M3U TV does not include any channels, playlists or content. You need your own m3u editor server and your own lawful sources.
+M3U TV does not include any channels, playlists or content. You need your own M3U Editor server and your own lawful sources.
 
 HOME
 • Continue Watching with Up Next episodes, so you can pick up right where you left off.
@@ -230,7 +230,7 @@ MADE FOR YOUR HOUSEHOLD
 • Adjustable display scale.
 
 OPEN SOURCE
-M3U TV and m3u editor are open source. Bring your own server, your own playlists and your own sources.
+M3U TV and M3U Editor are open source. Bring your own server, your own playlists and your own sources.
 ```
 
 ---
@@ -246,15 +246,15 @@ M3U TV
 ### Short description (80)
 
 ```
-Self-hosted Live TV, guide, DVR, VOD and AIOStreams client for m3u editor
+Self-hosted Live TV, guide, DVR, VOD and AIOStreams client for M3U Editor
 ```
 
 ### Full description (4000)
 
 ```
-M3U TV is the Android TV, Google TV and Android app for m3u editor, the open-source, self-hosted platform for managing your IPTV playlists, guides and media. Connect it to your own m3u editor server and your live channels, movies, series and AIOStreams catalogs come together in one fast, D-pad first interface, with full touch support on phones and tablets.
+M3U TV is the Android TV, Google TV and Android app for M3U Editor, the open-source, self-hosted platform for managing your IPTV playlists, guides and media. Connect it to your own M3U Editor server and your live channels, movies, series and AIOStreams catalogs come together in one fast, D-pad first interface, with full touch support on phones and tablets.
 
-M3U TV does not include any channels, playlists or content. You need your own m3u editor server and your own lawful sources.
+M3U TV does not include any channels, playlists or content. You need your own M3U Editor server and your own lawful sources.
 
 HOME
 • Continue Watching with Up Next episodes, so you can pick up right where you left off.
@@ -267,7 +267,7 @@ LIVE TV AND GUIDE
 • Catchup playback with seeking on channels that support it.
 • Multiview: watch several channels at once.
 • Custom channel sorting, favorites-first ordering and grid or list layouts.
-• Works with Xtream API and standard M3U playlists served by m3u editor.
+• Works with Xtream API and standard M3U playlists served by M3U Editor.
 
 DVR
 • Record a single airing or a whole series straight from the guide or search.
@@ -309,7 +309,7 @@ PLATFORMS
 • Also available on Apple TV, iPhone, iPad, Mac, Windows and Linux.
 
 OPEN SOURCE
-M3U TV and m3u editor are open source. Bring your own server, your own playlists and your own sources.
+M3U TV and M3U Editor are open source. Bring your own server, your own playlists and your own sources.
 ```
 
 ---
@@ -325,9 +325,9 @@ M3U TV
 ### Description (10000)
 
 ```
-M3U TV is the Windows app for m3u editor, the open-source, self-hosted platform for managing your IPTV playlists, guides and media. Connect it to your own m3u editor server and your live channels, movies, series and AIOStreams catalogs come together in one fast interface that works with a mouse or a keyboard.
+M3U TV is the Windows app for M3U Editor, the open-source, self-hosted platform for managing your IPTV playlists, guides and media. Connect it to your own M3U Editor server and your live channels, movies, series and AIOStreams catalogs come together in one fast interface that works with a mouse or a keyboard.
 
-M3U TV does not include any channels, playlists or content. You need your own m3u editor server and your own lawful sources.
+M3U TV does not include any channels, playlists or content. You need your own M3U Editor server and your own lawful sources.
 
 HOME
 • Continue Watching with Up Next episodes, so you can pick up right where you left off.
@@ -340,7 +340,7 @@ LIVE TV AND GUIDE
 • Catchup playback with seeking on channels that support it.
 • Multiview: watch several channels at once.
 • Custom channel sorting, favorites-first ordering and grid or list layouts.
-• Works with Xtream API and standard M3U playlists served by m3u editor.
+• Works with Xtream API and standard M3U playlists served by M3U Editor.
 
 DVR
 • Record a single airing or a whole series straight from the guide or search.
@@ -379,13 +379,13 @@ PLATFORMS
 • Also available on Android TV, Google TV, Android, Apple TV, iPhone, iPad, Mac and Linux.
 
 OPEN SOURCE
-M3U TV and m3u editor are open source. Bring your own server, your own playlists and your own sources.
+M3U TV and M3U Editor are open source. Bring your own server, your own playlists and your own sources.
 ```
 
 ### Product features (up to 20, 200 each)
 
 ```
-Connects to your own self-hosted m3u editor server (no content included)
+Connects to your own self-hosted M3U Editor server (no content included)
 Multi-day timeline TV guide with an optional live preview player
 On Now and Upcoming views with station logos
 Catchup playback with seeking on supported channels
@@ -440,7 +440,7 @@ M three U TV
 Shown on Xbox and in some Store layouts in place of the full description.
 
 ```
-The Windows app for m3u editor, the open-source, self-hosted IPTV and media platform. Watch live TV with a multi-day guide, catchup and Multiview, record with the DVR, and browse movies, series and AIOStreams catalogs with Continue Watching, Up Next and Trakt sync. M3U TV does not include any content: you need your own m3u editor server and your own lawful sources.
+The Windows app for M3U Editor, the open-source, self-hosted IPTV and media platform. Watch live TV with a multi-day guide, catchup and Multiview, record with the DVR, and browse movies, series and AIOStreams catalogs with Continue Watching, Up Next and Trakt sync. M3U TV does not include any content: you need your own M3U Editor server and your own lawful sources.
 ```
 
 ### Developed by (255)
@@ -463,7 +463,7 @@ M3U TV is free software released under the GNU General Public License v3.0. Full
 
 ### Additional system requirements
 
-- **Minimum hardware notes:** `An internet or local network connection to your own m3u editor server.`
+- **Minimum hardware notes:** `An internet or local network connection to your own M3U Editor server.`
 - **Recommended hardware notes:** `A wired or 5 GHz Wi-Fi connection for HD and 4K streams.`
 
 ---
@@ -481,7 +481,7 @@ Instructions for each store's reviewers. All stores use the same demo server, wh
 Also fill in the separate "Sign-in required" username and password fields with the credentials above.
 
 ```
-M3U TV is a client for m3u editor, an open-source, self-hosted media server (https://github.com/m3ue/m3u-editor). The app includes no content, playlists or streams. Users connect it to their own server and play only media they supply.
+M3U TV is a client for M3U Editor, an open-source, self-hosted media server (https://github.com/m3ue/m3u-editor). The app includes no content, playlists or streams. Users connect it to their own server and play only media they supply.
 
 DEMO SERVER
 A demo server is provided for review. It only serves Creative Commons licensed films from the Blender Foundation, public-domain classics and generated test channels. All artwork shown in the app and in our screenshots comes from these titles.
@@ -510,13 +510,13 @@ Choose "All or some functionality is restricted", then add one set of instructio
 - **Any other information:**
 
 ```
-M3U TV is a client for m3u editor, an open-source, self-hosted media server (https://github.com/m3ue/m3u-editor). The app includes no content. On first launch, enter https://api-tester-fcn5.onrender.com as the Server URL, then the username and password above. The demo server only serves public-domain and freely licensed content.
+M3U TV is a client for M3U Editor, an open-source, self-hosted media server (https://github.com/m3ue/m3u-editor). The app includes no content. On first launch, enter https://api-tester-fcn5.onrender.com as the Server URL, then the username and password above. The demo server only serves public-domain and freely licensed content.
 ```
 
 ### Microsoft Store: Submission options > Notes for certification
 
 ```
-M3U TV is a client for m3u editor, an open-source, self-hosted media server (https://github.com/m3ue/m3u-editor). The app includes no content, playlists or streams. Users connect it to their own server and play only media they supply.
+M3U TV is a client for M3U Editor, an open-source, self-hosted media server (https://github.com/m3ue/m3u-editor). The app includes no content, playlists or streams. Users connect it to their own server and play only media they supply.
 
 To test, enter the following on the connection screen:
 Server URL: https://api-tester-fcn5.onrender.com
