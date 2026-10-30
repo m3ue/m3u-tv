@@ -144,6 +144,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   List<Channel> _filterChannels(List<Channel> channels) =>
       _channelFilter.filterWhole(channels, _appliedQuery);
 
+  List<Channel>? _channelsByIdSource;
+  Map<int, Channel> _channelsById = const <int, Channel>{};
+
+  /// Rebuilt only when the channel list itself changes, not on every
+  /// keystroke's build.
+  Map<int, Channel> _channelsByIdFor(List<Channel> channels) {
+    if (!identical(channels, _channelsByIdSource)) {
+      _channelsByIdSource = channels;
+      _channelsById = {for (final c in channels) c.id: c};
+    }
+    return _channelsById;
+  }
+
   /// Kicks off (or skips, if already resolved for [_appliedQuery]) the VOD/
   /// series catalog search. Called from [build] - `setState` inside is safe
   /// because it only fires from the async completion callback, never
@@ -216,7 +229,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     // Build from the FULL channel list (not the filtered one) - EPG
     // show-result channel lookups must work even when the show's
     // channel name doesn't match the current query.
-    final channelsById = {for (final c in channels) c.id: c};
+    final channelsById = _channelsByIdFor(channels);
     // Computed once per build and threaded through to both the All tab and
     // the Live TV tab's ShowSearchResultsView - both are built eagerly by
     // TabBarView on every keystroke, so without sharing this the On-Now/
