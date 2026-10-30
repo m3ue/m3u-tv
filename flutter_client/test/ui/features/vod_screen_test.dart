@@ -886,6 +886,35 @@ void main() {
       ]);
     });
 
+    testWidgets('follows a favorite added outside the screen', (
+      tester,
+    ) async {
+      final repo = await _buildRepo(tester, items);
+      await tester.pumpWidget(
+        _TestApp(
+          catalogRepository: repo,
+          categories: categories,
+          favoritesService: favorites,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // E.g. a detail page or a server sync, not this screen's long-press.
+      await tester.runAsync(() async {
+        await favorites.add(1);
+        // Let the listener's real database read land.
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+
+      expect(gridTitles(tester), [
+        'AAAA Highest',
+        'CCCC Unrated',
+        'DDDD Third',
+        'BBBB Mid',
+      ]);
+    });
+
     testWidgets('switching it off restores the plain sort order', (
       tester,
     ) async {

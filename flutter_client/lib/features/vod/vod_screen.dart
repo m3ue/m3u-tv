@@ -99,6 +99,9 @@ class _VodScreenState extends ConsumerState<VodScreen> {
     super.initState();
     _sortOption = _initialSortOption();
     _favoritesFirst = _initialFavoritesFirst();
+    // Like Live TV and Home: pick up changes made elsewhere (a detail page,
+    // a server sync) rather than only after this screen's own toggles.
+    widget.favoritesService?.addListener(_onFavoritesChanged);
     unawaited(_loadFavorites());
     _reconfigureWindow();
   }
@@ -130,6 +133,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
 
   @override
   void dispose() {
+    widget.favoritesService?.removeListener(_onFavoritesChanged);
     _debounce?.cancel();
     _gridFocusNode.dispose();
     _window.dispose();
@@ -187,6 +191,8 @@ class _VodScreenState extends ConsumerState<VodScreen> {
     setState(() => _selectedCategory = id);
     if (id != _kFavoritesCategoryId) _reconfigureWindow();
   }
+
+  void _onFavoritesChanged() => unawaited(_loadFavorites());
 
   Future<void> _loadFavorites() async {
     final service = widget.favoritesService;
