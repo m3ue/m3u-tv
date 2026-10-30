@@ -78,7 +78,7 @@ class _AppVersionCardState extends State<AppVersionCard> {
 }
 
 /// TV screens can't scan a QR code shown on themselves, and tvOS has no
-/// in-app browser for url_launcher to hand off to — so this shows a QR
+/// in-app browser for url_launcher to hand off to - so this shows a QR
 /// code (scan on your phone) on wide/TV layouts, and an "Open" button
 /// (which works via url_launcher) only on narrow/mobile layouts. Mirrors
 /// the same wide/narrow split _TraktPending already uses.

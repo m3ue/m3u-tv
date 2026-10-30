@@ -98,7 +98,7 @@ class DvrActions {
     await appState.refreshDvrSeriesRules();
   }
 
-  /// Updates an existing DVR series rule in place (never delete-and-recreate —
+  /// Updates an existing DVR series rule in place (never delete-and-recreate -
   /// deleting cascades to the rule's recordings and would destroy history) and
   /// refreshes the cached list. `updateDvrSeriesRule` applies only the fields
   /// the sheet returned; absent fields keep their current server values.

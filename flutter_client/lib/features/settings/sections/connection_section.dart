@@ -43,7 +43,7 @@ class ConnectionFormBody extends StatefulWidget {
 class _ConnectionFormBodyState extends State<ConnectionFormBody>
     with SingleTickerProviderStateMixin {
   /// Non-null when this web build is served by the editor itself at
-  /// /m3u-tv/ — the server URL is that editor's own origin, not something
+  /// /m3u-tv/ - the server URL is that editor's own origin, not something
   /// the user should have to type or be able to change.
   final String? _lockedServerUrl = embeddedEditorOrigin;
   late final _serverController = TextEditingController(
@@ -154,7 +154,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
     final displayError = _validationError ?? widget.error;
 
     if (service == null) {
-      // No pairing service available — a single manual sign-in form, same
+      // No pairing service available - a single manual sign-in form, same
       // as before device pairing existed.
       return SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -399,7 +399,7 @@ class _DevicePairingBody extends StatelessWidget {
     } else {
       final pending = service.pending;
       final uri = pending?.verificationUri ?? '';
-      final userCode = pending?.userCode ?? '––––––';
+      final userCode = pending?.userCode ?? '------';
 
       body = LayoutBuilder(
         builder: (context, constraints) => constraints.maxWidth >= 600

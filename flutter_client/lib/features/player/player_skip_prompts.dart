@@ -36,14 +36,14 @@ class ComskipSkippedBadge extends StatelessWidget {
 }
 
 /// Confirm-to-skip control shown while playback is inside a commercial,
-/// intro, or credits window — comskip's and TheIntroDB's prompts share this
+/// intro, or credits window - comskip's and TheIntroDB's prompts share this
 /// one look. Renders as the app's `primaryInverted` [AppButton] (the same
 /// hero-action pill used for the resume/play button on detail screens) so it
 /// reads as a real UI control instead of a floating overlay chip, and always
 /// autofocuses so a D-pad user can hit Select the instant it appears.
 ///
 /// When [countdownShownAt]/[countdownDuration] are both provided (TheIntroDB
-/// only — comskip's prompt has no auto-hide), a slim bar under the button
+/// only - comskip's prompt has no auto-hide), a slim bar under the button
 /// counts down to when the prompt will fade. Comskip passes neither and the
 /// bar is simply omitted.
 class SkipSegmentPrompt extends StatelessWidget {

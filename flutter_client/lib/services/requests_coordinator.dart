@@ -69,7 +69,7 @@ class RequestsCoordinator {
   }
 
   /// Searches guest-enabled Arr integrations via `request_search`. Thin
-  /// pass-through — the Requests screen owns its own search-in-flight/error
+  /// pass-through - the Requests screen owns its own search-in-flight/error
   /// state since results aren't part of the app's persistent state.
   Future<List<ContentRequestSearchResult>> searchContentRequests(
     String query, {

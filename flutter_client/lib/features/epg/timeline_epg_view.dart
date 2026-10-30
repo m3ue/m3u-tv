@@ -2359,8 +2359,6 @@ class _NewBadge extends StatelessWidget {
   }
 }
 
-/// A row with no programme data: a single cell pinned across the visible
-/// programme area, so the cursor still has somewhere to sit.
 /// A guide row whose channel is still loading: the row's divider and an
 /// empty channel cell at the same geometry as a real row, so the list's
 /// extent and the cursor's position hold steady while the page lands.
@@ -2400,6 +2398,8 @@ class _PlaceholderGuideRow extends StatelessWidget {
   }
 }
 
+/// A row with no programme data: a single cell pinned across the visible
+/// programme area, so the cursor still has somewhere to sit.
 class _EmptyRowCell extends StatelessWidget {
   const _EmptyRowCell({required this.focused, required this.compact});
 

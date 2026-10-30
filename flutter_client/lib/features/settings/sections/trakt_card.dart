@@ -106,7 +106,7 @@ class _TraktPending extends StatelessWidget {
   Widget build(BuildContext context) {
     final pending = traktService.pending;
     final url = pending?.verificationUrl ?? 'https://trakt.tv/activate';
-    final userCode = pending?.userCode ?? '––––––';
+    final userCode = pending?.userCode ?? '------';
 
     return LayoutBuilder(
       builder: (context, constraints) => constraints.maxWidth >= 600

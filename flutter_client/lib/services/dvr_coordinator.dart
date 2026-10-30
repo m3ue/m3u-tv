@@ -79,7 +79,7 @@ class DvrCoordinator {
   // Guards against a second flush starting while one is already awaiting its
   // fetches. Without it, a push landing mid-flush (its debounce timer already
   // cleared by the in-flight run) would start an independent flush and
-  // duplicate the network call instead of being coalesced into it — see the
+  // duplicate the network call instead of being coalesced into it - see the
   // while-loop in [_flushDvrContentRefresh].
   bool _dvrContentRefreshFlushing = false;
   static const _dvrContentRefreshDebounceDelay = Duration(milliseconds: 1500);
@@ -153,13 +153,13 @@ class DvrCoordinator {
       return;
     }
 
-    // The push payload is a lightweight status ping (no stream_url/live_url —
+    // The push payload is a lightweight status ping (no stream_url/live_url -
     // those need this viewer's Xtream credentials to build). Fetch the full
     // record so the DVR Recordings screen updates its status label and gets
     // a playable URL as soon as a recording starts, not just on next reload.
     //
     // Toasts for user-facing transitions (started/completed/failed/cancelled)
-    // are no longer sent from here — the server dispatches a persisted
+    // are no longer sent from here - the server dispatches a persisted
     // TvNotification on the 'dvr' channel at those points instead, which
     // arrives through the same _onPushNotification path as every other
     // notification (unread badge, history, subscription filter all for free).
@@ -197,7 +197,7 @@ class DvrCoordinator {
       // When a recording lands in `completed` or `postProcessing`, the server
       // has just upserted it as a VOD movie or series episode. Re-fetch the
       // affected list(s) so the new item appears in Movies / Series / Home
-      // without requiring a full reconnect — fixes #179.
+      // without requiring a full reconnect - fixes #179.
       if (detail.status == DvrRecordingStatus.completed ||
           detail.status == DvrRecordingStatus.postProcessing) {
         _scheduleDvrContentRefresh(_classifyContentTargets(detail), ownsWork);
@@ -211,7 +211,7 @@ class DvrCoordinator {
   /// recording with both a season and episode number is unambiguously a
   /// series episode; everything else (movies, one-offs, or server payloads
   /// that omit season/episode metadata) falls back to refreshing both lists
-  /// — the issue permits over-refresh, never under-refresh.
+  /// - the issue permits over-refresh, never under-refresh.
   Set<_DvrContentRefreshTarget> _classifyContentTargets(
     DvrRecording recording,
   ) {
@@ -243,7 +243,7 @@ class DvrCoordinator {
   Future<void> _flushDvrContentRefresh(bool Function() ownsWork) async {
     // A flush is already looping (see below) and will pick up whatever this
     // call just merged into `_dvrContentRefreshPending` on its next
-    // iteration — starting a second, concurrent flush here would duplicate
+    // iteration - starting a second, concurrent flush here would duplicate
     // the network calls the first one is already making.
     if (_dvrContentRefreshFlushing) return;
     _dvrContentRefreshFlushing = true;
@@ -585,7 +585,7 @@ class DvrCoordinator {
   }
 
   /// Splices freshly-fetched `active` (status=recording) entries into
-  /// `_dvrRecordings` by uuid — inserting one this list doesn't know about
+  /// `_dvrRecordings` by uuid - inserting one this list doesn't know about
   /// yet, replacing one whose locally-known status disagrees with the
   /// server's. Returns null when every entry already matches, so a caller
   /// that finds nothing new doesn't force a `dvrRecordingsProvider` rebuild.
@@ -594,7 +594,7 @@ class DvrCoordinator {
   /// `_dvrRecordings`, and it only runs for pushes actually received. A
   /// `Scheduled -> Recording` push missed while disconnected previously left
   /// `_dvrRecordings` stuck on `Scheduled` even after `_recordingChannelIds`
-  /// self-healed via this same function — the DVR Recordings screen and EPG
+  /// self-healed via this same function - the DVR Recordings screen and EPG
   /// recording badges (#185) are both backed by `_dvrRecordings`, not
   /// `_recordingChannelIds`.
   List<DvrRecording>? _mergeActiveDvrRecordings(List<DvrRecording> active) {
@@ -615,7 +615,7 @@ class DvrCoordinator {
   }
 
   /// Cancels a scheduled or in-progress DVR recording, keeping it in the
-  /// local list with its refreshed (Cancelled) status — the server itself
+  /// local list with its refreshed (Cancelled) status - the server itself
   /// only marks the row cancelled and keeps history; deleting it is a
   /// separate, explicit action (see [deleteDvrRecording]). If the post-cancel
   /// detail fetch 404s (the row is already gone server-side for some other
@@ -691,7 +691,7 @@ class DvrCoordinator {
   /// One-shot reconciliation of which channels are currently recording,
   /// fetched from the server's authoritative `status=recording`/`scheduled`
   /// lists. DVR status otherwise arrives entirely via WebSocket push (see
-  /// [onStatusPush]) — there is no background poll — so callers invoke
+  /// [onStatusPush]) - there is no background poll - so callers invoke
   /// this on-demand at the points a push might plausibly have been missed:
   /// opening the DVR tab (`AppShell.didUpdateWidget`) and an unexpected live
   /// stream end (`AppShell._handleLiveStreamEnded`), on top of the
@@ -752,7 +752,7 @@ class DvrCoordinator {
 
   /// Refreshes DVR storage usage against quota via `get_dvr_storage`.
   /// Older m3u-editor servers without this action fail the request, which
-  /// we treat as "unsupported" — the storage display just stays hidden
+  /// we treat as "unsupported" - the storage display just stays hidden
   /// rather than surfacing an error.
   Future<void> refreshDvrStorage() async {
     final credentials = _credentials();
