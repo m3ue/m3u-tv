@@ -14,7 +14,11 @@ Future<R> runOffMainIsolate<R>(FutureOr<R> Function() computation) =>
 /// decode itself would ever block a frame for, so we just decode inline.
 const int _offloadThresholdBytes = 32 * 1024;
 
-final Converter<List<int>, Object?> _utf8Json = utf8.decoder.fuse(json.decoder);
+/// Lenient about malformed UTF-8 (a stray Latin-1 channel name decodes as
+/// U+FFFD) so one bad byte can't fail a whole catalog response.
+final Converter<List<int>, Object?> _utf8Json = const Utf8Decoder(
+  allowMalformed: true,
+).fuse(json.decoder);
 
 /// Decodes a UTF-8 JSON body in one pass, never materializing the
 /// intermediate String. Safe to call from any isolate.
@@ -76,20 +80,26 @@ class BackgroundWorker {
   Timer? _idleTimer;
   int _pending = 0;
 
+  /// Replies still owed by the worker, failed if it exits before sending
+  /// them.
+  final Set<Completer<Object?>> _awaiting = <Completer<Object?>>{};
+
   Future<R> run<R>(FutureOr<R> Function() computation) async {
     if (kIsWeb) return computation();
     _idleTimer?.cancel();
     _pending++;
     final reply = RawReceivePort();
+    final completer = Completer<Object?>();
     try {
-      final completer = Completer<Object?>();
       reply.handler = completer.complete;
+      _awaiting.add(completer);
       final port = await (_sendPort ??= _spawn());
       port.send((computation, reply.sendPort));
       final result = await completer.future;
       if (result is RemoteError) throw result;
       return result as R;
     } finally {
+      _awaiting.remove(completer);
       reply.close();
       _pending--;
       if (_pending == 0) _idleTimer = Timer(idleTimeout, shutdown);
@@ -111,14 +121,31 @@ class BackgroundWorker {
     final completer = Completer<SendPort>();
     void onReady(Object? port) => completer.complete(port! as SendPort);
     ready.handler = onReady;
+    final exit = RawReceivePort();
     try {
-      _isolate = await Isolate.spawn(
+      final isolate = _isolate = await Isolate.spawn(
         _workerMain,
         ready.sendPort,
         debugName: debugName,
+        onExit: exit.sendPort,
       );
+      // A worker that dies (rather than being shut down idle) would otherwise
+      // leave every pending and later run() waiting forever: fail what it
+      // owed and let the next run() spawn a fresh one.
+      exit.handler = (_) {
+        exit.close();
+        if (!identical(_isolate, isolate)) return;
+        _isolate = null;
+        _sendPort = null;
+        for (final owed in _awaiting) {
+          if (!owed.isCompleted) {
+            owed.complete(RemoteError('$debugName exited', ''));
+          }
+        }
+      };
       return await completer.future;
     } on Object {
+      exit.close();
       _sendPort = null;
       rethrow;
     } finally {

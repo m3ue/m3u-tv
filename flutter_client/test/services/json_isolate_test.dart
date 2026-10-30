@@ -18,6 +18,16 @@ void main() {
       });
     });
 
+    test('replaces malformed UTF-8 instead of failing the body', () {
+      // "Caf" + a lone Latin-1 0xE9 byte, as a misencoded provider sends.
+      final bytes = Uint8List.fromList([
+        ...utf8.encode('{"name":"Caf'),
+        0xE9,
+        ...utf8.encode('"}'),
+      ]);
+      expect(decodeJsonBytes(bytes), {'name': 'Caf\uFFFD'});
+    });
+
     test('offloads large bodies and returns the same structure', () async {
       final big = [
         for (var i = 0; i < 5000; i++) {'stream_id': i, 'name': 'Channel $i'},
@@ -54,6 +64,17 @@ void main() {
       // The worker survives a failed job.
       expect(await worker.run(() => 1), 1);
     });
+
+    test(
+      'a worker that dies fails its job and the next one respawns',
+      () async {
+        await expectLater(
+          worker.run<int>(Isolate.exit),
+          throwsA(isA<RemoteError>()),
+        );
+        expect(await worker.run(() => 2), 2);
+      },
+    );
 
     test('starts a fresh isolate after shutdown', () async {
       expect(await worker.run(() => 'first'), 'first');
