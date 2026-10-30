@@ -93,7 +93,9 @@ class AppStateController extends ChangeNotifier {
     // when a caller (chiefly tests) omits it, fall back to a private in-memory
     // database so there is exactly one catalog code path - never a JSON one.
     final resolvedCatalogRepository =
-        catalogRepository ?? CatalogRepository(CatalogDatabase.memory());
+        catalogRepository ??
+        cacheService?.catalogRepository ??
+        CatalogRepository(CatalogDatabase.memory());
     final resolvedCacheService =
         cacheService ??
         CacheService(
@@ -2276,15 +2278,17 @@ class AppStateController extends ChangeNotifier {
     final seriesCategories =
         (await cacheService.get<List<Category>>('seriesCategories'))?.data ??
         const <Category>[];
-    final channels =
-        (await cacheService.get<List<Channel>>('liveStreams'))?.data ??
-        const <Channel>[];
-    final vodItems =
-        (await cacheService.get<List<VodItem>>('vodStreams'))?.data ??
-        const <VodItem>[];
-    final seriesList =
-        (await cacheService.get<List<Series>>('seriesStreams'))?.data ??
-        const <Series>[];
+    // Counts only: the screens page their rows from SQLite, so decoding
+    // whole catalogs here just to test for content cost seconds of a cold
+    // start on a large library.
+    final itemCounts = await Future.wait([
+      for (final key in const ['liveStreams', 'vodStreams', 'seriesStreams'])
+        cacheService.itemCount(key),
+    ]);
+    final channels = (itemCounts[0] ?? 0) == 0
+        ? const <Channel>[]
+        : (await cacheService.get<List<Channel>>('liveStreams'))?.data ??
+              const <Channel>[];
     final viewers =
         (await cacheService.get<List<Viewer>>('viewers'))?.data ??
         const <Viewer>[];
@@ -2292,9 +2296,7 @@ class AppStateController extends ChangeNotifier {
         liveCategories.isNotEmpty ||
         vodCategories.isNotEmpty ||
         seriesCategories.isNotEmpty ||
-        channels.isNotEmpty ||
-        vodItems.isNotEmpty ||
-        seriesList.isNotEmpty;
+        itemCounts.any((count) => (count ?? 0) > 0);
     if (!hasContent) return false;
 
     final viewerGeneration = _viewerOperationGeneration.advance();

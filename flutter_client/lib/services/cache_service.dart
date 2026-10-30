@@ -65,6 +65,9 @@ class CacheService {
   final CatalogRepository _repo;
   Duration refreshInterval;
 
+  /// The SQLite catalog the large keys are stored in.
+  CatalogRepository get catalogRepository => _repo;
+
   static const String _sourceKey = CatalogRepository.activeSource;
 
   static const Map<String, String> _itemKinds = {
@@ -115,6 +118,19 @@ class CacheService {
       data: value.data as T,
       isStale: DateTime.now().difference(value.timestamp) > refreshInterval,
     );
+  }
+
+  /// How many rows a catalog item key (`liveStreams` / `vodStreams` /
+  /// `seriesStreams`) holds, or null when it has never been written. Lets a
+  /// caller check for cached content without decoding every row.
+  Future<int?> itemCount(String key) async {
+    final kind = _itemKinds[key];
+    if (kind == null) throw ArgumentError.value(key, 'key', 'not an item key');
+    final repo = _repo;
+    if (repo.isClosed || await repo.kvUpdatedAt(_tsKey(key)) == null) {
+      return null;
+    }
+    return repo.countItems(sourceKey: _sourceKey, kind: kind);
   }
 
   Future<CacheSnapshot> snapshot() async {
