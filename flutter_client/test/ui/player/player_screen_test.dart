@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:m3u_tv/features/player/epg_overlay.dart';
 import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/features/player/now_playing_overlay.dart';
@@ -19,79 +20,35 @@ import 'package:m3u_tv/playback/native_video_surface.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/services/api_client.dart';
+import 'package:m3u_tv/services/comskip_service.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/cached_backdrop_image.dart';
+import 'package:m3u_tv/shared/sort_option_row.dart';
 
 import 'fake_player_adapter.dart';
 import 'fake_transcode_gateway.dart';
 
-/// Minimal `HttpClient` fake for testing the comskip EDL fetch — every
-/// request returns the same canned body/status, regardless of URL. Only
-/// [getUrl] and [close] are implemented; anything else falls through to
-/// [noSuchMethod], which is fine since `_initComskip` never touches it.
-class _FakeHttpClient implements HttpClient {
+/// Canned comskip EDL endpoint: every request returns the same body with a
+/// 200, regardless of URL, and records what was requested. Hand
+/// [comskipService] to the `PlayerScreen` under test.
+class _FakeHttpClient {
   _FakeHttpClient(this._body);
 
   final String _body;
   final List<Uri> requestedUrls = <Uri>[];
 
-  @override
-  Future<HttpClientRequest> getUrl(Uri url) async {
-    requestedUrls.add(url);
-    return _FakeHttpClientRequest(_body, HttpStatus.ok);
-  }
-
-  @override
-  void close({bool force = false}) {}
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class _FakeHttpClientRequest implements HttpClientRequest {
-  _FakeHttpClientRequest(this._body, this._statusCode);
-
-  final String _body;
-  final int _statusCode;
-
-  @override
-  Future<HttpClientResponse> close() async =>
-      _FakeHttpClientResponse(_body, _statusCode);
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class _FakeHttpClientResponse extends Stream<List<int>>
-    implements HttpClientResponse {
-  _FakeHttpClientResponse(String body, this.statusCode)
-    : _stream = Stream.value(utf8.encode(body));
-
-  final Stream<List<int>> _stream;
-
-  @override
-  final int statusCode;
-
-  @override
-  StreamSubscription<List<int>> listen(
-    void Function(List<int> event)? onData, {
-    Function? onError,
-    void Function()? onDone,
-    bool? cancelOnError,
-  }) {
-    return _stream.listen(
-      onData,
-      onError: onError,
-      onDone: onDone,
-      cancelOnError: cancelOnError,
-    );
-  }
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+  late final ComskipService comskipService = ComskipService(
+    apiClient: ApiClient(
+      client: MockClient((request) async {
+        requestedUrls.add(request.url);
+        return http.Response(_body, 200);
+      }),
+    ),
+  );
 }
 
 void main() {
@@ -3302,82 +3259,78 @@ void main() {
           final orchestrator = buildOrchestrator(adapter);
           addTearDown(orchestrator.dispose);
 
-          await HttpOverrides.runZoned(
-            () async {
-              await tester.pumpWidget(
-                MaterialApp(
-                  localizationsDelegates:
-                      AppLocalizations.localizationsDelegates,
-                  supportedLocales: AppLocalizations.supportedLocales,
-                  home: PlayerScreen(
-                    args: recordingArgs,
-                    orchestrator: orchestrator,
-                    epgService: EpgService(clock: () => DateTime.utc(2026)),
-                    comskipSettings: ComskipSettings(),
-                  ),
-                ),
-              );
-              await tester.pump();
-
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 5),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, isEmpty);
-
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 12),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-              expect(find.text('Skipped commercial'), findsOneWidget);
-
-              // Orchestrator confirms the seek — clears the pending guard.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 20),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-
-              // Re-entry into the same segment after confirmation — must
-              // RE-fire seek. The mechanism is stateless once the guard
-              // clears: position is the source of truth.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 15),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-
-              expect(adapter.seekCalls, [
-                const Duration(seconds: 20),
-                const Duration(seconds: 20),
-              ]);
-            },
-            createHttpClient: (_) => _FakeHttpClient(
-              jsonEncode([
-                {'start': 10.0, 'end': 20.0},
-              ]),
+          final edl = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.0},
+            ]),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: recordingArgs,
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                comskipSettings: ComskipSettings(),
+                comskipService: edl.comskipService,
+              ),
             ),
           );
+          await tester.pump();
+
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 5),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, isEmpty);
+
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 12),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+          expect(find.text('Skipped commercial'), findsOneWidget);
+
+          // Orchestrator confirms the seek — clears the pending guard.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 20),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+
+          // Re-entry into the same segment after confirmation — must
+          // RE-fire seek. The mechanism is stateless once the guard
+          // clears: position is the source of truth.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 15),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+
+          expect(adapter.seekCalls, [
+            const Duration(seconds: 20),
+            const Duration(seconds: 20),
+          ]);
         },
       );
 
@@ -3393,50 +3346,46 @@ void main() {
           final settings = ComskipSettings();
           await settings.setAutoSkipEnabled(enabled: false);
 
-          await HttpOverrides.runZoned(
-            () async {
-              await tester.pumpWidget(
-                MaterialApp(
-                  localizationsDelegates:
-                      AppLocalizations.localizationsDelegates,
-                  supportedLocales: AppLocalizations.supportedLocales,
-                  home: PlayerScreen(
-                    args: recordingArgs,
-                    orchestrator: orchestrator,
-                    epgService: EpgService(clock: () => DateTime.utc(2026)),
-                    comskipSettings: settings,
-                  ),
-                ),
-              );
-              await tester.pump();
-
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 12),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              // The controls bar only mounts once that state lands.
-              await tester.pump();
-
-              expect(adapter.seekCalls, isEmpty);
-              expect(find.text('Skip commercial'), findsOneWidget);
-
-              await tester.tap(find.text('Skip commercial'));
-              await tester.pump();
-
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-              expect(find.text('Skip commercial'), findsNothing);
-            },
-            createHttpClient: (_) => _FakeHttpClient(
-              jsonEncode([
-                {'start': 10.0, 'end': 20.0},
-              ]),
+          final edl = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.0},
+            ]),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: recordingArgs,
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                comskipSettings: settings,
+                comskipService: edl.comskipService,
+              ),
             ),
           );
+          await tester.pump();
+
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 12),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          // The controls bar only mounts once that state lands.
+          await tester.pump();
+
+          expect(adapter.seekCalls, isEmpty);
+          expect(find.text('Skip commercial'), findsOneWidget);
+
+          await tester.tap(find.text('Skip commercial'));
+          await tester.pump();
+
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+          expect(find.text('Skip commercial'), findsNothing);
         },
       );
 
@@ -3452,55 +3401,51 @@ void main() {
           final settings = ComskipSettings();
           await settings.setAutoSkipEnabled(enabled: false);
 
-          await HttpOverrides.runZoned(
-            () async {
-              await tester.pumpWidget(
-                MaterialApp(
-                  localizationsDelegates:
-                      AppLocalizations.localizationsDelegates,
-                  supportedLocales: AppLocalizations.supportedLocales,
-                  home: PlayerScreen(
-                    args: recordingArgs,
-                    orchestrator: orchestrator,
-                    epgService: EpgService(clock: () => DateTime.utc(2026)),
-                    comskipSettings: settings,
-                  ),
-                ),
-              );
-              await tester.pump();
-
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 12),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              // The controls bar only mounts once that state lands.
-              await tester.pump();
-              expect(find.text('Skip commercial'), findsOneWidget);
-
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 25),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-
-              expect(find.text('Skip commercial'), findsNothing);
-              expect(adapter.seekCalls, isEmpty);
-            },
-            createHttpClient: (_) => _FakeHttpClient(
-              jsonEncode([
-                {'start': 10.0, 'end': 20.0},
-              ]),
+          final edl = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.0},
+            ]),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: recordingArgs,
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                comskipSettings: settings,
+                comskipService: edl.comskipService,
+              ),
             ),
           );
+          await tester.pump();
+
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 12),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          // The controls bar only mounts once that state lands.
+          await tester.pump();
+          expect(find.text('Skip commercial'), findsOneWidget);
+
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 25),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+
+          expect(find.text('Skip commercial'), findsNothing);
+          expect(adapter.seekCalls, isEmpty);
         },
       );
 
@@ -3514,50 +3459,46 @@ void main() {
           final orchestrator = buildOrchestrator(adapter);
           addTearDown(orchestrator.dispose);
 
-          await HttpOverrides.runZoned(
-            () async {
-              await tester.pumpWidget(
-                MaterialApp(
-                  localizationsDelegates:
-                      AppLocalizations.localizationsDelegates,
-                  supportedLocales: AppLocalizations.supportedLocales,
-                  home: PlayerScreen(
-                    args: recordingArgs,
-                    orchestrator: orchestrator,
-                    epgService: EpgService(clock: () => DateTime.utc(2026)),
-                    // comskipSettings intentionally omitted — null fallback
-                  ),
-                ),
-              );
-              await tester.pump();
-
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 12),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              // The controls bar only mounts once that state lands.
-              await tester.pump();
-
-              expect(adapter.seekCalls, isEmpty);
-              expect(find.text('Skip commercial'), findsOneWidget);
-
-              await tester.tap(find.text('Skip commercial'));
-              await tester.pump();
-
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-              expect(find.text('Skip commercial'), findsNothing);
-            },
-            createHttpClient: (_) => _FakeHttpClient(
-              jsonEncode([
-                {'start': 10.0, 'end': 20.0},
-              ]),
+          final edl = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.0},
+            ]),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: recordingArgs,
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                // comskipSettings intentionally omitted — null fallback,
+                comskipService: edl.comskipService,
+              ),
             ),
           );
+          await tester.pump();
+
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 12),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          // The controls bar only mounts once that state lands.
+          await tester.pump();
+
+          expect(adapter.seekCalls, isEmpty);
+          expect(find.text('Skip commercial'), findsOneWidget);
+
+          await tester.tap(find.text('Skip commercial'));
+          await tester.pump();
+
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+          expect(find.text('Skip commercial'), findsNothing);
         },
       );
 
@@ -3571,98 +3512,94 @@ void main() {
           final orchestrator = buildOrchestrator(adapter);
           addTearDown(orchestrator.dispose);
 
-          await HttpOverrides.runZoned(
-            () async {
-              await tester.pumpWidget(
-                MaterialApp(
-                  localizationsDelegates:
-                      AppLocalizations.localizationsDelegates,
-                  supportedLocales: AppLocalizations.supportedLocales,
-                  home: PlayerScreen(
-                    args: recordingArgs,
-                    orchestrator: orchestrator,
-                    epgService: EpgService(clock: () => DateTime.utc(2026)),
-                    comskipSettings: ComskipSettings(),
-                  ),
-                ),
-              );
-              await tester.pump();
-
-              // Enter segment A (10–20) → auto-skip to 20.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 12),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-
-              // Orchestrator confirms the seek — clears the pending guard.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 20),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-
-              // User scrubs back to 15s — still inside segment A — must
-              // RE-fire auto-skip. The mechanism is stateless once the guard
-              // clears: position is the source of truth, no persistent
-              // already-skipped tracking. Matches the web reference.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 15),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, [
-                const Duration(seconds: 20),
-                const Duration(seconds: 20),
-              ]);
-
-              // Orchestrator confirms the second seek.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 20),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-
-              // Advance into segment B (30–40) — must auto-skip to 40.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 35),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, [
-                const Duration(seconds: 20),
-                const Duration(seconds: 20),
-                const Duration(seconds: 40),
-              ]);
-            },
-            createHttpClient: (_) => _FakeHttpClient(
-              jsonEncode([
-                {'start': 10.0, 'end': 20.0},
-                {'start': 30.0, 'end': 40.0},
-              ]),
+          final edl = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.0},
+              {'start': 30.0, 'end': 40.0},
+            ]),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: recordingArgs,
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                comskipSettings: ComskipSettings(),
+                comskipService: edl.comskipService,
+              ),
             ),
           );
+          await tester.pump();
+
+          // Enter segment A (10–20) → auto-skip to 20.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 12),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+
+          // Orchestrator confirms the seek — clears the pending guard.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 20),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+
+          // User scrubs back to 15s — still inside segment A — must
+          // RE-fire auto-skip. The mechanism is stateless once the guard
+          // clears: position is the source of truth, no persistent
+          // already-skipped tracking. Matches the web reference.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 15),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, [
+            const Duration(seconds: 20),
+            const Duration(seconds: 20),
+          ]);
+
+          // Orchestrator confirms the second seek.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 20),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+
+          // Advance into segment B (30–40) — must auto-skip to 40.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 35),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, [
+            const Duration(seconds: 20),
+            const Duration(seconds: 20),
+            const Duration(seconds: 40),
+          ]);
         },
       );
 
@@ -3676,57 +3613,53 @@ void main() {
           final orchestrator = buildOrchestrator(adapter);
           addTearDown(orchestrator.dispose);
 
-          await HttpOverrides.runZoned(
-            () async {
-              await tester.pumpWidget(
-                MaterialApp(
-                  localizationsDelegates:
-                      AppLocalizations.localizationsDelegates,
-                  supportedLocales: AppLocalizations.supportedLocales,
-                  home: PlayerScreen(
-                    args: recordingArgs,
-                    orchestrator: orchestrator,
-                    epgService: EpgService(clock: () => DateTime.utc(2026)),
-                    comskipSettings: ComskipSettings(),
-                  ),
-                ),
-              );
-              await tester.pump();
-
-              // Enter segment A (10–20) → auto-skip fires.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 12),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-
-              // Orchestrator confirms seek — position now AT segment end.
-              // _checkComskip reads _currentPosition=20, no segment matched,
-              // no extra seek. This is the optimistic-bump mechanism: the
-              // next [start, end) half-open interval check naturally
-              // evaluates false at t=20.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 20),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-            },
-            createHttpClient: (_) => _FakeHttpClient(
-              jsonEncode([
-                {'start': 10.0, 'end': 20.0},
-              ]),
+          final edl = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.0},
+            ]),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: recordingArgs,
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                comskipSettings: ComskipSettings(),
+                comskipService: edl.comskipService,
+              ),
             ),
           );
+          await tester.pump();
+
+          // Enter segment A (10–20) → auto-skip fires.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 12),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+
+          // Orchestrator confirms seek — position now AT segment end.
+          // _checkComskip reads _currentPosition=20, no segment matched,
+          // no extra seek. This is the optimistic-bump mechanism: the
+          // next [start, end) half-open interval check naturally
+          // evaluates false at t=20.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 20),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
         },
       );
 
@@ -3742,68 +3675,64 @@ void main() {
           final settings = ComskipSettings();
           await settings.setAutoSkipEnabled(enabled: false);
 
-          await HttpOverrides.runZoned(
-            () async {
-              await tester.pumpWidget(
-                MaterialApp(
-                  localizationsDelegates:
-                      AppLocalizations.localizationsDelegates,
-                  supportedLocales: AppLocalizations.supportedLocales,
-                  home: PlayerScreen(
-                    args: recordingArgs,
-                    orchestrator: orchestrator,
-                    epgService: EpgService(clock: () => DateTime.utc(2026)),
-                    comskipSettings: settings,
-                  ),
-                ),
-              );
-              await tester.pump();
-
-              // Enter segment A (10–20) → prompt appears.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 12),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              // The controls bar only mounts once that state lands.
-              await tester.pump();
-              expect(find.text('Skip commercial'), findsOneWidget);
-
-              // User taps the button. _confirmComskipSkip now goes through
-              // _fireComskipSeek: optimistic bump to 20 + pending target 20.
-              await tester.tap(find.text('Skip commercial'));
-              await tester.pump();
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-              expect(find.text('Skip commercial'), findsNothing);
-
-              // Orchestrator's mid-seek stale report (still inside the
-              // segment). The pending guard must keep _currentPosition at
-              // the optimistic 20 — _checkComskip reads 20, the half-open
-              // interval [10, 20) doesn't match, and the prompt does NOT
-              // reappear. Pre-fix the prompt flickered back because the
-              // old confirm path never set the pending guard.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 15),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(find.text('Skip commercial'), findsNothing);
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-            },
-            createHttpClient: (_) => _FakeHttpClient(
-              jsonEncode([
-                {'start': 10.0, 'end': 20.0},
-              ]),
+          final edl = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.0},
+            ]),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: recordingArgs,
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                comskipSettings: settings,
+                comskipService: edl.comskipService,
+              ),
             ),
           );
+          await tester.pump();
+
+          // Enter segment A (10–20) → prompt appears.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 12),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          // The controls bar only mounts once that state lands.
+          await tester.pump();
+          expect(find.text('Skip commercial'), findsOneWidget);
+
+          // User taps the button. _confirmComskipSkip now goes through
+          // _fireComskipSeek: optimistic bump to 20 + pending target 20.
+          await tester.tap(find.text('Skip commercial'));
+          await tester.pump();
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+          expect(find.text('Skip commercial'), findsNothing);
+
+          // Orchestrator's mid-seek stale report (still inside the
+          // segment). The pending guard must keep _currentPosition at
+          // the optimistic 20 — _checkComskip reads 20, the half-open
+          // interval [10, 20) doesn't match, and the prompt does NOT
+          // reappear. Pre-fix the prompt flickered back because the
+          // old confirm path never set the pending guard.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 15),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(find.text('Skip commercial'), findsNothing);
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
         },
       );
 
@@ -3819,55 +3748,51 @@ void main() {
           final settings = ComskipSettings();
           await settings.setAutoSkipEnabled(enabled: false);
 
-          await HttpOverrides.runZoned(
-            () async {
-              await tester.pumpWidget(
-                MaterialApp(
-                  localizationsDelegates:
-                      AppLocalizations.localizationsDelegates,
-                  supportedLocales: AppLocalizations.supportedLocales,
-                  home: PlayerScreen(
-                    args: recordingArgs,
-                    orchestrator: orchestrator,
-                    epgService: EpgService(clock: () => DateTime.utc(2026)),
-                    comskipSettings: settings,
-                  ),
-                ),
-              );
-              await tester.pump();
-
-              // Segment ends at 20.08 — sub-second precision. Pre-fix the
-              // prompt path used round() and seeked to Duration(seconds: 20),
-              // i.e. 20.000s, which is still inside [10, 20.08) and would
-              // re-match on the next tick. The shared _fireComskipSeek
-              // helper now uses ceil() and seeks to 20.080s, exactly past
-              // the half-open end.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 12),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              // The controls bar only mounts once that state lands.
-              await tester.pump();
-              expect(find.text('Skip commercial'), findsOneWidget);
-
-              await tester.tap(find.text('Skip commercial'));
-              await tester.pump();
-
-              expect(adapter.seekCalls, [
-                const Duration(milliseconds: 20080),
-              ]);
-            },
-            createHttpClient: (_) => _FakeHttpClient(
-              jsonEncode([
-                {'start': 10.0, 'end': 20.08},
-              ]),
+          final edl = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.08},
+            ]),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: recordingArgs,
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                comskipSettings: settings,
+                comskipService: edl.comskipService,
+              ),
             ),
           );
+          await tester.pump();
+
+          // Segment ends at 20.08 — sub-second precision. Pre-fix the
+          // prompt path used round() and seeked to Duration(seconds: 20),
+          // i.e. 20.000s, which is still inside [10, 20.08) and would
+          // re-match on the next tick. The shared _fireComskipSeek
+          // helper now uses ceil() and seeks to 20.080s, exactly past
+          // the half-open end.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 12),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          // The controls bar only mounts once that state lands.
+          await tester.pump();
+          expect(find.text('Skip commercial'), findsOneWidget);
+
+          await tester.tap(find.text('Skip commercial'));
+          await tester.pump();
+
+          expect(adapter.seekCalls, [
+            const Duration(milliseconds: 20080),
+          ]);
         },
       );
 
@@ -3881,75 +3806,71 @@ void main() {
           final orchestrator = buildOrchestrator(adapter);
           addTearDown(orchestrator.dispose);
 
-          await HttpOverrides.runZoned(
-            () async {
-              await tester.pumpWidget(
-                MaterialApp(
-                  localizationsDelegates:
-                      AppLocalizations.localizationsDelegates,
-                  supportedLocales: AppLocalizations.supportedLocales,
-                  home: PlayerScreen(
-                    args: recordingArgs,
-                    orchestrator: orchestrator,
-                    epgService: EpgService(clock: () => DateTime.utc(2026)),
-                    comskipSettings: ComskipSettings(),
-                  ),
-                ),
-              );
-              await tester.pump();
-
-              // Auto-skip fires: segment [10..20], emit 12 → seek to 20,
-              // pending=20, _currentPosition=20.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 12),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              // The controls bar only mounts once that state lands.
-              await tester.pump();
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-
-              // User rewinds twice: 20 → 10 → 0. _seekTo clears the pending
-              // guard (the user's deliberate new position must never be
-              // guarded by the auto-skip's pending target). Pre-fix the
-              // guard stayed set at 20 across these manual seeks.
-              await tester.tap(find.byIcon(Icons.replay_10));
-              await tester.pump();
-              await tester.tap(find.byIcon(Icons.replay_10));
-              await tester.pump();
-              expect(adapter.seekCalls, [
-                const Duration(seconds: 20),
-                const Duration(seconds: 10),
-                Duration.zero,
-              ]);
-
-              // Orchestrator's confirmation of the manual seek arrives at
-              // 5s (mid-seek buffering). With the fix, _currentPosition is
-              // accepted as 5 — display '0:05'. Pre-fix, 5 < pending(20)
-              // would suppress the emit and the manual seek would silently
-              // snap back to 0 from _seekTo — display '0:00'.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 5),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(find.text('0:05'), findsOneWidget);
-              expect(find.text('0:00'), findsNothing);
-            },
-            createHttpClient: (_) => _FakeHttpClient(
-              jsonEncode([
-                {'start': 10.0, 'end': 20.0},
-              ]),
+          final edl = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.0},
+            ]),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: recordingArgs,
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                comskipSettings: ComskipSettings(),
+                comskipService: edl.comskipService,
+              ),
             ),
           );
+          await tester.pump();
+
+          // Auto-skip fires: segment [10..20], emit 12 → seek to 20,
+          // pending=20, _currentPosition=20.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 12),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          // The controls bar only mounts once that state lands.
+          await tester.pump();
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+
+          // User rewinds twice: 20 → 10 → 0. _seekTo clears the pending
+          // guard (the user's deliberate new position must never be
+          // guarded by the auto-skip's pending target). Pre-fix the
+          // guard stayed set at 20 across these manual seeks.
+          await tester.tap(find.byIcon(Icons.replay_10));
+          await tester.pump();
+          await tester.tap(find.byIcon(Icons.replay_10));
+          await tester.pump();
+          expect(adapter.seekCalls, [
+            const Duration(seconds: 20),
+            const Duration(seconds: 10),
+            Duration.zero,
+          ]);
+
+          // Orchestrator's confirmation of the manual seek arrives at
+          // 5s (mid-seek buffering). With the fix, _currentPosition is
+          // accepted as 5 — display '0:05'. Pre-fix, 5 < pending(20)
+          // would suppress the emit and the manual seek would silently
+          // snap back to 0 from _seekTo — display '0:00'.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 5),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(find.text('0:05'), findsOneWidget);
+          expect(find.text('0:00'), findsNothing);
         },
       );
 
@@ -3963,79 +3884,75 @@ void main() {
           final orchestrator = buildOrchestrator(adapter);
           addTearDown(orchestrator.dispose);
 
-          await HttpOverrides.runZoned(
-            () async {
-              await tester.pumpWidget(
-                MaterialApp(
-                  localizationsDelegates:
-                      AppLocalizations.localizationsDelegates,
-                  supportedLocales: AppLocalizations.supportedLocales,
-                  home: PlayerScreen(
-                    args: recordingArgs,
-                    orchestrator: orchestrator,
-                    epgService: EpgService(clock: () => DateTime.utc(2026)),
-                    comskipSettings: ComskipSettings(),
-                  ),
-                ),
-              );
-              await tester.pump();
-
-              // First playthrough: enter segment A (10–20) → auto-skip fires.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 12),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-
-              // Orchestrator confirms seek at 20s.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 20),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-
-              // User restarts from beginning — position now at 5s (outside).
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 5),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-
-              // Forward playback re-enters segment A — must auto-skip AGAIN.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 15),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, [
-                const Duration(seconds: 20),
-                const Duration(seconds: 20),
-              ]);
-            },
-            createHttpClient: (_) => _FakeHttpClient(
-              jsonEncode([
-                {'start': 10.0, 'end': 20.0},
-              ]),
+          final edl = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.0},
+            ]),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: recordingArgs,
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                comskipSettings: ComskipSettings(),
+                comskipService: edl.comskipService,
+              ),
             ),
           );
+          await tester.pump();
+
+          // First playthrough: enter segment A (10–20) → auto-skip fires.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 12),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+
+          // Orchestrator confirms seek at 20s.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 20),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+
+          // User restarts from beginning — position now at 5s (outside).
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 5),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+
+          // Forward playback re-enters segment A — must auto-skip AGAIN.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 15),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, [
+            const Duration(seconds: 20),
+            const Duration(seconds: 20),
+          ]);
         },
       );
 
@@ -4049,63 +3966,59 @@ void main() {
           final orchestrator = buildOrchestrator(adapter);
           addTearDown(orchestrator.dispose);
 
-          await HttpOverrides.runZoned(
-            () async {
-              await tester.pumpWidget(
-                MaterialApp(
-                  localizationsDelegates:
-                      AppLocalizations.localizationsDelegates,
-                  supportedLocales: AppLocalizations.supportedLocales,
-                  home: PlayerScreen(
-                    args: recordingArgs,
-                    orchestrator: orchestrator,
-                    epgService: EpgService(clock: () => DateTime.utc(2026)),
-                    comskipSettings: ComskipSettings(),
-                  ),
-                ),
-              );
-              await tester.pump();
-
-              // Segment ends at 2284.08s — sub-second precision like a real
-              // comskip EDL. Pre-fix this caused an infinite stuck loop
-              // because round(2284.08) = 2284 → bump-to-2284 was still
-              // inside [start, 2284.08) → re-match every tick. With ceil()
-              // on the millisecond value we seek to 2284.080s, which is
-              // exactly past the half-open end and so no longer matches.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 2280),
-                  duration: Duration(minutes: 60),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, [
-                const Duration(milliseconds: 2284080),
-              ]);
-
-              // Position 2285 confirmed — guard clears.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 2285),
-                  duration: Duration(minutes: 60),
-                ),
-              );
-              await tester.pump();
-              // No additional seek — stuck-loop is gone.
-              expect(adapter.seekCalls, [
-                const Duration(milliseconds: 2284080),
-              ]);
-            },
-            createHttpClient: (_) => _FakeHttpClient(
-              jsonEncode([
-                {'start': 2074.12, 'end': 2284.08},
-              ]),
+          final edl = _FakeHttpClient(
+            jsonEncode([
+              {'start': 2074.12, 'end': 2284.08},
+            ]),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: recordingArgs,
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                comskipSettings: ComskipSettings(),
+                comskipService: edl.comskipService,
+              ),
             ),
           );
+          await tester.pump();
+
+          // Segment ends at 2284.08s — sub-second precision like a real
+          // comskip EDL. Pre-fix this caused an infinite stuck loop
+          // because round(2284.08) = 2284 → bump-to-2284 was still
+          // inside [start, 2284.08) → re-match every tick. With ceil()
+          // on the millisecond value we seek to 2284.080s, which is
+          // exactly past the half-open end and so no longer matches.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 2280),
+              duration: Duration(minutes: 60),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, [
+            const Duration(milliseconds: 2284080),
+          ]);
+
+          // Position 2285 confirmed — guard clears.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 2285),
+              duration: Duration(minutes: 60),
+            ),
+          );
+          await tester.pump();
+          // No additional seek — stuck-loop is gone.
+          expect(adapter.seekCalls, [
+            const Duration(milliseconds: 2284080),
+          ]);
         },
       );
 
@@ -4119,70 +4032,66 @@ void main() {
           final orchestrator = buildOrchestrator(adapter);
           addTearDown(orchestrator.dispose);
 
-          await HttpOverrides.runZoned(
-            () async {
-              await tester.pumpWidget(
-                MaterialApp(
-                  localizationsDelegates:
-                      AppLocalizations.localizationsDelegates,
-                  supportedLocales: AppLocalizations.supportedLocales,
-                  home: PlayerScreen(
-                    args: recordingArgs,
-                    orchestrator: orchestrator,
-                    epgService: EpgService(clock: () => DateTime.utc(2026)),
-                    comskipSettings: ComskipSettings(),
-                  ),
-                ),
-              );
-              await tester.pump();
-
-              // Enter segment A (10–20) → seek to 20, pending guard = 20.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 12),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-
-              // Orchestrator's mid-seek position report LAGS back to 15s
-              // (real seek hasn't completed yet). The pending-seek-target
-              // guard must reject this — _currentPosition stays at the
-              // bumped 20s and no second seek fires. Pre-fix this would
-              // re-fire because the clobber pulled _currentPosition back
-              // inside the segment.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 15),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-
-              // Another stale report — still no re-fire.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 18),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-            },
-            createHttpClient: (_) => _FakeHttpClient(
-              jsonEncode([
-                {'start': 10.0, 'end': 20.0},
-              ]),
+          final edl = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.0},
+            ]),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: recordingArgs,
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                comskipSettings: ComskipSettings(),
+                comskipService: edl.comskipService,
+              ),
             ),
           );
+          await tester.pump();
+
+          // Enter segment A (10–20) → seek to 20, pending guard = 20.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 12),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+
+          // Orchestrator's mid-seek position report LAGS back to 15s
+          // (real seek hasn't completed yet). The pending-seek-target
+          // guard must reject this — _currentPosition stays at the
+          // bumped 20s and no second seek fires. Pre-fix this would
+          // re-fire because the clobber pulled _currentPosition back
+          // inside the segment.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 15),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+
+          // Another stale report — still no re-fire.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 18),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
         },
       );
 
@@ -4196,72 +4105,68 @@ void main() {
           final orchestrator = buildOrchestrator(adapter);
           addTearDown(orchestrator.dispose);
 
-          await HttpOverrides.runZoned(
-            () async {
-              await tester.pumpWidget(
-                MaterialApp(
-                  localizationsDelegates:
-                      AppLocalizations.localizationsDelegates,
-                  supportedLocales: AppLocalizations.supportedLocales,
-                  home: PlayerScreen(
-                    args: recordingArgs,
-                    orchestrator: orchestrator,
-                    epgService: EpgService(clock: () => DateTime.utc(2026)),
-                    comskipSettings: ComskipSettings(),
-                  ),
-                ),
-              );
-              await tester.pump();
-
-              // Enter segment A (10–20) → seek to 20, pending = 20.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 12),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-
-              // Orchestrator genuinely catches up past the target —
-              // 20 >= 20, guard clears, position is accepted.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 20),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, [const Duration(seconds: 20)]);
-
-              // Advance into segment B (30–40) — must auto-skip to 40.
-              // If the guard were stuck or the mechanism broken, this
-              // wouldn't fire.
-              adapter.emitState(
-                const PlaybackState(
-                  backend: PlaybackBackend.desktopLibmpv,
-                  status: PlaybackStatus.playing,
-                  position: Duration(seconds: 35),
-                  duration: Duration(minutes: 1),
-                ),
-              );
-              await tester.pump();
-              expect(adapter.seekCalls, [
-                const Duration(seconds: 20),
-                const Duration(seconds: 40),
-              ]);
-            },
-            createHttpClient: (_) => _FakeHttpClient(
-              jsonEncode([
-                {'start': 10.0, 'end': 20.0},
-                {'start': 30.0, 'end': 40.0},
-              ]),
+          final edl = _FakeHttpClient(
+            jsonEncode([
+              {'start': 10.0, 'end': 20.0},
+              {'start': 30.0, 'end': 40.0},
+            ]),
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: recordingArgs,
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                comskipSettings: ComskipSettings(),
+                comskipService: edl.comskipService,
+              ),
             ),
           );
+          await tester.pump();
+
+          // Enter segment A (10–20) → seek to 20, pending = 20.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 12),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+
+          // Orchestrator genuinely catches up past the target —
+          // 20 >= 20, guard clears, position is accepted.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 20),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, [const Duration(seconds: 20)]);
+
+          // Advance into segment B (30–40) — must auto-skip to 40.
+          // If the guard were stuck or the mechanism broken, this
+          // wouldn't fire.
+          adapter.emitState(
+            const PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: 35),
+              duration: Duration(minutes: 1),
+            ),
+          );
+          await tester.pump();
+          expect(adapter.seekCalls, [
+            const Duration(seconds: 20),
+            const Duration(seconds: 40),
+          ]);
         },
       );
 
@@ -4300,41 +4205,40 @@ void main() {
             ]),
           );
 
-          await HttpOverrides.runZoned(() async {
-            await tester.pumpWidget(
-              MaterialApp(
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
-                supportedLocales: AppLocalizations.supportedLocales,
-                home: PlayerScreen(
-                  args: const PlayerArgs(
-                    streamUrl: 'https://example.com/recording.mp4',
-                    title: 'Localhost EDL Fixture',
-                    type: 'vod',
-                    metadata: <String, Object?>{
-                      'edl_url': 'http://localhost/dvr/some/path/edl',
-                    },
-                  ),
-                  orchestrator: orchestrator,
-                  epgService: EpgService(clock: () => DateTime.utc(2026)),
-                  xtreamService: xtreamService,
-                  comskipSettings: ComskipSettings(),
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: const PlayerArgs(
+                  streamUrl: 'https://example.com/recording.mp4',
+                  title: 'Localhost EDL Fixture',
+                  type: 'vod',
+                  metadata: <String, Object?>{
+                    'edl_url': 'http://localhost/dvr/some/path/edl',
+                  },
                 ),
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                xtreamService: xtreamService,
+                comskipSettings: ComskipSettings(),
+                comskipService: httpClient.comskipService,
               ),
-            );
-            await tester.pump();
+            ),
+          );
+          await tester.pump();
 
-            // Give the fire-and-forget EDL fetch a chance to settle.
-            for (var i = 0; i < 10; i++) {
-              await tester.pump(const Duration(milliseconds: 10));
-            }
+          // Give the fire-and-forget EDL fetch a chance to settle.
+          for (var i = 0; i < 10; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
 
-            expect(httpClient.requestedUrls, isNotEmpty);
-            final fetched = httpClient.requestedUrls.single;
-            expect(fetched.scheme, 'https');
-            expect(fetched.host, 'xtream.example');
-            expect(fetched.path, '/dvr/some/path/edl');
-            expect(fetched.hasPort, isFalse);
-          }, createHttpClient: (_) => httpClient);
+          expect(httpClient.requestedUrls, isNotEmpty);
+          final fetched = httpClient.requestedUrls.single;
+          expect(fetched.scheme, 'https');
+          expect(fetched.host, 'xtream.example');
+          expect(fetched.path, '/dvr/some/path/edl');
+          expect(fetched.hasPort, isFalse);
         },
       );
 
@@ -4373,39 +4277,38 @@ void main() {
             ]),
           );
 
-          await HttpOverrides.runZoned(() async {
-            await tester.pumpWidget(
-              MaterialApp(
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
-                supportedLocales: AppLocalizations.supportedLocales,
-                home: PlayerScreen(
-                  args: const PlayerArgs(
-                    streamUrl: 'https://example.com/recording.mp4',
-                    title: 'Real Host EDL Fixture',
-                    type: 'vod',
-                    metadata: <String, Object?>{
-                      'edl_url': 'https://m3u.bearald.com/dvr/real/path/edl',
-                    },
-                  ),
-                  orchestrator: orchestrator,
-                  epgService: EpgService(clock: () => DateTime.utc(2026)),
-                  xtreamService: xtreamService,
-                  comskipSettings: ComskipSettings(),
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: const PlayerArgs(
+                  streamUrl: 'https://example.com/recording.mp4',
+                  title: 'Real Host EDL Fixture',
+                  type: 'vod',
+                  metadata: <String, Object?>{
+                    'edl_url': 'https://m3u.bearald.com/dvr/real/path/edl',
+                  },
                 ),
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                xtreamService: xtreamService,
+                comskipSettings: ComskipSettings(),
+                comskipService: httpClient.comskipService,
               ),
-            );
-            await tester.pump();
+            ),
+          );
+          await tester.pump();
 
-            for (var i = 0; i < 10; i++) {
-              await tester.pump(const Duration(milliseconds: 10));
-            }
+          for (var i = 0; i < 10; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
 
-            expect(httpClient.requestedUrls, isNotEmpty);
-            final fetched = httpClient.requestedUrls.single;
-            expect(fetched.scheme, 'https');
-            expect(fetched.host, 'm3u.bearald.com');
-            expect(fetched.path, '/dvr/real/path/edl');
-          }, createHttpClient: (_) => httpClient);
+          expect(httpClient.requestedUrls, isNotEmpty);
+          final fetched = httpClient.requestedUrls.single;
+          expect(fetched.scheme, 'https');
+          expect(fetched.host, 'm3u.bearald.com');
+          expect(fetched.path, '/dvr/real/path/edl');
         },
       );
 
@@ -4448,45 +4351,44 @@ void main() {
             ]),
           );
 
-          await HttpOverrides.runZoned(() async {
-            await tester.pumpWidget(
-              MaterialApp(
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
-                supportedLocales: AppLocalizations.supportedLocales,
-                home: PlayerScreen(
-                  args: recordingArgs,
-                  orchestrator: orchestrator,
-                  epgService: EpgService(clock: () => DateTime.utc(2026)),
-                  xtreamService: xtreamService,
-                  hasDvrFeature: true,
-                  comskipSettings: ComskipSettings(),
-                ),
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: recordingArgs,
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                xtreamService: xtreamService,
+                hasDvrFeature: true,
+                comskipSettings: ComskipSettings(),
+                comskipService: httpClient.comskipService,
               ),
-            );
-            await tester.pump();
+            ),
+          );
+          await tester.pump();
 
-            for (var i = 0; i < 10; i++) {
-              await tester.pump(const Duration(milliseconds: 10));
-            }
+          for (var i = 0; i < 10; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
 
-            expect(
-              requestedActions.contains('get_vod_info'),
-              isFalse,
-              reason:
-                  'Fast path must not call getVodInfo when metadata has edl_url',
-            );
-            expect(
-              requestedActions.contains('get_series_info'),
-              isFalse,
-              reason:
-                  'Fast path must not call getSeriesInfo when metadata has edl_url',
-            );
-            expect(httpClient.requestedUrls.single.host, 'example.com');
-            expect(
-              httpClient.requestedUrls.single.path,
-              '/recording/edl',
-            );
-          }, createHttpClient: (_) => httpClient);
+          expect(
+            requestedActions.contains('get_vod_info'),
+            isFalse,
+            reason:
+                'Fast path must not call getVodInfo when metadata has edl_url',
+          );
+          expect(
+            requestedActions.contains('get_series_info'),
+            isFalse,
+            reason:
+                'Fast path must not call getSeriesInfo when metadata has edl_url',
+          );
+          expect(httpClient.requestedUrls.single.host, 'example.com');
+          expect(
+            httpClient.requestedUrls.single.path,
+            '/recording/edl',
+          );
         },
       );
 
@@ -4532,38 +4434,37 @@ void main() {
             ]),
           );
 
-          await HttpOverrides.runZoned(() async {
-            await tester.pumpWidget(
-              MaterialApp(
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
-                supportedLocales: AppLocalizations.supportedLocales,
-                home: PlayerScreen(
-                  args: const PlayerArgs(
-                    streamUrl: 'https://xtream.example/recording.mp4',
-                    title: 'VOD Fallback Fixture',
-                    type: 'vod',
-                    streamId: 4242,
-                  ),
-                  orchestrator: orchestrator,
-                  epgService: EpgService(clock: () => DateTime.utc(2026)),
-                  xtreamService: xtreamService,
-                  hasDvrFeature: true,
-                  comskipSettings: ComskipSettings(),
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: const PlayerArgs(
+                  streamUrl: 'https://xtream.example/recording.mp4',
+                  title: 'VOD Fallback Fixture',
+                  type: 'vod',
+                  streamId: 4242,
                 ),
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                xtreamService: xtreamService,
+                hasDvrFeature: true,
+                comskipSettings: ComskipSettings(),
+                comskipService: httpClient.comskipService,
               ),
-            );
-            await tester.pump();
+            ),
+          );
+          await tester.pump();
 
-            for (var i = 0; i < 10; i++) {
-              await tester.pump(const Duration(milliseconds: 10));
-            }
+          for (var i = 0; i < 10; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
 
-            expect(httpClient.requestedUrls, isNotEmpty);
-            expect(
-              httpClient.requestedUrls.single.toString(),
-              'https://xtream.example/dvr/vod/edl',
-            );
-          }, createHttpClient: (_) => httpClient);
+          expect(httpClient.requestedUrls, isNotEmpty);
+          expect(
+            httpClient.requestedUrls.single.toString(),
+            'https://xtream.example/dvr/vod/edl',
+          );
         },
       );
 
@@ -4627,39 +4528,38 @@ void main() {
             ]),
           );
 
-          await HttpOverrides.runZoned(() async {
-            await tester.pumpWidget(
-              MaterialApp(
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
-                supportedLocales: AppLocalizations.supportedLocales,
-                home: PlayerScreen(
-                  args: const PlayerArgs(
-                    streamUrl: 'https://xtream.example/series/123.mp4',
-                    title: 'Series Fallback Fixture',
-                    type: 'series',
-                    streamId: 123,
-                    seriesId: 7,
-                  ),
-                  orchestrator: orchestrator,
-                  epgService: EpgService(clock: () => DateTime.utc(2026)),
-                  xtreamService: xtreamService,
-                  hasDvrFeature: true,
-                  comskipSettings: ComskipSettings(),
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: const PlayerArgs(
+                  streamUrl: 'https://xtream.example/series/123.mp4',
+                  title: 'Series Fallback Fixture',
+                  type: 'series',
+                  streamId: 123,
+                  seriesId: 7,
                 ),
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                xtreamService: xtreamService,
+                hasDvrFeature: true,
+                comskipSettings: ComskipSettings(),
+                comskipService: httpClient.comskipService,
               ),
-            );
-            await tester.pump();
+            ),
+          );
+          await tester.pump();
 
-            for (var i = 0; i < 10; i++) {
-              await tester.pump(const Duration(milliseconds: 10));
-            }
+          for (var i = 0; i < 10; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
 
-            expect(httpClient.requestedUrls, isNotEmpty);
-            expect(
-              httpClient.requestedUrls.single.toString(),
-              'https://xtream.example/dvr/series/ep-edl',
-            );
-          }, createHttpClient: (_) => httpClient);
+          expect(httpClient.requestedUrls, isNotEmpty);
+          expect(
+            httpClient.requestedUrls.single.toString(),
+            'https://xtream.example/dvr/series/ep-edl',
+          );
         },
       );
       testWidgets(
@@ -4701,47 +4601,45 @@ void main() {
             ]),
           );
 
-          await HttpOverrides.runZoned(() async {
-            await tester.pumpWidget(
-              MaterialApp(
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
-                supportedLocales: AppLocalizations.supportedLocales,
-                home: PlayerScreen(
-                  args: const PlayerArgs(
-                    streamUrl: 'https://xtream.example/recording.mp4',
-                    title: 'Gate Closed Fixture',
-                    type: 'vod',
-                    streamId: 4242,
-                  ),
-                  orchestrator: orchestrator,
-                  epgService: EpgService(clock: () => DateTime.utc(2026)),
-                  xtreamService: xtreamService,
-                  comskipSettings: ComskipSettings(),
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: const PlayerArgs(
+                  streamUrl: 'https://xtream.example/recording.mp4',
+                  title: 'Gate Closed Fixture',
+                  type: 'vod',
+                  streamId: 4242,
                 ),
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                xtreamService: xtreamService,
+                comskipSettings: ComskipSettings(),
+                comskipService: httpClient.comskipService,
               ),
-            );
-            await tester.pump();
+            ),
+          );
+          await tester.pump();
 
-            for (var i = 0; i < 10; i++) {
-              await tester.pump(const Duration(milliseconds: 10));
-            }
+          for (var i = 0; i < 10; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
 
-            expect(
-              requestedActions.contains('get_vod_info'),
-              isFalse,
-              reason:
-                  'Gate must suppress getVodInfo when hasDvrFeature is false',
-            );
-            expect(
-              requestedActions.contains('get_series_info'),
-              isFalse,
-              reason:
-                  'Gate must suppress getSeriesInfo when hasDvrFeature is false',
-            );
-            expect(httpClient.requestedUrls, isEmpty);
-            expect(find.text('Skipped commercial'), findsNothing);
-            expect(find.text('Skip commercial'), findsNothing);
-          }, createHttpClient: (_) => httpClient);
+          expect(
+            requestedActions.contains('get_vod_info'),
+            isFalse,
+            reason: 'Gate must suppress getVodInfo when hasDvrFeature is false',
+          );
+          expect(
+            requestedActions.contains('get_series_info'),
+            isFalse,
+            reason:
+                'Gate must suppress getSeriesInfo when hasDvrFeature is false',
+          );
+          expect(httpClient.requestedUrls, isEmpty);
+          expect(find.text('Skipped commercial'), findsNothing);
+          expect(find.text('Skip commercial'), findsNothing);
         },
       );
 
@@ -4783,37 +4681,36 @@ void main() {
             ]),
           );
 
-          await HttpOverrides.runZoned(() async {
-            await tester.pumpWidget(
-              MaterialApp(
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
-                supportedLocales: AppLocalizations.supportedLocales,
-                home: PlayerScreen(
-                  args: const PlayerArgs(
-                    streamUrl: 'https://xtream.example/recording.mp4',
-                    title: 'Fail-open Fixture',
-                    type: 'vod',
-                    streamId: 4242,
-                  ),
-                  orchestrator: orchestrator,
-                  epgService: EpgService(clock: () => DateTime.utc(2026)),
-                  xtreamService: xtreamService,
-                  hasDvrFeature: true,
-                  comskipSettings: ComskipSettings(),
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: const PlayerArgs(
+                  streamUrl: 'https://xtream.example/recording.mp4',
+                  title: 'Fail-open Fixture',
+                  type: 'vod',
+                  streamId: 4242,
                 ),
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                xtreamService: xtreamService,
+                hasDvrFeature: true,
+                comskipSettings: ComskipSettings(),
+                comskipService: httpClient.comskipService,
               ),
-            );
-            await tester.pump();
+            ),
+          );
+          await tester.pump();
 
-            for (var i = 0; i < 10; i++) {
-              await tester.pump(const Duration(milliseconds: 10));
-            }
+          for (var i = 0; i < 10; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
 
-            expect(httpClient.requestedUrls, isEmpty);
-            expect(adapter.seekCalls, isEmpty);
-            expect(find.text('Skipped commercial'), findsNothing);
-            expect(find.text('Skip commercial'), findsNothing);
-          }, createHttpClient: (_) => httpClient);
+          expect(httpClient.requestedUrls, isEmpty);
+          expect(adapter.seekCalls, isEmpty);
+          expect(find.text('Skipped commercial'), findsNothing);
+          expect(find.text('Skip commercial'), findsNothing);
         },
       );
 
@@ -4859,38 +4756,37 @@ void main() {
             ]),
           );
 
-          await HttpOverrides.runZoned(() async {
-            await tester.pumpWidget(
-              MaterialApp(
-                localizationsDelegates: AppLocalizations.localizationsDelegates,
-                supportedLocales: AppLocalizations.supportedLocales,
-                home: PlayerScreen(
-                  args: const PlayerArgs(
-                    streamUrl: 'https://xtream.example/recording.mp4',
-                    title: 'Loopback Fallback Fixture',
-                    type: 'vod',
-                    streamId: 4242,
-                  ),
-                  orchestrator: orchestrator,
-                  epgService: EpgService(clock: () => DateTime.utc(2026)),
-                  xtreamService: xtreamService,
-                  hasDvrFeature: true,
-                  comskipSettings: ComskipSettings(),
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: PlayerScreen(
+                args: const PlayerArgs(
+                  streamUrl: 'https://xtream.example/recording.mp4',
+                  title: 'Loopback Fallback Fixture',
+                  type: 'vod',
+                  streamId: 4242,
                 ),
+                orchestrator: orchestrator,
+                epgService: EpgService(clock: () => DateTime.utc(2026)),
+                xtreamService: xtreamService,
+                hasDvrFeature: true,
+                comskipSettings: ComskipSettings(),
+                comskipService: httpClient.comskipService,
               ),
-            );
-            await tester.pump();
+            ),
+          );
+          await tester.pump();
 
-            for (var i = 0; i < 10; i++) {
-              await tester.pump(const Duration(milliseconds: 10));
-            }
+          for (var i = 0; i < 10; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
 
-            expect(httpClient.requestedUrls, isNotEmpty);
-            final fetched = httpClient.requestedUrls.single;
-            expect(fetched.scheme, 'https');
-            expect(fetched.host, 'xtream.example');
-            expect(fetched.path, '/dvr/fallback/edl');
-          }, createHttpClient: (_) => httpClient);
+          expect(httpClient.requestedUrls, isNotEmpty);
+          final fetched = httpClient.requestedUrls.single;
+          expect(fetched.scheme, 'https');
+          expect(fetched.host, 'xtream.example');
+          expect(fetched.path, '/dvr/fallback/edl');
         },
       );
     });

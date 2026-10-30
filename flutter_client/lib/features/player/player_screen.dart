@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io' show HttpClient, HttpStatus;
 import 'dart:math' as math;
 
 import 'package:clock/clock.dart';
@@ -22,6 +20,7 @@ import 'package:m3u_tv/playback/native_video_surface.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/services/comskip_service.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -83,6 +82,7 @@ class PlayerScreen extends StatefulWidget {
     required this.epgService,
     this.xtreamService,
     this.comskipSettings,
+    this.comskipService,
     this.introDbSettings,
     this.hasDvrFeature = false,
     this.progressReporter,
@@ -110,6 +110,10 @@ class PlayerScreen extends StatefulWidget {
   final EpgService epgService;
   final XtreamService? xtreamService;
   final ComskipSettings? comskipSettings;
+
+  /// Fetches the recording's commercial-break segments. Defaults to a fresh
+  /// [ComskipService]; tests inject one over a fake HTTP client.
+  final ComskipService? comskipService;
 
   /// Null behaves as enabled (the setting's default).
   final IntroDbSettings? introDbSettings;
@@ -233,7 +237,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   // Comskip (commercial-skip) state — only populated when args.metadata
   // carries an 'edl_url' (completed DVR recordings with comskip enabled).
-  List<({double start, double end})> _comskipSegments = const [];
+  List<ComskipSegment> _comskipSegments = const [];
   ({double start, double end})? _activeComskipSegment;
   bool _showComskipSkippedBadge = false;
   Timer? _comskipBadgeTimer;
@@ -251,6 +255,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // playing VOD/series item resolves to a tmdb_id (or, for AIOStreams, an
   // imdb-style aio_item_id) with community-submitted timestamps.
   final IntroDbService _introDbService = IntroDbService();
+  late final ComskipService _comskipService =
+      widget.comskipService ?? ComskipService();
   IntroDbSegments? _introDbSegments;
   // The segment kind the play-head is currently inside, independent of
   // whether the prompt is actually on screen right now.
@@ -679,92 +685,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// any fetch failure just leaves [_comskipSegments] empty, so the rest of
   /// the player behaves exactly as if this recording had no EDL at all.
   Future<void> _initComskip(PlayerArgs args) async {
-    var edlUrl = args.metadata['edl_url'] as String?;
-    if (edlUrl == null || edlUrl.isEmpty) {
-      if (!widget.hasDvrFeature || widget.xtreamService == null) return;
-      edlUrl = await _resolveEdlUrlFromService(args);
-      if (!mounted || !identical(args, widget.args)) return;
-      if (edlUrl == null || edlUrl.isEmpty) return;
-    }
-
-    final client = HttpClient();
-    try {
-      final request = await client.getUrl(_resolveEdlUri(Uri.parse(edlUrl)));
-      final response = await request.close().timeout(
-        const Duration(seconds: 8),
-      );
-      if (response.statusCode != HttpStatus.ok) return;
-      final body = await utf8.decodeStream(response);
-      final decoded = jsonDecode(body);
-      if (decoded is! List) return;
-
-      final segments = decoded
-          .whereType<Map<String, Object?>>()
-          .map((segment) {
-            final start = segment['start'];
-            final end = segment['end'];
-            if (start is! num || end is! num) return null;
-            return (start: start.toDouble(), end: end.toDouble());
-          })
-          .whereType<({double start, double end})>()
-          .toList(growable: false);
-
-      if (!mounted || !identical(args, widget.args)) return;
-      setState(() => _comskipSegments = segments);
-    } on Object catch (error) {
-      debugPrint('Comskip: failed to fetch EDL: $error');
-    } finally {
-      client.close();
-    }
-  }
-
-  /// Lazily resolves an `edl_url` for play paths that don't carry the field
-  /// on the originating `PlayerArgs` — notably Continue Watching for series
-  /// episodes, which only holds a `Progress` and a `Series` summary.
-  /// Gated on the `hasDvrFeature` flag to keep non-DVR accounts off the
-  /// extra call (the series branch fetches the full `get_series_info`
-  /// payload).
-  Future<String?> _resolveEdlUrlFromService(PlayerArgs args) async {
-    final service = widget.xtreamService;
-    if (service == null) return null;
-    try {
-      if (args.type == 'vod' && args.streamId != null) {
-        final info = await service.getVodInfo(args.streamId!);
-        return info.edlUrl;
-      }
-      if (args.type == 'series' && args.seriesId != null) {
-        final info = await service.getSeriesInfo(args.seriesId!);
-        final episode = info.episodesBySeason.values
-            .expand((eps) => eps)
-            .where((e) => e.id == '${args.streamId}')
-            .firstOrNull;
-        return episode?.edlUrl;
-      }
-    } on Object catch (error) {
-      debugPrint('Comskip: failed to resolve EDL: $error');
-    }
-    return null;
-  }
-
-  /// Rewrites a localhost/127.0.0.1 EDL host to the connected Xtream server's
-  /// real scheme/host/port. The m3u-editor backend occasionally returns an
-  /// edl_url pointing at its own loopback (e.g. `http://localhost/dvr/...`)
-  /// instead of the public host, which makes the client hit the user's own
-  /// machine. Only rewrites when the parsed host is loopback AND we have
-  /// configured credentials; otherwise returns the input unchanged so the
-  /// existing failure path runs untouched.
-  Uri _resolveEdlUri(Uri edlUri) {
-    final host = edlUri.host.toLowerCase();
-    if (host != 'localhost' && host != '127.0.0.1') return edlUri;
-    final server = widget.xtreamService?.credentials?.server;
-    if (server == null) return edlUri;
-    final serverUri = Uri.tryParse(server);
-    if (serverUri == null) return edlUri;
-    return edlUri.replace(
-      scheme: serverUri.scheme,
-      host: serverUri.host,
-      port: serverUri.port,
+    final segments = await _comskipService.segmentsFor(
+      edlUrl: args.metadata['edl_url'] as String?,
+      type: args.type,
+      streamId: args.streamId,
+      seriesId: args.seriesId,
+      xtreamService: widget.xtreamService,
+      canLookUp: widget.hasDvrFeature,
     );
+    if (segments.isEmpty || !mounted || !identical(args, widget.args)) return;
+    setState(() => _comskipSegments = segments);
   }
 
   /// Checks whether the current playback position has entered a commercial
