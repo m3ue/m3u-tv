@@ -843,15 +843,17 @@ class XtreamService {
     int page = 1,
     int perPage = 20,
   }) async {
-    final response = await _requestWithCredentials(
-      credentials,
-      'request_search',
-      params: {
-        'query': query,
-        'type': ?type,
-        'page': '$page',
-        'per_page': '$perPage',
-      },
+    final response = await _requestAction(
+      () => _requestWithCredentials(
+        credentials,
+        'request_search',
+        params: {
+          'query': query,
+          'type': ?type,
+          'page': '$page',
+          'per_page': '$perPage',
+        },
+      ),
     );
     final data = _asMap(_unwrapRequestEnvelope(response)['data']);
     return _asList(data['results'])
@@ -887,16 +889,18 @@ class XtreamService {
     required String externalId,
     List<int>? seasons,
   }) async {
-    final response = await _requestWithCredentials(
-      credentials,
-      'request_submit',
-      method: 'POST',
-      body: {
-        'type': type,
-        'integration_id': '$integrationId',
-        'external_id': externalId,
-        'seasons': ?seasons,
-      },
+    final response = await _requestAction(
+      () => _requestWithCredentials(
+        credentials,
+        'request_submit',
+        method: 'POST',
+        body: {
+          'type': type,
+          'integration_id': '$integrationId',
+          'external_id': externalId,
+          'seasons': ?seasons,
+        },
+      ),
     );
     final data = _asMap(_unwrapRequestEnvelope(response)['data']);
     return MediaRequestSummary.fromJson(_asMap(data['request']));
@@ -907,9 +911,11 @@ class XtreamService {
     int page = 1,
     int perPage = 50,
   }) async {
-    final response = await _request(
-      'request_history',
-      params: {'page': '$page', 'per_page': '$perPage'},
+    final response = await _requestAction(
+      () => _request(
+        'request_history',
+        params: {'page': '$page', 'per_page': '$perPage'},
+      ),
     );
     final data = _asMap(_unwrapRequestEnvelope(response)['data']);
     return _asList(data['requests'])
@@ -920,9 +926,11 @@ class XtreamService {
   /// Refreshes a single request's status via `request_status`, including
   /// live download progress once approved.
   Future<MediaRequestSummary> getMediaRequestStatus(int requestId) async {
-    final response = await _request(
-      'request_status',
-      params: {'request_id': '$requestId'},
+    final response = await _requestAction(
+      () => _request(
+        'request_status',
+        params: {'request_id': '$requestId'},
+      ),
     );
     final data = _asMap(_unwrapRequestEnvelope(response)['data']);
     return MediaRequestSummary.fromJson(_asMap(data['request']));
@@ -930,12 +938,29 @@ class XtreamService {
 
   /// Dismisses a completed or rejected request via `request_dismiss`.
   Future<void> dismissMediaRequest(int requestId) async {
-    final response = await _request(
-      'request_dismiss',
-      method: 'POST',
-      body: {'request_id': '$requestId'},
+    final response = await _requestAction(
+      () => _request(
+        'request_dismiss',
+        method: 'POST',
+        body: {'request_id': '$requestId'},
+      ),
     );
     _unwrapRequestEnvelope(response);
+  }
+
+  /// Runs a `request_*` call, surfacing the documented error envelope as an
+  /// [XtreamRequestException] even when m3u-editor sends it with an error
+  /// status (409 `already_requested`, 429 `rate_limited`, 503
+  /// `provider_unavailable`, ...), which the transport raises as an
+  /// [XtreamHttpException]. Error responses without the envelope rethrow.
+  Future<Object?> _requestAction(Future<Object?> Function() send) async {
+    try {
+      return await send();
+    } on XtreamHttpException catch (error) {
+      final body = error.bodyJson;
+      if (body is Map && body['error'] is Map) _unwrapRequestEnvelope(body);
+      rethrow;
+    }
   }
 
   /// Unwraps the shared `request_*` action envelope
