@@ -3026,6 +3026,18 @@ abstract class AppLocalizations {
   /// **'Oldest First'**
   String get mediaSortReleaseDateOldest;
 
+  /// No description provided for @mediaSortTitleAsc.
+  ///
+  /// In en, this message translates to:
+  /// **'Title (A-Z)'**
+  String get mediaSortTitleAsc;
+
+  /// No description provided for @mediaSortTitleDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Title (Z-A)'**
+  String get mediaSortTitleDesc;
+
   /// No description provided for @mediaSortFavoritesFirst.
   ///
   /// In en, this message translates to:

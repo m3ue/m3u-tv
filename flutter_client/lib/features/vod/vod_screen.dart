@@ -224,6 +224,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
   List<VodItem> _sortedFavorites(List<VodItem> items) => sortMediaItems(
     items,
     _sortOption,
+    nameOf: (item) => item.name,
     ratingOf: (item) => item.rating,
     yearOf: (item) => int.tryParse(item.year ?? ''),
     recencyOf: (item) => item.addedAt,

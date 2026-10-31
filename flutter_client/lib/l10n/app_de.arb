@@ -895,6 +895,8 @@
   "mediaSortRating": "Bewertung",
   "mediaSortReleaseDateNewest": "Neueste zuerst",
   "mediaSortReleaseDateOldest": "Älteste zuerst",
+  "mediaSortTitleAsc": "Titel (A-Z)",
+  "mediaSortTitleDesc": "Titel (Z-A)",
   "mediaSortFavoritesFirst": "Favoriten zuerst",
   "liveTvSortDialogTitle": "Sender sortieren nach",
   "channelSortPlaylistOrder": "Playlist-Reihenfolge",

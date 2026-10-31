@@ -895,6 +895,8 @@
   "mediaSortRating": "评分",
   "mediaSortReleaseDateNewest": "最新优先",
   "mediaSortReleaseDateOldest": "最早优先",
+  "mediaSortTitleAsc": "标题 (A-Z)",
+  "mediaSortTitleDesc": "标题 (Z-A)",
   "mediaSortFavoritesFirst": "收藏优先",
   "liveTvSortDialogTitle": "频道排序方式",
   "channelSortPlaylistOrder": "播放列表顺序",

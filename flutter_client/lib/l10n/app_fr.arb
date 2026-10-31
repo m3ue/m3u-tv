@@ -895,6 +895,8 @@
   "mediaSortRating": "Note",
   "mediaSortReleaseDateNewest": "Plus récents d'abord",
   "mediaSortReleaseDateOldest": "Plus anciens d'abord",
+  "mediaSortTitleAsc": "Titre (A-Z)",
+  "mediaSortTitleDesc": "Titre (Z-A)",
   "mediaSortFavoritesFirst": "Favoris en premier",
   "liveTvSortDialogTitle": "Trier les chaînes par",
   "channelSortPlaylistOrder": "Ordre de la playlist",

@@ -1715,6 +1715,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get mediaSortReleaseDateOldest => 'Älteste zuerst';
 
   @override
+  String get mediaSortTitleAsc => 'Titel (A-Z)';
+
+  @override
+  String get mediaSortTitleDesc => 'Titel (Z-A)';
+
+  @override
   String get mediaSortFavoritesFirst => 'Favoriten zuerst';
 
   @override

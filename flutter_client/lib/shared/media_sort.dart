@@ -1,6 +1,7 @@
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
+import 'package:m3u_tv/shared/natural_sort.dart';
 
 /// Maps a persisted/UI [MediaSortOption] to the [CatalogSort] the windowed
 /// SQL query should order by. Kept separate from [MediaSortOption] itself
@@ -15,6 +16,8 @@ CatalogSort catalogSortFor(MediaSortOption option) => switch (option) {
   MediaSortOption.releaseDateAsc => CatalogSort.yearAsc,
   MediaSortOption.recentlyAdded ||
   MediaSortOption.recentlyUpdated => CatalogSort.recentDesc,
+  MediaSortOption.titleAsc => CatalogSort.nameNatural,
+  MediaSortOption.titleDesc => CatalogSort.nameNaturalDesc,
 };
 
 /// The sort button's label: generic "Sort" at the default order (matching
@@ -28,6 +31,8 @@ String mediaSortButtonLabel(AppLocalizations l, MediaSortOption option) =>
       MediaSortOption.releaseDateAsc => l.mediaSortReleaseDateOldest,
       MediaSortOption.recentlyAdded => l.mediaSortRecentlyAdded,
       MediaSortOption.recentlyUpdated => l.mediaSortRecentlyUpdated,
+      MediaSortOption.titleAsc => l.mediaSortTitleAsc,
+      MediaSortOption.titleDesc => l.mediaSortTitleDesc,
     };
 
 /// Sorts a small, fully-materialized list (e.g. a Favorites tab) per
@@ -35,12 +40,13 @@ String mediaSortButtonLabel(AppLocalizations l, MediaSortOption option) =>
 /// [CatalogRepository.pageActiveItems]/[catalogSortFor] instead - this is
 /// only for lists too small to be worth a windowed query.
 ///
-/// [ratingOf]/[yearOf]/[recencyOf] extract the comparison fields from [T] (`VodItem` and
+/// [nameOf]/[ratingOf]/[yearOf]/[recencyOf] extract the comparison fields from [T] (`VodItem` and
 /// `Series` share no common interface for these, so callers supply the
 /// accessors rather than this being generic over a shared base type).
 List<T> sortMediaItems<T>(
   List<T> items,
   MediaSortOption option, {
+  required String Function(T item) nameOf,
   required double? Function(T item) ratingOf,
   required int? Function(T item) yearOf,
   required int? Function(T item) recencyOf,
@@ -72,6 +78,10 @@ List<T> sortMediaItems<T>(
       });
     case MediaSortOption.recentlyAdded || MediaSortOption.recentlyUpdated:
       list.sort((a, b) => (recencyOf(b) ?? -1).compareTo(recencyOf(a) ?? -1));
+    case MediaSortOption.titleAsc:
+      sortByNatural(list, nameOf);
+    case MediaSortOption.titleDesc:
+      sortByNatural(list, nameOf, descending: true);
   }
   return list;
 }

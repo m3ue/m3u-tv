@@ -25,6 +25,8 @@ Future<MediaSortOption?> showMediaSortDialog(
   final l = AppLocalizations.of(context);
   final options = <(IconData, String, MediaSortOption)>[
     (Icons.list_alt, l.mediaSortDefault, MediaSortOption.defaultOrder),
+    (Icons.sort_by_alpha, l.mediaSortTitleAsc, MediaSortOption.titleAsc),
+    (Icons.sort_by_alpha, l.mediaSortTitleDesc, MediaSortOption.titleDesc),
     (Icons.star_rate, l.mediaSortRating, MediaSortOption.ratingDesc),
     (
       Icons.south,

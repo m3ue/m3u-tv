@@ -128,7 +128,13 @@ enum MediaSortOption {
   recentlyAdded('recentlyAdded'),
 
   /// Series only: newest `last_modified` (typically a new episode) first.
-  recentlyUpdated('recentlyUpdated');
+  recentlyUpdated('recentlyUpdated'),
+
+  /// Title in natural order (`compareNatural`), A-Z.
+  titleAsc('titleAsc'),
+
+  /// Title in natural order, Z-A.
+  titleDesc('titleDesc');
 
   const MediaSortOption(this.value);
   final String value;

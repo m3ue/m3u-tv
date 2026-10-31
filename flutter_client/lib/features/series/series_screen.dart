@@ -219,6 +219,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
   List<Series> _sortedFavorites(List<Series> items) => sortMediaItems(
     items,
     _sortOption,
+    nameOf: (item) => item.name,
     ratingOf: (item) => item.rating,
     yearOf: (item) => int.tryParse(item.year ?? ''),
     recencyOf: (item) => item.lastModifiedAt,

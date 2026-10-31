@@ -1654,6 +1654,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mediaSortReleaseDateOldest => '最早优先';
 
   @override
+  String get mediaSortTitleAsc => '标题 (A-Z)';
+
+  @override
+  String get mediaSortTitleDesc => '标题 (Z-A)';
+
+  @override
   String get mediaSortFavoritesFirst => '收藏优先';
 
   @override
