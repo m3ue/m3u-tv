@@ -1062,6 +1062,34 @@ void main() {
       expect(info.containerExtension, 'mkv');
     });
 
+    test(
+      'VOD info is cached for the session and cleared on sign-out',
+      () async {
+        final service = XtreamService(
+          transport: FakeXtreamTransport({
+            'auth': xtreamAuth(auth: 1),
+            'get_vod_info': {
+              'movie_data': {'stream_id': 201, 'name': 'Big Buck Bunny'},
+            },
+          }).call,
+        );
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        expect(service.cachedVodInfo(201), isNull);
+        await service.getVodInfo(201);
+        expect(service.cachedVodInfo(201)?.name, 'Big Buck Bunny');
+
+        service.clearCredentials();
+        expect(service.cachedVodInfo(201), isNull);
+      },
+    );
+
     test('VOD info falls back to root-level Xtream variants', () async {
       final service = XtreamService(
         transport: FakeXtreamTransport({

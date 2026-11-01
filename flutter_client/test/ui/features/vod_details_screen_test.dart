@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/vod/vod_details_screen.dart';
@@ -49,6 +51,38 @@ void main() {
       expect(find.text('Trailer'), findsNothing);
 
       // Flush the palette-generator timeout timer the cover kicks off.
+      await tester.pump(const Duration(seconds: 16));
+    });
+
+    testWidgets('paints session-cached info without the loading bar', (
+      tester,
+    ) async {
+      final refresh = Completer<VodInfo>();
+      await tester.pumpWidget(
+        _TestApp(
+          service: _CachedVodDetailsXtreamService(
+            cached: const VodInfo(
+              id: 201,
+              name: 'Big Buck Bunny',
+              plot: 'Cached synopsis.',
+            ),
+            refresh: refresh.future,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Cached synopsis.'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+
+      refresh.complete(
+        const VodInfo(id: 201, name: 'Big Buck Bunny', plot: 'Fresh synopsis.'),
+      );
+      await tester.pump();
+
+      expect(find.text('Fresh synopsis.'), findsOneWidget);
+
+      // Flush the palette-generator timeout timer.
       await tester.pump(const Duration(seconds: 16));
     });
 
@@ -362,4 +396,17 @@ class _VodDetailsXtreamService extends XtreamService {
 
   @override
   Future<VodInfo> getVodInfo(int vodId) async => info;
+}
+
+class _CachedVodDetailsXtreamService extends XtreamService {
+  _CachedVodDetailsXtreamService({required this.cached, required this.refresh});
+
+  final VodInfo cached;
+  final Future<VodInfo> refresh;
+
+  @override
+  VodInfo? cachedVodInfo(int vodId) => cached;
+
+  @override
+  Future<VodInfo> getVodInfo(int vodId) => refresh;
 }

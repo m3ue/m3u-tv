@@ -1,6 +1,7 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -423,6 +424,12 @@ class XtreamService {
   final Generation _authenticationGeneration = Generation();
   int _liveCategoryCacheSuppressions = 0;
 
+  /// Last `get_vod_info` result per VOD id for this session, so a detail
+  /// screen re-entered (or opened after the Home spotlight already fetched
+  /// it) can paint immediately instead of waiting on another round trip.
+  static const int _vodInfoCacheMaxEntries = 64;
+  final LinkedHashMap<int, VodInfo> _vodInfoCache = LinkedHashMap();
+
   bool get isConfigured => _credentials != null;
 
   /// The IANA timezone name resolved from the server's `server_info.timezone`
@@ -441,12 +448,14 @@ class XtreamService {
     _credentials = snapshot._credentials;
     _serverLocation = snapshot._serverLocation;
     _isM3UEditor = snapshot._isM3UEditor;
+    _vodInfoCache.clear();
     _sessionGeneration.advance();
     _authenticationGeneration.advance();
   }
 
   Future<XtreamAuthResponse> authenticate(UserCredentials credentials) async {
     final authenticationGeneration = _authenticationGeneration.advance();
+    _vodInfoCache.clear();
     _sessionGeneration.advance();
     final normalized = credentials.normalized();
     final response = await _requestWithCredentials(
@@ -534,6 +543,7 @@ class XtreamService {
     _credentials = null;
     _isM3UEditor = false;
     _serverLocation = tz.UTC;
+    _vodInfoCache.clear();
     _sessionGeneration.advance();
     _authenticationGeneration.advance();
   }
@@ -599,12 +609,26 @@ class XtreamService {
   }
 
   Future<VodInfo> getVodInfo(int vodId) async {
+    final sessionGeneration = _sessionGeneration.current;
     final response = await _request(
       'get_vod_info',
       params: {'vod_id': '$vodId'},
     );
-    return VodInfo.fromXtream(_asMap(response));
+    final info = VodInfo.fromXtream(_asMap(response));
+    if (!_sessionGeneration.isStale(sessionGeneration)) {
+      _vodInfoCache
+        ..remove(vodId)
+        ..[vodId] = info;
+      if (_vodInfoCache.length > _vodInfoCacheMaxEntries) {
+        _vodInfoCache.remove(_vodInfoCache.keys.first);
+      }
+    }
+    return info;
   }
+
+  /// The last [getVodInfo] result for [vodId] this session, or null when it
+  /// hasn't been fetched yet.
+  VodInfo? cachedVodInfo(int vodId) => _vodInfoCache[vodId];
 
   /// Fetches an actor's TMDB details and filmography, annotated with which
   /// credits already exist in the current playlist's library. Prefer

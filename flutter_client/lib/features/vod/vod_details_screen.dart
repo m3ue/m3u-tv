@@ -44,16 +44,20 @@ class VodDetailsScreen extends StatefulWidget {
 }
 
 class _VodDetailsScreenState extends State<VodDetailsScreen> {
+  /// Info this session already fetched (by an earlier visit or the Home
+  /// spotlight). Painted straight away while [_future] refreshes it, so
+  /// re-entering a title doesn't sit behind the loading bar again.
+  late final VodInfo? _cachedInfo = widget.xtreamService?.cachedVodInfo(
+    widget.item.id,
+  );
+
   late final Future<VodInfo?>? _future = widget.xtreamService
       ?.getVodInfo(widget.item.id)
       .then((info) {
-        unawaited(
-          _resolveDominantColor(
-            nullIfBlank(info.backdropUrl) ??
-                nullIfBlank(info.coverUrl) ??
-                widget.item.logoUrl,
-          ),
-        );
+        final url = _colorSourceUrl(info);
+        if (_cachedInfo == null || url != _colorSourceUrl(_cachedInfo)) {
+          unawaited(_resolveDominantColor(url));
+        }
         return info;
       });
 
@@ -72,8 +76,15 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
     // poster so this path still gets the colour-match treatment.
     if (_future == null) {
       unawaited(_resolveDominantColor(widget.item.logoUrl));
+    } else if (_cachedInfo case final cached?) {
+      unawaited(_resolveDominantColor(_colorSourceUrl(cached)));
     }
   }
+
+  String? _colorSourceUrl(VodInfo info) =>
+      nullIfBlank(info.backdropUrl) ??
+      nullIfBlank(info.coverUrl) ??
+      widget.item.logoUrl;
 
   /// Extracts a dominant tone from the backdrop (or poster, if no backdrop)
   /// so the hero can bleed it past the image edge, matching the Series
@@ -104,11 +115,14 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
             )
           : FutureBuilder<VodInfo?>(
               future: _future,
+              initialData: _cachedInfo,
               builder: (context, snapshot) {
                 return _VodDetailsBody(
                   item: widget.item,
-                  info: snapshot.hasError ? null : snapshot.data,
-                  isLoading: snapshot.connectionState != ConnectionState.done,
+                  info: snapshot.hasError ? _cachedInfo : snapshot.data,
+                  isLoading:
+                      snapshot.connectionState != ConnectionState.done &&
+                      !snapshot.hasData,
                   progressList: widget.progressList,
                   onPlay: widget.onPlay,
                   onOpenRelated: widget.onOpenRelated,
