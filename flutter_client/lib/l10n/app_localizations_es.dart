@@ -699,6 +699,57 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsDisconnectConfirm => 'Desconectar';
 
   @override
+  String get settingsPlaylists => 'Listas de reproducción';
+
+  @override
+  String get settingsPlaylistActive => 'Lista de reproducción activa';
+
+  @override
+  String get settingsAddPlaylist => 'Añadir lista de reproducción';
+
+  @override
+  String get settingsSwitchPlaylist => 'Cambiar a esta lista de reproducción';
+
+  @override
+  String get settingsRenamePlaylist => 'Cambiar nombre';
+
+  @override
+  String get settingsRemovePlaylist => 'Eliminar lista de reproducción';
+
+  @override
+  String get settingsRemovePlaylistTitle => '¿Eliminar lista de reproducción?';
+
+  @override
+  String settingsRemovePlaylistBody(String name) {
+    return '$name se eliminará de este dispositivo. Puedes volver a añadirla en cualquier momento.';
+  }
+
+  @override
+  String get settingsDisconnectBodyOtherPlaylists =>
+      'Se cerrará la sesión de esta lista de reproducción y se eliminará de este dispositivo. Tus otras listas de reproducción guardadas seguirán disponibles para volver a conectarte.';
+
+  @override
+  String get settingsPlaylistNameLabel => 'Nombre';
+
+  @override
+  String get settingsSave => 'Guardar';
+
+  @override
+  String settingsSwitchPlaylistFailed(String error) {
+    return 'No se pudo cambiar de lista de reproducción: $error';
+  }
+
+  @override
+  String get settingsTabSaved => 'Guardadas';
+
+  @override
+  String get settingsSavedPlaylistsTitle => 'Listas de reproducción guardadas';
+
+  @override
+  String get settingsSavedPlaylistsSubtitle =>
+      'Vuelve a conectarte a una lista de reproducción guardada en este dispositivo, o añade una nueva desde Vincular o Iniciar sesión.';
+
+  @override
   String get settingsApp => 'Aplicación';
 
   @override

@@ -29,6 +29,7 @@ import 'package:m3u_tv/services/push_notification_service.dart';
 import 'package:m3u_tv/services/requests_coordinator.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/reverb_service.dart';
+import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
@@ -76,6 +77,7 @@ class AppStateController extends ChangeNotifier {
     DevicePairingService? devicePairingService,
     DeviceIdentityService? deviceIdentityService,
     ViewSettingsService? viewSettingsService,
+    SavedPlaylistsService? savedPlaylistsService,
   }) {
     final store = persistentStore ?? PersistentJsonStore();
     final resolvedSecureStorage =
@@ -152,6 +154,9 @@ class AppStateController extends ChangeNotifier {
           pushNotificationService ?? PushNotificationService(),
       viewSettingsService:
           viewSettingsService ?? ViewSettingsService(store: store),
+      savedPlaylists:
+          savedPlaylistsService ??
+          SavedPlaylistsService(storage: resolvedSecureStorage),
     );
   }
 
@@ -181,6 +186,7 @@ class AppStateController extends ChangeNotifier {
     required this.introDbSettings,
     required this._pushNotificationService,
     required this.viewSettingsService,
+    required this.savedPlaylists,
   }) {
     epgService
       ..cacheTtl = cacheService.refreshInterval
@@ -203,8 +209,37 @@ class AppStateController extends ChangeNotifier {
         _captureAioFavoriteMutationOwnership;
     aioFavoritesService.onAdded = _pushAioFavoriteAdded;
     aioFavoritesService.onRemoved = _pushAioFavoriteRemoved;
+    favoritesService.playlistScope = _playlistScope;
+    vodFavoritesService.playlistScope = _playlistScope;
+    seriesFavoritesService.playlistScope = _playlistScope;
+    aioFavoritesService.playlistScope = _playlistScope;
+    proxyPlaybackSettings.playlistScope = _playlistScope;
     authNotifier.addListener(_registerLogSecrets);
     _registerLogSecrets();
+  }
+
+  /// The login whose content is on screen. Unlike `authNotifier.credentials`
+  /// it only moves when a session is published, so mid-switch (the incoming
+  /// login authenticated, its catalog still loading) the outgoing playlist's
+  /// favorites and proxy preferences stay in effect.
+  UserCredentials? _publishedLogin;
+
+  /// The scope the shown playlist's local state is stored under.
+  String? _playlistScope() => savedPlaylists.scopeFor(_publishedLogin);
+
+  void _publishLogin(UserCredentials? credentials) {
+    final previousScope = _playlistScope();
+    _publishedLogin = credentials;
+    final scope = _playlistScope();
+    // Proxy preferences are held in memory: load the shown playlist's.
+    if (!proxyPlaybackSettings.isLoadedFor(scope)) {
+      unawaited(proxyPlaybackSettings.load());
+    }
+    if (scope == previousScope) return;
+    favoritesService.notifyPlaylistChanged();
+    vodFavoritesService.notifyPlaylistChanged();
+    seriesFavoritesService.notifyPlaylistChanged();
+    aioFavoritesService.notifyPlaylistChanged();
   }
 
   /// Scrubs the active username/password from every captured log line, on
@@ -253,6 +288,9 @@ class AppStateController extends ChangeNotifier {
   final ComskipSettings comskipSettings;
   final IntroDbSettings introDbSettings;
   final ViewSettingsService viewSettingsService;
+
+  /// The playlists (editor logins) saved on this device.
+  final SavedPlaylistsService savedPlaylists;
   final TvNotificationService _tvNotificationService;
   final TvNotificationStore notificationStore;
   final ReverbService _reverbService;
@@ -448,7 +486,7 @@ class AppStateController extends ChangeNotifier {
     credentials: () => authNotifier.credentials,
     captureAppOwnership: _captureAppOwnership,
     sessionHandlers: _notificationSessionHandlers,
-    signOut: disconnect,
+    signOut: signOutDevice,
     runInBackground: _runBackgroundPersistence,
     notifyListeners: notifyListeners,
   );
@@ -543,7 +581,6 @@ class AppStateController extends ChangeNotifier {
     _error = null;
     notifyListeners();
     unawaited(traktService.init());
-    unawaited(proxyPlaybackSettings.load());
     unawaited(comskipSettings.load());
     unawaited(introDbSettings.load());
 
@@ -575,11 +612,19 @@ class AppStateController extends ChangeNotifier {
       }
     }
 
+    final playlistsLoaded = savedPlaylists.load();
     final savedSource = await _readSavedSourceType();
     // Read saved credentials off disk without a network handshake so cached
     // content can be painted before the live credential check completes.
     final credentials = await authNotifier.loadSavedCredentialsOffline();
+    // The active playlist decides which favorites and proxy preferences are
+    // read from here on, so the saved list has to be in first.
+    await playlistsLoaded;
+    // A login from before multiple playlists existed is saved here, keeping
+    // its state on the unscoped keys. No-op once saved.
+    if (credentials != null) await _rememberPlaylist(credentials);
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
+    _publishLogin(credentials);
 
     if (credentials != null) {
       _epg.resetSession();
@@ -665,6 +710,7 @@ class AppStateController extends ChangeNotifier {
           activeViewer,
           sourceGeneration: sourceGeneration,
           viewerGeneration: viewerGeneration,
+          scope: _playlistScope(),
         ),
       );
       _runBackgroundPersistence(
@@ -832,12 +878,21 @@ class AppStateController extends ChangeNotifier {
       notifyListeners();
     }
     if (loaded && isCurrent) {
+      await _rememberPlaylist(credentials);
       _runBackgroundPersistence(
         _notifications.connect(credentials, notificationGeneration),
       );
       await _notifications.registerPushToken(credentials);
     }
     return loaded && isCurrent;
+  }
+
+  Future<void> _rememberPlaylist(UserCredentials credentials) async {
+    try {
+      await savedPlaylists.remember(credentials);
+    } on Object catch (error) {
+      debugPrint('Saved playlists: could not save the login: $error');
+    }
   }
 
   Future<void> _restoreSource(String? source) async {
@@ -1115,10 +1170,13 @@ class AppStateController extends ChangeNotifier {
   /// one shared local list before server sync existed) and so just pulls.
   /// After that one-time reconciliation, the server is authoritative and
   /// every call here simply replaces the local cache with `get_favorites`.
+  /// [scope] is the playlist whose local favorites are synced: the shown one,
+  /// or the incoming one while a switch stages it.
   Future<bool> _syncFavoritesForActiveViewer(
     Viewer viewer, {
     required int sourceGeneration,
     required int viewerGeneration,
+    required String? scope,
     bool Function()? ownsWork,
   }) async {
     bool isCurrent() =>
@@ -1134,13 +1192,17 @@ class AppStateController extends ChangeNotifier {
       if (!isCurrent()) return false;
       if (!migrated.contains(viewer.ulid)) {
         final synchronized = viewer.isAdmin && migrated.isEmpty
-            ? await _pushLocalFavoritesOnce(viewer, isCurrent: isCurrent)
-            : await _pullFavorites(viewer, isCurrent: isCurrent);
+            ? await _pushLocalFavoritesOnce(
+                viewer,
+                isCurrent: isCurrent,
+                scope: scope,
+              )
+            : await _pullFavorites(viewer, isCurrent: isCurrent, scope: scope);
         if (!synchronized || !isCurrent()) return false;
         await _markFavoritesMigrated(viewer.ulid, isCurrent: isCurrent);
         return isCurrent();
       }
-      return await _pullFavorites(viewer, isCurrent: isCurrent);
+      return await _pullFavorites(viewer, isCurrent: isCurrent, scope: scope);
     } on Object catch (error) {
       debugPrint('Favorites: sync failed for viewer ${viewer.ulid}: $error');
       return false;
@@ -1150,14 +1212,15 @@ class AppStateController extends ChangeNotifier {
   Future<bool> _pushLocalFavoritesOnce(
     Viewer viewer, {
     required bool Function() isCurrent,
+    required String? scope,
   }) async {
-    final live = await favoritesService.all();
+    final live = await favoritesService.allIn(scope);
     if (!isCurrent()) return false;
-    final vod = await vodFavoritesService.all();
+    final vod = await vodFavoritesService.allIn(scope);
     if (!isCurrent()) return false;
-    final series = await seriesFavoritesService.all();
+    final series = await seriesFavoritesService.allIn(scope);
     if (!isCurrent()) return false;
-    final aio = await aioFavoritesService.all();
+    final aio = await aioFavoritesService.allIn(scope);
     if (!isCurrent()) return false;
     final payload = <Map<String, Object?>>[
       for (final id in live) {'content_type': 'live', 'stream_id': id},
@@ -1176,22 +1239,24 @@ class AppStateController extends ChangeNotifier {
     if (!isCurrent()) return false;
     final merged = await xtreamService.syncFavorites(viewer.ulid, payload);
     if (!isCurrent()) return false;
-    return _applyServerFavorites(merged, isCurrent: isCurrent);
+    return _applyServerFavorites(merged, isCurrent: isCurrent, scope: scope);
   }
 
   Future<bool> _pullFavorites(
     Viewer viewer, {
     required bool Function() isCurrent,
+    required String? scope,
   }) async {
     if (!isCurrent()) return false;
     final favorites = await xtreamService.getFavorites(viewer.ulid);
     if (!isCurrent()) return false;
-    return _applyServerFavorites(favorites, isCurrent: isCurrent);
+    return _applyServerFavorites(favorites, isCurrent: isCurrent, scope: scope);
   }
 
   Future<bool> _applyServerFavorites(
     List<Map<String, Object?>> favorites, {
     required bool Function() isCurrent,
+    required String? scope,
   }) async {
     final live = <int>{};
     final vod = <int>{};
@@ -1226,19 +1291,32 @@ class AppStateController extends ChangeNotifier {
       }
     }
     if (!isCurrent()) return false;
-    if (!await favoritesService.replaceAll(live, shouldCommit: isCurrent)) {
+    if (!await favoritesService.replaceAllIn(
+      scope,
+      live,
+      shouldCommit: isCurrent,
+    )) {
       return false;
     }
-    if (!await vodFavoritesService.replaceAll(vod, shouldCommit: isCurrent)) {
+    if (!await vodFavoritesService.replaceAllIn(
+      scope,
+      vod,
+      shouldCommit: isCurrent,
+    )) {
       return false;
     }
-    if (!await seriesFavoritesService.replaceAll(
+    if (!await seriesFavoritesService.replaceAllIn(
+      scope,
       series,
       shouldCommit: isCurrent,
     )) {
       return false;
     }
-    return aioFavoritesService.replaceAll(aio, shouldCommit: isCurrent);
+    return aioFavoritesService.replaceAllIn(
+      scope,
+      aio,
+      shouldCommit: isCurrent,
+    );
   }
 
   Future<Set<String>> _readMigratedFavoriteViewers() async {
@@ -1265,7 +1343,16 @@ class AppStateController extends ChangeNotifier {
     );
   }
 
-  Future<void> disconnect() async {
+  /// Signs out of the active playlist and removes it from this device. Any
+  /// other saved playlists stay available on the connect screen.
+  Future<void> disconnect() => _signOut(forgetAllPlaylists: false);
+
+  /// Signs this device out of every saved playlist. An admin revoking the
+  /// device in the editor applies to the device, not to one playlist.
+  Future<void> signOutDevice() => _signOut(forgetAllPlaylists: true);
+
+  Future<void> _signOut({required bool forgetAllPlaylists}) async {
+    final signedOutPlaylist = savedPlaylists.find(authNotifier.credentials);
     final sourceGeneration = _sourceOperationGeneration.advance();
     _sourceRollbackGeneration.advance();
     _isLoadingContent = false;
@@ -1283,6 +1370,15 @@ class AppStateController extends ChangeNotifier {
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     await secureStorage.delete(_sourceKey);
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
+    _publishLogin(null);
+    // Before the final notify, so the connect screen never lists a playlist
+    // that was just signed out of.
+    if (forgetAllPlaylists) {
+      await _forgetAllPlaylists();
+    } else if (signedOutPlaylist != null) {
+      await _forgetPlaylist(signedOutPlaylist);
+    }
+    if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     // cacheService.clear() above emptied the stored guide, but a sweep write
     // can still land during the awaits since; wipe again behind it.
     _epg.resetSession(wipeStore: true);
@@ -1298,6 +1394,87 @@ class AppStateController extends ChangeNotifier {
     _progressList = const <Progress>[];
     _error = null;
     notifyListeners();
+  }
+
+  /// Switches to the playlist for [credentials], saving it if it is new.
+  /// Returns null once it is active, else the error to show. A failed switch
+  /// leaves the current playlist running, without the failed attempt's error
+  /// left on it.
+  Future<String?> switchToPlaylist(UserCredentials credentials) async {
+    final normalized = credentials.normalized();
+    if (isConfigured && sameCredentials(authNotifier.credentials, normalized)) {
+      return null;
+    }
+    final hadSession = isConfigured;
+    final previousError = _error;
+    final switching = connectXtream(normalized);
+    // connectXtream advances the generation before its first await.
+    final sourceGeneration = _sourceOperationGeneration.current;
+    if (await switching) return null;
+    final message = error ?? '';
+    if (hadSession &&
+        !_disposed &&
+        !_sourceOperationGeneration.isStale(sourceGeneration)) {
+      _error = previousError;
+      authNotifier.clearError();
+      notifyListeners();
+    }
+    return message;
+  }
+
+  /// Removes a saved playlist. Removing the active one signs out of it, the
+  /// same as [disconnect].
+  Future<void> removePlaylist(String id) async {
+    final playlist = savedPlaylists.byId(id);
+    if (playlist == null) return;
+    if (savedPlaylists.find(authNotifier.credentials)?.id == id) {
+      await disconnect();
+      return;
+    }
+    await _forgetPlaylist(playlist);
+  }
+
+  /// Sets a saved playlist's label; null or blank restores the default.
+  Future<void> renamePlaylist(String id, String? name) =>
+      savedPlaylists.rename(id, name);
+
+  /// Removes [playlist] from this device along with its local state. The
+  /// exception is the last playlist on the unscoped keys: its state stays,
+  /// as a sign-out always left it before multiple playlists existed.
+  Future<void> _forgetPlaylist(SavedPlaylist playlist) async {
+    try {
+      await savedPlaylists.remove(playlist.id);
+      if (playlist.usesBaseKeys && savedPlaylists.playlists.isEmpty) return;
+      await _clearPlaylistState(playlist);
+    } on Object catch (error) {
+      debugPrint('Saved playlists: could not remove a playlist: $error');
+    }
+  }
+
+  Future<void> _forgetAllPlaylists() async {
+    final playlists = savedPlaylists.playlists;
+    try {
+      await savedPlaylists.clear();
+      for (final playlist in playlists) {
+        if (!playlist.usesBaseKeys) await _clearPlaylistState(playlist);
+      }
+    } on Object catch (error) {
+      debugPrint('Saved playlists: could not clear saved playlists: $error');
+    }
+  }
+
+  Future<void> _clearPlaylistState(SavedPlaylist playlist) async {
+    final scope = playlist.scope;
+    await Future.wait(<Future<void>>[
+      favoritesService.clearPlaylistState(scope),
+      vodFavoritesService.clearPlaylistState(scope),
+      seriesFavoritesService.clearPlaylistState(scope),
+      aioFavoritesService.clearPlaylistState(scope),
+      proxyPlaybackSettings.clearPlaylistState(scope),
+      viewerService.forgetActiveViewer(
+        loginKey: _loginKeyFor(playlist.credentials, scope),
+      ),
+    ]);
   }
 
   Duration get epgRefreshInterval => epgService.cacheTtl;
@@ -1422,6 +1599,7 @@ class AppStateController extends ChangeNotifier {
         viewer,
         sourceGeneration: sourceGeneration,
         viewerGeneration: viewerGeneration,
+        scope: _playlistScope(),
       ),
     );
   }
@@ -1623,6 +1801,10 @@ class AppStateController extends ChangeNotifier {
           ? _progressList
           : fetched;
 
+      // The playlist being loaded: the shown one on a refresh, the incoming
+      // one on a switch, whose favorites are staged before it is shown.
+      final targetScope = savedPlaylists.scopeFor(authNotifier.credentials);
+
       Future<bool> commit() async {
         if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
         try {
@@ -1684,6 +1866,7 @@ class AppStateController extends ChangeNotifier {
                   activeViewer,
                   sourceGeneration: sourceGeneration,
                   viewerGeneration: viewerGeneration,
+                  scope: targetScope,
                   ownsWork: ownsReplacement,
                 );
             if (!ownsReplacement()) {
@@ -1694,6 +1877,7 @@ class AppStateController extends ChangeNotifier {
                 !await _applyServerFavorites(
                   const <Map<String, Object?>>[],
                   isCurrent: ownsReplacement,
+                  scope: targetScope,
                 )) {
               await rollbackSource?.call();
               return false;
@@ -1709,6 +1893,7 @@ class AppStateController extends ChangeNotifier {
             );
           }
           _sourceType = AppSourceType.xtream;
+          _publishLogin(authNotifier.credentials);
           _liveCategories = liveCategories;
           _vodCategories = vodCategories;
           _seriesCategories = seriesCategories;
@@ -1735,6 +1920,7 @@ class AppStateController extends ChangeNotifier {
                   activeViewer,
                   sourceGeneration: sourceGeneration,
                   viewerGeneration: viewerGeneration,
+                  scope: targetScope,
                 ),
               );
             }
@@ -1889,6 +2075,7 @@ class AppStateController extends ChangeNotifier {
           currentViewer,
           sourceGeneration: _sourceOperationGeneration.current,
           viewerGeneration: _viewerOperationGeneration.current,
+          scope: _playlistScope(),
         ),
       );
     }
@@ -2133,14 +2320,20 @@ class AppStateController extends ChangeNotifier {
     return redacted;
   }
 
-  // Scopes ViewerService's saved active-viewer ulid to this server+login so
-  // switching logins on the same device can never reuse a viewer ulid saved
-  // under a different login.
   String? _currentLoginKey() {
     final credentials = authNotifier.credentials;
     if (credentials == null) return null;
-    return '${credentials.server}|${credentials.username}';
+    return _loginKeyFor(credentials, savedPlaylists.scopeFor(credentials));
   }
+
+  // Scopes ViewerService's saved active-viewer ulid to one playlist so
+  // switching can never reuse a viewer ulid saved under another. Owner
+  // default logins share a username across playlists, so server+login alone
+  // is not enough; the first playlist on a device keeps that original key.
+  static String _loginKeyFor(UserCredentials credentials, String? scope) =>
+      scope == null
+      ? '${credentials.server}|${credentials.username}'
+      : 'playlist_$scope';
 
   @override
   void dispose() {

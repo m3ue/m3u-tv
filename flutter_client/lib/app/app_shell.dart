@@ -21,6 +21,7 @@ import 'package:m3u_tv/features/player/resume_modal.dart';
 import 'package:m3u_tv/features/requests/request_screen.dart';
 import 'package:m3u_tv/features/search/search_screen.dart';
 import 'package:m3u_tv/features/series/series_screen.dart';
+import 'package:m3u_tv/features/settings/sections/playlists_page.dart';
 import 'package:m3u_tv/features/settings/settings_screen.dart';
 import 'package:m3u_tv/features/vod/vod_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -1721,6 +1722,12 @@ class AppShellState extends ConsumerState<AppShell>
           comskipSettings: _appState.comskipSettings,
           introDbSettings: _appState.introDbSettings,
           onHandleTopLevelBack: handleBackFromTopLevelRoute,
+          playlists: PlaylistManagement(
+            service: _appState.savedPlaylists,
+            onSwitch: _appState.switchToPlaylist,
+            onRename: _appState.renamePlaylist,
+            onRemove: _appState.removePlaylist,
+          ),
         ),
       ),
       _ => PlaceholderScreen(title: AppLocalizations.of(context).navHome),

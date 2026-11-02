@@ -273,6 +273,35 @@
   "settingsDisconnectTitle": "Se déconnecter ?",
   "settingsDisconnectBody": "Vous serez déconnecté et devrez saisir à nouveau vos identifiants pour vous reconnecter.",
   "settingsDisconnectConfirm": "Déconnecter",
+  "settingsPlaylists": "Playlists",
+  "settingsPlaylistActive": "Playlist active",
+  "settingsAddPlaylist": "Ajouter une playlist",
+  "settingsSwitchPlaylist": "Passer à cette playlist",
+  "settingsRenamePlaylist": "Renommer la playlist",
+  "settingsRemovePlaylist": "Supprimer la playlist",
+  "settingsRemovePlaylistTitle": "Supprimer la playlist ?",
+  "settingsRemovePlaylistBody": "{name} sera supprimée de cet appareil. Vous pourrez l'ajouter à nouveau à tout moment.",
+  "@settingsRemovePlaylistBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsDisconnectBodyOtherPlaylists": "Vous serez déconnecté de cette playlist et elle sera supprimée de cet appareil. Vos autres playlists enregistrées restent disponibles pour vous reconnecter.",
+  "settingsPlaylistNameLabel": "Nom",
+  "settingsSave": "Enregistrer",
+  "settingsSwitchPlaylistFailed": "Impossible de changer de playlist : {error}",
+  "@settingsSwitchPlaylistFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsTabSaved": "Enregistrées",
+  "settingsSavedPlaylistsTitle": "Playlists enregistrées",
+  "settingsSavedPlaylistsSubtitle": "Reconnectez-vous à une playlist enregistrée sur cet appareil, ou ajoutez-en une nouvelle via Coupler ou Connexion.",
   "settingsApp": "Application",
   "settingsAppVersion": "Version",
   "settingsAppUpdateStatus": "Mise à jour",

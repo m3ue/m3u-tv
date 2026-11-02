@@ -3,6 +3,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
+import 'package:m3u_tv/services/saved_playlists_service.dart';
 
 typedef FavoritesMutationOwnership = bool Function();
 typedef FavoritesMutationOwnershipCapture =
@@ -36,20 +37,31 @@ class FavoritesService extends ChangeNotifier {
 
   FavoritesMutationOwnershipCapture? captureMutationOwnership;
 
+  /// Keeps each saved playlist's favorites apart (see [playlistScopedKey]).
+  /// Unset, or resolving to null, uses the unscoped key.
+  PlaylistScope? playlistScope;
+
+  /// The key for the active playlist, captured when a mutation is queued so
+  /// it can never land in a playlist that became active after it started.
+  String get _scopedFavoritesKey =>
+      playlistScopedKey(_favoritesKey, playlistScope?.call());
+
   Future<bool> add(int streamId) {
     final shouldCommit = captureMutationOwnership?.call() ?? () => true;
+    final key = _scopedFavoritesKey;
     return _mutationQueue.run(
-      () => _add(streamId, shouldCommit: shouldCommit),
+      () => _add(streamId, key: key, shouldCommit: shouldCommit),
     );
   }
 
   Future<bool> _add(
     int streamId, {
+    required String key,
     required FavoritesMutationOwnership shouldCommit,
   }) async {
-    final ids = await all();
+    final ids = await _readIds(key);
     ids.add(streamId);
-    if (!await _writeIf(_favoritesKey, ids.toList()..sort(), shouldCommit)) {
+    if (!await _writeIf(key, ids.toList()..sort(), shouldCommit)) {
       return false;
     }
     if (!shouldCommit()) return false;
@@ -60,18 +72,20 @@ class FavoritesService extends ChangeNotifier {
 
   Future<bool> remove(int streamId) {
     final shouldCommit = captureMutationOwnership?.call() ?? () => true;
+    final key = _scopedFavoritesKey;
     return _mutationQueue.run(
-      () => _remove(streamId, shouldCommit: shouldCommit),
+      () => _remove(streamId, key: key, shouldCommit: shouldCommit),
     );
   }
 
   Future<bool> _remove(
     int streamId, {
+    required String key,
     required FavoritesMutationOwnership shouldCommit,
   }) async {
-    final ids = await all();
+    final ids = await _readIds(key);
     ids.remove(streamId);
-    if (!await _writeIf(_favoritesKey, ids.toList()..sort(), shouldCommit)) {
+    if (!await _writeIf(key, ids.toList()..sort(), shouldCommit)) {
       return true;
     }
     if (!shouldCommit()) return true;
@@ -82,11 +96,12 @@ class FavoritesService extends ChangeNotifier {
 
   Future<bool> toggle(int streamId) {
     final shouldCommit = captureMutationOwnership?.call() ?? () => true;
+    final key = _scopedFavoritesKey;
     return _mutationQueue.run(() async {
-      if ((await all()).contains(streamId)) {
-        return _remove(streamId, shouldCommit: shouldCommit);
+      if ((await _readIds(key)).contains(streamId)) {
+        return _remove(streamId, key: key, shouldCommit: shouldCommit);
       }
-      return _add(streamId, shouldCommit: shouldCommit);
+      return _add(streamId, key: key, shouldCommit: shouldCommit);
     });
   }
 
@@ -99,11 +114,12 @@ class FavoritesService extends ChangeNotifier {
   }) {
     final capturedOwnership = captureMutationOwnership?.call();
     final canCommit = _combineOwnership(capturedOwnership, shouldCommit);
+    final key = _scopedFavoritesKey;
     return _mutationQueue.run(() async {
-      final ids = await all();
+      final ids = await _readIds(key);
       final changed = favorited ? ids.add(streamId) : ids.remove(streamId);
       if (!changed) return;
-      if (!await _writeIf(_favoritesKey, ids.toList()..sort(), canCommit)) {
+      if (!await _writeIf(key, ids.toList()..sort(), canCommit)) {
         return;
       }
       if (!canCommit()) return;
@@ -117,12 +133,25 @@ class FavoritesService extends ChangeNotifier {
   Future<bool> replaceAll(
     Iterable<int> streamIds, {
     bool Function()? shouldCommit,
+  }) => replaceAllIn(
+    playlistScope?.call(),
+    streamIds,
+    shouldCommit: shouldCommit,
+  );
+
+  /// [replaceAll] for the playlist with [scope] rather than the active one:
+  /// a switch stages the incoming playlist's favorites before it is shown.
+  Future<bool> replaceAllIn(
+    String? scope,
+    Iterable<int> streamIds, {
+    bool Function()? shouldCommit,
   }) {
     final capturedOwnership = captureMutationOwnership?.call();
     final canCommit = _combineOwnership(capturedOwnership, shouldCommit);
+    final key = playlistScopedKey(_favoritesKey, scope);
     return _mutationQueue.run(() async {
       final value = streamIds.toSet().toList()..sort();
-      if (!await _writeIf(_favoritesKey, value, canCommit)) return false;
+      if (!await _writeIf(key, value, canCommit)) return false;
       if (!canCommit()) return false;
       notifyListeners();
       return true;
@@ -132,8 +161,26 @@ class FavoritesService extends ChangeNotifier {
   Future<bool> isFavorite(int streamId) async =>
       (await all()).contains(streamId);
 
-  Future<Set<int>> all() async {
-    final raw = await _read(_favoritesKey);
+  Future<Set<int>> all() => _readIds(_scopedFavoritesKey);
+
+  /// [all] for the playlist with [scope] rather than the active one.
+  Future<Set<int>> allIn(String? scope) =>
+      _readIds(playlistScopedKey(_favoritesKey, scope));
+
+  /// Tells listeners the active playlist changed, so the favorites they read
+  /// are now another playlist's.
+  void notifyPlaylistChanged() => notifyListeners();
+
+  /// Drops the favorites stored for a removed playlist's [scope].
+  Future<void> clearPlaylistState(String? scope) =>
+      _mutationQueue.run(() async {
+        final key = playlistScopedKey(_favoritesKey, scope);
+        _memory.remove(key);
+        await _store?.delete(key);
+      });
+
+  Future<Set<int>> _readIds(String key) async {
+    final raw = await _read(key);
     if (raw is Iterable) return raw.map((value) => int.parse('$value')).toSet();
     return <int>{};
   }

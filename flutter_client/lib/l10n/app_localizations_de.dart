@@ -698,6 +698,57 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsDisconnectConfirm => 'Trennen';
 
   @override
+  String get settingsPlaylists => 'Playlists';
+
+  @override
+  String get settingsPlaylistActive => 'Aktive Playlist';
+
+  @override
+  String get settingsAddPlaylist => 'Playlist hinzufügen';
+
+  @override
+  String get settingsSwitchPlaylist => 'Zu dieser Playlist wechseln';
+
+  @override
+  String get settingsRenamePlaylist => 'Playlist umbenennen';
+
+  @override
+  String get settingsRemovePlaylist => 'Playlist entfernen';
+
+  @override
+  String get settingsRemovePlaylistTitle => 'Playlist entfernen?';
+
+  @override
+  String settingsRemovePlaylistBody(String name) {
+    return '$name wird von diesem Gerät entfernt. Du kannst sie jederzeit wieder hinzufügen.';
+  }
+
+  @override
+  String get settingsDisconnectBodyOtherPlaylists =>
+      'Du wirst von dieser Playlist abgemeldet und sie wird von diesem Gerät entfernt. Deine anderen gespeicherten Playlists bleiben zum erneuten Verbinden verfügbar.';
+
+  @override
+  String get settingsPlaylistNameLabel => 'Name';
+
+  @override
+  String get settingsSave => 'Speichern';
+
+  @override
+  String settingsSwitchPlaylistFailed(String error) {
+    return 'Playlist konnte nicht gewechselt werden: $error';
+  }
+
+  @override
+  String get settingsTabSaved => 'Gespeichert';
+
+  @override
+  String get settingsSavedPlaylistsTitle => 'Gespeicherte Playlists';
+
+  @override
+  String get settingsSavedPlaylistsSubtitle =>
+      'Verbinde dich wieder mit einer auf diesem Gerät gespeicherten Playlist oder füge über Koppeln oder Anmelden eine neue hinzu.';
+
+  @override
   String get settingsApp => 'App';
 
   @override

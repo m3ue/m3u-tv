@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
 import 'package:m3u_tv/features/settings/sections/connected_view.dart';
 import 'package:m3u_tv/features/settings/sections/connection_section.dart';
+import 'package:m3u_tv/features/settings/sections/playlists_page.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
@@ -12,6 +13,7 @@ import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
+import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 
@@ -46,6 +48,7 @@ class SettingsScreen extends StatefulWidget {
     this.viewSettingsService,
     this.deviceType,
     this.onHandleTopLevelBack,
+    this.playlists,
   });
 
   final AuthNotifier authNotifier;
@@ -90,6 +93,10 @@ class SettingsScreen extends StatefulWidget {
   /// `AppShellState.handleBackFromTopLevelRoute` and `settings_ui.dart`'s
   /// `_withTopLevelBackHandling`).
   final bool Function()? onHandleTopLevelBack;
+
+  /// Playlists saved on this device: listed on the connect screen when
+  /// signed out, and managed from Settings > Account when connected.
+  final PlaylistManagement? playlists;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -151,6 +158,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               widget.authNotifier.error,
           devicePairingService: widget.devicePairingService,
           deviceType: widget.deviceType,
+          savedPlaylists:
+              widget.playlists?.service.playlists ?? const <SavedPlaylist>[],
         ),
       );
     }
@@ -182,6 +191,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         viewSettingsService: widget.viewSettingsService,
         deviceType: widget.deviceType,
         onHandleTopLevelBack: widget.onHandleTopLevelBack,
+        playlists: widget.playlists,
+        devicePairingService: widget.devicePairingService,
+        onPlaylistSwitched: widget.onConnected,
       ),
     );
   }

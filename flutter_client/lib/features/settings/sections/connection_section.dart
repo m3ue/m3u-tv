@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
+import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
@@ -28,6 +30,7 @@ class ConnectionFormBody extends StatefulWidget {
     this.error,
     this.devicePairingService,
     this.deviceType,
+    this.savedPlaylists = const <SavedPlaylist>[],
   });
 
   final Future<void> Function(UserCredentials credentials) onConnect;
@@ -36,12 +39,16 @@ class ConnectionFormBody extends StatefulWidget {
   final DevicePairingService? devicePairingService;
   final DeviceType? deviceType;
 
+  /// Playlists already saved on this device, offered for one-step reconnect
+  /// ahead of pairing or signing in.
+  final List<SavedPlaylist> savedPlaylists;
+
   @override
   State<ConnectionFormBody> createState() => _ConnectionFormBodyState();
 }
 
 class _ConnectionFormBodyState extends State<ConnectionFormBody>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   /// Non-null when this web build is served by the editor itself at
   /// /m3u-tv/ - the server URL is that editor's own origin, not something
   /// the user should have to type or be able to change.
@@ -55,15 +62,29 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
   late final _passwordController = TextEditingController(
     text: widget.initialValues?.password,
   );
-  late final TabController _tabController;
+  late TabController _tabController;
   String? _validationError;
   bool _pairing = false;
+
+  bool get _hasSavedPlaylists => widget.savedPlaylists.isNotEmpty;
+
+  TabController _createTabController() =>
+      TabController(length: _hasSavedPlaylists ? 3 : 2, vsync: this);
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = _createTabController();
     widget.devicePairingService?.addListener(_onPairingChanged);
+  }
+
+  @override
+  void didUpdateWidget(ConnectionFormBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.savedPlaylists.isNotEmpty != _hasSavedPlaylists) {
+      _tabController.dispose();
+      _tabController = _createTabController();
+    }
   }
 
   @override
@@ -174,8 +195,12 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
             ),
             const SizedBox(height: 24),
             _buildError(theme, displayError),
+            if (_hasSavedPlaylists) ...[
+              _buildSavedPlaylists(),
+              const SizedBox(height: 24),
+            ],
             _buildCredentialHelp(theme, l),
-            ..._buildSignInFields(l, autofocusServer: true),
+            ..._buildSignInFields(l, autofocusServer: !_hasSavedPlaylists),
           ],
         ),
       );
@@ -185,12 +210,39 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
       children: [
         DpadTabBar(
           controller: _tabController,
-          tabs: [l.settingsTabPair, l.settingsTabSignIn],
+          tabs: [
+            if (_hasSavedPlaylists) l.settingsTabSaved,
+            l.settingsTabPair,
+            l.settingsTabSignIn,
+          ],
         ),
         Expanded(
           child: DpadTabBarView(
             controller: _tabController,
             children: [
+              if (_hasSavedPlaylists)
+                SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        l.settingsSavedPlaylistsTitle,
+                        style: theme.textTheme.headlineMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        l.settingsSavedPlaylistsSubtitle,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      _buildError(theme, displayError),
+                      _buildSavedPlaylists(),
+                    ],
+                  ),
+                ),
               SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Column(
@@ -269,6 +321,25 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildSavedPlaylists() {
+    final playlists = widget.savedPlaylists;
+    return SettingsGroup(
+      children: [
+        for (var i = 0; i < playlists.length; i++)
+          SettingsRow(
+            title: playlistDisplayName(playlists[i], playlists),
+            subtitle: playlists[i].name == null
+                ? null
+                : playlistDefaultName(playlists[i], playlists),
+            icon: Icons.playlist_play,
+            autofocus: i == 0,
+            trailing: const SettingsChevron(),
+            onTap: () => unawaited(widget.onConnect(playlists[i].credentials)),
+          ),
       ],
     );
   }

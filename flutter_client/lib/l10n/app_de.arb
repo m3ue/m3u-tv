@@ -273,6 +273,35 @@
   "settingsDisconnectTitle": "Trennen?",
   "settingsDisconnectBody": "Du wirst abgemeldet und musst deine Anmeldedaten erneut eingeben, um dich wieder zu verbinden.",
   "settingsDisconnectConfirm": "Trennen",
+  "settingsPlaylists": "Playlists",
+  "settingsPlaylistActive": "Aktive Playlist",
+  "settingsAddPlaylist": "Playlist hinzufügen",
+  "settingsSwitchPlaylist": "Zu dieser Playlist wechseln",
+  "settingsRenamePlaylist": "Playlist umbenennen",
+  "settingsRemovePlaylist": "Playlist entfernen",
+  "settingsRemovePlaylistTitle": "Playlist entfernen?",
+  "settingsRemovePlaylistBody": "{name} wird von diesem Gerät entfernt. Du kannst sie jederzeit wieder hinzufügen.",
+  "@settingsRemovePlaylistBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsDisconnectBodyOtherPlaylists": "Du wirst von dieser Playlist abgemeldet und sie wird von diesem Gerät entfernt. Deine anderen gespeicherten Playlists bleiben zum erneuten Verbinden verfügbar.",
+  "settingsPlaylistNameLabel": "Name",
+  "settingsSave": "Speichern",
+  "settingsSwitchPlaylistFailed": "Playlist konnte nicht gewechselt werden: {error}",
+  "@settingsSwitchPlaylistFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsTabSaved": "Gespeichert",
+  "settingsSavedPlaylistsTitle": "Gespeicherte Playlists",
+  "settingsSavedPlaylistsSubtitle": "Verbinde dich wieder mit einer auf diesem Gerät gespeicherten Playlist oder füge über Koppeln oder Anmelden eine neue hinzu.",
   "settingsApp": "App",
   "settingsAppVersion": "Version",
   "settingsAppUpdateStatus": "Update",

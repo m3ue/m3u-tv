@@ -273,6 +273,35 @@
   "settingsDisconnectTitle": "断开连接？",
   "settingsDisconnectBody": "您将被退出登录，需要重新输入凭据才能重新连接。",
   "settingsDisconnectConfirm": "断开连接",
+  "settingsPlaylists": "播放列表",
+  "settingsPlaylistActive": "当前播放列表",
+  "settingsAddPlaylist": "添加播放列表",
+  "settingsSwitchPlaylist": "切换到此播放列表",
+  "settingsRenamePlaylist": "重命名播放列表",
+  "settingsRemovePlaylist": "移除播放列表",
+  "settingsRemovePlaylistTitle": "移除播放列表？",
+  "settingsRemovePlaylistBody": "{name} 将从此设备中移除。您可以随时重新添加。",
+  "@settingsRemovePlaylistBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsDisconnectBodyOtherPlaylists": "您将退出此播放列表，并将其从此设备中移除。其他已保存的播放列表仍可用于重新连接。",
+  "settingsPlaylistNameLabel": "名称",
+  "settingsSave": "保存",
+  "settingsSwitchPlaylistFailed": "无法切换播放列表：{error}",
+  "@settingsSwitchPlaylistFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsTabSaved": "已保存",
+  "settingsSavedPlaylistsTitle": "已保存的播放列表",
+  "settingsSavedPlaylistsSubtitle": "重新连接此设备上保存的播放列表，或通过“配对”或“登录”添加新的播放列表。",
   "settingsApp": "应用",
   "settingsAppVersion": "版本",
   "settingsAppUpdateStatus": "更新",

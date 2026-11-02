@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
+import 'package:m3u_tv/services/saved_playlists_service.dart';
 
 /// Metadata stored per AIOStreams favourite item.
 class AIOStreamsFavoriteItem {
@@ -51,8 +52,10 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
   final PersistentJsonStore? _store;
   final SerialQueue _mutationQueue = SerialQueue();
 
-  /// In-memory cache so reads after the first load are synchronous.
-  Map<String, AIOStreamsFavoriteItem>? _cache;
+  /// In-memory cache per playlist scope (see [playlistScopedKey]) so reads
+  /// after the first load are synchronous.
+  final Map<String?, Map<String, AIOStreamsFavoriteItem>> _caches =
+      <String?, Map<String, AIOStreamsFavoriteItem>>{};
 
   /// Invoked after [add] persists a new favorite locally, so the app layer
   /// can push it (with its full metadata — the server has no other way to
@@ -64,11 +67,28 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
 
   AIOStreamsMutationOwnershipCapture? captureMutationOwnership;
 
-  Future<Map<String, AIOStreamsFavoriteItem>> _all() async {
-    if (_cache != null) return _cache!;
-    final raw = await _store?.read(_key);
+  /// Keeps each saved playlist's favorites apart. Unset, or resolving to
+  /// null, uses the unscoped key.
+  PlaylistScope? playlistScope;
+
+  /// Tells listeners the active playlist changed, so the favorites they read
+  /// are now another playlist's.
+  void notifyPlaylistChanged() => notifyListeners();
+
+  /// Drops the favorites stored for a removed playlist's [scope].
+  Future<void> clearPlaylistState(String? scope) =>
+      _mutationQueue.run(() async {
+        _caches.remove(scope);
+        await _store?.delete(playlistScopedKey(_key, scope));
+      });
+
+  Future<Map<String, AIOStreamsFavoriteItem>> _all(String? scope) async {
+    final cached = _caches[scope];
+    if (cached != null) return cached;
+    final raw = await _store?.read(playlistScopedKey(_key, scope));
+    final Map<String, AIOStreamsFavoriteItem> loaded;
     if (raw is Map) {
-      _cache = Map.fromEntries(
+      loaded = Map.fromEntries(
         raw.entries.map((e) {
           final v = e.value;
           if (v is Map) {
@@ -81,42 +101,50 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
         }).whereType<MapEntry<String, AIOStreamsFavoriteItem>>(),
       );
     } else {
-      _cache = {};
+      loaded = {};
     }
-    return _cache!;
+    return _caches[scope] = loaded;
   }
 
   Future<bool> _persist(
     Map<String, AIOStreamsFavoriteItem> cache, {
+    required String? scope,
     AIOStreamsMutationOwnership? shouldCommit,
   }) async {
     final data = cache.map((key, value) => MapEntry(key, value.toJson()));
+    final key = playlistScopedKey(_key, scope);
     final store = _store;
     if (shouldCommit == null) {
-      await store?.write(_key, data);
+      await store?.write(key, data);
       return true;
     }
     if (store == null) return shouldCommit();
-    return store.writeIf(_key, data, shouldCommit);
+    return store.writeIf(key, data, shouldCommit);
   }
 
   Future<bool> isFavorite(String itemId) async =>
-      (await _all()).containsKey(itemId);
+      (await _all(playlistScope?.call())).containsKey(itemId);
 
   Future<bool> add(AIOStreamsFavoriteItem item) {
     final shouldCommit = captureMutationOwnership?.call();
-    return _mutationQueue.run(() => _add(item, shouldCommit: shouldCommit));
+    final scope = playlistScope?.call();
+    return _mutationQueue.run(
+      () => _add(item, scope: scope, shouldCommit: shouldCommit),
+    );
   }
 
   Future<bool> _add(
     AIOStreamsFavoriteItem item, {
+    required String? scope,
     AIOStreamsMutationOwnership? shouldCommit,
   }) async {
-    final cache = Map<String, AIOStreamsFavoriteItem>.of(await _all());
+    final cache = Map<String, AIOStreamsFavoriteItem>.of(await _all(scope));
     cache[item.id] = item;
-    if (!await _persist(cache, shouldCommit: shouldCommit)) return false;
+    if (!await _persist(cache, scope: scope, shouldCommit: shouldCommit)) {
+      return false;
+    }
     if (shouldCommit != null && !shouldCommit()) return false;
-    _cache = cache;
+    _caches[scope] = cache;
     notifyListeners();
     onAdded?.call(item);
     return true;
@@ -124,21 +152,25 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
 
   Future<bool> remove(String itemId) {
     final shouldCommit = captureMutationOwnership?.call();
+    final scope = playlistScope?.call();
     return _mutationQueue.run(
-      () => _remove(itemId, shouldCommit: shouldCommit),
+      () => _remove(itemId, scope: scope, shouldCommit: shouldCommit),
     );
   }
 
   Future<bool> _remove(
     String itemId, {
+    required String? scope,
     AIOStreamsMutationOwnership? shouldCommit,
   }) async {
     final cache = Map<String, AIOStreamsFavoriteItem>.of(
-      await _all(),
+      await _all(scope),
     )..remove(itemId);
-    if (!await _persist(cache, shouldCommit: shouldCommit)) return false;
+    if (!await _persist(cache, scope: scope, shouldCommit: shouldCommit)) {
+      return false;
+    }
     if (shouldCommit != null && !shouldCommit()) return false;
-    _cache = cache;
+    _caches[scope] = cache;
     notifyListeners();
     onRemoved?.call(itemId);
     return true;
@@ -149,13 +181,18 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
   /// viewer/source switched mid-toggle).
   Future<bool> toggle(AIOStreamsFavoriteItem item) {
     final shouldCommit = captureMutationOwnership?.call();
+    final scope = playlistScope?.call();
     return _mutationQueue.run(() async {
-      final wasFavorite = (await _all()).containsKey(item.id);
+      final wasFavorite = (await _all(scope)).containsKey(item.id);
       if (wasFavorite) {
-        final removed = await _remove(item.id, shouldCommit: shouldCommit);
+        final removed = await _remove(
+          item.id,
+          scope: scope,
+          shouldCommit: shouldCommit,
+        );
         return !removed;
       } else {
-        return _add(item, shouldCommit: shouldCommit);
+        return _add(item, scope: scope, shouldCommit: shouldCommit);
       }
     });
   }
@@ -171,17 +208,20 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
     AIOStreamsFavoriteItem? item,
   }) {
     final shouldCommit = captureMutationOwnership?.call();
+    final scope = playlistScope?.call();
     return _mutationQueue.run(() async {
-      final cache = Map<String, AIOStreamsFavoriteItem>.of(await _all());
+      final cache = Map<String, AIOStreamsFavoriteItem>.of(await _all(scope));
       if (favorited) {
         if (item == null) return;
         cache[itemId] = item;
       } else {
         if (cache.remove(itemId) == null) return;
       }
-      if (!await _persist(cache, shouldCommit: shouldCommit)) return;
+      if (!await _persist(cache, scope: scope, shouldCommit: shouldCommit)) {
+        return;
+      }
       if (shouldCommit != null && !shouldCommit()) return;
-      _cache = cache;
+      _caches[scope] = cache;
       notifyListeners();
     });
   }
@@ -190,6 +230,14 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
   /// (e.g. after `get_favorites` on connect/viewer switch), without
   /// triggering [onAdded]/[onRemoved].
   Future<bool> replaceAll(
+    Iterable<AIOStreamsFavoriteItem> items, {
+    bool Function()? shouldCommit,
+  }) => replaceAllIn(playlistScope?.call(), items, shouldCommit: shouldCommit);
+
+  /// [replaceAll] for the playlist with [scope] rather than the active one:
+  /// a switch stages the incoming playlist's favorites before it is shown.
+  Future<bool> replaceAllIn(
+    String? scope,
     Iterable<AIOStreamsFavoriteItem> items, {
     bool Function()? shouldCommit,
   }) {
@@ -202,15 +250,20 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
     };
     return _mutationQueue.run(() async {
       final cache = {for (final item in items) item.id: item};
-      if (!await _persist(cache, shouldCommit: canCommit)) return false;
+      if (!await _persist(cache, scope: scope, shouldCommit: canCommit)) {
+        return false;
+      }
       if (canCommit != null && !canCommit()) return false;
-      _cache = cache;
+      _caches[scope] = cache;
       notifyListeners();
       return true;
     });
   }
 
   /// Returns favorites in most-recently-added order (reversed insertion).
-  Future<List<AIOStreamsFavoriteItem>> all() async =>
-      (await _all()).values.toList().reversed.toList(growable: false);
+  Future<List<AIOStreamsFavoriteItem>> all() => allIn(playlistScope?.call());
+
+  /// [all] for the playlist with [scope] rather than the active one.
+  Future<List<AIOStreamsFavoriteItem>> allIn(String? scope) async =>
+      (await _all(scope)).values.toList().reversed.toList(growable: false);
 }

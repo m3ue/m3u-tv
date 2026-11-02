@@ -273,6 +273,35 @@
   "settingsDisconnectTitle": "¿Desconectar?",
   "settingsDisconnectBody": "Se cerrará tu sesión y deberás volver a introducir tus credenciales para reconectarte.",
   "settingsDisconnectConfirm": "Desconectar",
+  "settingsPlaylists": "Listas de reproducción",
+  "settingsPlaylistActive": "Lista de reproducción activa",
+  "settingsAddPlaylist": "Añadir lista de reproducción",
+  "settingsSwitchPlaylist": "Cambiar a esta lista de reproducción",
+  "settingsRenamePlaylist": "Cambiar nombre",
+  "settingsRemovePlaylist": "Eliminar lista de reproducción",
+  "settingsRemovePlaylistTitle": "¿Eliminar lista de reproducción?",
+  "settingsRemovePlaylistBody": "{name} se eliminará de este dispositivo. Puedes volver a añadirla en cualquier momento.",
+  "@settingsRemovePlaylistBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsDisconnectBodyOtherPlaylists": "Se cerrará la sesión de esta lista de reproducción y se eliminará de este dispositivo. Tus otras listas de reproducción guardadas seguirán disponibles para volver a conectarte.",
+  "settingsPlaylistNameLabel": "Nombre",
+  "settingsSave": "Guardar",
+  "settingsSwitchPlaylistFailed": "No se pudo cambiar de lista de reproducción: {error}",
+  "@settingsSwitchPlaylistFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsTabSaved": "Guardadas",
+  "settingsSavedPlaylistsTitle": "Listas de reproducción guardadas",
+  "settingsSavedPlaylistsSubtitle": "Vuelve a conectarte a una lista de reproducción guardada en este dispositivo, o añade una nueva desde Vincular o Iniciar sesión.",
   "settingsApp": "Aplicación",
   "settingsAppVersion": "Versión",
   "settingsAppUpdateStatus": "Actualización",

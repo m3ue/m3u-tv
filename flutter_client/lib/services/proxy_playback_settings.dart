@@ -2,6 +2,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
+import 'package:m3u_tv/services/saved_playlists_service.dart';
 
 /// Per-device proxy playback preferences.
 ///
@@ -23,16 +24,50 @@ class ProxyPlaybackSettings extends ChangeNotifier {
   int? _liveProfileId;
   int? _vodProfileId;
 
+  /// Keeps each saved playlist's preferences apart: profile ids are defined
+  /// per editor, so one playlist's choice means nothing on another. Unset, or
+  /// resolving to null, uses the unscoped key.
+  PlaylistScope? playlistScope;
+  bool _loaded = false;
+  String? _loadedScope;
+
   bool get enabled => _enabled;
   int? get liveProfileId => _liveProfileId;
   int? get vodProfileId => _vodProfileId;
 
+  /// Whether the current values were loaded for the playlist with [scope].
+  bool isLoadedFor(String? scope) => _loaded && _loadedScope == scope;
+
+  /// Loads the active playlist's preferences, falling back to defaults when it
+  /// has none stored. Without a store the in-memory values are kept.
   Future<void> load() async {
-    final raw = await _store?.read(_storeKey);
-    if (raw is! Map) return;
-    _enabled = raw['enabled'] == true;
-    _liveProfileId = _asProfileId(raw['live_profile_id']);
-    _vodProfileId = _asProfileId(raw['vod_profile_id']);
+    final scope = playlistScope?.call();
+    final store = _store;
+    if (store == null) {
+      _loaded = true;
+      _loadedScope = scope;
+      return;
+    }
+    final raw = await store.read(playlistScopedKey(_storeKey, scope));
+    // A newer load for the playlist that has since become active owns the
+    // values now.
+    if (playlistScope?.call() != scope) return;
+    _loaded = true;
+    _loadedScope = scope;
+    final values = raw is Map ? raw : const <Object?, Object?>{};
+    _enabled = values['enabled'] == true;
+    _liveProfileId = _asProfileId(values['live_profile_id']);
+    _vodProfileId = _asProfileId(values['vod_profile_id']);
+    notifyListeners();
+  }
+
+  /// Drops the preferences stored for a removed playlist's [scope].
+  Future<void> clearPlaylistState(String? scope) async {
+    await _store?.delete(playlistScopedKey(_storeKey, scope));
+    if (scope != _loadedScope) return;
+    _enabled = false;
+    _liveProfileId = null;
+    _vodProfileId = null;
     notifyListeners();
   }
 
@@ -108,11 +143,14 @@ class ProxyPlaybackSettings extends ChangeNotifier {
       type == 'live' || type == 'catchup' ? _liveProfileId : _vodProfileId;
 
   Future<void> _persist() async {
-    await _store?.write(_storeKey, <String, Object?>{
-      'enabled': _enabled,
-      'live_profile_id': _liveProfileId,
-      'vod_profile_id': _vodProfileId,
-    });
+    await _store?.write(
+      playlistScopedKey(_storeKey, _loadedScope),
+      <String, Object?>{
+        'enabled': _enabled,
+        'live_profile_id': _liveProfileId,
+        'vod_profile_id': _vodProfileId,
+      },
+    );
   }
 
   int? _asProfileId(Object? value) {

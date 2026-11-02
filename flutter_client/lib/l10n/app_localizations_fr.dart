@@ -699,6 +699,57 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsDisconnectConfirm => 'Déconnecter';
 
   @override
+  String get settingsPlaylists => 'Playlists';
+
+  @override
+  String get settingsPlaylistActive => 'Playlist active';
+
+  @override
+  String get settingsAddPlaylist => 'Ajouter une playlist';
+
+  @override
+  String get settingsSwitchPlaylist => 'Passer à cette playlist';
+
+  @override
+  String get settingsRenamePlaylist => 'Renommer la playlist';
+
+  @override
+  String get settingsRemovePlaylist => 'Supprimer la playlist';
+
+  @override
+  String get settingsRemovePlaylistTitle => 'Supprimer la playlist ?';
+
+  @override
+  String settingsRemovePlaylistBody(String name) {
+    return '$name sera supprimée de cet appareil. Vous pourrez l\'ajouter à nouveau à tout moment.';
+  }
+
+  @override
+  String get settingsDisconnectBodyOtherPlaylists =>
+      'Vous serez déconnecté de cette playlist et elle sera supprimée de cet appareil. Vos autres playlists enregistrées restent disponibles pour vous reconnecter.';
+
+  @override
+  String get settingsPlaylistNameLabel => 'Nom';
+
+  @override
+  String get settingsSave => 'Enregistrer';
+
+  @override
+  String settingsSwitchPlaylistFailed(String error) {
+    return 'Impossible de changer de playlist : $error';
+  }
+
+  @override
+  String get settingsTabSaved => 'Enregistrées';
+
+  @override
+  String get settingsSavedPlaylistsTitle => 'Playlists enregistrées';
+
+  @override
+  String get settingsSavedPlaylistsSubtitle =>
+      'Reconnectez-vous à une playlist enregistrée sur cet appareil, ou ajoutez-en une nouvelle via Coupler ou Connexion.';
+
+  @override
   String get settingsApp => 'Application';
 
   @override

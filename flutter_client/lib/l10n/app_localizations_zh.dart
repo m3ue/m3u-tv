@@ -676,6 +676,57 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsDisconnectConfirm => '断开连接';
 
   @override
+  String get settingsPlaylists => '播放列表';
+
+  @override
+  String get settingsPlaylistActive => '当前播放列表';
+
+  @override
+  String get settingsAddPlaylist => '添加播放列表';
+
+  @override
+  String get settingsSwitchPlaylist => '切换到此播放列表';
+
+  @override
+  String get settingsRenamePlaylist => '重命名播放列表';
+
+  @override
+  String get settingsRemovePlaylist => '移除播放列表';
+
+  @override
+  String get settingsRemovePlaylistTitle => '移除播放列表？';
+
+  @override
+  String settingsRemovePlaylistBody(String name) {
+    return '$name 将从此设备中移除。您可以随时重新添加。';
+  }
+
+  @override
+  String get settingsDisconnectBodyOtherPlaylists =>
+      '您将退出此播放列表，并将其从此设备中移除。其他已保存的播放列表仍可用于重新连接。';
+
+  @override
+  String get settingsPlaylistNameLabel => '名称';
+
+  @override
+  String get settingsSave => '保存';
+
+  @override
+  String settingsSwitchPlaylistFailed(String error) {
+    return '无法切换播放列表：$error';
+  }
+
+  @override
+  String get settingsTabSaved => '已保存';
+
+  @override
+  String get settingsSavedPlaylistsTitle => '已保存的播放列表';
+
+  @override
+  String get settingsSavedPlaylistsSubtitle =>
+      '重新连接此设备上保存的播放列表，或通过“配对”或“登录”添加新的播放列表。';
+
+  @override
   String get settingsApp => '应用';
 
   @override

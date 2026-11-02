@@ -695,6 +695,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDisconnectConfirm => 'Disconnect';
 
   @override
+  String get settingsPlaylists => 'Playlists';
+
+  @override
+  String get settingsPlaylistActive => 'Active playlist';
+
+  @override
+  String get settingsAddPlaylist => 'Add Playlist';
+
+  @override
+  String get settingsSwitchPlaylist => 'Switch to Playlist';
+
+  @override
+  String get settingsRenamePlaylist => 'Rename Playlist';
+
+  @override
+  String get settingsRemovePlaylist => 'Remove Playlist';
+
+  @override
+  String get settingsRemovePlaylistTitle => 'Remove playlist?';
+
+  @override
+  String settingsRemovePlaylistBody(String name) {
+    return '$name will be removed from this device. You can add it again at any time.';
+  }
+
+  @override
+  String get settingsDisconnectBodyOtherPlaylists =>
+      'You will be signed out of this playlist and it will be removed from this device. Your other saved playlists stay available to reconnect.';
+
+  @override
+  String get settingsPlaylistNameLabel => 'Name';
+
+  @override
+  String get settingsSave => 'Save';
+
+  @override
+  String settingsSwitchPlaylistFailed(String error) {
+    return 'Couldn\'t switch playlists: $error';
+  }
+
+  @override
+  String get settingsTabSaved => 'Saved';
+
+  @override
+  String get settingsSavedPlaylistsTitle => 'Saved Playlists';
+
+  @override
+  String get settingsSavedPlaylistsSubtitle =>
+      'Reconnect to a playlist saved on this device, or add a new one from Pair or Sign In.';
+
+  @override
   String get settingsApp => 'App';
 
   @override

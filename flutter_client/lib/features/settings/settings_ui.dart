@@ -1,5 +1,7 @@
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
@@ -523,4 +525,59 @@ Future<void> pushSettingsPicker<T>(
       ],
     ),
   );
+}
+
+/// A title/message/confirm dialog for settings actions. Resolves true only
+/// when [confirmLabel] is chosen.
+Future<bool> showSettingsConfirmDialog(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String confirmLabel,
+  bool isDestructive = false,
+}) async {
+  final theme = Theme.of(context);
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => Dialog(
+      child: SizedBox(
+        width: 480 * FontSizeScope.scaleOf(ctx),
+        child: DpadRegion(
+          memoryKey: 'confirm-dialog',
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(title, style: theme.textTheme.titleLarge),
+                const SizedBox(height: 12),
+                Text(message, style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    AppButton(
+                      label: AppLocalizations.of(ctx).cancel,
+                      onPressed: () => Navigator.pop(ctx, false),
+                    ),
+                    const SizedBox(width: 8),
+                    AppButton(
+                      autofocus: true,
+                      variant: isDestructive
+                          ? AppButtonVariant.destructive
+                          : AppButtonVariant.primary,
+                      label: confirmLabel,
+                      onPressed: () => Navigator.pop(ctx, true),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  return result ?? false;
 }

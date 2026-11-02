@@ -48,6 +48,12 @@ class ViewerService {
     _memory[key] = viewer.ulid;
     await _store?.write(key, viewer.ulid);
   }
+
+  Future<void> forgetActiveViewer({String? loginKey}) async {
+    final key = _keyFor(loginKey);
+    _memory.remove(key);
+    await _store?.delete(key);
+  }
 }
 
 extension _FirstOrNull<T> on Iterable<T> {

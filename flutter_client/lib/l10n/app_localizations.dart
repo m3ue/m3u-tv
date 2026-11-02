@@ -1352,6 +1352,96 @@ abstract class AppLocalizations {
   /// **'Disconnect'**
   String get settingsDisconnectConfirm;
 
+  /// No description provided for @settingsPlaylists.
+  ///
+  /// In en, this message translates to:
+  /// **'Playlists'**
+  String get settingsPlaylists;
+
+  /// No description provided for @settingsPlaylistActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active playlist'**
+  String get settingsPlaylistActive;
+
+  /// No description provided for @settingsAddPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Playlist'**
+  String get settingsAddPlaylist;
+
+  /// No description provided for @settingsSwitchPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Playlist'**
+  String get settingsSwitchPlaylist;
+
+  /// No description provided for @settingsRenamePlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename Playlist'**
+  String get settingsRenamePlaylist;
+
+  /// No description provided for @settingsRemovePlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Playlist'**
+  String get settingsRemovePlaylist;
+
+  /// No description provided for @settingsRemovePlaylistTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove playlist?'**
+  String get settingsRemovePlaylistTitle;
+
+  /// No description provided for @settingsRemovePlaylistBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} will be removed from this device. You can add it again at any time.'**
+  String settingsRemovePlaylistBody(String name);
+
+  /// No description provided for @settingsDisconnectBodyOtherPlaylists.
+  ///
+  /// In en, this message translates to:
+  /// **'You will be signed out of this playlist and it will be removed from this device. Your other saved playlists stay available to reconnect.'**
+  String get settingsDisconnectBodyOtherPlaylists;
+
+  /// No description provided for @settingsPlaylistNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get settingsPlaylistNameLabel;
+
+  /// No description provided for @settingsSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get settingsSave;
+
+  /// No description provided for @settingsSwitchPlaylistFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t switch playlists: {error}'**
+  String settingsSwitchPlaylistFailed(String error);
+
+  /// No description provided for @settingsTabSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get settingsTabSaved;
+
+  /// No description provided for @settingsSavedPlaylistsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved Playlists'**
+  String get settingsSavedPlaylistsTitle;
+
+  /// No description provided for @settingsSavedPlaylistsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect to a playlist saved on this device, or add a new one from Pair or Sign In.'**
+  String get settingsSavedPlaylistsSubtitle;
+
   /// No description provided for @settingsApp.
   ///
   /// In en, this message translates to:

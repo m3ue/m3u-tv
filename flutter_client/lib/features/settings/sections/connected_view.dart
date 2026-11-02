@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
@@ -9,6 +8,7 @@ import 'package:m3u_tv/features/settings/diagnostics_screen.dart';
 import 'package:m3u_tv/features/settings/release_notes_view.dart';
 import 'package:m3u_tv/features/settings/sections/app_version_card.dart';
 import 'package:m3u_tv/features/settings/sections/playback_settings_page.dart';
+import 'package:m3u_tv/features/settings/sections/playlists_page.dart';
 import 'package:m3u_tv/features/settings/sections/settings_status_row.dart';
 import 'package:m3u_tv/features/settings/sections/trakt_card.dart';
 import 'package:m3u_tv/features/settings/sections/view_settings_section.dart';
@@ -18,9 +18,11 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
+import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
+import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
@@ -57,6 +59,9 @@ class ConnectedView extends StatefulWidget {
     this.viewSettingsService,
     this.deviceType,
     this.onHandleTopLevelBack,
+    this.playlists,
+    this.devicePairingService,
+    this.onPlaylistSwitched,
   });
 
   final AuthNotifier authNotifier;
@@ -83,6 +88,15 @@ class ConnectedView extends StatefulWidget {
   final Future<int> Function(String report)? onUploadLogs;
   final Locale? locale;
   final void Function(Locale?)? onLocaleChanged;
+
+  /// Saved playlists. The Playlists row is hidden when null.
+  final PlaylistManagement? playlists;
+
+  /// For pairing a new playlist from the Playlists page.
+  final DevicePairingService? devicePairingService;
+
+  /// Runs after the Playlists page switches to, or adds, a playlist.
+  final VoidCallback? onPlaylistSwitched;
 
   @override
   State<ConnectedView> createState() => _ConnectedViewState();
@@ -123,10 +137,14 @@ class _ConnectedViewState extends State<ConnectedView> {
 
   Future<void> _handleDisconnect() async {
     final l = AppLocalizations.of(context);
-    final confirmed = await _showConfirmDialog(
+    final hasOtherPlaylists =
+        (widget.playlists?.service.playlists.length ?? 0) > 1;
+    final confirmed = await showSettingsConfirmDialog(
       context,
       title: l.settingsDisconnectTitle,
-      message: l.settingsDisconnectBody,
+      message: hasOtherPlaylists
+          ? l.settingsDisconnectBodyOtherPlaylists
+          : l.settingsDisconnectBody,
       confirmLabel: l.settingsDisconnectConfirm,
       isDestructive: true,
     );
@@ -284,6 +302,27 @@ class _ConnectedViewState extends State<ConnectedView> {
           SettingsSectionHeader(l.settingsAccount),
           SettingsGroup(
             children: [
+              if (widget.playlists case final playlists?)
+                ListenableBuilder(
+                  listenable: playlists.service,
+                  builder: (context, _) => SettingsRow(
+                    title: l.settingsPlaylists,
+                    subtitle: _activePlaylistName(playlists.service),
+                    icon: Icons.playlist_play,
+                    trailing: const SettingsChevron(),
+                    onTap: () => unawaited(
+                      openPlaylistsPage(
+                        context,
+                        playlists: playlists,
+                        authNotifier: widget.authNotifier,
+                        devicePairingService: widget.devicePairingService,
+                        deviceType: widget.deviceType,
+                        onSwitched: widget.onPlaylistSwitched,
+                        onBack: widget.onHandleTopLevelBack,
+                      ),
+                    ),
+                  ),
+                ),
               if (widget.activeViewer != null)
                 SettingsRow(
                   title: l.settingsActiveViewer,
@@ -303,6 +342,13 @@ class _ConnectedViewState extends State<ConnectedView> {
         ],
       ),
     );
+  }
+
+  String? _activePlaylistName(SavedPlaylistsService service) {
+    final active = service.find(widget.authNotifier.credentials);
+    return active == null
+        ? null
+        : playlistDisplayName(active, service.playlists);
   }
 
   Widget _buildGeneralPageBody(BuildContext context) {
@@ -463,61 +509,4 @@ class _ConnectedViewState extends State<ConnectedView> {
         return AppLocalizations.of(context).settingsLanguageSystem;
     }
   }
-}
-
-// ---------------------------------------------------------------------------
-// Confirm dialog helper
-// ---------------------------------------------------------------------------
-
-Future<bool> _showConfirmDialog(
-  BuildContext context, {
-  required String title,
-  required String message,
-  required String confirmLabel,
-  bool isDestructive = false,
-}) async {
-  final theme = Theme.of(context);
-  final result = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => Dialog(
-      child: SizedBox(
-        width: 480 * FontSizeScope.scaleOf(ctx),
-        child: DpadRegion(
-          memoryKey: 'confirm-dialog',
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(title, style: theme.textTheme.titleLarge),
-                const SizedBox(height: 12),
-                Text(message, style: theme.textTheme.bodyMedium),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    AppButton(
-                      label: AppLocalizations.of(ctx).cancel,
-                      onPressed: () => Navigator.pop(ctx, false),
-                    ),
-                    const SizedBox(width: 8),
-                    AppButton(
-                      autofocus: true,
-                      variant: isDestructive
-                          ? AppButtonVariant.destructive
-                          : AppButtonVariant.primary,
-                      label: confirmLabel,
-                      onPressed: () => Navigator.pop(ctx, true),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-  return result ?? false;
 }

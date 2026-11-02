@@ -1793,7 +1793,13 @@ void main() {
         await pumpEventQueue();
 
         expect(await fixture.controller.favoritesService.all(), <int>{103});
-        expect(await store.read('m3ue_favorites'), <int>[103]);
+        // Each playlist keeps its own favorites: the first one's are untouched.
+        expect(await store.read('m3ue_favorites'), <int>[101]);
+        final third = fixture.controller.savedPlaylists.find(_thirdCredentials);
+        expect(
+          await store.read('m3ue_favorites_playlist_${third!.id}'),
+          <int>[103],
+        );
         expect(currentNotifications, 1);
         expect(
           transport.requests.where(
@@ -2873,6 +2879,11 @@ class _BlockingSourceCacheStore extends PersistentJsonStore {
   }
 }
 
+/// The live favorites key of any saved playlist: the first playlist on a
+/// device keeps the unscoped key, later ones get their own.
+bool _isLiveFavoritesKey(String key) =>
+    key == 'm3ue_favorites' || key.startsWith('m3ue_favorites_playlist_');
+
 class _BlockingFavoritesStore extends PersistentJsonStore {
   _BlockingFavoritesStore({required super.file});
 
@@ -2885,7 +2896,7 @@ class _BlockingFavoritesStore extends PersistentJsonStore {
     Object? value,
     bool Function() shouldCommit,
   ) async {
-    if (key == 'm3ue_favorites' && !favoritesWriteStarted.isCompleted) {
+    if (_isLiveFavoritesKey(key) && !favoritesWriteStarted.isCompleted) {
       favoritesWriteStarted.complete();
       await releaseFavoritesWrite.future;
     }
@@ -2915,7 +2926,7 @@ class _BlockingPostCommitStore extends PersistentJsonStore {
   void blockResumeFor(String viewerId) => _blockedResumeViewer = viewerId;
 
   Future<void> _blockWrite(String key, Object? value) async {
-    if (key == 'm3ue_favorites' &&
+    if (_isLiveFavoritesKey(key) &&
         value is List<Object?> &&
         value.contains(_blockedFavorite) &&
         !blockedFavoritesWriteStarted.isCompleted) {
@@ -2935,7 +2946,7 @@ class _BlockingPostCommitStore extends PersistentJsonStore {
   Future<void> write(String key, Object? value) async {
     await _blockWrite(key, value);
     await super.write(key, value);
-    if (key == 'm3ue_favorites' &&
+    if (_isLiveFavoritesKey(key) &&
         value is List<Object?> &&
         value.contains(_blockedFavorite) &&
         !blockedFavoritesWriteCompleted.isCompleted) {
@@ -2955,7 +2966,7 @@ class _BlockingPostCommitStore extends PersistentJsonStore {
   ) async {
     await _blockWrite(key, value);
     final committed = await super.writeIf(key, value, shouldCommit);
-    if (key == 'm3ue_favorites' &&
+    if (_isLiveFavoritesKey(key) &&
         value is List<Object?> &&
         value.contains(_blockedFavorite) &&
         !blockedFavoritesWriteCompleted.isCompleted) {
