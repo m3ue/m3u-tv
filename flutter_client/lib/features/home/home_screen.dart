@@ -42,6 +42,9 @@ class HomeScreen extends ConsumerStatefulWidget {
     required this.onSeriesSelect,
     required this.onProgressSelect,
     required this.onContinueWatchingMore,
+    required this.onLiveTvMore,
+    required this.onMoviesMore,
+    required this.onSeriesMore,
     required this.onRecordingsSelect,
     required this.onAioStreamsItemSelect,
     this.useSidebarLayout = false,
@@ -55,6 +58,9 @@ class HomeScreen extends ConsumerStatefulWidget {
   final void Function(Series) onSeriesSelect;
   final void Function(Progress) onProgressSelect;
   final VoidCallback onContinueWatchingMore;
+  final VoidCallback onLiveTvMore;
+  final VoidCallback onMoviesMore;
+  final VoidCallback onSeriesMore;
   final VoidCallback onRecordingsSelect;
   final void Function(AIOStreamsItem, int integrationId) onAioStreamsItemSelect;
   final bool useSidebarLayout;
@@ -115,12 +121,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   FocusNode? _initialFocus;
   bool _canClaimInitialFocus = true;
 
+  /// Whether each catalog row found anything once loaded; empty rows hide,
+  /// and Home says so when every source of rows came up empty.
+  final Map<_CatalogRow, bool> _catalogRowHasItems = {};
+
+  /// The rows are keyed to the shown playlist, so a switch starts them over
+  /// (loading, not the last playlist's items).
+  late String? _shownPlaylistKey;
+
   @override
   void initState() {
     super.initState();
     FocusManager.instance.addListener(_onPrimaryFocusChanged);
     HardwareKeyboard.instance.addHandler(_onKey);
     _viewSettings = ref.read(viewSettingsServiceProvider);
+    _shownPlaylistKey = ref.read(shownPlaylistKeyProvider);
     _style = _viewSettings.homeScreenStyleCached ?? HomeScreenStyle.simplified;
     _viewSettings.addListener(_onViewSettingsChanged);
     unawaited(_loadStyle());
@@ -266,11 +281,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (mounted) setState(() => _favoriteSeriesIds = series);
   }
 
+  void _onCatalogRowLoaded(_CatalogRow row, bool hasItems) {
+    if (_catalogRowHasItems[row] == hasItems) return;
+    setState(() => _catalogRowHasItems[row] = hasItems);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isBootstrapping = ref.watch(isBootstrappingProvider);
     final isConfigured = ref.watch(isConfiguredProvider);
     final sourceError = ref.watch(sourceErrorProvider);
+    final playlistKey = ref.watch(shownPlaylistKeyProvider);
+    if (playlistKey != _shownPlaylistKey) {
+      _shownPlaylistKey = playlistKey;
+      _catalogRowHasItems.clear();
+      // The hero still describes the last playlist's card.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _spotlight.reset();
+      });
+    }
 
     if (isBootstrapping) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -291,10 +320,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // the simplified Home.
     final rich = widget.useSidebarLayout && _style == HomeScreenStyle.rich;
     final spotlight = rich ? _spotlight : null;
+    final hasNoProgress = ref.watch(
+      progressListProvider.select((progress) => progress.isEmpty),
+    );
+    final hasDvrFeature = ref.watch(hasDvrFeatureProvider);
+    final nothingToShow =
+        hasNoProgress &&
+        !hasDvrFeature &&
+        _CatalogRow.values.every((row) => _catalogRowHasItems[row] == false);
     final rows = <Widget>[
       Focus(
         focusNode: _continueWatchingNode,
         child: _ContinueWatchingRow(
+          key: ValueKey(('continue-watching', playlistKey)),
           onProgressSelect: widget.onProgressSelect,
           onContinueWatchingMore: widget.onContinueWatchingMore,
           useSidebarLayout: widget.useSidebarLayout,
@@ -305,6 +343,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ),
       _LiveRow(
+        key: ValueKey(('live', playlistKey)),
         favoriteChannelIds: _favoriteChannelIds,
         onChannelSelect: widget.onChannelSelect,
         onChannelContextChanged: widget.onChannelContextChanged,
@@ -313,11 +352,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           await _loadFavorites();
         },
         rowItemLimit: _rowItemLimit,
+        onViewAll: widget.onLiveTvMore,
+        onLoaded: (hasItems) => _onCatalogRowLoaded(_CatalogRow.live, hasItems),
         useSidebarLayout: widget.useSidebarLayout,
         onSidebarActivate: widget.onSidebarActivate,
         spotlight: spotlight,
       ),
       _MoviesRow(
+        key: ValueKey(('movies', playlistKey)),
         favoriteVodIds: _favoriteVodIds,
         onVodSelect: widget.onVodSelect,
         onToggleFavorite: (item) async {
@@ -325,11 +367,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           await _loadFavorites();
         },
         rowItemLimit: _rowItemLimit,
+        onViewAll: widget.onMoviesMore,
+        onLoaded: (hasItems) =>
+            _onCatalogRowLoaded(_CatalogRow.movies, hasItems),
         useSidebarLayout: widget.useSidebarLayout,
         onSidebarActivate: widget.onSidebarActivate,
         spotlight: spotlight,
       ),
       _SeriesRow(
+        key: ValueKey(('series', playlistKey)),
         favoriteSeriesIds: _favoriteSeriesIds,
         onSeriesSelect: widget.onSeriesSelect,
         onToggleFavorite: (series) async {
@@ -337,6 +383,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           await _loadFavorites();
         },
         rowItemLimit: _rowItemLimit,
+        onViewAll: widget.onSeriesMore,
+        onLoaded: (hasItems) =>
+            _onCatalogRowLoaded(_CatalogRow.series, hasItems),
         useSidebarLayout: widget.useSidebarLayout,
         onSidebarActivate: widget.onSidebarActivate,
         spotlight: spotlight,
@@ -347,6 +396,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onSidebarActivate: widget.onSidebarActivate,
         spotlight: spotlight,
       ),
+      if (nothingToShow)
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            vertical: MediaBrowsingMetrics.pagePadding * 2,
+          ),
+          child: Center(
+            child: Text(
+              AppLocalizations.of(context).homeNothingToShow,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+        ),
     ];
     final hasSourceError = sourceError != null && sourceError.isNotEmpty;
 
@@ -398,8 +459,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 // provider tick only rebuilds the row(s) that actually watch it - e.g. an
 // EPG update no longer touches the Movies/Series rows.
 
+enum _CatalogRow { live, movies, series }
+
+/// A row's [MediaPreviewSection.viewAll] card. In the rich layout the hero
+/// describes [target], where it leads.
+MediaPreviewItem _viewAllItem(
+  AppLocalizations l, {
+  required StaticSpotlightTarget target,
+  required VoidCallback onTap,
+  required HomeSpotlightController? spotlight,
+  String? subtitle,
+}) => MediaPreviewItem(
+  title: l.homeViewAll,
+  subtitle: subtitle,
+  fallbackIcon: Icons.arrow_forward,
+  onTap: onTap,
+  onFocused: spotlight == null ? null : () => spotlight.select(target),
+  onHoverChanged: spotlight?.hoverHandler(target),
+);
+
 class _ContinueWatchingRow extends ConsumerStatefulWidget {
   const _ContinueWatchingRow({
+    super.key,
     required this.onProgressSelect,
     required this.onContinueWatchingMore,
     required this.useSidebarLayout,
@@ -480,25 +561,22 @@ class _ContinueWatchingRowState extends ConsumerState<_ContinueWatchingRow> {
       title: l.homeContinueWatching,
       description: l.homeContinueWatchingMoreCount(continueWatchingOverflow),
     );
-    final continueWatchingRowItems = [
-      ..._items.take(continueWatchingRowLimit),
-      if (continueWatchingOverflow > 0)
-        MediaPreviewItem(
-          title: l.homeContinueWatchingSeeAll,
-          subtitle: l.homeContinueWatchingMoreCount(continueWatchingOverflow),
-          fallbackIcon: Icons.history,
-          onTap: widget.onContinueWatchingMore,
-          onFocused: spotlight == null
-              ? null
-              : () => spotlight.select(seeAllTarget),
-          onHoverChanged: spotlight?.hoverHandler(seeAllTarget),
-        ),
-    ];
     return MediaPreviewSection(
       title: l.homeContinueWatching,
       titleIcon: Icons.history,
       emptyLabel: l.homeNoContinueWatching,
-      items: continueWatchingRowItems,
+      items: _items.take(continueWatchingRowLimit).toList(growable: false),
+      viewAll: continueWatchingOverflow > 0
+          ? _viewAllItem(
+              l,
+              target: seeAllTarget,
+              subtitle: l.homeContinueWatchingMoreCount(
+                continueWatchingOverflow,
+              ),
+              onTap: widget.onContinueWatchingMore,
+              spotlight: spotlight,
+            )
+          : null,
       landscapeStyle: true,
       useSidebarLayout: widget.useSidebarLayout,
       onSidebarActivate: widget.onSidebarActivate,
@@ -508,11 +586,14 @@ class _ContinueWatchingRowState extends ConsumerState<_ContinueWatchingRow> {
 
 class _LiveRow extends ConsumerStatefulWidget {
   const _LiveRow({
+    super.key,
     required this.favoriteChannelIds,
     required this.onChannelSelect,
     required this.onChannelContextChanged,
     required this.onToggleFavorite,
     required this.rowItemLimit,
+    required this.onViewAll,
+    required this.onLoaded,
     required this.useSidebarLayout,
     required this.onSidebarActivate,
     required this.spotlight,
@@ -523,6 +604,10 @@ class _LiveRow extends ConsumerStatefulWidget {
   final void Function(ChannelContext)? onChannelContextChanged;
   final Future<void> Function(Channel) onToggleFavorite;
   final int rowItemLimit;
+  final VoidCallback onViewAll;
+
+  /// Whether the row found any channels, after each load.
+  final ValueChanged<bool> onLoaded;
   final bool useSidebarLayout;
   final VoidCallback? onSidebarActivate;
   final HomeSpotlightController? spotlight;
@@ -577,6 +662,7 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
           ),
         );
       });
+      widget.onLoaded(channels.isNotEmpty);
     }());
   }
 
@@ -591,6 +677,7 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
         ref.read(catalogRepositoryProvider),
       );
     }
+    final isLoading = _windowSlice == null;
     final slice =
         _windowSlice ??
         (
@@ -599,6 +686,11 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
           contextAt: (_) => ListChannelContext.empty,
         );
     final rowChannels = slice.rowChannels;
+    if (!isLoading && rowChannels.isEmpty) return const SizedBox.shrink();
+    // Until it loads, guess the row shows favorites when there are any.
+    final showsFavorites = isLoading
+        ? widget.favoriteChannelIds.isNotEmpty
+        : slice.showsFavorites;
     final spotlight = widget.spotlight;
     final epgService = ref.watch(epgServiceProvider);
     final l = AppLocalizations.of(context);
@@ -607,9 +699,20 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
     // Same card as Live TV's Grid view (logo, progress, current program and
     // its start/end), so the Home row matches that view.
     return MediaPreviewSection.builder(
-      title: slice.showsFavorites ? l.homeFavoriteChannels : l.navLiveTv,
-      titleIcon: slice.showsFavorites ? Icons.star : Icons.live_tv,
+      title: showsFavorites ? l.homeFavoriteChannels : l.navLiveTv,
+      titleIcon: showsFavorites ? Icons.star : Icons.live_tv,
       emptyLabel: l.homeNoLiveTv,
+      isLoading: isLoading,
+      viewAll: _viewAllItem(
+        l,
+        target: StaticSpotlightTarget(
+          id: 'live-view-all',
+          title: l.navLiveTv,
+          description: l.homeBrowseLiveTv,
+        ),
+        onTap: widget.onViewAll,
+        spotlight: spotlight,
+      ),
       itemCount: rowChannels.length,
       baseCardWidth: ChannelGridTile.baseWidth,
       baseCardHeight: ChannelGridTile.baseHeight,
@@ -647,10 +750,13 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
 
 class _MoviesRow extends ConsumerStatefulWidget {
   const _MoviesRow({
+    super.key,
     required this.favoriteVodIds,
     required this.onVodSelect,
     required this.onToggleFavorite,
     required this.rowItemLimit,
+    required this.onViewAll,
+    required this.onLoaded,
     required this.useSidebarLayout,
     required this.onSidebarActivate,
     required this.spotlight,
@@ -660,6 +766,10 @@ class _MoviesRow extends ConsumerStatefulWidget {
   final void Function(VodItem) onVodSelect;
   final Future<void> Function(VodItem) onToggleFavorite;
   final int rowItemLimit;
+  final VoidCallback onViewAll;
+
+  /// Whether the row found anything, after each load.
+  final ValueChanged<bool> onLoaded;
   final bool useSidebarLayout;
   final VoidCallback? onSidebarActivate;
   final HomeSpotlightController? spotlight;
@@ -670,7 +780,9 @@ class _MoviesRow extends ConsumerStatefulWidget {
 
 class _MoviesRowState extends ConsumerState<_MoviesRow> {
   List<Category>? _fetchedFor;
-  List<VodItem> _items = const [];
+
+  /// Null until the first page loads. A reload keeps these on screen.
+  List<VodItem>? _items;
 
   void _fetch(List<Category> categories, CatalogRepository repo) {
     _fetchedFor = categories;
@@ -684,6 +796,7 @@ class _MoviesRowState extends ConsumerState<_MoviesRow> {
           .then((items) {
             if (mounted && identical(_fetchedFor, categories)) {
               setState(() => _items = items);
+              widget.onLoaded(items.isNotEmpty);
             }
           }),
     );
@@ -695,6 +808,8 @@ class _MoviesRowState extends ConsumerState<_MoviesRow> {
     if (!identical(categories, _fetchedFor)) {
       _fetch(categories, ref.read(catalogRepositoryProvider));
     }
+    final items = _items;
+    if (items != null && items.isEmpty) return const SizedBox.shrink();
     final l = AppLocalizations.of(context);
     final spotlight = widget.spotlight;
     return MediaPreviewSection(
@@ -702,7 +817,18 @@ class _MoviesRowState extends ConsumerState<_MoviesRow> {
       titleIcon: Icons.movie,
       emptyLabel: l.homeNoMovies,
       posterStyle: true,
-      items: _items
+      isLoading: items == null,
+      viewAll: _viewAllItem(
+        l,
+        target: StaticSpotlightTarget(
+          id: 'movies-view-all',
+          title: l.navVod,
+          description: l.homeBrowseMovies,
+        ),
+        onTap: widget.onViewAll,
+        spotlight: spotlight,
+      ),
+      items: (items ?? const [])
           .map(
             (item) => MediaPreviewItem(
               title: item.name,
@@ -731,10 +857,13 @@ class _MoviesRowState extends ConsumerState<_MoviesRow> {
 
 class _SeriesRow extends ConsumerStatefulWidget {
   const _SeriesRow({
+    super.key,
     required this.favoriteSeriesIds,
     required this.onSeriesSelect,
     required this.onToggleFavorite,
     required this.rowItemLimit,
+    required this.onViewAll,
+    required this.onLoaded,
     required this.useSidebarLayout,
     required this.onSidebarActivate,
     required this.spotlight,
@@ -744,6 +873,10 @@ class _SeriesRow extends ConsumerStatefulWidget {
   final void Function(Series) onSeriesSelect;
   final Future<void> Function(Series) onToggleFavorite;
   final int rowItemLimit;
+  final VoidCallback onViewAll;
+
+  /// Whether the row found anything, after each load.
+  final ValueChanged<bool> onLoaded;
   final bool useSidebarLayout;
   final VoidCallback? onSidebarActivate;
   final HomeSpotlightController? spotlight;
@@ -754,7 +887,9 @@ class _SeriesRow extends ConsumerStatefulWidget {
 
 class _SeriesRowState extends ConsumerState<_SeriesRow> {
   List<Category>? _fetchedFor;
-  List<Series> _items = const [];
+
+  /// Null until the first page loads. A reload keeps these on screen.
+  List<Series>? _items;
 
   void _fetch(List<Category> categories, CatalogRepository repo) {
     _fetchedFor = categories;
@@ -768,6 +903,7 @@ class _SeriesRowState extends ConsumerState<_SeriesRow> {
           .then((items) {
             if (mounted && identical(_fetchedFor, categories)) {
               setState(() => _items = items);
+              widget.onLoaded(items.isNotEmpty);
             }
           }),
     );
@@ -779,6 +915,8 @@ class _SeriesRowState extends ConsumerState<_SeriesRow> {
     if (!identical(categories, _fetchedFor)) {
       _fetch(categories, ref.read(catalogRepositoryProvider));
     }
+    final items = _items;
+    if (items != null && items.isEmpty) return const SizedBox.shrink();
     final l = AppLocalizations.of(context);
     final spotlight = widget.spotlight;
     return MediaPreviewSection(
@@ -786,7 +924,18 @@ class _SeriesRowState extends ConsumerState<_SeriesRow> {
       titleIcon: Icons.tv,
       emptyLabel: l.homeNoSeries,
       posterStyle: true,
-      items: _items
+      isLoading: items == null,
+      viewAll: _viewAllItem(
+        l,
+        target: StaticSpotlightTarget(
+          id: 'series-view-all',
+          title: l.navSeries,
+          description: l.homeBrowseSeries,
+        ),
+        onTap: widget.onViewAll,
+        spotlight: spotlight,
+      ),
+      items: (items ?? const [])
           .map(
             (series) => MediaPreviewItem(
               title: series.name,

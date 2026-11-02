@@ -1551,6 +1551,9 @@ class AppShellState extends ConsumerState<AppShell>
         onContinueWatchingMore: () => unawaited(
           _pushDetail(RouteNames.continueWatchingPath, fullScreen: true),
         ),
+        onLiveTvMore: () => _navigateToRoute(RouteNames.liveTv),
+        onMoviesMore: () => _navigateToRoute(RouteNames.vod),
+        onSeriesMore: () => _navigateToRoute(RouteNames.series),
         onRecordingsSelect: () => _navigateToRoute(RouteNames.dvr),
         onAioStreamsItemSelect: _openAioStreamsItem,
         useSidebarLayout: shouldUseSidebar(widget.deviceType),

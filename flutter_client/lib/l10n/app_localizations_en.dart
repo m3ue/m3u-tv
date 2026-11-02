@@ -923,7 +923,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeNoContinueWatching => 'No Continue Watching available';
 
   @override
-  String get homeContinueWatchingSeeAll => 'See All';
+  String get homeViewAll => 'View All';
 
   @override
   String homeContinueWatchingMoreCount(int count) {
@@ -957,6 +957,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeMovie => 'Movie';
+
+  @override
+  String get homeBrowseLiveTv => 'Browse every channel';
+
+  @override
+  String get homeBrowseMovies => 'Browse every movie';
+
+  @override
+  String get homeBrowseSeries => 'Browse every series';
+
+  @override
+  String get homeNothingToShow => 'This playlist has nothing to show yet';
 
   @override
   String get notificationsTitle => 'Notifications';

@@ -1742,11 +1742,11 @@ abstract class AppLocalizations {
   /// **'No Continue Watching available'**
   String get homeNoContinueWatching;
 
-  /// No description provided for @homeContinueWatchingSeeAll.
+  /// No description provided for @homeViewAll.
   ///
   /// In en, this message translates to:
-  /// **'See All'**
-  String get homeContinueWatchingSeeAll;
+  /// **'View All'**
+  String get homeViewAll;
 
   /// Subtitle on the Continue Watching row's overflow tile, showing how many additional resumable titles exist beyond the ones shown directly in the row.
   ///
@@ -1795,6 +1795,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Movie'**
   String get homeMovie;
+
+  /// No description provided for @homeBrowseLiveTv.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse every channel'**
+  String get homeBrowseLiveTv;
+
+  /// No description provided for @homeBrowseMovies.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse every movie'**
+  String get homeBrowseMovies;
+
+  /// No description provided for @homeBrowseSeries.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse every series'**
+  String get homeBrowseSeries;
+
+  /// No description provided for @homeNothingToShow.
+  ///
+  /// In en, this message translates to:
+  /// **'This playlist has nothing to show yet'**
+  String get homeNothingToShow;
 
   /// No description provided for @notificationsTitle.
   ///

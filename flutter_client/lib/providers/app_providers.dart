@@ -134,6 +134,10 @@ final sourceLabelProvider = Provider<String>((ref) {
   return ref.watch(appStateControllerProvider).appState.sourceLabel;
 });
 
+final shownPlaylistKeyProvider = Provider<String?>((ref) {
+  return ref.watch(appStateControllerProvider).appState.shownPlaylistKey;
+});
+
 final sourceErrorProvider = Provider<String?>((ref) {
   return ref.watch(appStateControllerProvider).appState.error;
 });

@@ -1203,6 +1203,8 @@ class MediaPreviewSection extends StatefulWidget {
     this.titleIcon,
     this.posterStyle = false,
     this.landscapeStyle = false,
+    this.isLoading = false,
+    this.viewAll,
     this.useSidebarLayout = false,
     this.onSidebarActivate,
     super.key,
@@ -1224,6 +1226,8 @@ class MediaPreviewSection extends StatefulWidget {
     required double this.baseCardWidth,
     required double this.baseCardHeight,
     this.titleIcon,
+    this.isLoading = false,
+    this.viewAll,
     this.useSidebarLayout = false,
     this.onSidebarActivate,
     super.key,
@@ -1237,6 +1241,14 @@ class MediaPreviewSection extends StatefulWidget {
   final List<MediaPreviewItem> items;
   final bool posterStyle;
   final bool landscapeStyle;
+
+  /// Shows placeholder cards at the row's card size in place of its items,
+  /// so the row keeps its height while its first page loads.
+  final bool isLoading;
+
+  /// A last card after the items that opens the full list. Only its title,
+  /// subtitle, icon and tap/focus/hover callbacks are used.
+  final MediaPreviewItem? viewAll;
 
   /// Set only by [MediaPreviewSection.builder].
   final int? itemCount;
@@ -1323,6 +1335,8 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
     // card's Column (bigger image + taller scaled-up text in a row height
     // that never grew to match).
     final cardHeight = baseHeight * scale * fontScale;
+    final viewAll = widget.viewAll;
+    final cardCount = visibleCount + (viewAll == null ? 0 : 1);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 28),
@@ -1349,7 +1363,29 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
             ],
           ),
           const SizedBox(height: MediaBrowsingMetrics.chipGap),
-          if (visibleCount == 0)
+          if (widget.isLoading)
+            SizedBox(
+              height: cardHeight + 16,
+              child: ExcludeSemantics(
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 12),
+                  itemCount: MediaPreviewSection.maxVisibleItems,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(width: MediaBrowsingMetrics.itemGap),
+                  itemBuilder: (_, _) => _PreviewCardSkeleton(
+                    width: cardWidth * fontScale,
+                    shape: widget.itemBuilder != null
+                        ? _PreviewSkeletonShape.tile
+                        : widget.landscapeStyle
+                        ? _PreviewSkeletonShape.landscape
+                        : _PreviewSkeletonShape.poster,
+                  ),
+                ),
+              ),
+            )
+          else if (visibleCount == 0)
             Text(widget.emptyLabel)
           else
             SizedBox(
@@ -1376,11 +1412,17 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
                       controller: _controller,
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.only(bottom: 12),
-                      itemCount: visibleCount,
+                      itemCount: cardCount,
                       separatorBuilder: (_, _) => const SizedBox(
                         width: MediaBrowsingMetrics.itemGap,
                       ),
                       itemBuilder: (context, index) {
+                        if (index == visibleCount) {
+                          return _PreviewViewAllCard(
+                            item: viewAll!,
+                            width: cardWidth * fontScale,
+                          );
+                        }
                         final cardBuilder = widget.itemBuilder;
                         if (cardBuilder != null) {
                           return cardBuilder(
@@ -1411,6 +1453,157 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
   double _previewCardScale(double availableWidth) {
     if (availableWidth >= 1600) return 1;
     return (availableWidth / 1280.0).clamp(1.0, 1.15);
+  }
+}
+
+enum _PreviewSkeletonShape { poster, landscape, tile }
+
+/// A [MediaPreviewSection.isLoading] card: the card's background with blocks
+/// where its art and text will go.
+class _PreviewCardSkeleton extends StatelessWidget {
+  const _PreviewCardSkeleton({required this.width, required this.shape});
+
+  final double width;
+  final _PreviewSkeletonShape shape;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final scale = FontSizeScope.scaleOf(context);
+    final block = colorScheme.surfaceContainerHighest;
+    Widget bar(double widthFactor, double height) => FractionallySizedBox(
+      widthFactor: widthFactor,
+      alignment: Alignment.centerLeft,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: block,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: SizedBox(height: height * scale),
+      ),
+    );
+    const radius = Radius.circular(MediaBrowsingMetrics.cardRadius);
+    return SizedBox(
+      width: width,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHigh,
+          borderRadius: const BorderRadius.all(radius),
+        ),
+        child: shape == _PreviewSkeletonShape.tile
+            ? const SizedBox.expand()
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (shape == _PreviewSkeletonShape.landscape)
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: block,
+                        borderRadius: const BorderRadius.vertical(top: radius),
+                      ),
+                      child: SizedBox(height: width * 9 / 16),
+                    )
+                  else
+                    Expanded(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: block,
+                          borderRadius: const BorderRadius.all(radius),
+                        ),
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.all(MediaBrowsingMetrics.chipGap),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        bar(0.7, 10),
+                        const SizedBox(height: 6),
+                        bar(0.4, 8),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+/// [MediaPreviewSection.viewAll]: an icon and label centered on a card the
+/// size of the row's others.
+class _PreviewViewAllCard extends StatelessWidget {
+  const _PreviewViewAllCard({required this.item, required this.width});
+
+  final MediaPreviewItem item;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final scale = FontSizeScope.scaleOf(context);
+    final subtitle = item.subtitle;
+    final card = SizedBox(
+      width: width,
+      child: DpadInkWell(
+        onTap: item.onTap,
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
+        child: Padding(
+          padding: const EdgeInsets.all(MediaBrowsingMetrics.chipGap),
+          child: Center(
+            // Scales down rather than overflowing the shorter Live TV tiles
+            // at large font sizes.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(12 * scale),
+                      child: Icon(
+                        item.fallbackIcon,
+                        size: 28 * scale,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: MediaBrowsingMetrics.chipGap),
+                  Text(
+                    item.title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (item.onFocused == null && item.onHoverChanged == null) return card;
+    return PreviewFocusAnchor(
+      onFocused: item.onFocused,
+      onHoverChanged: item.onHoverChanged,
+      contentKey: (item.title, item.subtitle),
+      child: card,
+    );
   }
 }
 

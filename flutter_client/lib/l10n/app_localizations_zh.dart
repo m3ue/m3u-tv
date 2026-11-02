@@ -898,7 +898,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeNoContinueWatching => '暂无可继续观看的内容';
 
   @override
-  String get homeContinueWatchingSeeAll => '查看全部';
+  String get homeViewAll => '查看全部';
 
   @override
   String homeContinueWatchingMoreCount(int count) {
@@ -925,6 +925,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get homeMovie => '电影';
+
+  @override
+  String get homeBrowseLiveTv => '浏览所有频道';
+
+  @override
+  String get homeBrowseMovies => '浏览所有电影';
+
+  @override
+  String get homeBrowseSeries => '浏览所有剧集';
+
+  @override
+  String get homeNothingToShow => '此播放列表暂无内容';
 
   @override
   String get notificationsTitle => '通知';

@@ -227,6 +227,12 @@ class AppStateController extends ChangeNotifier {
   /// The scope the shown playlist's local state is stored under.
   String? _playlistScope() => savedPlaylists.scopeFor(_publishedLogin);
 
+  /// Identifies the playlist on screen; changes once a switch is shown.
+  String? get shownPlaylistKey {
+    final login = _publishedLogin;
+    return login == null ? null : _loginKeyFor(login, _playlistScope());
+  }
+
   void _publishLogin(UserCredentials? credentials) {
     final previousScope = _playlistScope();
     _publishedLogin = credentials;
@@ -1796,10 +1802,20 @@ class AppStateController extends ChangeNotifier {
                   !_sourceOperationGeneration.isStale(sourceGeneration),
             );
       if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
-      // Keep local progress if the server returned nothing (e.g. sync lag).
-      final progress = fetched.isEmpty && _progressList.isNotEmpty
-          ? _progressList
-          : fetched;
+      // Keep local progress if the server returned nothing (e.g. sync lag),
+      // but only this viewer's: another playlist has its own viewer, so a
+      // switch falls back to what this device stored for that one.
+      var progress = fetched;
+      if (fetched.isEmpty && activeViewer != null) {
+        if (activeViewer.ulid == _activeViewer?.ulid) {
+          if (_progressList.isNotEmpty) progress = _progressList;
+        } else {
+          progress = await _storedRecentlyWatched(activeViewer.ulid);
+          if (_sourceOperationGeneration.isStale(sourceGeneration)) {
+            return false;
+          }
+        }
+      }
 
       // The playlist being loaded: the shown one on a refresh, the incoming
       // one on a switch, whose favorites are staged before it is shown.

@@ -218,6 +218,36 @@ void main() {
       );
     });
 
+    test('continue watching follows the shown playlist', () async {
+      final fixture = _Fixture()
+        ..transport.recentlyWatchedByViewer['viewer-sports'] = [
+          <String, Object?>{
+            'content_type': 'vod',
+            'stream_id': 301,
+            'position_seconds': 91,
+            'duration_seconds': 600,
+            'title': 'Sports Movie',
+          },
+        ];
+      addTearDown(fixture.dispose);
+      final controller = fixture.controller;
+      List<String?> titles() =>
+          controller.progressList.map((p) => p.title).toList();
+
+      expect(await controller.connectXtream(_sports), isTrue);
+      await pumpEventQueue();
+      expect(titles(), <String>['Sports Movie']);
+
+      // The movies playlist's viewer has watched nothing.
+      expect(await controller.switchToPlaylist(_movies), isNull);
+      await pumpEventQueue();
+      expect(controller.progressList, isEmpty);
+
+      expect(await controller.switchToPlaylist(_sports), isNull);
+      await pumpEventQueue();
+      expect(titles(), <String>['Sports Movie']);
+    });
+
     test('proxy preferences are kept per playlist', () async {
       final directory = await Directory.systemTemp.createTemp(
         'm3u-tv-playlist-proxy-',
@@ -306,6 +336,8 @@ class _Fixture {
 class _PlaylistTransport {
   final Map<String, List<Map<String, Object?>>> favoritesByViewer =
       <String, List<Map<String, Object?>>>{};
+  final Map<String, List<Map<String, Object?>>> recentlyWatchedByViewer =
+      <String, List<Map<String, Object?>>>{};
   final Set<String> rejected = <String>{};
   int authRequests = 0;
 
@@ -332,8 +364,10 @@ class _PlaylistTransport {
       case 'get_series_categories':
       case 'get_vod_streams':
       case 'get_series':
-      case 'get_recently_watched':
         return const <Object?>[];
+      case 'get_recently_watched':
+        return recentlyWatchedByViewer['${request.params['viewer_id']}'] ??
+            const <Object?>[];
       case 'get_live_streams':
         return <Map<String, Object?>>[
           <String, Object?>{

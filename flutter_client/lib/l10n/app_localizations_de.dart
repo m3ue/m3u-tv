@@ -928,7 +928,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get homeNoContinueWatching => 'Nichts zum Weiterschauen';
 
   @override
-  String get homeContinueWatchingSeeAll => 'Alle anzeigen';
+  String get homeViewAll => 'Alle anzeigen';
 
   @override
   String homeContinueWatchingMoreCount(int count) {
@@ -962,6 +962,18 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get homeMovie => 'Film';
+
+  @override
+  String get homeBrowseLiveTv => 'Alle Sender durchsuchen';
+
+  @override
+  String get homeBrowseMovies => 'Alle Filme durchsuchen';
+
+  @override
+  String get homeBrowseSeries => 'Alle Serien durchsuchen';
+
+  @override
+  String get homeNothingToShow => 'Diese Playlist hat noch keine Inhalte';
 
   @override
   String get notificationsTitle => 'Mitteilungen';
