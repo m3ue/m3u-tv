@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/vod/vod_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -162,6 +163,106 @@ void main() {
         expect(firstMovieCard, findsOneWidget);
         expect(tester.getSize(firstMovieCard).width, lessThanOrEqualTo(220));
       }
+    });
+
+    group('after a catalog reload (e.g. a playlist switch)', () {
+      const reloadedItems = <VodItem>[
+        VodItem(
+          id: 9,
+          name: 'Elephants Dream',
+          streamUrl: 'http://example.com/9.mp4',
+          containerExtension: 'mp4',
+          categoryId: '40',
+        ),
+      ];
+      const reloadedCategories = <Category>[
+        Category(id: '40', name: 'Animation'),
+      ];
+      // No poster URLs: rendering one under tester.runAsync reaches the real
+      // image cache, which is not set up in tests.
+      const initialItems = <VodItem>[
+        VodItem(
+          id: 1,
+          name: 'Big Buck Bunny',
+          streamUrl: 'http://example.com/1.mp4',
+          containerExtension: 'mp4',
+          categoryId: '20',
+        ),
+        VodItem(
+          id: 2,
+          name: 'Sintel',
+          streamUrl: 'http://example.com/2.mp4',
+          containerExtension: 'mp4',
+          categoryId: '21',
+        ),
+      ];
+
+      Future<void> reload(
+        WidgetTester tester,
+        CatalogRepository repo,
+        StateProvider<List<Category>> categoriesState,
+      ) async {
+        await tester.runAsync(
+          () => repo.replaceItems(
+            sourceKey: CatalogRepository.activeSource,
+            kind: kCatalogKindVod,
+            items: reloadedItems,
+          ),
+        );
+        ProviderScope.containerOf(
+          tester.element(find.byType(VodScreen)),
+        ).read(categoriesState.notifier).state = reloadedCategories;
+        await tester.pump();
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await _settle(tester);
+      }
+
+      testWidgets('the mounted grid shows the new movies', (tester) async {
+        final repo = await _buildRepo(tester, initialItems);
+        final categoriesState = StateProvider<List<Category>>(
+          (_) => testCategories,
+        );
+        await tester.pumpWidget(
+          _TestApp(
+            catalogRepository: repo,
+            categories: testCategories,
+            categoriesState: categoriesState,
+          ),
+        );
+        await _settle(tester);
+        expect(find.text('Big Buck Bunny'), findsOneWidget);
+
+        await reload(tester, repo, categoriesState);
+
+        expect(find.text('Elephants Dream'), findsOneWidget);
+        expect(find.text('Big Buck Bunny'), findsNothing);
+      });
+
+      testWidgets('a category the new catalog lacks falls back to All', (
+        tester,
+      ) async {
+        final repo = await _buildRepo(tester, initialItems);
+        final categoriesState = StateProvider<List<Category>>(
+          (_) => testCategories,
+        );
+        await tester.pumpWidget(
+          _TestApp(
+            catalogRepository: repo,
+            categories: testCategories,
+            categoriesState: categoriesState,
+          ),
+        );
+        await _settle(tester);
+        await tester.tap(find.text('Action'));
+        await _settle(tester);
+
+        await reload(tester, repo, categoriesState);
+
+        expect(find.text('Elephants Dream'), findsOneWidget);
+        expect(find.text('Action'), findsNothing);
+      });
     });
 
     testWidgets('renders All Movies and category tabs', (tester) async {
@@ -1169,6 +1270,7 @@ class _TestApp extends StatelessWidget {
     this.onVodSelect,
     this.viewSettingsService,
     this.favoritesService,
+    this.categoriesState,
   });
 
   final CatalogRepository catalogRepository;
@@ -1179,6 +1281,10 @@ class _TestApp extends StatelessWidget {
   final ViewSettingsService? viewSettingsService;
   final FavoritesService? favoritesService;
 
+  /// When set, the categories come from here, so a test can swap them while
+  /// the screen stays mounted (a catalog reload).
+  final StateProvider<List<Category>>? categoriesState;
+
   @override
   Widget build(BuildContext context) {
     final service = viewSettingsService ?? ViewSettingsService();
@@ -1186,7 +1292,11 @@ class _TestApp extends StatelessWidget {
       overrides: [
         isBootstrappingProvider.overrideWith((_) => false),
         isConfiguredProvider.overrideWith((_) => isConfigured),
-        vodCategoriesProvider.overrideWith((_) => categories),
+        vodCategoriesProvider.overrideWith(
+          (ref) => categoriesState == null
+              ? categories
+              : ref.watch(categoriesState!),
+        ),
         viewSettingsServiceProvider.overrideWith((_) => service),
         catalogRepositoryProvider.overrideWith((_) => catalogRepository),
       ],

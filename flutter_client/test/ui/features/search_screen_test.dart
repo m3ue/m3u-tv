@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/search/search_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -145,6 +146,45 @@ void main() {
       expect(find.text('Matrix Reloaded'), findsOneWidget);
       // BBC News and CNN should not appear in All results
       expect(find.text('BBC News'), findsNothing);
+    });
+
+    testWidgets('a catalog reload re-runs the search on the new rows', (
+      tester,
+    ) async {
+      final categoriesState = StateProvider<List<Category>>(
+        (_) => const <Category>[],
+      );
+      await tester.pumpWidget(
+        _TestApp(catalogRepository: testRepo, categoriesState: categoriesState),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'matrix');
+      await tester.pumpAndSettle();
+      expect(find.text('Matrix Reloaded'), findsOneWidget);
+
+      await testRepo.replaceItems(
+        sourceKey: CatalogRepository.activeSource,
+        kind: kCatalogKindVod,
+        items: const <VodItem>[
+          VodItem(
+            id: 30,
+            name: 'Matrix Resurrections',
+            streamUrl: 'http://example.com/30.mp4',
+            containerExtension: 'mp4',
+            categoryId: '20',
+          ),
+        ],
+      );
+      // Every load decodes a new list; that new identity is the signal.
+      ProviderScope.containerOf(
+        tester.element(find.byType(SearchScreen)),
+      ).read(categoriesState.notifier).state = <Category>[
+        const Category(id: '10', name: 'News'),
+      ];
+      await tester.pumpAndSettle();
+
+      expect(find.text('Matrix Resurrections'), findsOneWidget);
+      expect(find.text('Matrix Reloaded'), findsNothing);
     });
 
     testWidgets('Live TV tab shows only channels', (tester) async {
@@ -682,6 +722,7 @@ class _TestApp extends StatelessWidget {
     this.onSeriesSelect,
     this.onSearchShows,
     this.onShowSelect,
+    this.categoriesState,
   });
 
   final CatalogRepository catalogRepository;
@@ -693,6 +734,10 @@ class _TestApp extends StatelessWidget {
   final Future<List<EpgShow>> Function(String)? onSearchShows;
   final void Function(EpgShow)? onShowSelect;
 
+  /// When set, a test can replace the live categories while the screen stays
+  /// mounted, the way every catalog load does.
+  final StateProvider<List<Category>>? categoriesState;
+
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
@@ -700,6 +745,11 @@ class _TestApp extends StatelessWidget {
         isBootstrappingProvider.overrideWith((_) => false),
         isConfiguredProvider.overrideWith((_) => isConfigured),
         catalogRepositoryProvider.overrideWith((_) => catalogRepository),
+        liveCategoriesProvider.overrideWith(
+          (ref) => categoriesState == null
+              ? const <Category>[]
+              : ref.watch(categoriesState!),
+        ),
       ],
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,

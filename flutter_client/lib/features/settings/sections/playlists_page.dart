@@ -290,7 +290,9 @@ class _SwitchingDialogState extends State<_SwitchingDialog> {
   @override
   void initState() {
     super.initState();
-    unawaited(_run());
+    // After this frame: the task notifies app state (and Riverpod) as soon
+    // as it starts, which is not allowed while the dialog is being built.
+    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_run()));
   }
 
   Future<void> _run() async {

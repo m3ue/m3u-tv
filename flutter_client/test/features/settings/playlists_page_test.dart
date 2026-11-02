@@ -67,22 +67,28 @@ void main() {
     WidgetTester tester,
     PlaylistManagement playlists, {
     VoidCallback? onSwitched,
+    Listenable? appState,
   }) async {
     await tester.pumpWidget(
-      MaterialApp(
-        theme: ThemeData.dark(useMaterial3: true),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: TextButton(
-              onPressed: () => openPlaylistsPage(
-                context,
-                playlists: playlists,
-                authNotifier: auth,
-                onSwitched: onSwitched,
+      ListenableBuilder(
+        // Stands in for the app shell, which rebuilds on app state changes.
+        listenable: appState ?? Listenable.merge(const []),
+        builder: (_, child) => child!,
+        child: MaterialApp(
+          theme: ThemeData.dark(useMaterial3: true),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () => openPlaylistsPage(
+                  context,
+                  playlists: playlists,
+                  authNotifier: auth,
+                  onSwitched: onSwitched,
+                ),
+                child: const Text('Open playlists'),
               ),
-              child: const Text('Open playlists'),
             ),
           ),
         ),
@@ -137,6 +143,34 @@ void main() {
     expect(switched, 1);
     expect(find.text('Open playlists'), findsOneWidget);
     expect(find.text('editor.invalid (2)'), findsNothing);
+  });
+
+  testWidgets('the switch starts only once the dialog has been built', (
+    tester,
+  ) async {
+    // connectXtream notifies app state before its first await; starting it
+    // while the dialog builds marked the shell dirty mid-build.
+    final appState = ValueNotifier<int>(0);
+    addTearDown(appState.dispose);
+    await openPage(
+      tester,
+      management(
+        onSwitch: (_) {
+          appState.value += 1;
+          return Future<String?>.value();
+        },
+      ),
+      appState: appState,
+    );
+
+    await tester.tap(find.text('editor.invalid (2)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Switch to Playlist'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(appState.value, 1);
+    expect(find.text('Open playlists'), findsOneWidget);
   });
 
   testWidgets('a failed switch stays on the page and shows the error', (

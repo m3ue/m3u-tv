@@ -128,6 +128,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _vodFavoritesService = ref.read(vodFavoritesServiceProvider);
     _seriesFavoritesService = ref.read(seriesFavoritesServiceProvider);
     _liveFavoritesService.addListener(_onChannelFavoritesChanged);
+    _vodFavoritesService.addListener(_onMediaFavoritesChanged);
+    _seriesFavoritesService.addListener(_onMediaFavoritesChanged);
     unawaited(_loadFavorites());
   }
 
@@ -139,6 +141,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _continueWatchingNode.dispose();
     _viewSettings.removeListener(_onViewSettingsChanged);
     _liveFavoritesService.removeListener(_onChannelFavoritesChanged);
+    _vodFavoritesService.removeListener(_onMediaFavoritesChanged);
+    _seriesFavoritesService.removeListener(_onMediaFavoritesChanged);
     _spotlight.dispose();
     super.dispose();
   }
@@ -246,9 +250,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (mounted) setState(() => _favoriteChannelIds = ids);
   }
 
+  /// Movie/series favorites change outside Home too: a detail page, a server
+  /// sync, or a switch to another playlist.
+  void _onMediaFavoritesChanged() => unawaited(_loadMediaFavorites());
+
   Future<void> _loadFavorites() async {
-    final live = await _liveFavoritesService.all();
-    if (mounted) setState(() => _favoriteChannelIds = live);
+    await _loadChannelFavorites();
+    await _loadMediaFavorites();
+  }
+
+  Future<void> _loadMediaFavorites() async {
     final vod = await _vodFavoritesService.all();
     if (mounted) setState(() => _favoriteVodIds = vod);
     final series = await _seriesFavoritesService.all();

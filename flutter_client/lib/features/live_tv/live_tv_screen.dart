@@ -680,9 +680,19 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
 
   /// A catalog refresh landed: re-read the slice in place.
   void _onCatalogReloaded(List<Category>? previous, List<Category> next) {
-    if (_windowReady && !identical(previous, next)) {
-      unawaited(_window.refresh());
+    if (!_windowReady || identical(previous, next)) return;
+    // After a switch to another playlist the selected category may not
+    // exist any more; fall back to All rather than an empty slice.
+    final selected = _selectedCategory;
+    if (selected != null &&
+        selected.isNotEmpty &&
+        selected != _favoritesCategoryId &&
+        !next.any((category) => category.id == selected)) {
+      setState(() => _selectedCategory = null);
+      _reconfigureWindow();
+      return;
     }
+    unawaited(_window.refresh());
   }
 
   void _onQueryChanged(String value) {

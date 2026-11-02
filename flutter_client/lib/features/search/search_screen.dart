@@ -198,6 +198,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   Widget build(BuildContext context) {
     final isBootstrapping = ref.watch(isBootstrappingProvider);
     final isConfigured = ref.watch(isConfiguredProvider);
+    // A catalog load (a refresh, or a switch to another playlist) replaces
+    // the rows the results came from: run the search again.
+    ref.listen<List<Category>>(liveCategoriesProvider, (previous, next) {
+      if (!identical(previous, next)) setState(() => _catalogResultsFor = null);
+    });
 
     if (isBootstrapping) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));

@@ -182,6 +182,25 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
     });
   }
 
+  /// A catalog load replaced the rows under the window (a refresh, or a
+  /// switch to another playlist): re-read them, falling back to All when the
+  /// selected category is not in the new catalog.
+  void _onCatalogReloaded(List<Category>? previous, List<Category> next) {
+    if (identical(previous, next)) return;
+    final selected = _selectedCategory;
+    final selectionGone =
+        selected != null &&
+        selected.isNotEmpty &&
+        selected != _kFavoritesCategoryId &&
+        !next.any((category) => category.id == selected);
+    if (selectionGone) {
+      setState(() => _selectedCategory = null);
+      _reconfigureWindow();
+    } else {
+      unawaited(_window.refresh());
+    }
+  }
+
   void _onCategorySelected(String id) {
     setState(() => _selectedCategory = id);
     if (id != _kFavoritesCategoryId) _reconfigureWindow();
@@ -274,6 +293,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
     final isBootstrapping = ref.watch(isBootstrappingProvider);
     final isConfigured = ref.watch(isConfiguredProvider);
     final categories = ref.watch(seriesCategoriesProvider);
+    ref.listen<List<Category>>(seriesCategoriesProvider, _onCatalogReloaded);
 
     if (isBootstrapping) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
