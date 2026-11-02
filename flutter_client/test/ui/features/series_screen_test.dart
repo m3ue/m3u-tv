@@ -141,6 +141,42 @@ void main() {
       },
     );
 
+    testWidgets('the Favorites tab is left once it has nothing in it', (
+      tester,
+    ) async {
+      Future<void> settleCatalog() async {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      final repo = await _buildRepo(tester, const <Series>[
+        Series(id: 1, name: 'Breaking Bad', categoryId: '30'),
+        Series(id: 2, name: 'Stranger Things', categoryId: '31'),
+      ]);
+      final favorites = FavoritesService(memory: <String, Object?>{});
+      await favorites.add(1);
+      await tester.pumpWidget(
+        _TestApp(
+          catalogRepository: repo,
+          categories: testCategories,
+          favoritesService: favorites,
+        ),
+      );
+      await settleCatalog();
+      await tester.tap(find.text('★ Favorites'));
+      await settleCatalog();
+      expect(find.text('Stranger Things'), findsNothing);
+
+      // The last favorite goes (or a switch lands on a playlist with none).
+      await favorites.toggle(1);
+      await settleCatalog();
+
+      expect(find.text('★ Favorites'), findsNothing);
+      expect(find.text('Stranger Things'), findsOneWidget);
+    });
+
     testWidgets('renders All Series and category tabs', (tester) async {
       final repo = await _buildRepo(tester, testSeriesList);
       await tester.pumpWidget(

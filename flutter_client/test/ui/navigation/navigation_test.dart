@@ -2765,6 +2765,9 @@ Future<void> _pumpAppFrame(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 250));
   await tester.pump();
+  // Home's Live row reads the favorites before its channels, so its first
+  // card lands (and scrolls itself into view) a frame later.
+  await tester.pump(const Duration(milliseconds: 250));
 }
 
 Future<void> _sendPlatformNavigationMethod(

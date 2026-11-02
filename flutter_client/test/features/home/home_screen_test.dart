@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
@@ -39,6 +41,23 @@ const _otherMovies = <VodItem>[
   ),
 ];
 const _series = <Series>[Series(id: 5, name: 'Sintel Saga', categoryId: '30')];
+
+/// Favorites whose reads can be held back (a slow storage read) and are
+/// counted.
+class _GatedFavorites extends FavoritesService {
+  _GatedFavorites(this.ids) : super(memory: <String, Object?>{});
+
+  Set<int> ids;
+  Completer<void>? gate;
+  int reads = 0;
+
+  @override
+  Future<Set<int>> all() async {
+    reads += 1;
+    await gate?.future;
+    return {...ids};
+  }
+}
 
 /// The catalog one playlist shows.
 class _Catalog {
@@ -110,6 +129,7 @@ void main() {
     WidgetTester tester,
     _Catalog catalog, {
     VoidCallback? onMoviesMore,
+    FavoritesService? liveFavorites,
   }) async {
     // A TV screen: every row is on it.
     await tester.binding.setSurfaceSize(const Size(1920, 1080));
@@ -145,7 +165,7 @@ void main() {
             (_) => ViewSettingsService(),
           ),
           liveFavoritesServiceProvider.overrideWith(
-            (_) => FavoritesService(memory: memory),
+            (_) => liveFavorites ?? FavoritesService(memory: memory),
           ),
           vodFavoritesServiceProvider.overrideWith(
             (_) => FavoritesService(memory: memory, namespace: 'vod'),
@@ -266,5 +286,64 @@ void main() {
 
     await _settle(tester);
     expect(find.text('Elephants Dream'), findsWidgets);
+  });
+
+  testWidgets('after a switch the Live row waits for that playlist favorites', (
+    tester,
+  ) async {
+    final favorites = _GatedFavorites({1});
+    final repo = await pumpHome(
+      tester,
+      const _Catalog(channels: _channels),
+      liveFavorites: favorites,
+    );
+    await _settle(tester);
+    expect(find.text('Favorite Channels'), findsOneWidget);
+
+    // The next playlist has its own channel 1, no favorites, and they are
+    // slow to read.
+    const next = _Catalog(
+      channels: [
+        Channel(id: 1, name: 'Sports One', streamUrl: 'http://x/s1'),
+      ],
+    );
+    final gate = Completer<void>();
+    favorites
+      ..ids = <int>{}
+      ..gate = gate
+      ..notifyPlaylistChanged();
+    await tester.runAsync(() => _fill(repo, next));
+    ProviderScope.containerOf(
+      tester.element(find.byType(HomeScreen)),
+    ).read(shown.notifier).state = (
+      'second',
+      next,
+    );
+    await _settle(tester);
+
+    // Not "Favorite Channels" picked by the last playlist's ids.
+    expect(find.text('Favorite Channels'), findsNothing);
+    expect(find.text('Sports One'), findsNothing);
+
+    gate.complete();
+    await _settle(tester);
+    expect(_section('Live TV'), findsOneWidget);
+    expect(find.text('Sports One'), findsOneWidget);
+  });
+
+  testWidgets('a favorite toggled on Home is read back once', (tester) async {
+    final favorites = _GatedFavorites(<int>{});
+    await pumpHome(
+      tester,
+      const _Catalog(channels: _channels),
+      liveFavorites: favorites,
+    );
+    await _settle(tester);
+    final readsBefore = favorites.reads;
+
+    await tester.longPress(find.text('BBC One'));
+    await _settle(tester);
+
+    expect(favorites.reads - readsBefore, 1);
   });
 }

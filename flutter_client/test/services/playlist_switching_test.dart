@@ -25,6 +25,11 @@ const _movies = UserCredentials(
   username: 'movies',
   password: 'movies-password',
 );
+const _otherEditor = UserCredentials(
+  server: 'https://other.invalid',
+  username: 'other',
+  password: 'other-password',
+);
 const _rejected = UserCredentials(
   server: 'https://editor.invalid',
   username: 'rejected',
@@ -218,6 +223,80 @@ void main() {
       );
     });
 
+    test(
+      'a revoke forgets only the playlists on the editor that sent it',
+      () async {
+        final fixture = _Fixture();
+        addTearDown(fixture.dispose);
+        final controller = fixture.controller;
+        expect(await controller.connectXtream(_otherEditor), isTrue);
+        expect(await controller.connectXtream(_sports), isTrue);
+        expect(await controller.connectXtream(_movies), isTrue);
+        final movies = controller.savedPlaylists.find(_movies)!;
+        await controller.favoritesService.add(202);
+
+        await controller.signOutDevice();
+
+        expect(controller.isConfigured, isFalse);
+        expect(
+          controller.savedPlaylists.playlists.map(
+            (p) => p.credentials.username,
+          ),
+          <String>['other'],
+        );
+        expect(
+          fixture.memory.containsKey('m3ue_favorites_playlist_${movies.id}'),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'a failed favorites sync keeps the favorites a playlist stored',
+      () async {
+        final fixture = _Fixture()
+          ..transport.favoritesByViewer['viewer-sports'] = [
+            <String, Object?>{'content_type': 'live', 'stream_id': 101},
+          ]
+          ..transport.favoritesByViewer['viewer-movies'] = [
+            <String, Object?>{'content_type': 'live', 'stream_id': 202},
+          ];
+        addTearDown(fixture.dispose);
+        final controller = fixture.controller;
+        expect(await controller.connectXtream(_sports), isTrue);
+        await pumpEventQueue();
+        expect(await controller.favoritesService.all(), <int>{101});
+        expect(await controller.switchToPlaylist(_movies), isNull);
+        await pumpEventQueue();
+
+        fixture.transport.failingFavorites.add('viewer-sports');
+        expect(await controller.switchToPlaylist(_sports), isNull);
+        await pumpEventQueue();
+
+        expect(await controller.favoritesService.all(), <int>{101});
+      },
+    );
+
+    test('a failed connect clears what it staged for its playlist', () async {
+      final fixture = _Fixture()..transport.failingContent.add('movies');
+      addTearDown(fixture.dispose);
+      final controller = fixture.controller;
+      expect(await controller.connectXtream(_sports), isTrue);
+      // Stands in for state written under the incoming playlist's id
+      // before its load failed.
+      final pending = controller.savedPlaylists.scopeFor(_movies)!;
+      await controller.favoritesService.replaceAllIn(pending, <int>{202});
+      final stagedKey = 'm3ue_favorites_playlist_$pending';
+      expect(fixture.memory[stagedKey], isNotNull);
+
+      expect(await controller.connectXtream(_movies), isFalse);
+
+      expect(controller.authNotifier.credentials?.username, 'sports');
+      expect(fixture.memory.containsKey(stagedKey), isFalse);
+      expect(controller.savedPlaylists.find(_movies), isNull);
+      expect(controller.savedPlaylists.scopeFor(_movies), isNot(pending));
+    });
+
     test('continue watching follows the shown playlist', () async {
       final fixture = _Fixture()
         ..transport.recentlyWatchedByViewer['viewer-sports'] = [
@@ -339,6 +418,12 @@ class _PlaylistTransport {
   final Map<String, List<Map<String, Object?>>> recentlyWatchedByViewer =
       <String, List<Map<String, Object?>>>{};
   final Set<String> rejected = <String>{};
+
+  /// Viewer ulids whose favorites can't be read or synced.
+  final Set<String> failingFavorites = <String>{};
+
+  /// Usernames whose catalog can't be downloaded.
+  final Set<String> failingContent = <String>{};
   int authRequests = 0;
 
   Future<Object?> call(XtreamRequest request) async {
@@ -369,6 +454,9 @@ class _PlaylistTransport {
         return recentlyWatchedByViewer['${request.params['viewer_id']}'] ??
             const <Object?>[];
       case 'get_live_streams':
+        if (failingContent.contains(username)) {
+          throw StateError('catalog unavailable');
+        }
         return <Map<String, Object?>>[
           <String, Object?>{
             'stream_id': username == 'sports' ? 101 : 202,
@@ -387,11 +475,13 @@ class _PlaylistTransport {
       case 'get_epg_batch':
         return <String, Object?>{};
       case 'get_favorites':
-        return favoritesByViewer['${request.params['viewer_id']}'] ??
-            const <Object?>[];
       case 'sync_favorites':
-        return favoritesByViewer['${request.body['viewer_id']}'] ??
-            const <Object?>[];
+        final viewerId =
+            '${request.params['viewer_id'] ?? request.body['viewer_id']}';
+        if (failingFavorites.contains(viewerId)) {
+          throw StateError('favorites unavailable');
+        }
+        return favoritesByViewer[viewerId] ?? const <Object?>[];
       case 'toggle_favorite':
         return <String, Object?>{'favorited': request.body['favorited']};
       default:

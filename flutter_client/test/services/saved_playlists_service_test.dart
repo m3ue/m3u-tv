@@ -114,7 +114,7 @@ void main() {
       );
       expect(stored, hasLength(1));
 
-      await service.clear();
+      await service.remove(service.playlists.single.id);
       expect(service.playlists, isEmpty);
       expect(await storage.read(SavedPlaylistsService.storageKey), isNull);
     });
@@ -127,6 +127,35 @@ void main() {
       await service.load();
 
       expect(service.playlists, isEmpty);
+
+      // It never will parse, so the next save replaces it.
+      await service.remember(_sports);
+      final stored = jsonDecode(
+        (await storage.read(SavedPlaylistsService.storageKey))!,
+      );
+      expect(stored, hasLength(1));
+    });
+
+    test('sameServer matches one editor however its URL was typed', () {
+      expect(sameServer('editor.invalid/', 'http://editor.invalid'), isTrue);
+      expect(
+        sameServer(
+          'https://Editor.invalid:8443',
+          'https://editor.invalid:8443/',
+        ),
+        isTrue,
+      );
+      expect(
+        sameServer('https://editor.invalid', 'https://other.invalid'),
+        isFalse,
+      );
+      expect(
+        sameServer(
+          'http://editor.invalid:36400',
+          'http://editor.invalid:36401',
+        ),
+        isFalse,
+      );
     });
 
     test(

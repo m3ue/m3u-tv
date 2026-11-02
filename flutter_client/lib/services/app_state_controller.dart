@@ -876,6 +876,7 @@ class AppStateController extends ChangeNotifier {
     final isCurrent = !_sourceOperationGeneration.isStale(sourceGeneration);
     if (!loaded && isCurrent) {
       await restorePreviousSource(allowStaleSource: false);
+      await _discardPendingPlaylist(credentials);
     } else {
       if (loaded && isCurrent) authNotifier.publishSession();
     }
@@ -891,6 +892,17 @@ class AppStateController extends ChangeNotifier {
       await _notifications.registerPushToken(credentials);
     }
     return loaded && isCurrent;
+  }
+
+  /// A login that failed to connect stays unsaved, so drop the id its state
+  /// was staged under while connecting and whatever was written there.
+  Future<void> _discardPendingPlaylist(UserCredentials credentials) async {
+    // Still shown (the rollback could not restore the previous login): that
+    // state is in use.
+    if (sameCredentials(_publishedLogin, credentials)) return;
+    final scope = savedPlaylists.takePendingScope(credentials);
+    if (scope == null) return;
+    await _bestEffort(() => _clearPlaylistState(credentials, scope));
   }
 
   Future<void> _rememberPlaylist(UserCredentials credentials) async {
@@ -1351,14 +1363,16 @@ class AppStateController extends ChangeNotifier {
 
   /// Signs out of the active playlist and removes it from this device. Any
   /// other saved playlists stay available on the connect screen.
-  Future<void> disconnect() => _signOut(forgetAllPlaylists: false);
+  Future<void> disconnect() => _signOut(forgetEditor: false);
 
-  /// Signs this device out of every saved playlist. An admin revoking the
-  /// device in the editor applies to the device, not to one playlist.
-  Future<void> signOutDevice() => _signOut(forgetAllPlaylists: true);
+  /// Signs this device out after its editor revoked it. The revoke applies
+  /// to the device on that editor, not to one playlist, so every playlist
+  /// saved there is forgotten; those on other editors stay.
+  Future<void> signOutDevice() => _signOut(forgetEditor: true);
 
-  Future<void> _signOut({required bool forgetAllPlaylists}) async {
-    final signedOutPlaylist = savedPlaylists.find(authNotifier.credentials);
+  Future<void> _signOut({required bool forgetEditor}) async {
+    final signedOutLogin = authNotifier.credentials;
+    final signedOutPlaylist = savedPlaylists.find(signedOutLogin);
     final sourceGeneration = _sourceOperationGeneration.advance();
     _sourceRollbackGeneration.advance();
     _isLoadingContent = false;
@@ -1379,10 +1393,14 @@ class AppStateController extends ChangeNotifier {
     _publishLogin(null);
     // Before the final notify, so the connect screen never lists a playlist
     // that was just signed out of.
-    if (forgetAllPlaylists) {
-      await _forgetAllPlaylists();
+    if (forgetEditor && signedOutLogin != null) {
+      await _forgetPlaylists([
+        for (final playlist in savedPlaylists.playlists)
+          if (sameServer(playlist.credentials.server, signedOutLogin.server))
+            playlist,
+      ]);
     } else if (signedOutPlaylist != null) {
-      await _forgetPlaylist(signedOutPlaylist);
+      await _forgetPlaylists([signedOutPlaylist]);
     }
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     // cacheService.clear() above emptied the stored guide, but a sweep write
@@ -1437,40 +1455,35 @@ class AppStateController extends ChangeNotifier {
       await disconnect();
       return;
     }
-    await _forgetPlaylist(playlist);
+    await _forgetPlaylists([playlist]);
   }
 
   /// Sets a saved playlist's label; null or blank restores the default.
   Future<void> renamePlaylist(String id, String? name) =>
       savedPlaylists.rename(id, name);
 
-  /// Removes [playlist] from this device along with its local state. The
-  /// exception is the last playlist on the unscoped keys: its state stays,
-  /// as a sign-out always left it before multiple playlists existed.
-  Future<void> _forgetPlaylist(SavedPlaylist playlist) async {
+  /// Removes [playlists] from this device along with their local state. The
+  /// exception is the playlist on the unscoped keys when none are left: its
+  /// state stays, as a sign-out always left it before multiple playlists.
+  Future<void> _forgetPlaylists(List<SavedPlaylist> playlists) async {
     try {
-      await savedPlaylists.remove(playlist.id);
-      if (playlist.usesBaseKeys && savedPlaylists.playlists.isEmpty) return;
-      await _clearPlaylistState(playlist);
+      for (final playlist in playlists) {
+        await savedPlaylists.remove(playlist.id);
+      }
+      final keepBaseKeys = savedPlaylists.playlists.isEmpty;
+      for (final playlist in playlists) {
+        if (playlist.usesBaseKeys && keepBaseKeys) continue;
+        await _clearPlaylistState(playlist.credentials, playlist.scope);
+      }
     } on Object catch (error) {
       debugPrint('Saved playlists: could not remove a playlist: $error');
     }
   }
 
-  Future<void> _forgetAllPlaylists() async {
-    final playlists = savedPlaylists.playlists;
-    try {
-      await savedPlaylists.clear();
-      for (final playlist in playlists) {
-        if (!playlist.usesBaseKeys) await _clearPlaylistState(playlist);
-      }
-    } on Object catch (error) {
-      debugPrint('Saved playlists: could not clear saved playlists: $error');
-    }
-  }
-
-  Future<void> _clearPlaylistState(SavedPlaylist playlist) async {
-    final scope = playlist.scope;
+  Future<void> _clearPlaylistState(
+    UserCredentials credentials,
+    String? scope,
+  ) async {
     await Future.wait(<Future<void>>[
       favoritesService.clearPlaylistState(scope),
       vodFavoritesService.clearPlaylistState(scope),
@@ -1478,7 +1491,7 @@ class AppStateController extends ChangeNotifier {
       aioFavoritesService.clearPlaylistState(scope),
       proxyPlaybackSettings.clearPlaylistState(scope),
       viewerService.forgetActiveViewer(
-        loginKey: _loginKeyFor(playlist.credentials, scope),
+        loginKey: _loginKeyFor(credentials, scope),
       ),
     ]);
   }
@@ -1889,7 +1902,11 @@ class AppStateController extends ChangeNotifier {
               await rollbackSource?.call();
               return false;
             }
+            // When the sync fails, what the incoming playlist has stored is
+            // its own and the next sync reconciles it. Only storage it would
+            // share with the outgoing playlist must not carry over.
             if (!synchronized &&
+                targetScope == _playlistScope() &&
                 !await _applyServerFavorites(
                   const <Map<String, Object?>>[],
                   isCurrent: ownsReplacement,

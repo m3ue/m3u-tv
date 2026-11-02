@@ -1,9 +1,24 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 
+import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+
+/// Whether [selectedId] names a category missing from a reloaded
+/// [categories] list (e.g. after a switch to another playlist), so the screen
+/// should fall back to All. All ('' or null) and [favoritesId] are never in
+/// the list and never count as missing.
+bool isCategorySelectionGone(
+  String? selectedId,
+  List<Category> categories, {
+  required String favoritesId,
+}) =>
+    selectedId != null &&
+    selectedId.isNotEmpty &&
+    selectedId != favoritesId &&
+    !categories.any((category) => category.id == selectedId);
 
 /// Search + category filter UI shared by media-browsing screens (VOD,
 /// Series, Live TV, Requests), with two presentations selected by

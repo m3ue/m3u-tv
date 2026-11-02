@@ -19,6 +19,15 @@ typedef PlaylistScope = String? Function();
 String playlistScopedKey(String base, String? scope) =>
     scope == null ? base : '${base}_playlist_$scope';
 
+/// Whether two server URLs reach the same editor: same host, port and path,
+/// whatever the scheme was typed as or a trailing slash.
+bool sameServer(String first, String second) {
+  final a = Uri.tryParse(normalizeServerUrl(first));
+  final b = Uri.tryParse(normalizeServerUrl(second));
+  if (a == null || b == null) return first == second;
+  return a.host == b.host && a.port == b.port && a.path == b.path;
+}
+
 /// The label shown for [playlist] among [playlists]: its custom name, else
 /// [playlistDefaultName].
 String playlistDisplayName(
@@ -137,7 +146,9 @@ class SavedPlaylistsService extends ChangeNotifier {
 
   /// Reads the saved list once. A failed read is retried by the next call,
   /// and nothing is written back until a read succeeds, so a transient
-  /// storage error can't overwrite the stored list with a partial one.
+  /// storage error can't overwrite the stored list with a partial one. A
+  /// stored value that can't be parsed never will be: it loads as empty and
+  /// the next save replaces it.
   Future<void> load() async {
     if (_loaded) return;
     await (_loading ??= _load());
@@ -186,6 +197,13 @@ class SavedPlaylistsService extends ChangeNotifier {
     return _pendingIds.putIfAbsent(_identity(credentials), _newId);
   }
 
+  /// Drops the id [scopeFor] handed to [credentials] while it connected and
+  /// returns it; null when it had none or has been saved since.
+  String? takePendingScope(UserCredentials credentials) {
+    if (find(credentials) != null) return null;
+    return _pendingIds.remove(_identity(credentials));
+  }
+
   /// Saves [credentials] (no-op when already saved) and returns its entry.
   Future<SavedPlaylist> remember(UserCredentials credentials) async {
     await load();
@@ -232,15 +250,6 @@ class SavedPlaylistsService extends ChangeNotifier {
     notifyListeners();
     await _persist();
     return removed;
-  }
-
-  Future<void> clear() async {
-    await load();
-    _pendingIds.clear();
-    if (_playlists.isEmpty) return;
-    _playlists = const <SavedPlaylist>[];
-    notifyListeners();
-    await _persist();
   }
 
   Future<void> _persist() => _writes.run(() async {

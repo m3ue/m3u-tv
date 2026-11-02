@@ -263,6 +263,39 @@ void main() {
         expect(find.text('Elephants Dream'), findsOneWidget);
         expect(find.text('Action'), findsNothing);
       });
+
+      testWidgets('the Favorites tab is left once it has nothing in it', (
+        tester,
+      ) async {
+        Future<void> settleCatalog() async {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 50)),
+          );
+          await _settle(tester);
+        }
+
+        final repo = await _buildRepo(tester, initialItems);
+        final favorites = FavoritesService(memory: <String, Object?>{});
+        await favorites.add(1);
+        await tester.pumpWidget(
+          _TestApp(
+            catalogRepository: repo,
+            categories: testCategories,
+            favoritesService: favorites,
+          ),
+        );
+        await settleCatalog();
+        await tester.tap(find.text('★ Favorites'));
+        await settleCatalog();
+        expect(find.text('Sintel'), findsNothing);
+
+        // The last favorite goes (or a switch lands on a playlist with none).
+        await favorites.toggle(1);
+        await settleCatalog();
+
+        expect(find.text('★ Favorites'), findsNothing);
+        expect(find.text('Sintel'), findsOneWidget);
+      });
     });
 
     testWidgets('renders All Movies and category tabs', (tester) async {

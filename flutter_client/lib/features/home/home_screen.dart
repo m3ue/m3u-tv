@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,9 +83,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// catalog on each rebuild.
   static const int _rowItemLimit = MediaPreviewSection.maxVisibleItems;
 
-  Set<int> _favoriteChannelIds = {};
+  /// Null until read for the shown playlist: they decide what the Live row
+  /// shows, so it waits for them.
+  Set<int>? _favoriteChannelIds;
   Set<int> _favoriteVodIds = {};
   Set<int> _favoriteSeriesIds = {};
+
+  /// Moves on a playlist switch, so a read of the last playlist's favorites
+  /// that lands afterwards is dropped.
+  int _favoritesGeneration = 0;
 
   late final FavoritesService _liveFavoritesService;
   late final FavoritesService _vodFavoritesService;
@@ -261,8 +268,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _loadChannelFavorites() async {
-    final ids = await _liveFavoritesService.all();
-    if (mounted) setState(() => _favoriteChannelIds = ids);
+    final generation = _favoritesGeneration;
+    Set<int> ids;
+    try {
+      ids = await _liveFavoritesService.all();
+    } on Object catch (error) {
+      // The Live row waits on these; show the whole lineup instead.
+      debugPrint('Home: could not read favorite channels: $error');
+      ids = const <int>{};
+    }
+    if (!mounted || generation != _favoritesGeneration) return;
+    final current = _favoriteChannelIds;
+    // Same ids, same Set: the Live row refetches when it gets a new one.
+    if (current != null && setEquals(current, ids)) return;
+    setState(() => _favoriteChannelIds = ids);
   }
 
   /// Movie/series favorites change outside Home too: a detail page, a server
@@ -275,10 +294,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _loadMediaFavorites() async {
+    final generation = _favoritesGeneration;
     final vod = await _vodFavoritesService.all();
-    if (mounted) setState(() => _favoriteVodIds = vod);
+    if (!mounted || generation != _favoritesGeneration) return;
+    if (!setEquals(vod, _favoriteVodIds)) {
+      setState(() => _favoriteVodIds = vod);
+    }
     final series = await _seriesFavoritesService.all();
-    if (mounted) setState(() => _favoriteSeriesIds = series);
+    if (!mounted || generation != _favoritesGeneration) return;
+    if (!setEquals(series, _favoriteSeriesIds)) {
+      setState(() => _favoriteSeriesIds = series);
+    }
   }
 
   void _onCatalogRowLoaded(_CatalogRow row, bool hasItems) {
@@ -295,6 +321,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (playlistKey != _shownPlaylistKey) {
       _shownPlaylistKey = playlistKey;
       _catalogRowHasItems.clear();
+      // The rows start over below, and must not mark (or, for Live, pick)
+      // channels by the last playlist's favorites while these are re-read.
+      _favoritesGeneration += 1;
+      _favoriteChannelIds = null;
+      _favoriteVodIds = const <int>{};
+      _favoriteSeriesIds = const <int>{};
+      unawaited(_loadFavorites());
       // The hero still describes the last playlist's card.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _spotlight.reset();
@@ -347,10 +380,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         favoriteChannelIds: _favoriteChannelIds,
         onChannelSelect: widget.onChannelSelect,
         onChannelContextChanged: widget.onChannelContextChanged,
-        onToggleFavorite: (channel) async {
-          await _liveFavoritesService.toggle(channel.id);
-          await _loadFavorites();
-        },
+        onToggleFavorite: (channel) => _liveFavoritesService.toggle(channel.id),
         rowItemLimit: _rowItemLimit,
         onViewAll: widget.onLiveTvMore,
         onLoaded: (hasItems) => _onCatalogRowLoaded(_CatalogRow.live, hasItems),
@@ -362,10 +392,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         key: ValueKey(('movies', playlistKey)),
         favoriteVodIds: _favoriteVodIds,
         onVodSelect: widget.onVodSelect,
-        onToggleFavorite: (item) async {
-          await _vodFavoritesService.toggle(item.id);
-          await _loadFavorites();
-        },
+        onToggleFavorite: (item) => _vodFavoritesService.toggle(item.id),
         rowItemLimit: _rowItemLimit,
         onViewAll: widget.onMoviesMore,
         onLoaded: (hasItems) =>
@@ -378,10 +405,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         key: ValueKey(('series', playlistKey)),
         favoriteSeriesIds: _favoriteSeriesIds,
         onSeriesSelect: widget.onSeriesSelect,
-        onToggleFavorite: (series) async {
-          await _seriesFavoritesService.toggle(series.id);
-          await _loadFavorites();
-        },
+        onToggleFavorite: (series) => _seriesFavoritesService.toggle(series.id),
         rowItemLimit: _rowItemLimit,
         onViewAll: widget.onSeriesMore,
         onLoaded: (hasItems) =>
@@ -599,7 +623,8 @@ class _LiveRow extends ConsumerStatefulWidget {
     required this.spotlight,
   });
 
-  final Set<int> favoriteChannelIds;
+  /// Null until known; the row waits for them before loading.
+  final Set<int>? favoriteChannelIds;
   final void Function(Channel) onChannelSelect;
   final void Function(ChannelContext)? onChannelContextChanged;
   final Future<void> Function(Channel) onToggleFavorite;
@@ -669,13 +694,10 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
   @override
   Widget build(BuildContext context) {
     final catalog = ref.watch(liveCategoriesProvider);
-    if (_fetchedFor !=
-        (catalog, widget.favoriteChannelIds, widget.rowItemLimit)) {
-      _fetch(
-        catalog,
-        widget.favoriteChannelIds,
-        ref.read(catalogRepositoryProvider),
-      );
+    final favorites = widget.favoriteChannelIds;
+    if (favorites != null &&
+        _fetchedFor != (catalog, favorites, widget.rowItemLimit)) {
+      _fetch(catalog, favorites, ref.read(catalogRepositoryProvider));
     }
     final isLoading = _windowSlice == null;
     final slice =
@@ -689,7 +711,7 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
     if (!isLoading && rowChannels.isEmpty) return const SizedBox.shrink();
     // Until it loads, guess the row shows favorites when there are any.
     final showsFavorites = isLoading
-        ? widget.favoriteChannelIds.isNotEmpty
+        ? favorites?.isNotEmpty ?? false
         : slice.showsFavorites;
     final spotlight = widget.spotlight;
     final epgService = ref.watch(epgServiceProvider);
@@ -723,7 +745,7 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
           child: ChannelGridTile(
             channel: channel,
             epg: epgService.lookupForChannel(channel),
-            isFavorite: widget.favoriteChannelIds.contains(channel.id),
+            isFavorite: favorites?.contains(channel.id) ?? false,
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: autofocus,
             onTap: () {

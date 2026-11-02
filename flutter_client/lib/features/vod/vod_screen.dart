@@ -192,13 +192,11 @@ class _VodScreenState extends ConsumerState<VodScreen> {
   /// selected category is not in the new catalog.
   void _onCatalogReloaded(List<Category>? previous, List<Category> next) {
     if (identical(previous, next)) return;
-    final selected = _selectedCategory;
-    final selectionGone =
-        selected != null &&
-        selected.isNotEmpty &&
-        selected != _kFavoritesCategoryId &&
-        !next.any((category) => category.id == selected);
-    if (selectionGone) {
+    if (isCategorySelectionGone(
+      _selectedCategory,
+      next,
+      favoritesId: _kFavoritesCategoryId,
+    )) {
       setState(() => _selectedCategory = null);
       _reconfigureWindow();
     } else {
@@ -228,14 +226,23 @@ class _VodScreenState extends ConsumerState<VodScreen> {
           );
     if (!mounted) return;
     final orderChanged = !setEquals(ids, _favoriteIds);
+    // The Favorites tab only shows while there are favorites, so leave it
+    // when the last one goes (or another playlist has none).
+    final leaveFavoritesTab =
+        ids.isEmpty && _selectedCategory == _kFavoritesCategoryId;
     setState(() {
       _favoriteIds = ids;
       _favoriteItems = items;
       _favoritesLoadedOnce = true;
+      if (leaveFavoritesTab) _selectedCategory = null;
     });
-    // Also covers the first load: the grid doesn't wait on the favorites
-    // read, so the favorites move up in place once it resolves.
-    if (_favoritesFirst && orderChanged) unawaited(_window.refresh());
+    if (leaveFavoritesTab) {
+      _reconfigureWindow();
+    } else if (_favoritesFirst && orderChanged) {
+      // Also covers the first load: the grid doesn't wait on the favorites
+      // read, so the favorites move up in place once it resolves.
+      unawaited(_window.refresh());
+    }
   }
 
   /// Applies [_sortOption] to the (already category/query-filtered)

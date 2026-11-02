@@ -683,11 +683,11 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     if (!_windowReady || identical(previous, next)) return;
     // After a switch to another playlist the selected category may not
     // exist any more; fall back to All rather than an empty slice.
-    final selected = _selectedCategory;
-    if (selected != null &&
-        selected.isNotEmpty &&
-        selected != _favoritesCategoryId &&
-        !next.any((category) => category.id == selected)) {
+    if (isCategorySelectionGone(
+      _selectedCategory,
+      next,
+      favoritesId: _favoritesCategoryId,
+    )) {
       setState(() => _selectedCategory = null);
       _reconfigureWindow();
       return;
