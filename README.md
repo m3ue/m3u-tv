@@ -8,7 +8,7 @@ Cross-platform TV front-end player for the [M3U Editor web app](https://github.c
 
 ## Download
 
-<a href='https://testflight.apple.com/join/hqJYVsJr'><img height='60' alt='Download on the App Store (TestFlight beta)' src='./assets/badges/app-store-badge.png'/></a>
+<a href='https://apps.apple.com/us/app/m3u-tv/id6782398050'><img height='60' alt='Download on the App Store' src='./assets/badges/app-store-badge.png'/></a>
 <a href='https://play.google.com/store/apps/details?id=dev.sparkison.tv&referrer=utm_source%3Dgithub%26utm_campaign%3Dreadme_badge'><img height='60' alt='Get it on Google Play' src='./assets/badges/play-store-badge.png'/></a>
 <a href='https://apps.microsoft.com/detail/9P2PBHQ4XZ1L?referrer=appbadge&cid=github'><img height='60' alt='Get it from Microsoft' src='./assets/badges/microsoft-badge.png'/></a>
 
