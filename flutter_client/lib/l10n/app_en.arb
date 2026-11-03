@@ -293,7 +293,7 @@
   "settingsAppearance": "Appearance",
   "settingsAppearanceSubtitle": "Layout, EPG, and display",
   "settingsPlayback": "Playback",
-  "settingsPlaybackSubtitle": "Proxy, cache, and DVR",
+  "settingsPlaybackSubtitle": "Proxy and DVR",
   "settingsReleaseNotesSubtitle": "See what's new in this version",
   "settingsSectionLanguageRegion": "Language & Region",
   "settingsSectionLayout": "Layout",
@@ -321,22 +321,73 @@
   "settingsRetryConnection": "Retry connection",
   "settingsEditServer": "Edit server settings",
   "settingsActiveViewer": "Active Viewer",
-  "settingsClearCacheTitle": "Clear Cache & Refresh?",
-  "settingsClearCacheBody": "Choose what to clear. It will be reloaded from your source.",
   "settingsClearCacheConfirm": "Clear & Refresh",
   "settingsCacheCleared": "Cache cleared. Content is refreshing in the background.",
-  "settingsClearCacheAll": "Everything",
-  "settingsClearCacheAllHint": "Channels, movies, series, guide data and artwork",
-  "settingsClearCacheContent": "Content only",
-  "settingsClearCacheContentHint": "Channels, movies and series",
-  "settingsClearCacheEpg": "Guide (EPG) only",
   "settingsClearCacheEpgHint": "The current guide stays visible while it reloads",
-  "settingsClearCacheImages": "Images only",
   "settingsClearCacheImagesHint": "Posters and logos reload as you browse",
   "settingsEpgCacheCleared": "Guide data is refreshing in the background.",
   "settingsImageCacheCleared": "Image cache cleared.",
-  "settingsContentCache": "Content Cache",
   "settingsCacheSubtitle": "Cached content loads instantly. Data refreshes automatically in the background.",
+  "settingsStorage": "Storage",
+  "settingsStorageSubtitle": "Cached playlists, guide and artwork",
+  "settingsStorageTotal": "Total",
+  "settingsStorageGuide": "Guide",
+  "settingsStorageArtwork": "Artwork",
+  "settingsStorageCalculating": "Calculating...",
+  "settingsStorageUnavailable": "Unavailable",
+  "settingsStorageItems": "{count, plural, =1{1 item} other{{count} items}}",
+  "@settingsStorageItems": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "settingsStorageNotStored": "Not stored on this device",
+  "settingsStorageKeepPlaylists": "Playlists kept on this device",
+  "settingsStorageKeepPlaylistsValue": "{count, plural, =1{Only the active playlist} other{The {count} most recent}}",
+  "@settingsStorageKeepPlaylistsValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsStorageClearPlaylistTitle": "Clear stored content?",
+  "settingsStorageClearPlaylistBody": "{name}'s channels, movies, series and guide are removed from this device. They download again the next time you switch to it.",
+  "@settingsStorageClearPlaylistBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsStorageClearActiveBody": "{name}'s channels, movies and series are removed and downloaded again now.",
+  "@settingsStorageClearActiveBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsStorageClear": "Clear",
+  "settingsStorageCleared": "Stored content cleared.",
+  "settingsStorageGuideData": "Guide data",
+  "settingsStorageProgrammes": "{count, plural, =1{1 programme} other{{count} programmes}}",
+  "@settingsStorageProgrammes": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "settingsStorageClearGuideTitle": "Refresh guide data?",
+  "settingsStorageArtworkCache": "Artwork cache",
+  "settingsStorageClearArtworkTitle": "Clear artwork?",
+  "settingsStorageClearAll": "Clear everything",
+  "settingsStorageClearAllBody": "Your other playlists' stored content and all artwork are removed. The active playlist's channels, movies, series and guide download again now.",
   "settingsEpgRefreshInterval": "EPG refresh interval",
   "settingsEpgDurationMinutes": "{count} min",
   "@settingsEpgDurationMinutes": {
@@ -378,6 +429,35 @@
   "settingsDisconnectTitle": "Disconnect?",
   "settingsDisconnectBody": "You will be signed out and will need to re-enter your credentials to reconnect.",
   "settingsDisconnectConfirm": "Disconnect",
+  "settingsPlaylists": "Playlists",
+  "settingsPlaylistActive": "Active playlist",
+  "settingsAddPlaylist": "Add Playlist",
+  "settingsSwitchPlaylist": "Switch to Playlist",
+  "settingsRenamePlaylist": "Rename Playlist",
+  "settingsRemovePlaylist": "Remove Playlist",
+  "settingsRemovePlaylistTitle": "Remove playlist?",
+  "settingsRemovePlaylistBody": "{name} will be removed from this device. You can add it again at any time.",
+  "@settingsRemovePlaylistBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsDisconnectBodyOtherPlaylists": "You will be signed out of this playlist and it will be removed from this device. Your other saved playlists stay available to reconnect.",
+  "settingsPlaylistNameLabel": "Name",
+  "settingsSave": "Save",
+  "settingsSwitchPlaylistFailed": "Couldn't switch playlists: {error}",
+  "@settingsSwitchPlaylistFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsTabSaved": "Saved",
+  "settingsSavedPlaylistsTitle": "Saved Playlists",
+  "settingsSavedPlaylistsSubtitle": "Reconnect to a playlist saved on this device, or add a new one from Pair or Sign In.",
   "settingsApp": "App",
   "settingsAppVersion": "Version",
   "settingsAppUpdateStatus": "Update",
@@ -463,7 +543,7 @@
   "pairingPendingWaiting": "Waiting for approval…",
   "homeContinueWatching": "Continue Watching",
   "homeNoContinueWatching": "No Continue Watching available",
-  "homeContinueWatchingSeeAll": "See All",
+  "homeViewAll": "View All",
   "homeContinueWatchingMoreCount": "{count, plural, =1{+1 more} other{+{count} more}}",
   "@homeContinueWatchingMoreCount": {
     "description": "Subtitle on the Continue Watching row's overflow tile, showing how many additional resumable titles exist beyond the ones shown directly in the row.",
@@ -480,6 +560,10 @@
   "homeNoFavoriteChannels": "No favorite channels available",
   "homeNoMovies": "No Movies available",
   "homeMovie": "Movie",
+  "homeBrowseLiveTv": "Browse every channel",
+  "homeBrowseMovies": "Browse every movie",
+  "homeBrowseSeries": "Browse every series",
+  "homeNothingToShow": "This playlist has nothing to show yet",
   "notificationsTitle": "Notifications",
   "notificationsTabNotifications": "Notifications",
   "notificationsTabChannelSettings": "Channel Settings",

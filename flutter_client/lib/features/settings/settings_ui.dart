@@ -1,5 +1,7 @@
+import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
@@ -116,6 +118,7 @@ class SettingsRow extends StatelessWidget {
     this.subtitle,
     this.icon,
     this.leading,
+    this.titleTrailing,
     this.trailing,
     this.onTap,
     this.destructive = false,
@@ -128,6 +131,9 @@ class SettingsRow extends StatelessWidget {
 
   /// Custom leading visual (e.g. a service logo) shown in place of [icon].
   final Widget? leading;
+
+  /// A small marker (e.g. the active item's check) shown right after [title].
+  final Widget? titleTrailing;
   final Widget? trailing;
   final VoidCallback? onTap;
   final bool destructive;
@@ -138,6 +144,13 @@ class SettingsRow extends StatelessWidget {
     final theme = Theme.of(context);
     final scale = FontSizeScope.scaleOf(context);
     final titleColor = destructive ? theme.colorScheme.error : null;
+    final titleText = Text(
+      title,
+      style: theme.textTheme.bodyLarge?.copyWith(
+        color: titleColor,
+        fontWeight: FontWeight.w500,
+      ),
+    );
     final content = Padding(
       padding: EdgeInsets.symmetric(
         horizontal: 16 * scale,
@@ -161,13 +174,16 @@ class SettingsRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  title,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: titleColor,
-                    fontWeight: FontWeight.w500,
+                if (titleTrailing == null)
+                  titleText
+                else
+                  Row(
+                    children: [
+                      Flexible(child: titleText),
+                      SizedBox(width: 8 * scale),
+                      titleTrailing!,
+                    ],
                   ),
-                ),
                 if (subtitle != null) ...[
                   SizedBox(height: 2 * scale),
                   Text(
@@ -523,4 +539,59 @@ Future<void> pushSettingsPicker<T>(
       ],
     ),
   );
+}
+
+/// A title/message/confirm dialog for settings actions. Resolves true only
+/// when [confirmLabel] is chosen.
+Future<bool> showSettingsConfirmDialog(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String confirmLabel,
+  bool isDestructive = false,
+}) async {
+  final theme = Theme.of(context);
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => Dialog(
+      child: SizedBox(
+        width: 480 * FontSizeScope.scaleOf(ctx),
+        child: DpadRegion(
+          memoryKey: 'confirm-dialog',
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(title, style: theme.textTheme.titleLarge),
+                const SizedBox(height: 12),
+                Text(message, style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    AppButton(
+                      label: AppLocalizations.of(ctx).cancel,
+                      onPressed: () => Navigator.pop(ctx, false),
+                    ),
+                    const SizedBox(width: 8),
+                    AppButton(
+                      autofocus: true,
+                      variant: isDestructive
+                          ? AppButtonVariant.destructive
+                          : AppButtonVariant.primary,
+                      label: confirmLabel,
+                      onPressed: () => Navigator.pop(ctx, true),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  return result ?? false;
 }

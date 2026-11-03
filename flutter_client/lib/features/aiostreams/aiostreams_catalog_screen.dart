@@ -715,18 +715,13 @@ class _AIOStreamsCatalogRowState extends State<AIOStreamsCatalogRow> {
     return FutureBuilder<List<AIOStreamsItem>>(
       future: _future,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _CatalogRowSkeleton(
-            title: _catalogDisplayTitle(l, widget.catalog),
-            titleIcon: _catalogTypeIcon(widget.catalog),
-          );
-        }
         final items = snapshot.data ?? const [];
         return MediaPreviewSection(
           title: _catalogDisplayTitle(l, widget.catalog),
           titleIcon: _catalogTypeIcon(widget.catalog),
           emptyLabel: AppLocalizations.of(context).aiostrreamsCatalogEmpty,
           posterStyle: true,
+          isLoading: snapshot.connectionState == ConnectionState.waiting,
           useSidebarLayout: widget.useSidebarLayout,
           items: items
               .map(
@@ -757,76 +752,6 @@ class _AIOStreamsCatalogRowState extends State<AIOStreamsCatalogRow> {
           onSidebarActivate: widget.onSidebarActivate,
         );
       },
-    );
-  }
-}
-
-class _CatalogRowSkeleton extends StatelessWidget {
-  const _CatalogRowSkeleton({required this.title, required this.titleIcon});
-
-  final String title;
-  final IconData titleIcon;
-
-  // Mirrors MediaPreviewSection._previewCardScale.
-  double _scale(double availableWidth) {
-    if (availableWidth >= 1600) return 1;
-    return (availableWidth / 1280.0).clamp(1.0, 1.15);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = theme.colorScheme.surfaceContainerHigh;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                titleIcon,
-                size: 20 * FontSizeScope.scaleOf(context),
-                color: theme.textTheme.titleLarge?.color,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: theme.textTheme.titleLarge?.copyWith(fontSize: 18),
-              ),
-            ],
-          ),
-          const SizedBox(height: MediaBrowsingMetrics.chipGap),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final scale = _scale(constraints.maxWidth);
-              final fontScale = FontSizeScope.scaleOf(context);
-              final cardWidth =
-                  MediaBrowsingMetrics.posterCardWidth * scale * fontScale;
-              final cardHeight =
-                  MediaBrowsingMetrics.posterCardHeight * scale * fontScale;
-              return SizedBox(
-                height: cardHeight + 16,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: 6,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(width: MediaBrowsingMetrics.itemGap),
-                  itemBuilder: (_, _) => ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: SizedBox(
-                      width: cardWidth,
-                      child: ColoredBox(color: color),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
     );
   }
 }

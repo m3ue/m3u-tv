@@ -63,7 +63,7 @@ Future<CatalogRepository> _buildRepo(WidgetTester tester) async {
     addTearDown(db.close);
     final repo = CatalogRepository(db);
     await repo.replaceItems(
-      sourceKey: CatalogRepository.activeSource,
+      sourceKey: CatalogRepository.defaultSource,
       kind: kCatalogKindLive,
       items: _channels,
     );

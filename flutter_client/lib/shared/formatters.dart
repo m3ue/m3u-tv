@@ -73,12 +73,14 @@ String? formatRuntimeText(String? text) {
   return duration == null ? value : formatRuntime(duration);
 }
 
-/// Renders a byte count as "1.5 GB" (at or above 1 GiB) or "342 MB".
+/// Renders a byte count as "1.5 GB" (at or above 1 GiB), "342 MB" (at or
+/// above 1 MiB) or "512 KB".
 String formatBytes(int bytes) {
   final gib = bytes / (1024 * 1024 * 1024);
   if (gib >= 1) return '${gib.toStringAsFixed(1)} GB';
   final mib = bytes / (1024 * 1024);
-  return '${mib.toStringAsFixed(0)} MB';
+  if (mib >= 1) return '${mib.toStringAsFixed(0)} MB';
+  return '${(bytes / 1024).toStringAsFixed(0)} KB';
 }
 
 /// Renders a score as "★ 7.5", optionally suffixed with its [source]

@@ -1013,12 +1013,12 @@ class _Fixture {
   /// the controller - these read it back the same way `cacheService.get`
   /// already does for the cache-key assertions below.
   Future<List<VodItem>> get vodItems => catalogRepository.allItems<VodItem>(
-    CatalogRepository.activeSource,
+    catalogRepository.shownSource,
     kCatalogKindVod,
   );
 
   Future<List<Series>> get seriesList => catalogRepository.allItems<Series>(
-    CatalogRepository.activeSource,
+    catalogRepository.shownSource,
     kCatalogKindSeries,
   );
 

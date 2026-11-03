@@ -1109,7 +1109,7 @@ void main() {
   });
 
   testWidgets(
-    'Home continue watching row caps at 4 items with a See All overflow tile',
+    'Home continue watching row caps at 4 items with a View All overflow tile',
     (tester) async {
       // The default test surface is too narrow to lay out 5 landscape cards
       // in the row without scrolling, which would leave the later ones
@@ -1153,11 +1153,21 @@ void main() {
       expect(find.text('Overflow Movie 4'), findsNothing);
 
       // The overflow tile shows the remaining count.
-      expect(find.text('See All'), findsOneWidget);
-      expect(find.text('+1 more'), findsOneWidget);
+      final continueWatchingViewAll = find.ancestor(
+        of: find.text('+1 more'),
+        matching: find.byType(DpadInkWell),
+      );
+      expect(continueWatchingViewAll, findsOneWidget);
+      expect(
+        find.descendant(
+          of: continueWatchingViewAll,
+          matching: find.text('View All'),
+        ),
+        findsOneWidget,
+      );
 
       // Tapping it navigates to the full list, which shows every item.
-      await tester.tap(_dpadInkWellWithText('See All'));
+      await tester.tap(continueWatchingViewAll);
       await _pumpAppFrame(tester);
       await _waitForText(tester, 'Overflow Movie 4');
 
@@ -2755,6 +2765,9 @@ Future<void> _pumpAppFrame(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 250));
   await tester.pump();
+  // Home's Live row reads the favorites before its channels, so its first
+  // card lands (and scrolls itself into view) a frame later.
+  await tester.pump(const Duration(milliseconds: 250));
 }
 
 Future<void> _sendPlatformNavigationMethod(

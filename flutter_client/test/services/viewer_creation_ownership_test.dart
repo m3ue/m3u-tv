@@ -54,9 +54,16 @@ void main() {
         'viewer-b',
       ]);
       expect(controller.activeViewer?.ulid, 'viewer-b');
+      // Account B is the second playlist saved, so its viewer is keyed by its
+      // playlist id; account A keeps the original server+login key.
+      final playlistB = controller.savedPlaylists.find(_accountB);
       expect(
-        memory['m3ue_tv_active_viewer_${_accountB.server}|${_accountB.username}'],
+        memory['m3ue_tv_active_viewer_playlist_${playlistB!.id}'],
         'viewer-b',
+      );
+      expect(
+        memory['m3ue_tv_active_viewer_${_accountA.server}|${_accountA.username}'],
+        isNot('viewer-b'),
       );
       expect(notifications, 0);
     },

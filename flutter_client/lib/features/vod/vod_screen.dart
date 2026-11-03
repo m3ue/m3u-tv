@@ -187,6 +187,23 @@ class _VodScreenState extends ConsumerState<VodScreen> {
     });
   }
 
+  /// A catalog load replaced the rows under the window (a refresh, or a
+  /// switch to another playlist): re-read them, falling back to All when the
+  /// selected category is not in the new catalog.
+  void _onCatalogReloaded(List<Category>? previous, List<Category> next) {
+    if (identical(previous, next)) return;
+    if (isCategorySelectionGone(
+      _selectedCategory,
+      next,
+      favoritesId: _kFavoritesCategoryId,
+    )) {
+      setState(() => _selectedCategory = null);
+      _reconfigureWindow();
+    } else {
+      unawaited(_window.refresh());
+    }
+  }
+
   void _onCategorySelected(String id) {
     setState(() => _selectedCategory = id);
     if (id != _kFavoritesCategoryId) _reconfigureWindow();
@@ -209,14 +226,23 @@ class _VodScreenState extends ConsumerState<VodScreen> {
           );
     if (!mounted) return;
     final orderChanged = !setEquals(ids, _favoriteIds);
+    // The Favorites tab only shows while there are favorites, so leave it
+    // when the last one goes (or another playlist has none).
+    final leaveFavoritesTab =
+        ids.isEmpty && _selectedCategory == _kFavoritesCategoryId;
     setState(() {
       _favoriteIds = ids;
       _favoriteItems = items;
       _favoritesLoadedOnce = true;
+      if (leaveFavoritesTab) _selectedCategory = null;
     });
-    // Also covers the first load: the grid doesn't wait on the favorites
-    // read, so the favorites move up in place once it resolves.
-    if (_favoritesFirst && orderChanged) unawaited(_window.refresh());
+    if (leaveFavoritesTab) {
+      _reconfigureWindow();
+    } else if (_favoritesFirst && orderChanged) {
+      // Also covers the first load: the grid doesn't wait on the favorites
+      // read, so the favorites move up in place once it resolves.
+      unawaited(_window.refresh());
+    }
   }
 
   /// Applies [_sortOption] to the (already category/query-filtered)
@@ -279,6 +305,7 @@ class _VodScreenState extends ConsumerState<VodScreen> {
     final isBootstrapping = ref.watch(isBootstrappingProvider);
     final isConfigured = ref.watch(isConfiguredProvider);
     final categories = ref.watch(vodCategoriesProvider);
+    ref.listen<List<Category>>(vodCategoriesProvider, _onCatalogReloaded);
 
     if (isBootstrapping) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));

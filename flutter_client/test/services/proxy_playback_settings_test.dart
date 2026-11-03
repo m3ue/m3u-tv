@@ -181,6 +181,47 @@ void main() {
     });
   });
 
+  group('ProxyPlaybackSettings per playlist', () {
+    const server = 'https://editor.example';
+    const liveUrl = '$server/live/user/pass/42.m3u8';
+
+    test(
+      "another playlist's values are neither applied nor changed",
+      () async {
+        final dir = await Directory.systemTemp.createTemp('proxy-scopes-');
+        addTearDown(() => dir.delete(recursive: true));
+        final store = PersistentJsonStore(file: File('${dir.path}/s.json'));
+        var shown = 'a';
+        final settings = ProxyPlaybackSettings(store: store)
+          ..playlistScope = () => shown;
+        await settings.load();
+        await settings.setEnabled(enabled: true);
+        await settings.setLiveProfileId(5);
+
+        // Playlist b is shown before its values have loaded.
+        shown = 'b';
+        expect(
+          settings.apply(
+            liveUrl,
+            type: 'live',
+            forced: false,
+            serverBase: server,
+          ),
+          liveUrl,
+        );
+
+        // A change loads b's values first and is saved under b.
+        await settings.setLiveProfileId(7);
+        expect(settings.enabled, isFalse);
+        expect(settings.liveProfileId, 7);
+        shown = 'a';
+        await settings.load();
+        expect(settings.enabled, isTrue);
+        expect(settings.liveProfileId, 5);
+      },
+    );
+  });
+
   group('ProxyPlaybackSettings.isTranscoding', () {
     const server = 'https://editor.example';
     const vodUrl = '$server/movie/user/pass/7.mkv';

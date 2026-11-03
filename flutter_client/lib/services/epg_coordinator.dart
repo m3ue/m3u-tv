@@ -557,9 +557,9 @@ class EpgCoordinator {
     }
   }
 
-  /// [wipeStore] also drops the stored guide, behind any write already in
-  /// flight (see [EpgService.wipeStore]): for a source switch or sign-out.
-  void resetSession({bool clearGuide = true, bool wipeStore = false}) {
+  /// [clearGuide] also drops the guide held in memory and any write not yet
+  /// stored; what is stored stays with its playlist.
+  void resetSession({bool clearGuide = true}) {
     _epgPrimeRetry?.cancel();
     _epgRequestGeneration += 1;
     _epgSweepGeneration += 1;
@@ -576,7 +576,6 @@ class EpgCoordinator {
     _activeEpgRangeKey = '';
     epgService.invalidateSourceFetchState();
     if (clearGuide) epgService.clear();
-    if (wipeStore) epgService.wipeStore();
   }
 
   void dispose() {

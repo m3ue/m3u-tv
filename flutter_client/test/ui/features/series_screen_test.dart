@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/series/series_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -29,7 +30,7 @@ Future<CatalogRepository> _buildRepo(
     addTearDown(db.close);
     final repo = CatalogRepository(db);
     await repo.replaceItems(
-      sourceKey: CatalogRepository.activeSource,
+      sourceKey: CatalogRepository.defaultSource,
       kind: kCatalogKindSeries,
       items: seriesList,
     );
@@ -87,6 +88,92 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Breaking Bad'), findsOneWidget);
+      expect(find.text('Stranger Things'), findsOneWidget);
+    });
+
+    testWidgets(
+      'a catalog reload shows the new series and drops a missing category',
+      (tester) async {
+        // No cover URLs: rendering one under tester.runAsync reaches the
+        // real image cache, which is not set up in tests.
+        final repo = await _buildRepo(tester, const <Series>[
+          Series(id: 1, name: 'Breaking Bad', categoryId: '30'),
+          Series(id: 2, name: 'Stranger Things', categoryId: '31'),
+        ]);
+        final categoriesState = StateProvider<List<Category>>(
+          (_) => testCategories,
+        );
+        await tester.pumpWidget(
+          _TestApp(
+            catalogRepository: repo,
+            categories: testCategories,
+            categoriesState: categoriesState,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Thriller'));
+        await tester.pumpAndSettle();
+        expect(find.text('Breaking Bad'), findsOneWidget);
+
+        await tester.runAsync(
+          () => repo.replaceItems(
+            sourceKey: CatalogRepository.defaultSource,
+            kind: kCatalogKindSeries,
+            items: const <Series>[
+              Series(id: 9, name: 'The Expanse', categoryId: '50'),
+            ],
+          ),
+        );
+        ProviderScope.containerOf(
+          tester.element(find.byType(SeriesScreen)),
+        ).read(categoriesState.notifier).state = const <Category>[
+          Category(id: '50', name: 'Space'),
+        ];
+        await tester.pump();
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('The Expanse'), findsOneWidget);
+        expect(find.text('Breaking Bad'), findsNothing);
+        expect(find.text('Thriller'), findsNothing);
+      },
+    );
+
+    testWidgets('the Favorites tab is left once it has nothing in it', (
+      tester,
+    ) async {
+      Future<void> settleCatalog() async {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      final repo = await _buildRepo(tester, const <Series>[
+        Series(id: 1, name: 'Breaking Bad', categoryId: '30'),
+        Series(id: 2, name: 'Stranger Things', categoryId: '31'),
+      ]);
+      final favorites = FavoritesService(memory: <String, Object?>{});
+      await favorites.add(1);
+      await tester.pumpWidget(
+        _TestApp(
+          catalogRepository: repo,
+          categories: testCategories,
+          favoritesService: favorites,
+        ),
+      );
+      await settleCatalog();
+      await tester.tap(find.text('★ Favorites'));
+      await settleCatalog();
+      expect(find.text('Stranger Things'), findsNothing);
+
+      // The last favorite goes (or a switch lands on a playlist with none).
+      await favorites.toggle(1);
+      await settleCatalog();
+
+      expect(find.text('★ Favorites'), findsNothing);
       expect(find.text('Stranger Things'), findsOneWidget);
     });
 
@@ -592,6 +679,7 @@ class _TestApp extends StatelessWidget {
     this.onSeriesSelect,
     this.viewSettingsService,
     this.favoritesService,
+    this.categoriesState,
   });
 
   final CatalogRepository catalogRepository;
@@ -602,6 +690,10 @@ class _TestApp extends StatelessWidget {
   final ViewSettingsService? viewSettingsService;
   final FavoritesService? favoritesService;
 
+  /// When set, the categories come from here, so a test can swap them while
+  /// the screen stays mounted (a catalog reload).
+  final StateProvider<List<Category>>? categoriesState;
+
   @override
   Widget build(BuildContext context) {
     final service = viewSettingsService ?? ViewSettingsService();
@@ -609,7 +701,11 @@ class _TestApp extends StatelessWidget {
       overrides: [
         isBootstrappingProvider.overrideWith((_) => false),
         isConfiguredProvider.overrideWith((_) => isConfigured),
-        seriesCategoriesProvider.overrideWith((_) => categories),
+        seriesCategoriesProvider.overrideWith(
+          (ref) => categoriesState == null
+              ? categories
+              : ref.watch(categoriesState!),
+        ),
         catalogRepositoryProvider.overrideWith((_) => catalogRepository),
         viewSettingsServiceProvider.overrideWith((_) => service),
       ],

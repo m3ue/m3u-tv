@@ -65,10 +65,13 @@ void main() {
   });
 
   group('formatBytes', () {
-    test('uses GB from 1 GiB and whole MB below it', () {
+    test('uses GB from 1 GiB, whole MB from 1 MiB, and KB below', () {
       expect(formatBytes(1610612736), '1.5 GB');
       expect(formatBytes(1073741824), '1.0 GB');
       expect(formatBytes(358612992), '342 MB');
+      expect(formatBytes(1048576), '1 MB');
+      expect(formatBytes(524288), '512 KB');
+      expect(formatBytes(0), '0 KB');
     });
   });
 

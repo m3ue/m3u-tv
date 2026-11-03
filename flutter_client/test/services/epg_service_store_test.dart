@@ -199,16 +199,6 @@ void main() {
     },
   );
 
-  test('wipeStore drops writes that landed before it', () async {
-    service.applySuccessfulResponse(['a'], day('a'));
-    await settle();
-    service
-      ..applySuccessfulResponse(['b'], day('b'))
-      ..wipeStore();
-    await settle();
-    expect(await repo.programmesForChannels({'a', 'b'}), isEmpty);
-  });
-
   test('clear drops queued writes for the old source', () async {
     service
       ..applySuccessfulResponse(['a'], day('a'))

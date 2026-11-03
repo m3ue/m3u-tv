@@ -929,7 +929,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsPlaybackSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Proxy, cache, and DVR'**
+  /// **'Proxy and DVR'**
   String get settingsPlaybackSubtitle;
 
   /// No description provided for @settingsReleaseNotesSubtitle.
@@ -1094,18 +1094,6 @@ abstract class AppLocalizations {
   /// **'Active Viewer'**
   String get settingsActiveViewer;
 
-  /// No description provided for @settingsClearCacheTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Clear Cache & Refresh?'**
-  String get settingsClearCacheTitle;
-
-  /// No description provided for @settingsClearCacheBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose what to clear. It will be reloaded from your source.'**
-  String get settingsClearCacheBody;
-
   /// No description provided for @settingsClearCacheConfirm.
   ///
   /// In en, this message translates to:
@@ -1118,47 +1106,11 @@ abstract class AppLocalizations {
   /// **'Cache cleared. Content is refreshing in the background.'**
   String get settingsCacheCleared;
 
-  /// No description provided for @settingsClearCacheAll.
-  ///
-  /// In en, this message translates to:
-  /// **'Everything'**
-  String get settingsClearCacheAll;
-
-  /// No description provided for @settingsClearCacheAllHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Channels, movies, series, guide data and artwork'**
-  String get settingsClearCacheAllHint;
-
-  /// No description provided for @settingsClearCacheContent.
-  ///
-  /// In en, this message translates to:
-  /// **'Content only'**
-  String get settingsClearCacheContent;
-
-  /// No description provided for @settingsClearCacheContentHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Channels, movies and series'**
-  String get settingsClearCacheContentHint;
-
-  /// No description provided for @settingsClearCacheEpg.
-  ///
-  /// In en, this message translates to:
-  /// **'Guide (EPG) only'**
-  String get settingsClearCacheEpg;
-
   /// No description provided for @settingsClearCacheEpgHint.
   ///
   /// In en, this message translates to:
   /// **'The current guide stays visible while it reloads'**
   String get settingsClearCacheEpgHint;
-
-  /// No description provided for @settingsClearCacheImages.
-  ///
-  /// In en, this message translates to:
-  /// **'Images only'**
-  String get settingsClearCacheImages;
 
   /// No description provided for @settingsClearCacheImagesHint.
   ///
@@ -1178,17 +1130,149 @@ abstract class AppLocalizations {
   /// **'Image cache cleared.'**
   String get settingsImageCacheCleared;
 
-  /// No description provided for @settingsContentCache.
-  ///
-  /// In en, this message translates to:
-  /// **'Content Cache'**
-  String get settingsContentCache;
-
   /// No description provided for @settingsCacheSubtitle.
   ///
   /// In en, this message translates to:
   /// **'Cached content loads instantly. Data refreshes automatically in the background.'**
   String get settingsCacheSubtitle;
+
+  /// No description provided for @settingsStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage'**
+  String get settingsStorage;
+
+  /// No description provided for @settingsStorageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cached playlists, guide and artwork'**
+  String get settingsStorageSubtitle;
+
+  /// No description provided for @settingsStorageTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get settingsStorageTotal;
+
+  /// No description provided for @settingsStorageGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'Guide'**
+  String get settingsStorageGuide;
+
+  /// No description provided for @settingsStorageArtwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Artwork'**
+  String get settingsStorageArtwork;
+
+  /// No description provided for @settingsStorageCalculating.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculating...'**
+  String get settingsStorageCalculating;
+
+  /// No description provided for @settingsStorageUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get settingsStorageUnavailable;
+
+  /// No description provided for @settingsStorageItems.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String settingsStorageItems(int count);
+
+  /// No description provided for @settingsStorageNotStored.
+  ///
+  /// In en, this message translates to:
+  /// **'Not stored on this device'**
+  String get settingsStorageNotStored;
+
+  /// No description provided for @settingsStorageKeepPlaylists.
+  ///
+  /// In en, this message translates to:
+  /// **'Playlists kept on this device'**
+  String get settingsStorageKeepPlaylists;
+
+  /// No description provided for @settingsStorageKeepPlaylistsValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Only the active playlist} other{The {count} most recent}}'**
+  String settingsStorageKeepPlaylistsValue(int count);
+
+  /// No description provided for @settingsStorageClearPlaylistTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear stored content?'**
+  String get settingsStorageClearPlaylistTitle;
+
+  /// No description provided for @settingsStorageClearPlaylistBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}\'s channels, movies, series and guide are removed from this device. They download again the next time you switch to it.'**
+  String settingsStorageClearPlaylistBody(String name);
+
+  /// No description provided for @settingsStorageClearActiveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}\'s channels, movies and series are removed and downloaded again now.'**
+  String settingsStorageClearActiveBody(String name);
+
+  /// No description provided for @settingsStorageClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get settingsStorageClear;
+
+  /// No description provided for @settingsStorageCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Stored content cleared.'**
+  String get settingsStorageCleared;
+
+  /// No description provided for @settingsStorageGuideData.
+  ///
+  /// In en, this message translates to:
+  /// **'Guide data'**
+  String get settingsStorageGuideData;
+
+  /// No description provided for @settingsStorageProgrammes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 programme} other{{count} programmes}}'**
+  String settingsStorageProgrammes(int count);
+
+  /// No description provided for @settingsStorageClearGuideTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh guide data?'**
+  String get settingsStorageClearGuideTitle;
+
+  /// No description provided for @settingsStorageArtworkCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Artwork cache'**
+  String get settingsStorageArtworkCache;
+
+  /// No description provided for @settingsStorageClearArtworkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear artwork?'**
+  String get settingsStorageClearArtworkTitle;
+
+  /// No description provided for @settingsStorageClearAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear everything'**
+  String get settingsStorageClearAll;
+
+  /// No description provided for @settingsStorageClearAllBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your other playlists\' stored content and all artwork are removed. The active playlist\'s channels, movies, series and guide download again now.'**
+  String get settingsStorageClearAllBody;
 
   /// No description provided for @settingsEpgRefreshInterval.
   ///
@@ -1351,6 +1435,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Disconnect'**
   String get settingsDisconnectConfirm;
+
+  /// No description provided for @settingsPlaylists.
+  ///
+  /// In en, this message translates to:
+  /// **'Playlists'**
+  String get settingsPlaylists;
+
+  /// No description provided for @settingsPlaylistActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active playlist'**
+  String get settingsPlaylistActive;
+
+  /// No description provided for @settingsAddPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Playlist'**
+  String get settingsAddPlaylist;
+
+  /// No description provided for @settingsSwitchPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Playlist'**
+  String get settingsSwitchPlaylist;
+
+  /// No description provided for @settingsRenamePlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename Playlist'**
+  String get settingsRenamePlaylist;
+
+  /// No description provided for @settingsRemovePlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Playlist'**
+  String get settingsRemovePlaylist;
+
+  /// No description provided for @settingsRemovePlaylistTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove playlist?'**
+  String get settingsRemovePlaylistTitle;
+
+  /// No description provided for @settingsRemovePlaylistBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} will be removed from this device. You can add it again at any time.'**
+  String settingsRemovePlaylistBody(String name);
+
+  /// No description provided for @settingsDisconnectBodyOtherPlaylists.
+  ///
+  /// In en, this message translates to:
+  /// **'You will be signed out of this playlist and it will be removed from this device. Your other saved playlists stay available to reconnect.'**
+  String get settingsDisconnectBodyOtherPlaylists;
+
+  /// No description provided for @settingsPlaylistNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get settingsPlaylistNameLabel;
+
+  /// No description provided for @settingsSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get settingsSave;
+
+  /// No description provided for @settingsSwitchPlaylistFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t switch playlists: {error}'**
+  String settingsSwitchPlaylistFailed(String error);
+
+  /// No description provided for @settingsTabSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get settingsTabSaved;
+
+  /// No description provided for @settingsSavedPlaylistsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved Playlists'**
+  String get settingsSavedPlaylistsTitle;
+
+  /// No description provided for @settingsSavedPlaylistsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect to a playlist saved on this device, or add a new one from Pair or Sign In.'**
+  String get settingsSavedPlaylistsSubtitle;
 
   /// No description provided for @settingsApp.
   ///
@@ -1652,11 +1826,11 @@ abstract class AppLocalizations {
   /// **'No Continue Watching available'**
   String get homeNoContinueWatching;
 
-  /// No description provided for @homeContinueWatchingSeeAll.
+  /// No description provided for @homeViewAll.
   ///
   /// In en, this message translates to:
-  /// **'See All'**
-  String get homeContinueWatchingSeeAll;
+  /// **'View All'**
+  String get homeViewAll;
 
   /// Subtitle on the Continue Watching row's overflow tile, showing how many additional resumable titles exist beyond the ones shown directly in the row.
   ///
@@ -1705,6 +1879,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Movie'**
   String get homeMovie;
+
+  /// No description provided for @homeBrowseLiveTv.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse every channel'**
+  String get homeBrowseLiveTv;
+
+  /// No description provided for @homeBrowseMovies.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse every movie'**
+  String get homeBrowseMovies;
+
+  /// No description provided for @homeBrowseSeries.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse every series'**
+  String get homeBrowseSeries;
+
+  /// No description provided for @homeNothingToShow.
+  ///
+  /// In en, this message translates to:
+  /// **'This playlist has nothing to show yet'**
+  String get homeNothingToShow;
 
   /// No description provided for @notificationsTitle.
   ///

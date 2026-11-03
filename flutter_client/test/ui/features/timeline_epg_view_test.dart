@@ -209,7 +209,9 @@ void main() {
     testWidgets(
       'past programs on catchup channels render per-program replay icon',
       (tester) async {
-        final now = DateTime.now();
+        // Midday, so the past programme is on the guide's day whenever the
+        // suite runs.
+        final now = DateTime(2026, 7, 31, 12);
         final pastProgram = EpgProgram(
           channelId: 'bbc.one',
           title: 'Archived Show',
@@ -226,8 +228,10 @@ void main() {
         );
         await pumpGuide(
           tester,
+          clock: () => now,
           channels: const [bbcOne],
-          epgService: EpgService()..loadPrograms([pastProgram, futureProgram]),
+          epgService: EpgService(clock: () => now)
+            ..loadPrograms([pastProgram, futureProgram]),
         );
 
         // One from the channel's catchup badge, one on the past programme.
@@ -252,9 +256,10 @@ void main() {
     testWidgets(
       'past programs on non-catchup channels do not render per-program replay icon',
       (tester) async {
-        final now = DateTime.now();
+        final now = DateTime(2026, 7, 31, 12);
         await pumpGuide(
           tester,
+          clock: () => now,
           channels: const [
             Channel(
               id: 102,
@@ -263,7 +268,7 @@ void main() {
               epgChannelId: 'bbc.two',
             ),
           ],
-          epgService: EpgService()
+          epgService: EpgService(clock: () => now)
             ..loadPrograms([
               EpgProgram(
                 channelId: 'bbc.two',

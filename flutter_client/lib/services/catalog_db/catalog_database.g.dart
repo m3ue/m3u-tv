@@ -1336,6 +1336,17 @@ class $EpgProgrammesTable extends EpgProgrammes
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $EpgProgrammesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _sourceKeyMeta = const VerificationMeta(
+    'sourceKey',
+  );
+  @override
+  late final GeneratedColumn<String> sourceKey = GeneratedColumn<String>(
+    'source_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
   static const VerificationMeta _channelIdMeta = const VerificationMeta(
     'channelId',
   );
@@ -1542,6 +1553,7 @@ class $EpgProgrammesTable extends EpgProgrammes
   );
   @override
   List<GeneratedColumn> get $columns => [
+    sourceKey,
     channelId,
     startMs,
     endMs,
@@ -1573,6 +1585,14 @@ class $EpgProgrammesTable extends EpgProgrammes
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('source_key')) {
+      context.handle(
+        _sourceKeyMeta,
+        sourceKey.isAcceptableOrUnknown(data['source_key']!, _sourceKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceKeyMeta);
+    }
     if (data.containsKey('channel_id')) {
       context.handle(
         _channelIdMeta,
@@ -1700,11 +1720,15 @@ class $EpgProgrammesTable extends EpgProgrammes
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => {channelId, startMs};
+  Set<GeneratedColumn> get $primaryKey => {sourceKey, channelId, startMs};
   @override
   EpgProgrammeRow map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return EpgProgrammeRow(
+      sourceKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_key'],
+      )!,
       channelId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}channel_id'],
@@ -1787,6 +1811,8 @@ class $EpgProgrammesTable extends EpgProgrammes
 }
 
 class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
+  /// The playlist this guide belongs to (see [CatalogItems.sourceKey]).
+  final String sourceKey;
   final String channelId;
   final int startMs;
   final int endMs;
@@ -1806,6 +1832,7 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
   final bool isRepeat;
   final bool isPlaceholder;
   const EpgProgrammeRow({
+    required this.sourceKey,
     required this.channelId,
     required this.startMs,
     required this.endMs,
@@ -1828,6 +1855,7 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['source_key'] = Variable<String>(sourceKey);
     map['channel_id'] = Variable<String>(channelId);
     map['start_ms'] = Variable<int>(startMs);
     map['end_ms'] = Variable<int>(endMs);
@@ -1869,6 +1897,7 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
 
   EpgProgrammesCompanion toCompanion(bool nullToAbsent) {
     return EpgProgrammesCompanion(
+      sourceKey: Value(sourceKey),
       channelId: Value(channelId),
       startMs: Value(startMs),
       endMs: Value(endMs),
@@ -1912,6 +1941,7 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return EpgProgrammeRow(
+      sourceKey: serializer.fromJson<String>(json['sourceKey']),
       channelId: serializer.fromJson<String>(json['channelId']),
       startMs: serializer.fromJson<int>(json['startMs']),
       endMs: serializer.fromJson<int>(json['endMs']),
@@ -1936,6 +1966,7 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'sourceKey': serializer.toJson<String>(sourceKey),
       'channelId': serializer.toJson<String>(channelId),
       'startMs': serializer.toJson<int>(startMs),
       'endMs': serializer.toJson<int>(endMs),
@@ -1958,6 +1989,7 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
   }
 
   EpgProgrammeRow copyWith({
+    String? sourceKey,
     String? channelId,
     int? startMs,
     int? endMs,
@@ -1977,6 +2009,7 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
     bool? isRepeat,
     bool? isPlaceholder,
   }) => EpgProgrammeRow(
+    sourceKey: sourceKey ?? this.sourceKey,
     channelId: channelId ?? this.channelId,
     startMs: startMs ?? this.startMs,
     endMs: endMs ?? this.endMs,
@@ -1998,6 +2031,7 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
   );
   EpgProgrammeRow copyWithCompanion(EpgProgrammesCompanion data) {
     return EpgProgrammeRow(
+      sourceKey: data.sourceKey.present ? data.sourceKey.value : this.sourceKey,
       channelId: data.channelId.present ? data.channelId.value : this.channelId,
       startMs: data.startMs.present ? data.startMs.value : this.startMs,
       endMs: data.endMs.present ? data.endMs.value : this.endMs,
@@ -2030,6 +2064,7 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
   @override
   String toString() {
     return (StringBuffer('EpgProgrammeRow(')
+          ..write('sourceKey: $sourceKey, ')
           ..write('channelId: $channelId, ')
           ..write('startMs: $startMs, ')
           ..write('endMs: $endMs, ')
@@ -2054,6 +2089,7 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
 
   @override
   int get hashCode => Object.hash(
+    sourceKey,
     channelId,
     startMs,
     endMs,
@@ -2077,6 +2113,7 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is EpgProgrammeRow &&
+          other.sourceKey == this.sourceKey &&
           other.channelId == this.channelId &&
           other.startMs == this.startMs &&
           other.endMs == this.endMs &&
@@ -2098,6 +2135,7 @@ class EpgProgrammeRow extends DataClass implements Insertable<EpgProgrammeRow> {
 }
 
 class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
+  final Value<String> sourceKey;
   final Value<String> channelId;
   final Value<int> startMs;
   final Value<int> endMs;
@@ -2118,6 +2156,7 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
   final Value<bool> isPlaceholder;
   final Value<int> rowid;
   const EpgProgrammesCompanion({
+    this.sourceKey = const Value.absent(),
     this.channelId = const Value.absent(),
     this.startMs = const Value.absent(),
     this.endMs = const Value.absent(),
@@ -2139,6 +2178,7 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
     this.rowid = const Value.absent(),
   });
   EpgProgrammesCompanion.insert({
+    required String sourceKey,
     required String channelId,
     required int startMs,
     required int endMs,
@@ -2158,10 +2198,12 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
     this.isRepeat = const Value.absent(),
     this.isPlaceholder = const Value.absent(),
     this.rowid = const Value.absent(),
-  }) : channelId = Value(channelId),
+  }) : sourceKey = Value(sourceKey),
+       channelId = Value(channelId),
        startMs = Value(startMs),
        endMs = Value(endMs);
   static Insertable<EpgProgrammeRow> custom({
+    Expression<String>? sourceKey,
     Expression<String>? channelId,
     Expression<int>? startMs,
     Expression<int>? endMs,
@@ -2183,6 +2225,7 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (sourceKey != null) 'source_key': sourceKey,
       if (channelId != null) 'channel_id': channelId,
       if (startMs != null) 'start_ms': startMs,
       if (endMs != null) 'end_ms': endMs,
@@ -2206,6 +2249,7 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
   }
 
   EpgProgrammesCompanion copyWith({
+    Value<String>? sourceKey,
     Value<String>? channelId,
     Value<int>? startMs,
     Value<int>? endMs,
@@ -2227,6 +2271,7 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
     Value<int>? rowid,
   }) {
     return EpgProgrammesCompanion(
+      sourceKey: sourceKey ?? this.sourceKey,
       channelId: channelId ?? this.channelId,
       startMs: startMs ?? this.startMs,
       endMs: endMs ?? this.endMs,
@@ -2252,6 +2297,9 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (sourceKey.present) {
+      map['source_key'] = Variable<String>(sourceKey.value);
+    }
     if (channelId.present) {
       map['channel_id'] = Variable<String>(channelId.value);
     }
@@ -2315,6 +2363,7 @@ class EpgProgrammesCompanion extends UpdateCompanion<EpgProgrammeRow> {
   @override
   String toString() {
     return (StringBuffer('EpgProgrammesCompanion(')
+          ..write('sourceKey: $sourceKey, ')
           ..write('channelId: $channelId, ')
           ..write('startMs: $startMs, ')
           ..write('endMs: $endMs, ')
@@ -2619,7 +2668,7 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
   );
   late final Index epgProgrammesEnd = Index(
     'epg_programmes_end',
-    'CREATE INDEX epg_programmes_end ON epg_programmes (end_ms)',
+    'CREATE INDEX epg_programmes_end ON epg_programmes (source_key, end_ms)',
   );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -3297,6 +3346,7 @@ typedef $$CatalogCategoriesTableProcessedTableManager =
     >;
 typedef $$EpgProgrammesTableCreateCompanionBuilder =
     EpgProgrammesCompanion Function({
+      required String sourceKey,
       required String channelId,
       required int startMs,
       required int endMs,
@@ -3319,6 +3369,7 @@ typedef $$EpgProgrammesTableCreateCompanionBuilder =
     });
 typedef $$EpgProgrammesTableUpdateCompanionBuilder =
     EpgProgrammesCompanion Function({
+      Value<String> sourceKey,
       Value<String> channelId,
       Value<int> startMs,
       Value<int> endMs,
@@ -3349,6 +3400,11 @@ class $$EpgProgrammesTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<String> get sourceKey => $composableBuilder(
+    column: $table.sourceKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get channelId => $composableBuilder(
     column: $table.channelId,
     builder: (column) => ColumnFilters(column),
@@ -3449,6 +3505,11 @@ class $$EpgProgrammesTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<String> get sourceKey => $composableBuilder(
+    column: $table.sourceKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get channelId => $composableBuilder(
     column: $table.channelId,
     builder: (column) => ColumnOrderings(column),
@@ -3549,6 +3610,9 @@ class $$EpgProgrammesTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<String> get sourceKey =>
+      $composableBuilder(column: $table.sourceKey, builder: (column) => column);
+
   GeneratedColumn<String> get channelId =>
       $composableBuilder(column: $table.channelId, builder: (column) => column);
 
@@ -3649,6 +3713,7 @@ class $$EpgProgrammesTableTableManager
               $$EpgProgrammesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<String> sourceKey = const Value.absent(),
                 Value<String> channelId = const Value.absent(),
                 Value<int> startMs = const Value.absent(),
                 Value<int> endMs = const Value.absent(),
@@ -3669,6 +3734,7 @@ class $$EpgProgrammesTableTableManager
                 Value<bool> isPlaceholder = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EpgProgrammesCompanion(
+                sourceKey: sourceKey,
                 channelId: channelId,
                 startMs: startMs,
                 endMs: endMs,
@@ -3691,6 +3757,7 @@ class $$EpgProgrammesTableTableManager
               ),
           createCompanionCallback:
               ({
+                required String sourceKey,
                 required String channelId,
                 required int startMs,
                 required int endMs,
@@ -3711,6 +3778,7 @@ class $$EpgProgrammesTableTableManager
                 Value<bool> isPlaceholder = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EpgProgrammesCompanion.insert(
+                sourceKey: sourceKey,
                 channelId: channelId,
                 startMs: startMs,
                 endMs: endMs,

@@ -455,6 +455,8 @@ void main() {
 
         api.releaseSecondAccount();
         await _waitForNotificationTitle(fixture.controller, 'Account B public');
+        // The unread count, then the toast, follow the stored notification.
+        await _waitForPresented(presented, 'Account B public');
         final accountBNotifications = await fixture.controller.notificationStore
             .all();
         expect(
@@ -1784,7 +1786,9 @@ void main() {
 
         expect(fixture.controller.activeViewer?.ulid, 'viewer-server-a');
         expect(await fixture.controller.favoritesService.all(), <int>{101});
-        expect(await store.read('m3ue_favorites'), <int>[101]);
+        final first = fixture.controller.savedPlaylists.find(_firstCredentials);
+        final firstKey = 'm3ue_favorites_playlist_${first!.id}';
+        expect(await store.read(firstKey), <int>[101]);
         expect(staleNotifications, 0);
 
         transport.releaseThirdFavoritesPull.complete();
@@ -1793,7 +1797,13 @@ void main() {
         await pumpEventQueue();
 
         expect(await fixture.controller.favoritesService.all(), <int>{103});
-        expect(await store.read('m3ue_favorites'), <int>[103]);
+        // Each playlist keeps its own favorites: the first one's are untouched.
+        expect(await store.read(firstKey), <int>[101]);
+        final third = fixture.controller.savedPlaylists.find(_thirdCredentials);
+        expect(
+          await store.read('m3ue_favorites_playlist_${third!.id}'),
+          <int>[103],
+        );
         expect(currentNotifications, 1);
         expect(
           transport.requests.where(
@@ -2186,12 +2196,12 @@ class _Fixture {
   /// VOD/series content lives in the shared catalog repository now, not on
   /// the controller.
   Future<List<VodItem>> get vodItems => catalogRepository.allItems<VodItem>(
-    CatalogRepository.activeSource,
+    catalogRepository.shownSource,
     kCatalogKindVod,
   );
 
   Future<List<Series>> get seriesList => catalogRepository.allItems<Series>(
-    CatalogRepository.activeSource,
+    catalogRepository.shownSource,
     kCatalogKindSeries,
   );
 }
@@ -2855,6 +2865,7 @@ class _BlockingSourceCacheStore extends PersistentJsonStore {
 
   final Completer<void> secondCachePersisted = Completer<void>();
   final Completer<void> releaseSecondCache = Completer<void>();
+  int _cacheReplacements = 0;
 
   @override
   Future<void> replaceWhere(
@@ -2862,16 +2873,22 @@ class _BlockingSourceCacheStore extends PersistentJsonStore {
     Map<String, Object?> replacement,
   ) async {
     await super.replaceWhere(test, replacement);
-    // The catalog itself is written to SQLite, not this JSON store, but the
-    // second source's `viewers` blob still lands here in the same atomic
-    // CacheService.replace() call - gate on that to know B has been staged.
-    if (jsonEncode(replacement).contains('viewer-server-b') &&
+    // The catalog and viewers are written to SQLite, not this JSON store, but
+    // each CacheService.replace() still swaps the shared keys here, after
+    // them: the second is B's, so B has been staged.
+    if (replacement.containsKey('m3ue_cache_sourceType') &&
+        ++_cacheReplacements == 2 &&
         !secondCachePersisted.isCompleted) {
       secondCachePersisted.complete();
       await releaseSecondCache.future;
     }
   }
 }
+
+/// The live favorites key of any saved playlist: the first playlist on a
+/// device keeps the unscoped key, later ones get their own.
+bool _isLiveFavoritesKey(String key) =>
+    key == 'm3ue_favorites' || key.startsWith('m3ue_favorites_playlist_');
 
 class _BlockingFavoritesStore extends PersistentJsonStore {
   _BlockingFavoritesStore({required super.file});
@@ -2885,7 +2902,7 @@ class _BlockingFavoritesStore extends PersistentJsonStore {
     Object? value,
     bool Function() shouldCommit,
   ) async {
-    if (key == 'm3ue_favorites' && !favoritesWriteStarted.isCompleted) {
+    if (_isLiveFavoritesKey(key) && !favoritesWriteStarted.isCompleted) {
       favoritesWriteStarted.complete();
       await releaseFavoritesWrite.future;
     }
@@ -2915,7 +2932,7 @@ class _BlockingPostCommitStore extends PersistentJsonStore {
   void blockResumeFor(String viewerId) => _blockedResumeViewer = viewerId;
 
   Future<void> _blockWrite(String key, Object? value) async {
-    if (key == 'm3ue_favorites' &&
+    if (_isLiveFavoritesKey(key) &&
         value is List<Object?> &&
         value.contains(_blockedFavorite) &&
         !blockedFavoritesWriteStarted.isCompleted) {
@@ -2935,7 +2952,7 @@ class _BlockingPostCommitStore extends PersistentJsonStore {
   Future<void> write(String key, Object? value) async {
     await _blockWrite(key, value);
     await super.write(key, value);
-    if (key == 'm3ue_favorites' &&
+    if (_isLiveFavoritesKey(key) &&
         value is List<Object?> &&
         value.contains(_blockedFavorite) &&
         !blockedFavoritesWriteCompleted.isCompleted) {
@@ -2955,7 +2972,7 @@ class _BlockingPostCommitStore extends PersistentJsonStore {
   ) async {
     await _blockWrite(key, value);
     final committed = await super.writeIf(key, value, shouldCommit);
-    if (key == 'm3ue_favorites' &&
+    if (_isLiveFavoritesKey(key) &&
         value is List<Object?> &&
         value.contains(_blockedFavorite) &&
         !blockedFavoritesWriteCompleted.isCompleted) {
@@ -3556,6 +3573,17 @@ Future<void> _waitForNotificationTitle(
   fail('Timed out waiting for notification: $title');
 }
 
+Future<void> _waitForPresented(
+  List<TvNotificationItem> presented,
+  String title,
+) async {
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    if (presented.any((item) => item.title == title)) return;
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  fail('Timed out waiting for a toast: $title');
+}
+
 Future<void> _waitForProgress(
   AppStateController controller,
   String title,
@@ -3619,6 +3647,6 @@ Future<void> _waitForMigratedViewer(
 /// The live lineup as the catalog holds it.
 Future<List<Channel>> _liveChannels(AppStateController controller) =>
     controller.catalogRepository.allItems<Channel>(
-      CatalogRepository.activeSource,
+      controller.catalogRepository.shownSource,
       kCatalogKindLive,
     );

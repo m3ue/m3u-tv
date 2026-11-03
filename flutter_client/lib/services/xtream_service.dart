@@ -539,6 +539,17 @@ class XtreamService {
     _credentials ??= credentials.normalized();
   }
 
+  /// Like [hydrateCredentials], replacing a session already open: what the
+  /// previous login's handshake resolved no longer applies.
+  void replaceCredentialsOffline(UserCredentials credentials) {
+    _credentials = credentials.normalized();
+    _isM3UEditor = false;
+    _serverLocation = tz.UTC;
+    _vodInfoCache.clear();
+    _sessionGeneration.advance();
+    _authenticationGeneration.advance();
+  }
+
   void clearCredentials() {
     _credentials = null;
     _isM3UEditor = false;

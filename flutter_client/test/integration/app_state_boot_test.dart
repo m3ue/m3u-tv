@@ -11,6 +11,7 @@ import 'package:m3u_tv/app/navigation_sidebar.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
+import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
@@ -20,6 +21,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
+import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
@@ -1129,8 +1131,8 @@ void main() {
         expect(find.text('Connection'), findsOneWidget);
         expect(find.text('Source'), findsOneWidget);
         expect(find.text('Xtream'), findsOneWidget);
+        // The username names the playlist; the password never shows.
         expect(_visibleText(tester), isNot(contains('fixture-password')));
-        expect(_visibleText(tester), isNot(contains('fixture-user')));
 
         final restarted = _controller(
           storage: storage,
@@ -2510,7 +2512,9 @@ void main() {
 
         await controller.refreshDvrStorage();
 
-        expect(calledActions, isEmpty);
+        // Only the DVR call matters: the connect's background favorites sync
+        // can land here too.
+        expect(calledActions, isNot(contains('get_dvr_storage')));
         expect(controller.dvrStorageInfo, isNull);
       },
     );
@@ -2533,19 +2537,19 @@ Map<String, Object?> _epgResponse(String title, DateTime start) => {
 /// controller.
 Future<List<Channel>> _liveChannels(AppStateController controller) =>
     controller.catalogRepository.allItems<Channel>(
-      CatalogRepository.activeSource,
+      controller.catalogRepository.shownSource,
       kCatalogKindLive,
     );
 
 Future<List<VodItem>> _vodItems(AppStateController controller) =>
     controller.catalogRepository.allItems<VodItem>(
-      CatalogRepository.activeSource,
+      controller.catalogRepository.shownSource,
       kCatalogKindVod,
     );
 
 Future<List<Series>> _seriesList(AppStateController controller) =>
     controller.catalogRepository.allItems<Series>(
-      CatalogRepository.activeSource,
+      controller.catalogRepository.shownSource,
       kCatalogKindSeries,
     );
 
@@ -2579,6 +2583,19 @@ AppStateController _controller({
     catalogRepository: sharedCatalogRepository,
     epgService: epgService,
     favoritesService: FavoritesService(memory: sharedLocalMemory),
+    // Memory-backed, like the rest: boot moves a pre-playlists login's state
+    // through these, and a file-backed store's first read never completes
+    // under testWidgets' fake async.
+    vodFavoritesService: FavoritesService(
+      memory: sharedLocalMemory,
+      namespace: 'vod',
+    ),
+    seriesFavoritesService: FavoritesService(
+      memory: sharedLocalMemory,
+      namespace: 'series',
+    ),
+    aioFavoritesService: AIOStreamsFavoritesService(),
+    proxyPlaybackSettings: ProxyPlaybackSettings(),
     resumeService: ResumeService(memory: sharedLocalMemory),
     viewerService: ViewerService(memory: sharedLocalMemory),
   );

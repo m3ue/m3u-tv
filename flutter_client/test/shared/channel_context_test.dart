@@ -39,7 +39,7 @@ void main() {
     setUp(() async {
       repo = CatalogRepository(CatalogDatabase.memory());
       await repo.replaceItems(
-        sourceKey: CatalogRepository.activeSource,
+        sourceKey: CatalogRepository.defaultSource,
         kind: kCatalogKindLive,
         items: [
           _channel(1, 'Delta', category: 'news'),

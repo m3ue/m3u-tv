@@ -21,12 +21,12 @@ Future<CatalogRepository> _buildRepo(
     addTearDown(db.close);
     final repo = CatalogRepository(db);
     await repo.replaceItems(
-      sourceKey: CatalogRepository.activeSource,
+      sourceKey: CatalogRepository.defaultSource,
       kind: kCatalogKindVod,
       items: vodItems,
     );
     await repo.replaceItems(
-      sourceKey: CatalogRepository.activeSource,
+      sourceKey: CatalogRepository.defaultSource,
       kind: kCatalogKindSeries,
       items: seriesList,
     );

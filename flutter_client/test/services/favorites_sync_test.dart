@@ -1,11 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
-import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
@@ -247,7 +247,7 @@ void main() {
       );
       expect(await service.isFavorite(item.id), isTrue);
       expect(
-        (await store.snapshot())['aio_favorites'],
+        _storedFor(await store.snapshot(), 'aio_favorites'),
         <String, Object?>{prior.id: prior.toJson(), item.id: item.toJson()},
       );
       expect(events, <String>['listener', 'added:${item.id}']);
@@ -487,7 +487,7 @@ void main() {
 
         expect(await _favoriteIds(service), <String>[item.id]);
         expect(
-          (await store.snapshot())['aio_favorites'],
+          _storedFor(await store.snapshot(), 'aio_favorites'),
           <String, Object?>{item.id: item.toJson()},
         );
         expect(notifications, 1);
@@ -589,7 +589,9 @@ void main() {
             .toSet();
         final persisted = await store.snapshot();
         final persistedIds =
-            (persisted['aio_favorites']! as Map<Object?, Object?>).keys.toSet();
+            (_storedFor(persisted, 'aio_favorites')! as Map<Object?, Object?>)
+                .keys
+                .toSet();
         expect(
           <String, Set<Object?>>{
             'visible': visibleIds,
@@ -606,11 +608,27 @@ void main() {
 
   group('AppStateController favorites server sync', () {
     test(
-      'connecting as admin with pre-existing local favorites syncs them to the server',
+      'an admin upgrading with local favorites syncs them to the server',
       () async {
         final memory = <String, Object?>{};
+        final storage = InMemorySecureStorage();
+        // Signed in from before multiple playlists existed, so its favorites
+        // are on the unscoped keys (where these adds land, with no playlist
+        // shown yet) until boot moves them to the playlist's own.
+        await storage.write(
+          'm3ue_tv_credentials',
+          jsonEncode(<String, String>{
+            'server': 'https://fixture.example',
+            'username': 'fixture-user',
+            'password': 'fixture-password',
+          }),
+        );
         final transport = _FakeXtreamTransport();
-        final controller = _controller(memory: memory, transport: transport);
+        final controller = _controller(
+          memory: memory,
+          transport: transport,
+          secureStorage: storage,
+        );
         addTearDown(controller.dispose);
 
         await controller.favoritesService.add(101);
@@ -626,19 +644,10 @@ void main() {
           ),
         );
         // The adds above happened before any server connection, so no push
-        // was attempted yet — connecting now should sync_favorites once.
+        // was attempted yet; booting should sync_favorites once.
         transport.requests.clear();
 
-        expect(
-          await controller.connectXtream(
-            const UserCredentials(
-              server: 'https://fixture.example',
-              username: 'fixture-user',
-              password: 'fixture-password',
-            ),
-          ),
-          isTrue,
-        );
+        await controller.boot();
         await pumpEventQueue();
 
         final syncRequest = transport.requests.singleWhere(
@@ -818,11 +827,11 @@ void main() {
         await transport.blockedFavoritesStarted.future;
         await pumpEventQueue();
         expect(controller.activeViewer?.ulid, 'viewer-source-a');
-        // The catalog rows swap at the cache write, ahead of this commit (as
-        // movies and series always have); the published state is still A.
+        // B's catalog is written under its own source, so the shown rows
+        // are still A's until this commit, like the rest of the state.
         expect(
           (await _liveChannels(controller)).map((channel) => channel.id),
-          <int>[202],
+          <int>[101],
         );
         expect(await controller.favoritesService.all(), contains(101));
         expect(sourceBPublishCaptured, isFalse);
@@ -1414,6 +1423,7 @@ AppStateController _controller({
   FavoritesService? seriesFavoritesService,
   ReverbService? reverbService,
   TvNotificationService? tvNotificationService,
+  SecureStorage? secureStorage,
 }) {
   final sharedMemory = memory ?? <String, Object?>{};
   return AppStateController(
@@ -1421,7 +1431,7 @@ AppStateController _controller({
       transport: transport.call,
       cache: CacheService(memory: <String, Object?>{}),
     ),
-    secureStorage: InMemorySecureStorage(),
+    secureStorage: secureStorage ?? InMemorySecureStorage(),
     cacheService: CacheService(memory: <String, Object?>{}),
     favoritesService:
         favoritesService ?? FavoritesService(memory: sharedMemory),
@@ -1799,14 +1809,24 @@ Set<int> _persistedNumericFavoriteIds(
     'series' => 'm3ue_favorites_series',
     _ => 'm3ue_favorites',
   };
-  final raw = snapshot[key];
+  final raw = _storedFor(snapshot, key);
   return raw is Iterable
       ? raw.map((value) => int.parse('$value')).toSet()
       : <int>{};
 }
 
 Set<Object?> _persistedFavoriteIds(Map<String, Object?> snapshot) =>
-    (snapshot['aio_favorites']! as Map<Object?, Object?>).keys.toSet();
+    (_storedFor(snapshot, 'aio_favorites')! as Map<Object?, Object?>).keys
+        .toSet();
+
+/// The value stored under [base]: the unscoped key for a bare service, the
+/// playlist's own key (see `playlistScopedKey`) once a controller owns it.
+Object? _storedFor(Map<String, Object?> snapshot, String base) =>
+    snapshot[base] ??
+    snapshot.entries
+        .where((entry) => entry.key.startsWith('${base}_playlist_'))
+        .firstOrNull
+        ?.value;
 
 Future<List<String>> _favoriteIds(AIOStreamsFavoritesService service) async =>
     (await service.all()).map((favorite) => favorite.id).toList();
@@ -1814,6 +1834,6 @@ Future<List<String>> _favoriteIds(AIOStreamsFavoritesService service) async =>
 /// The live lineup as the catalog holds it.
 Future<List<Channel>> _liveChannels(AppStateController controller) =>
     controller.catalogRepository.allItems<Channel>(
-      CatalogRepository.activeSource,
+      controller.catalogRepository.shownSource,
       kCatalogKindLive,
     );

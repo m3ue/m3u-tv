@@ -467,7 +467,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsPlayback => 'Wiedergabe';
 
   @override
-  String get settingsPlaybackSubtitle => 'Proxy, Cache und DVR';
+  String get settingsPlaybackSubtitle => 'Proxy und DVR';
 
   @override
   String get settingsReleaseNotesSubtitle => 'Neuigkeiten in dieser Version';
@@ -552,13 +552,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsActiveViewer => 'Aktiver Nutzer';
 
   @override
-  String get settingsClearCacheTitle => 'Cache löschen und aktualisieren?';
-
-  @override
-  String get settingsClearCacheBody =>
-      'Wähle aus, was gelöscht werden soll. Es wird von deiner Quelle neu geladen.';
-
-  @override
   String get settingsClearCacheConfirm => 'Löschen und aktualisieren';
 
   @override
@@ -566,27 +559,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Cache geleert. Inhalte werden im Hintergrund aktualisiert.';
 
   @override
-  String get settingsClearCacheAll => 'Alles';
-
-  @override
-  String get settingsClearCacheAllHint =>
-      'Kanäle, Filme, Serien, Programmdaten und Bilder';
-
-  @override
-  String get settingsClearCacheContent => 'Nur Inhalte';
-
-  @override
-  String get settingsClearCacheContentHint => 'Kanäle, Filme und Serien';
-
-  @override
-  String get settingsClearCacheEpg => 'Nur Programmführer (EPG)';
-
-  @override
   String get settingsClearCacheEpgHint =>
       'Der aktuelle Programmführer bleibt beim Neuladen sichtbar';
-
-  @override
-  String get settingsClearCacheImages => 'Nur Bilder';
 
   @override
   String get settingsClearCacheImagesHint =>
@@ -600,11 +574,117 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsImageCacheCleared => 'Bild-Cache geleert.';
 
   @override
-  String get settingsContentCache => 'Inhaltscache';
-
-  @override
   String get settingsCacheSubtitle =>
       'Gecachte Inhalte laden sofort. Daten werden automatisch im Hintergrund aktualisiert.';
+
+  @override
+  String get settingsStorage => 'Speicher';
+
+  @override
+  String get settingsStorageSubtitle =>
+      'Gespeicherte Playlists, Programmführer und Bilder';
+
+  @override
+  String get settingsStorageTotal => 'Gesamt';
+
+  @override
+  String get settingsStorageGuide => 'Programmführer';
+
+  @override
+  String get settingsStorageArtwork => 'Bilder';
+
+  @override
+  String get settingsStorageCalculating => 'Wird berechnet...';
+
+  @override
+  String get settingsStorageUnavailable => 'Nicht verfügbar';
+
+  @override
+  String settingsStorageItems(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString Einträge',
+      one: '1 Eintrag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsStorageNotStored => 'Nicht auf diesem Gerät gespeichert';
+
+  @override
+  String get settingsStorageKeepPlaylists =>
+      'Auf diesem Gerät behaltene Playlists';
+
+  @override
+  String settingsStorageKeepPlaylistsValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Die $count zuletzt genutzten',
+      one: 'Nur die aktive Playlist',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsStorageClearPlaylistTitle =>
+      'Gespeicherte Inhalte löschen?';
+
+  @override
+  String settingsStorageClearPlaylistBody(String name) {
+    return 'Kanäle, Filme, Serien und Programmführer von $name werden von diesem Gerät entfernt. Sie werden beim nächsten Wechsel zu dieser Playlist neu geladen.';
+  }
+
+  @override
+  String settingsStorageClearActiveBody(String name) {
+    return 'Kanäle, Filme und Serien von $name werden entfernt und jetzt neu geladen.';
+  }
+
+  @override
+  String get settingsStorageClear => 'Löschen';
+
+  @override
+  String get settingsStorageCleared => 'Gespeicherte Inhalte gelöscht.';
+
+  @override
+  String get settingsStorageGuideData => 'Programmdaten';
+
+  @override
+  String settingsStorageProgrammes(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString Sendungen',
+      one: '1 Sendung',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsStorageClearGuideTitle => 'Programmdaten aktualisieren?';
+
+  @override
+  String get settingsStorageArtworkCache => 'Bilder-Cache';
+
+  @override
+  String get settingsStorageClearArtworkTitle => 'Bilder löschen?';
+
+  @override
+  String get settingsStorageClearAll => 'Alles löschen';
+
+  @override
+  String get settingsStorageClearAllBody =>
+      'Die gespeicherten Inhalte der anderen Playlists und alle Bilder werden entfernt. Kanäle, Filme, Serien und Programmführer der aktiven Playlist werden jetzt neu geladen.';
 
   @override
   String get settingsEpgRefreshInterval => 'EPG-Aktualisierungsintervall';
@@ -696,6 +776,57 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsDisconnectConfirm => 'Trennen';
+
+  @override
+  String get settingsPlaylists => 'Playlists';
+
+  @override
+  String get settingsPlaylistActive => 'Aktive Playlist';
+
+  @override
+  String get settingsAddPlaylist => 'Playlist hinzufügen';
+
+  @override
+  String get settingsSwitchPlaylist => 'Zu dieser Playlist wechseln';
+
+  @override
+  String get settingsRenamePlaylist => 'Playlist umbenennen';
+
+  @override
+  String get settingsRemovePlaylist => 'Playlist entfernen';
+
+  @override
+  String get settingsRemovePlaylistTitle => 'Playlist entfernen?';
+
+  @override
+  String settingsRemovePlaylistBody(String name) {
+    return '$name wird von diesem Gerät entfernt. Du kannst sie jederzeit wieder hinzufügen.';
+  }
+
+  @override
+  String get settingsDisconnectBodyOtherPlaylists =>
+      'Du wirst von dieser Playlist abgemeldet und sie wird von diesem Gerät entfernt. Deine anderen gespeicherten Playlists bleiben zum erneuten Verbinden verfügbar.';
+
+  @override
+  String get settingsPlaylistNameLabel => 'Name';
+
+  @override
+  String get settingsSave => 'Speichern';
+
+  @override
+  String settingsSwitchPlaylistFailed(String error) {
+    return 'Playlist konnte nicht gewechselt werden: $error';
+  }
+
+  @override
+  String get settingsTabSaved => 'Gespeichert';
+
+  @override
+  String get settingsSavedPlaylistsTitle => 'Gespeicherte Playlists';
+
+  @override
+  String get settingsSavedPlaylistsSubtitle =>
+      'Verbinde dich wieder mit einer auf diesem Gerät gespeicherten Playlist oder füge über Koppeln oder Anmelden eine neue hinzu.';
 
   @override
   String get settingsApp => 'App';
@@ -877,7 +1008,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get homeNoContinueWatching => 'Nichts zum Weiterschauen';
 
   @override
-  String get homeContinueWatchingSeeAll => 'Alle anzeigen';
+  String get homeViewAll => 'Alle anzeigen';
 
   @override
   String homeContinueWatchingMoreCount(int count) {
@@ -911,6 +1042,18 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get homeMovie => 'Film';
+
+  @override
+  String get homeBrowseLiveTv => 'Alle Sender durchsuchen';
+
+  @override
+  String get homeBrowseMovies => 'Alle Filme durchsuchen';
+
+  @override
+  String get homeBrowseSeries => 'Alle Serien durchsuchen';
+
+  @override
+  String get homeNothingToShow => 'Diese Playlist hat noch keine Inhalte';
 
   @override
   String get notificationsTitle => 'Mitteilungen';

@@ -513,15 +513,6 @@ class EpgService extends ChangeNotifier {
     return programs.reversed.toList();
   }
 
-  /// Drops every stored programme, ordered after any write already queued or
-  /// in flight, so a write-through from a source being replaced can't land
-  /// after the switch wiped the store and resurface under a shared id.
-  void wipeStore() {
-    if (_store == null) return;
-    _pendingOps.clear();
-    _enqueue(const EpgClearAll());
-  }
-
   void clear() {
     _programsByChannel.clear();
     _hot.clear();
