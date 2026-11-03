@@ -313,7 +313,13 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
           child: DpadRegion(
             memoryKey: 'requests/grid',
             horizontalEdge: DpadEdgeBehavior.stop,
+            // The tabs sit outside this scope, beyond plain traversal
+            upEdge: DpadEdgeBehavior.stop,
             onEdge: (direction) {
+              if (direction == TraversalDirection.up) {
+                _tabBarKey.currentState?.requestFocusFromContent();
+                return;
+              }
               if (direction != TraversalDirection.left) return;
               if (widget.useSidebarLayout) {
                 _navKey.currentState?.requestFocus();

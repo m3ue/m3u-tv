@@ -1,3 +1,5 @@
+import 'package:dpad/dpad.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/sports/sports_screen.dart';
@@ -130,6 +132,7 @@ Future<void> _pumpScreen(
   required SportsCapability? capability,
   XtreamService? editor,
   List<Channel>? opened,
+  bool dpad = false,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -147,6 +150,7 @@ Future<void> _pumpScreen(
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
+        builder: dpad ? (context, child) => Dpad(child: child!) : null,
         home: SportsScreen(
           onChannelSelect: (channel) => opened?.add(channel),
           useSidebarLayout: true,
@@ -286,6 +290,43 @@ void main() {
     await tester.tap(find.text('Done').last);
     await _settle(tester);
     expect(find.text('1 of 2 shown'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Up from the top game moves to the range tabs', (tester) async {
+    final repo = await _buildRepo(tester);
+    final editor = (await tester.runAsync(_editor))!;
+
+    await _pumpScreen(
+      tester,
+      repo: repo,
+      settings: SportsSettings(),
+      capability: _capability,
+      editor: editor,
+      dpad: true,
+    );
+
+    final card = find
+        .ancestor(
+          of: find.text('Toronto Maple Leafs'),
+          matching: find.byType(DpadFocusable),
+        )
+        .first;
+    tester
+        .widget<Focus>(
+          find.descendant(of: card, matching: find.byType(Focus)).first,
+        )
+        .focusNode!
+        .requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await _settle(tester);
+
+    expect(
+      FocusManager.instance.primaryFocus?.debugLabel,
+      'DpadTabBar tab 1',
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
   });

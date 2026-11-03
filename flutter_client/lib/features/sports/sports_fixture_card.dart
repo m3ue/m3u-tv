@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:intl/intl.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/sports_models.dart';
@@ -79,6 +81,12 @@ class SportsFixtureCard extends StatelessWidget {
 
   static const double _radius = 12;
 
+  /// The channel chips' slot: fixed, so their width doesn't move the rest.
+  static const double _channelSlotWidth = 168;
+
+  /// Below this card width, status and channels move above the teams.
+  static const double _compactBelowWidth = 560;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -105,37 +113,59 @@ class SportsFixtureCard extends StatelessWidget {
             horizontal: 20 * scale,
             vertical: 12 * scale,
           ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 104 * scale,
-                child: _StatusColumn(fixture: fixture, showLeague: showLeague),
-              ),
-              SizedBox(width: 12 * scale),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (var i = 0; i < sides.length; i++) ...[
-                      if (i > 0) SizedBox(height: 8 * scale),
-                      _TeamRow(fixture: fixture, competitor: sides[i]),
-                    ],
-                  ],
-                ),
-              ),
-              SizedBox(width: 16 * scale),
-              _ChannelIndicator(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final status = _StatusColumn(
+                fixture: fixture,
+                showLeague: showLeague,
+              );
+              final teams = _Matchup(fixture: fixture, sides: sides);
+              final channels = _ChannelIndicator(
                 count: channelCount,
                 isResolving: isResolving,
                 inMultiview: inMultiview,
-              ),
-              SizedBox(width: 8 * scale),
-              Icon(
+              );
+              final chevron = Icon(
                 Icons.chevron_right,
                 size: 20 * scale,
                 color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ],
+              );
+              if (constraints.maxWidth < _compactBelowWidth * scale) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: status),
+                        channels,
+                        SizedBox(width: 4 * scale),
+                        chevron,
+                      ],
+                    ),
+                    SizedBox(height: 10 * scale),
+                    teams,
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  SizedBox(width: 104 * scale, child: status),
+                  SizedBox(width: 16 * scale),
+                  Expanded(child: teams),
+                  SizedBox(width: 16 * scale),
+                  SizedBox(
+                    width: _channelSlotWidth * scale,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: channels,
+                    ),
+                  ),
+                  SizedBox(width: 8 * scale),
+                  chevron,
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -239,47 +269,136 @@ class _StatusColumn extends StatelessWidget {
   }
 }
 
+/// Both teams, one per row: crest, name, and the score in a fixed-width
+/// column, so scores line up with each other and with other cards.
+class _Matchup extends StatelessWidget {
+  const _Matchup({required this.fixture, required this.sides});
+
+  final SportsFixture fixture;
+  final List<SportsCompetitor> sides;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = FontSizeScope.scaleOf(context);
+    final scored =
+        fixture.state == SportsFixtureState.live ||
+        fixture.state == SportsFixtureState.finished;
+    final scores = [
+      if (scored)
+        for (final side in sides) num.tryParse(side.score ?? ''),
+    ];
+    final leader = switch (scores) {
+      [final num a, final num b] when a != b => a > b ? 0 : 1,
+      _ => null,
+    };
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < sides.length; i++) ...[
+          if (i > 0) SizedBox(height: 10 * scale),
+          _TeamRow(
+            fixture: fixture,
+            competitor: sides[i],
+            showScore: scored,
+            // Finished games mark ESPN's winner; live ones the side ahead
+            leads: fixture.state == SportsFixtureState.finished
+                ? sides[i].winner
+                : leader == i,
+            trails: fixture.state == SportsFixtureState.finished
+                ? !sides[i].winner
+                : leader != null && leader != i,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _TeamRow extends StatelessWidget {
-  const _TeamRow({required this.fixture, required this.competitor});
+  const _TeamRow({
+    required this.fixture,
+    required this.competitor,
+    required this.showScore,
+    required this.leads,
+    required this.trails,
+  });
 
   final SportsFixture fixture;
   final SportsCompetitor competitor;
+  final bool showScore;
+  final bool leads;
+  final bool trails;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scale = FontSizeScope.scaleOf(context);
-    final finished = fixture.state == SportsFixtureState.finished;
-    final dimmed = finished && !competitor.winner;
-    final style = theme.textTheme.bodyLarge?.copyWith(
-      fontWeight: finished && competitor.winner
-          ? FontWeight.w700
-          : FontWeight.w500,
-      color: dimmed ? theme.colorScheme.onSurfaceVariant : null,
+    final color = trails ? theme.colorScheme.onSurfaceVariant : null;
+    final nameStyle = theme.textTheme.titleMedium?.copyWith(
+      fontWeight: leads ? FontWeight.w700 : FontWeight.w500,
+      color: color,
     );
-    final score = competitor.score;
-    final showScore =
-        score != null && (fixture.state == SportsFixtureState.live || finished);
+    final score = showScore ? competitor.score : null;
+    final name = Text(
+      competitor.team.displayName,
+      style: nameStyle,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
     return Row(
       children: [
-        SportsTeamLogo(url: competitor.team.logoUrl, size: 26 * scale),
-        SizedBox(width: 12 * scale),
-        Expanded(
-          child: Text(
-            competitor.team.displayName,
-            style: style,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        if (showScore)
-          Text(
-            score,
-            style: style?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontFeatures: const [FontFeature.tabularFigures()],
+        SportsTeamLogo(url: competitor.team.logoUrl, size: 36 * scale),
+        SizedBox(width: 14 * scale),
+        if (score == null)
+          Expanded(child: name)
+        else
+          // A hairline from the name to its score, so the eye follows the
+          // row across the gap. The name takes its own width (a flexible
+          // name's unused share wouldn't pass to the line, and the score
+          // would drift), short of room for some line.
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final gap = 12 * scale;
+                return Row(
+                  children: [
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: math.max(
+                          0,
+                          constraints.maxWidth - 2 * gap - 16 * scale,
+                        ),
+                      ),
+                      child: name,
+                    ),
+                    SizedBox(width: gap),
+                    Expanded(
+                      child: Container(
+                        height: 1,
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.22,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: gap),
+                  ],
+                );
+              },
             ),
           ),
+        SizedBox(
+          width: 36 * scale,
+          child: score == null
+              ? null
+              : Text(
+                  score,
+                  textAlign: TextAlign.end,
+                  style: nameStyle?.copyWith(
+                    fontWeight: leads ? FontWeight.w800 : FontWeight.w600,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+        ),
       ],
     );
   }
@@ -307,12 +426,13 @@ class _ChannelIndicator extends StatelessWidget {
     if (count == 0) {
       return MetadataChip(icon: Icons.tv_off, label: l10n.sportsNoChannel);
     }
-    return Row(
+    return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         if (inMultiview) ...[
           MetadataChip(icon: Icons.grid_view, label: l10n.multiviewTitle),
-          SizedBox(width: 8 * scale),
+          SizedBox(height: 6 * scale),
         ],
         MetadataChip(
           icon: Icons.live_tv,

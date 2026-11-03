@@ -611,28 +611,31 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
           listenable: _settings,
           builder: (context, _) => AppMenuDialog(
             title: Text(l10n.sportsLeaguesTitle),
+            width: _pickerWidth,
             children: [
               DpadRegion(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    for (final (index, leagues) in bySport.values.indexed)
-                      AppMenuOption(
-                        icon: _sportIcon(leagues.first.sport),
-                        label: leagues.first.sportName,
-                        subtitle: l10n.sportsLeaguesShownCount(
-                          leagues.where(_settings.isLeagueEnabled).length,
-                          leagues.length,
-                        ),
-                        autofocus: index == 0,
-                        onTap: () => unawaited(
-                          _showLeagueOptions(
-                            leagues,
-                            available: available,
-                            title: leagues.first.sportName,
+                    ..._inColumns([
+                      for (final (index, leagues) in bySport.values.indexed)
+                        AppMenuOption(
+                          icon: _sportIcon(leagues.first.sport),
+                          label: leagues.first.sportName,
+                          subtitle: l10n.sportsLeaguesShownCount(
+                            leagues.where(_settings.isLeagueEnabled).length,
+                            leagues.length,
+                          ),
+                          autofocus: index == 0,
+                          onTap: () => unawaited(
+                            _showLeagueOptions(
+                              leagues,
+                              available: available,
+                              title: leagues.first.sportName,
+                            ),
                           ),
                         ),
-                      ),
+                    ]),
                     AppMenuOption(
                       icon: Icons.check,
                       label: l10n.sportsDone,
@@ -663,26 +666,29 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
           listenable: _settings,
           builder: (context, _) => AppMenuDialog(
             title: Text(title ?? l10n.sportsLeaguesTitle),
+            width: _pickerWidth,
             children: [
               DpadRegion(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    for (final (index, league) in leagues.indexed)
-                      AppMenuOption(
-                        icon: _settings.isLeagueEnabled(league)
-                            ? Icons.check_box
-                            : Icons.check_box_outline_blank,
-                        label: league.name,
-                        autofocus: index == 0,
-                        onTap: () => unawaited(
-                          _settings.setLeagueEnabled(
-                            league,
-                            enabled: !_settings.isLeagueEnabled(league),
-                            available: available,
+                    ..._inColumns([
+                      for (final (index, league) in leagues.indexed)
+                        AppMenuOption(
+                          icon: _settings.isLeagueEnabled(league)
+                              ? Icons.check_box
+                              : Icons.check_box_outline_blank,
+                          label: league.name,
+                          autofocus: index == 0,
+                          onTap: () => unawaited(
+                            _settings.setLeagueEnabled(
+                              league,
+                              enabled: !_settings.isLeagueEnabled(league),
+                              available: available,
+                            ),
                           ),
                         ),
-                      ),
+                    ]),
                     AppMenuOption(
                       icon: Icons.check,
                       label: l10n.sportsDone,
@@ -697,6 +703,26 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
       },
     );
   }
+
+  /// The league pickers' width: room for two columns of options.
+  static const double _pickerWidth = 640;
+
+  /// [options] two to a row, so long pickers (220 soccer leagues) scroll
+  /// half as far. Rows stay aligned for D-pad up/down.
+  static List<Widget> _inColumns(List<Widget> options) => [
+    for (var i = 0; i < options.length; i += 2)
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: options[i]),
+          Expanded(
+            child: i + 1 < options.length
+                ? options[i + 1]
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+  ];
 
   static IconData _sportIcon(String sport) => switch (sport) {
     'football' => Icons.sports_football,
@@ -897,7 +923,13 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
       child: DpadRegion(
         memoryKey: 'sports/list',
         horizontalEdge: DpadEdgeBehavior.stop,
+        // The tabs sit outside this scope, beyond plain traversal
+        upEdge: DpadEdgeBehavior.stop,
         onEdge: (direction) {
+          if (direction == TraversalDirection.up) {
+            _tabBarKey.currentState?.requestFocusFromContent();
+            return;
+          }
           if (direction != TraversalDirection.left) return;
           if (widget.useSidebarLayout) {
             _navKey.currentState?.requestFocus();

@@ -6,14 +6,34 @@ import 'package:material_ui/material_ui.dart';
 /// with `showAppDialog`) instead of a raw [SimpleDialog]; [children] are
 /// usually [AppMenuOption]s.
 class AppMenuDialog extends StatelessWidget {
-  const AppMenuDialog({super.key, required this.title, required this.children});
+  const AppMenuDialog({
+    super.key,
+    required this.title,
+    required this.children,
+    this.width,
+  });
 
   final Widget title;
   final List<Widget> children;
 
+  /// A fixed width (scaled, and kept within the screen) for long pickers;
+  /// otherwise the dialog fits its options.
+  final double? width;
+
   @override
-  Widget build(BuildContext context) =>
-      SimpleDialog(title: title, children: children);
+  Widget build(BuildContext context) {
+    final width = this.width;
+    final scaled = width == null
+        ? null
+        : width * FontSizeScope.scaleOf(context);
+    return SimpleDialog(
+      title: title,
+      constraints: scaled == null
+          ? null
+          : BoxConstraints(minWidth: scaled, maxWidth: scaled),
+      children: children,
+    );
+  }
 }
 
 /// One choice in an [AppMenuDialog]: an icon, a label and an optional

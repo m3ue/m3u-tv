@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
@@ -70,6 +73,32 @@ class DpadTabBarState extends State<DpadTabBar> {
     if (index >= 0 && index < _focusNodes.length) {
       _focusNodes[index].requestFocus();
     }
+  }
+
+  /// For an Up press at the top edge of content below the bar (a region
+  /// with `upEdge: DpadEdgeBehavior.stop`): moves to the selected tab once
+  /// the focused item's list is scrolled to its start. Until then it scrolls
+  /// that list up a page instead, since a lazily built list can reach its
+  /// edge with rows still above, not built yet.
+  void requestFocusFromContent() {
+    final focused = FocusManager.instance.primaryFocus?.context;
+    final position = focused == null
+        ? null
+        : Scrollable.maybeOf(focused)?.position;
+    if (position != null && position.pixels > position.minScrollExtent + 1) {
+      unawaited(
+        position.animateTo(
+          math.max(
+            position.minScrollExtent,
+            position.pixels - position.viewportDimension * 0.8,
+          ),
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        ),
+      );
+      return;
+    }
+    requestFocus();
   }
 
   @override
