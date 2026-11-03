@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/home/home_spotlight.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/sports_models.dart';
 
 void main() {
   final l10n = lookupAppLocalizations(const Locale('en'));
@@ -265,6 +266,95 @@ void main() {
       expect(spotlight.progress, isNull);
       expect(spotlight.progressLabel, isNull);
       expect(spotlight.playLength, const Duration(minutes: 50));
+    });
+
+    test('a game shows its matchup, score, crests and channels', () {
+      SportsTeam team(String id, String name) => SportsTeam(
+        leagueId: 'hockey/nhl',
+        id: id,
+        displayName: name,
+        shortName: name,
+        nickname: name,
+        abbreviation: id.toUpperCase(),
+        logoUrl: 'http://img/$id.png',
+      );
+      final live = SportsFixture(
+        id: '401',
+        league: const SportsLeague(
+          id: 'hockey/nhl',
+          name: 'NHL',
+          abbreviation: 'NHL',
+        ),
+        start: now,
+        state: SportsFixtureState.live,
+        statusDetail: '2nd - 12:34',
+        home: SportsCompetitor(
+          team: team('tor', 'Toronto Maple Leafs'),
+          score: '2',
+        ),
+        away: SportsCompetitor(team: team('uta', 'Utah Mammoth'), score: '1'),
+        broadcasts: const ['ESPN+'],
+      );
+
+      final spotlight = resolve(
+        SportsSpotlightTarget(live, channelNames: const ['NHL 05', 'ESPN+ 53']),
+      );
+      expect(spotlight.title, 'Utah Mammoth at Toronto Maple Leafs');
+      expect(spotlight.badge, 'LIVE');
+      expect(spotlight.kicker, 'NHL');
+      expect(
+        spotlight.secondaryTitle,
+        'Utah Mammoth 1  ·  Toronto Maple Leafs 2',
+      );
+      expect(spotlight.chips, ['2nd - 12:34', 'ESPN+']);
+      expect(spotlight.crestUrls, ['http://img/uta.png', 'http://img/tor.png']);
+      expect(spotlight.footnote, 'On NHL 05, ESPN+ 53');
+
+      final later = resolve(
+        SportsSpotlightTarget(
+          SportsFixture(
+            id: '402',
+            league: live.league,
+            start: DateTime(2026, 10, 12, 19),
+            state: SportsFixtureState.scheduled,
+            statusDetail: '',
+            home: live.home,
+            away: live.away,
+          ),
+        ),
+      );
+      expect(later.badge, isNull);
+      expect(later.secondaryTitle, isNull);
+      expect(later.chips, ['Starts 19:00']);
+
+      // With the league's logo standing in for the title, the matchup reads
+      // under it and the kicker drops the league name the logo already shows
+      SportsFixture withLogo(SportsFixtureState state) => SportsFixture(
+        id: '403',
+        league: live.league,
+        start: now,
+        state: state,
+        statusDetail: '',
+        home: live.home,
+        away: live.away,
+        leagueLogoUrl: 'http://img/nhl-dark.png',
+      );
+      final liveWithLogo = resolve(
+        SportsSpotlightTarget(withLogo(SportsFixtureState.live)),
+      );
+      expect(liveWithLogo.clearLogoUrl, 'http://img/nhl-dark.png');
+      expect(liveWithLogo.title, 'Utah Mammoth at Toronto Maple Leafs');
+      expect(liveWithLogo.kicker, isNull);
+      expect(
+        liveWithLogo.secondaryTitle,
+        'Utah Mammoth 1  ·  Toronto Maple Leafs 2',
+      );
+      expect(
+        resolve(
+          SportsSpotlightTarget(withLogo(SportsFixtureState.scheduled)),
+        ).secondaryTitle,
+        'Utah Mammoth at Toronto Maple Leafs',
+      );
     });
   });
 

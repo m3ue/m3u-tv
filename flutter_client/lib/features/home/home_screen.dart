@@ -1,10 +1,12 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show setEquals;
+import 'package:flutter/foundation.dart' show ValueListenable, setEquals;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/features/home/home_spotlight.dart';
 import 'package:m3u_tv/features/home/home_spotlight_hero.dart';
+import 'package:m3u_tv/features/sports/sports_fixture_actions.dart';
+import 'package:m3u_tv/features/sports/sports_fixture_card.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
@@ -13,6 +15,8 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/sports_channel_resolver.dart';
+import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
@@ -44,6 +48,7 @@ class HomeScreen extends ConsumerStatefulWidget {
     required this.onProgressSelect,
     required this.onContinueWatchingMore,
     required this.onLiveTvMore,
+    this.onSportsMore,
     required this.onMoviesMore,
     required this.onSeriesMore,
     required this.onRecordingsSelect,
@@ -60,6 +65,9 @@ class HomeScreen extends ConsumerStatefulWidget {
   final void Function(Progress) onProgressSelect;
   final VoidCallback onContinueWatchingMore;
   final VoidCallback onLiveTvMore;
+
+  /// Opens the Sports screen from the Sports row's View All card.
+  final VoidCallback? onSportsMore;
   final VoidCallback onMoviesMore;
   final VoidCallback onSeriesMore;
   final VoidCallback onRecordingsSelect;
@@ -384,6 +392,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         rowItemLimit: _rowItemLimit,
         onViewAll: widget.onLiveTvMore,
         onLoaded: (hasItems) => _onCatalogRowLoaded(_CatalogRow.live, hasItems),
+        useSidebarLayout: widget.useSidebarLayout,
+        onSidebarActivate: widget.onSidebarActivate,
+        spotlight: spotlight,
+      ),
+      _SportsRow(
+        key: ValueKey(('sports', playlistKey)),
+        onChannelSelect: widget.onChannelSelect,
+        onViewAll: widget.onSportsMore,
+        rowItemLimit: _rowItemLimit,
         useSidebarLayout: widget.useSidebarLayout,
         onSidebarActivate: widget.onSidebarActivate,
         spotlight: spotlight,
@@ -772,6 +789,237 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
           onFocused: () => spotlight.select(target),
           onHoverChanged: spotlight.hoverHandler(target),
           contentKey: channel.id,
+          child: tile,
+        );
+      },
+      useSidebarLayout: widget.useSidebarLayout,
+      onSidebarActivate: widget.onSidebarActivate,
+    );
+  }
+}
+
+/// Today's games from the viewer's leagues that a channel carries: live
+/// ones and followed teams first, then by kickoff. Hidden while Sports is
+/// off or nothing is watchable. Selecting a game plays it the way the
+/// Sports screen does.
+class _SportsRow extends ConsumerStatefulWidget {
+  const _SportsRow({
+    super.key,
+    required this.onChannelSelect,
+    required this.onViewAll,
+    required this.rowItemLimit,
+    required this.useSidebarLayout,
+    required this.onSidebarActivate,
+    required this.spotlight,
+  });
+
+  final void Function(Channel) onChannelSelect;
+  final VoidCallback? onViewAll;
+  final int rowItemLimit;
+  final bool useSidebarLayout;
+  final VoidCallback? onSidebarActivate;
+  final HomeSpotlightController? spotlight;
+
+  @override
+  ConsumerState<_SportsRow> createState() => _SportsRowState();
+}
+
+class _SportsRowState extends ConsumerState<_SportsRow> {
+  /// How often scores refresh while a game is on (and Home is shown).
+  static const Duration _refreshInterval = Duration(minutes: 2);
+
+  /// Null until the first load.
+  List<SportsFixture>? _fixtures;
+  Map<String, List<SportsChannelMatch>> _matches = const {};
+  String? _loadedFor;
+  int _generation = 0;
+  Timer? _refreshTimer;
+  ValueListenable<TickerModeData>? _tickerMode;
+
+  bool get _isVisible => _tickerMode?.value.enabled ?? true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Hidden branches (another tab shown) run with tickers off: no polling
+    final notifier = TickerMode.getValuesNotifier(context);
+    if (!identical(notifier, _tickerMode)) {
+      _tickerMode?.removeListener(_onVisibilityChanged);
+      _tickerMode = notifier..addListener(_onVisibilityChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    _tickerMode?.removeListener(_onVisibilityChanged);
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onVisibilityChanged() {
+    if (_isVisible) {
+      _loadedFor = null;
+      if (mounted) setState(() {});
+    } else {
+      _refreshTimer?.cancel();
+    }
+  }
+
+  Future<void> _load(
+    SportsCapability capability,
+    List<SportsLeague> leagues,
+    Set<String> followed,
+  ) async {
+    final generation = ++_generation;
+    _refreshTimer?.cancel();
+    final now = DateTime.now();
+    final midnight = DateTime(now.year, now.month, now.day);
+    try {
+      final fixtures = await ref
+          .read(sportsServiceProvider)
+          .fixtures(
+            capability: capability,
+            leagues: leagues,
+            from: midnight.toUtc(),
+            to: DateTime(
+              midnight.year,
+              midnight.month,
+              midnight.day + 1,
+            ).toUtc(),
+          );
+      final watchable = fixtures.where(isSportsFixtureWatchable).toList();
+      final matches = await SportsChannelResolver(
+        ref.read(catalogRepositoryProvider),
+      ).resolve(watchable);
+      if (!mounted || generation != _generation) return;
+      int rank(SportsFixture fixture) {
+        final isFollowed = fixture.displayOrder.any(
+          (side) => followed.contains(side.team.key),
+        );
+        final isLive = fixture.state == SportsFixtureState.live;
+        return (isLive ? 0 : 2) + (isFollowed ? 0 : 1);
+      }
+
+      final shown =
+          watchable
+              .where((fixture) => matches[fixture.id]?.isNotEmpty ?? false)
+              .toList()
+            ..sort((a, b) {
+              final byRank = rank(a).compareTo(rank(b));
+              return byRank != 0 ? byRank : a.start.compareTo(b.start);
+            });
+      setState(() {
+        _fixtures = shown.take(widget.rowItemLimit).toList();
+        _matches = matches;
+      });
+      // A refreshed score reaches the hero if its game is the one shown
+      final spotlight = widget.spotlight;
+      final current = spotlight?.value;
+      if (current is SportsSpotlightTarget) {
+        for (final fixture in shown) {
+          final target = _targetFor(fixture);
+          if (target.key == current.key) spotlight!.select(target);
+        }
+      }
+    } on Object catch (error) {
+      debugPrint('[Sports] Home row load failed: $error');
+      if (!mounted || generation != _generation) return;
+      setState(() => _fixtures ??= const []);
+    }
+    if (!mounted || !_isVisible) return;
+    final soon = DateTime.now().toUtc().add(const Duration(hours: 1));
+    final active = (_fixtures ?? const <SportsFixture>[]).any(
+      (fixture) =>
+          fixture.state == SportsFixtureState.live ||
+          fixture.start.isBefore(soon),
+    );
+    if (active) {
+      _refreshTimer = Timer(_refreshInterval, () {
+        if (mounted) setState(() => _loadedFor = null);
+      });
+    }
+  }
+
+  SportsSpotlightTarget _targetFor(SportsFixture fixture) =>
+      SportsSpotlightTarget(
+        fixture,
+        channelNames: [
+          for (final match
+              in _matches[fixture.id] ?? const <SportsChannelMatch>[])
+            match.channel.name,
+        ],
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final capability = ref.watch(sportsCapabilityProvider);
+    if (capability == null) return const SizedBox.shrink();
+    final settings = ref.watch(sportsSettingsProvider);
+    final leagues = settings.enabledLeagues(capability.leagues);
+    if (leagues.isEmpty) return const SizedBox.shrink();
+    final followed = settings.followedTeamKeys;
+    final signature = [
+      for (final league in leagues) league.id,
+      '|',
+      ...followed,
+    ].join(',');
+    if (_isVisible && signature != _loadedFor) {
+      _loadedFor = signature;
+      unawaited(_load(capability, leagues, followed));
+    }
+
+    final fixtures = _fixtures;
+    final isLoading = fixtures == null;
+    if (fixtures != null && fixtures.isEmpty) return const SizedBox.shrink();
+    final l = AppLocalizations.of(context);
+    final spotlight = widget.spotlight;
+    final onViewAll = widget.onViewAll;
+    final rowFixtures = fixtures ?? const <SportsFixture>[];
+    return MediaPreviewSection.builder(
+      title: l.navSports,
+      titleIcon: Icons.stadium_rounded,
+      emptyLabel: l.sportsNoGames,
+      isLoading: isLoading,
+      viewAll: onViewAll == null
+          ? null
+          : _viewAllItem(
+              l,
+              target: StaticSpotlightTarget(
+                id: 'sports-view-all',
+                title: l.navSports,
+                description: l.homeBrowseSports,
+              ),
+              onTap: onViewAll,
+              spotlight: spotlight,
+            ),
+      itemCount: rowFixtures.length,
+      baseCardWidth: SportsFixtureTile.baseWidth,
+      baseCardHeight: SportsFixtureTile.baseHeight,
+      itemBuilder: (context, index, cardSize, {required autofocus}) {
+        final fixture = rowFixtures[index];
+        final matches = _matches[fixture.id] ?? const <SportsChannelMatch>[];
+        final tile = SizedBox.fromSize(
+          size: cardSize,
+          child: SportsFixtureTile(
+            fixture: fixture,
+            channelCount: matches.length,
+            autofocus: autofocus,
+            onTap: () => unawaited(
+              playSportsFixture(
+                context,
+                fixture: fixture,
+                matches: matches,
+                onChannelSelect: widget.onChannelSelect,
+              ),
+            ),
+          ),
+        );
+        if (spotlight == null) return tile;
+        final target = _targetFor(fixture);
+        return PreviewFocusAnchor(
+          onFocused: () => spotlight.select(target),
+          onHoverChanged: spotlight.hoverHandler(target),
+          contentKey: target.key,
           child: tile,
         );
       },

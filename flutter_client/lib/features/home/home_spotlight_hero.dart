@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/features/epg/epg_program_details.dart'
     show epgDurationLabel, epgTimeLabel;
 import 'package:m3u_tv/features/home/home_spotlight.dart';
+import 'package:m3u_tv/features/sports/sports_fixture_card.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/shared/auto_scroll_text.dart';
@@ -68,6 +69,8 @@ class RichHomeLayout extends StatelessWidget {
                   _SpotlightBackground(
                     spotlight: spotlight,
                     artHeight: heroHeight + constraints.maxHeight * 0.22,
+                    // Crests stay clear of the rows docked below the hero
+                    crestAreaHeight: heroHeight - rowsFadeExtent,
                   ),
                   Positioned(
                     top: 0,
@@ -422,10 +425,15 @@ class _SpotlightBackground extends StatefulWidget {
   const _SpotlightBackground({
     required this.spotlight,
     required this.artHeight,
+    required this.crestAreaHeight,
   });
 
   final HomeSpotlight? spotlight;
   final double artHeight;
+
+  /// How far down a game's crests may reach: to where the rows begin.
+  /// Backdrop art may run past it (it fades under the rows); crests can't.
+  final double crestAreaHeight;
 
   @override
   State<_SpotlightBackground> createState() => _SpotlightBackgroundState();
@@ -470,11 +478,20 @@ class _SpotlightBackgroundState extends State<_SpotlightBackground> {
 
   @override
   Widget build(BuildContext context) {
+    final spotlight = widget.spotlight;
+    final crests = spotlight?.backdropUrl == null
+        ? spotlight?.crestUrls ?? const <String>[]
+        : const <String>[];
     final backdrop = RepaintBoundary(
       child: _EdgeFade(
-        child: _CrossfadeBackdrop(url: widget.spotlight?.backdropUrl),
+        child: _CrossfadeBackdrop(
+          url: crests.isEmpty ? spotlight?.backdropUrl : null,
+        ),
       ),
     );
+    // Below the clock, above the rows
+    const crestTop = MediaBrowsingMetrics.pagePadding * 3;
+    final crestHeight = widget.crestAreaHeight - crestTop;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -514,6 +531,24 @@ class _SpotlightBackgroundState extends State<_SpotlightBackground> {
             child: FractionallySizedBox(widthFactor: 0.72, child: backdrop),
           ),
         ),
+        if (crests.isNotEmpty && crestHeight > 0)
+          Positioned(
+            top: crestTop,
+            right: 0,
+            left: 0,
+            height: crestHeight,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: FractionallySizedBox(
+                widthFactor: 0.6,
+                child: _SpotlightCrests(
+                  key: ValueKey(spotlight!.key),
+                  urls: crests,
+                  size: crestHeight * 0.78,
+                ),
+              ),
+            ),
+          ),
         // Keeps the title/plot legible where they overlap the faded-in art.
         // Smooth on every edge, so it adds no seam of its own.
         const IgnorePointer(
@@ -531,6 +566,41 @@ class _SpotlightBackgroundState extends State<_SpotlightBackground> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A game's crests, side by side where backdrop art would be, fading in as
+/// the spotlight moves to it.
+class _SpotlightCrests extends StatelessWidget {
+  const _SpotlightCrests({super.key, required this.urls, required this.size});
+
+  final List<String> urls;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+      builder: (context, opacity, child) =>
+          Opacity(opacity: opacity, child: child),
+      // Shrinks, never overflows, when the hero is narrow
+      child: Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final (index, url) in urls.indexed) ...[
+                if (index > 0) SizedBox(width: size * 0.45),
+                SportsTeamLogo(url: url, size: size),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

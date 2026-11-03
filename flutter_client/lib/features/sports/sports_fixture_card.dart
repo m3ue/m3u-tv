@@ -192,6 +192,80 @@ class SportsFixtureCard extends StatelessWidget {
   }
 }
 
+/// A game as a Home row card: status and league, both teams with crests and
+/// scores, and how many channels carry it, over the teams' colour wash.
+class SportsFixtureTile extends StatelessWidget {
+  const SportsFixtureTile({
+    super.key,
+    required this.fixture,
+    required this.channelCount,
+    required this.onTap,
+    this.autofocus = false,
+  });
+
+  /// The card's unscaled size; the row scales it.
+  static const double baseWidth = 340;
+  static const double baseHeight = 176;
+
+  final SportsFixture fixture;
+  final int channelCount;
+  final VoidCallback onTap;
+  final bool autofocus;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    final scale = FontSizeScope.scaleOf(context);
+    final sides = fixture.displayOrder;
+    final colors = [
+      for (final side in sides)
+        SportsFixtureCard._washColor(side.team, theme.colorScheme),
+    ];
+    final muted = theme.textTheme.labelMedium?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    return DpadInkWell(
+      onTap: onTap,
+      autofocus: autofocus,
+      color: theme.colorScheme.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(SportsFixtureCard._radius),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(SportsFixtureCard._radius),
+          gradient: colors.length == 2 ? LinearGradient(colors: colors) : null,
+        ),
+        padding: EdgeInsets.symmetric(
+          horizontal: 16 * scale,
+          vertical: 12 * scale,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _StatusColumn(fixture: fixture, showLeague: false),
+                ),
+                Text(fixture.league.abbreviation, style: muted),
+              ],
+            ),
+            const Spacer(),
+            _Matchup(fixture: fixture, sides: sides),
+            const Spacer(),
+            Text(
+              l10n.sportsChannelCount(channelCount),
+              style: muted,
+              textAlign: TextAlign.end,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _StatusColumn extends StatelessWidget {
   const _StatusColumn({required this.fixture, required this.showLeague});
 

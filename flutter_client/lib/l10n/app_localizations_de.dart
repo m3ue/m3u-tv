@@ -1047,6 +1047,20 @@ class AppLocalizationsDe extends AppLocalizations {
   String get homeBrowseLiveTv => 'Alle Sender durchsuchen';
 
   @override
+  String get homeBrowseSports =>
+      'Alle Spiele deiner Ligen, mit Live-Ergebnissen';
+
+  @override
+  String homeSportsStartsAt(String time) {
+    return 'Beginnt um $time';
+  }
+
+  @override
+  String homeSportsOnChannels(String channels) {
+    return 'Auf $channels';
+  }
+
+  @override
   String get homeBrowseMovies => 'Alle Filme durchsuchen';
 
   @override

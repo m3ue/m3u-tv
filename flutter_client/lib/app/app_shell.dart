@@ -1559,6 +1559,7 @@ class AppShellState extends ConsumerState<AppShell>
           _pushDetail(RouteNames.continueWatchingPath, fullScreen: true),
         ),
         onLiveTvMore: () => _navigateToRoute(RouteNames.liveTv),
+        onSportsMore: () => _navigateToRoute(RouteNames.sports),
         onMoviesMore: () => _navigateToRoute(RouteNames.vod),
         onSeriesMore: () => _navigateToRoute(RouteNames.series),
         onRecordingsSelect: () => _navigateToRoute(RouteNames.dvr),

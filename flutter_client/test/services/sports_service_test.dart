@@ -56,6 +56,7 @@ Map<String, Object?> _fixture(String id, String start, {String? league}) => {
   'status_detail': '1st - 15:00',
   'name': 'Utah Mammoth at Toronto Maple Leafs',
   'broadcasts': ['ESPN+'],
+  'league_logo': 'https://editor.example/logo-proxy/nhl-dark',
   'home': _side('tor', 'Toronto Maple Leafs', 'Maple Leafs'),
   'away': _side('uta', 'Utah Mammoth', 'Mammoth'),
 };
@@ -162,6 +163,10 @@ void main() {
       expect(fixture.home!.team.logoUrl, contains('/logo-proxy/'));
       expect(fixture.away!.score, '2');
       expect(fixture.broadcasts, ['ESPN+']);
+      expect(
+        fixture.leagueLogoUrl,
+        'https://editor.example/logo-proxy/nhl-dark',
+      );
       // North American leagues list the away side first.
       expect(fixture.displayOrder.first.team.displayName, 'Utah Mammoth');
     },

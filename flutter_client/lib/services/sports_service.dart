@@ -72,6 +72,7 @@ class SportsService {
       home: _parseCompetitor(json['home'], league.id),
       away: _parseCompetitor(json['away'], league.id),
       name: _string(json['name']),
+      leagueLogoUrl: _string(json['league_logo']),
       broadcasts: [
         if (broadcasts is List)
           for (final broadcast in broadcasts) ?_string(broadcast),

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:m3u_tv/features/multiview/multiview_controller.dart';
 import 'package:m3u_tv/features/multiview/multiview_manage_dialog.dart';
 import 'package:m3u_tv/features/multiview/multiview_screen.dart';
+import 'package:m3u_tv/features/sports/sports_fixture_actions.dart';
 import 'package:m3u_tv/features/sports/sports_fixture_card.dart';
 import 'package:m3u_tv/features/sports/sports_teams_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -415,9 +416,7 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
   // Actions
   // ---------------------------------------------------------------------------
 
-  bool _isWatchable(SportsFixture fixture) =>
-      fixture.state == SportsFixtureState.live ||
-      fixture.state == SportsFixtureState.scheduled;
+  bool _isWatchable(SportsFixture fixture) => isSportsFixtureWatchable(fixture);
 
   /// The fixture's channels, waiting out a resolve already under way so a
   /// press right after the list loads doesn't report "no channel".
@@ -433,61 +432,15 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
   }
 
   Future<void> _openFixture(SportsFixture fixture) async {
-    final l10n = AppLocalizations.of(context);
-    if (!_isWatchable(fixture)) {
-      _showMessage(l10n.sportsGameOver);
-      return;
-    }
-    final matches = await _matchesFor(fixture);
+    final matches = _isWatchable(fixture)
+        ? await _matchesFor(fixture)
+        : const <SportsChannelMatch>[];
     if (!mounted) return;
-    if (matches.isEmpty) {
-      _showMessage(l10n.sportsNoChannelFound);
-      return;
-    }
-    final match = matches.length == 1
-        ? matches.single
-        : await _pickChannel(fixture, matches);
-    if (match != null && mounted) widget.onChannelSelect(match.channel);
-  }
-
-  Future<SportsChannelMatch?> _pickChannel(
-    SportsFixture fixture,
-    List<SportsChannelMatch> matches,
-  ) {
-    final l10n = AppLocalizations.of(context);
-    return showAppDialog<SportsChannelMatch>(
-      context: context,
-      builder: (dialogContext) => AppMenuDialog(
-        title: Text(
-          sportsFixtureTitle(l10n, fixture),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        children: [
-          DpadRegion(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (var i = 0; i < matches.length; i++)
-                  AppMenuOption(
-                    icon: Icons.live_tv,
-                    label: matches[i].channel.name,
-                    subtitle:
-                        matches[i].program?.displayTitle ??
-                        l10n.sportsEventChannel,
-                    autofocus: i == 0,
-                    onTap: () => Navigator.of(dialogContext).pop(matches[i]),
-                  ),
-                AppMenuOption(
-                  icon: Icons.close,
-                  label: l10n.cancel,
-                  onTap: () => Navigator.of(dialogContext).pop(),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    await playSportsFixture(
+      context,
+      fixture: fixture,
+      matches: matches,
+      onChannelSelect: widget.onChannelSelect,
     );
   }
 
@@ -569,7 +522,7 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
       case _AddToMultiviewAction():
         final match = matches.length == 1
             ? matches.single
-            : await _pickChannel(fixture, matches);
+            : await pickSportsChannel(context, fixture, matches);
         if (match == null || !mounted) return;
         final added = ref
             .read(multiviewControllerProvider)

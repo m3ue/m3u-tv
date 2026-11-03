@@ -192,10 +192,15 @@ class SportsFixture {
     this.away,
     this.name,
     this.broadcasts = const [],
+    this.leagueLogoUrl,
   });
 
   final String id;
   final SportsLeague league;
+
+  /// The league's logo (through the editor's logo proxy), made for dark
+  /// backgrounds where ESPN has one.
+  final String? leagueLogoUrl;
 
   /// Kickoff, UTC.
   final DateTime start;

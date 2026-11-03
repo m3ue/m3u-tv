@@ -997,6 +997,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeBrowseLiveTv => '浏览所有频道';
 
   @override
+  String get homeBrowseSports => '你所关注联赛的全部比赛，含实时比分';
+
+  @override
+  String homeSportsStartsAt(String time) {
+    return '$time 开始';
+  }
+
+  @override
+  String homeSportsOnChannels(String channels) {
+    return '在 $channels 播出';
+  }
+
+  @override
   String get homeBrowseMovies => '浏览所有电影';
 
   @override

@@ -12,7 +12,11 @@ import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/sports_models.dart';
+import 'package:m3u_tv/services/sports_service.dart';
+import 'package:m3u_tv/services/sports_settings.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
+import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:material_ui/material_ui.dart';
@@ -131,6 +135,10 @@ void main() {
     VoidCallback? onMoviesMore,
     FavoritesService? liveFavorites,
     bool unreadable = false,
+    SportsCapability? sports,
+    XtreamService? sportsEditor,
+    ValueChanged<Channel>? onChannelSelect,
+    VoidCallback? onSportsMore,
   }) async {
     // A TV screen: every row is on it.
     await tester.binding.setSurfaceSize(const Size(1920, 1080));
@@ -162,6 +170,14 @@ void main() {
           catalogRepositoryProvider.overrideWith((_) => repo),
           progressListProvider.overrideWith((_) => const <Progress>[]),
           hasDvrFeatureProvider.overrideWith((_) => false),
+          // Sports is off unless a test turns it on
+          sportsCapabilityProvider.overrideWith((_) => sports),
+          if (sportsEditor != null) ...[
+            sportsServiceProvider.overrideWith(
+              (_) => SportsService(sportsEditor),
+            ),
+            sportsSettingsProvider.overrideWith((_) => SportsSettings()),
+          ],
           epgServiceProvider.overrideWith((_) => EpgService()),
           recordingChannelIdsProvider.overrideWith((_) => const <int>{}),
           viewSettingsServiceProvider.overrideWith(
@@ -182,7 +198,8 @@ void main() {
           supportedLocales: AppLocalizations.supportedLocales,
           theme: ThemeData.dark(useMaterial3: true),
           home: HomeScreen(
-            onChannelSelect: (_) {},
+            onChannelSelect: onChannelSelect ?? (_) {},
+            onSportsMore: onSportsMore,
             onVodSelect: (_) {},
             onSeriesSelect: (_) {},
             onProgressSelect: (_) {},
@@ -199,6 +216,118 @@ void main() {
     );
     return repo;
   }
+
+  testWidgets(
+    "a Sports row lists today's watchable games, plays one, and opens Sports",
+    (tester) async {
+      const eventChannel = Channel(
+        id: 5,
+        name: 'NHL 05: Mammoth @ Maple Leafs',
+        streamUrl: 'http://x/5',
+        categoryId: '10',
+      );
+      Map<String, Object?> team(String id, String name, String nickname) => {
+        'id': id,
+        'display_name': name,
+        'short_name': nickname,
+        'nickname': nickname,
+        'abbreviation': id.toUpperCase(),
+      };
+      final editor = (await tester.runAsync(() async {
+        final service = XtreamService(
+          transport: (request) async {
+            if (request.action == null) {
+              return {
+                'user_info': {'auth': 1, 'status': 'Active'},
+                'm3u_editor': {
+                  'version': '0.14.0',
+                  'features': ['sports'],
+                },
+              };
+            }
+            return {
+              'fixtures': [
+                {
+                  'id': '401',
+                  'league_id': 'hockey/nhl',
+                  'start': DateTime.now().toUtc().toIso8601String(),
+                  'state': 'live',
+                  'status_detail': '1st - 15:00',
+                  'home': {
+                    'score': '1',
+                    'team': team('tor', 'Toronto Maple Leafs', 'Maple Leafs'),
+                  },
+                  'away': {
+                    'score': '0',
+                    'team': team('uta', 'Utah Mammoth', 'Mammoth'),
+                  },
+                },
+              ],
+            };
+          },
+        );
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://editor.example',
+            username: 'user',
+            password: 'pass',
+          ),
+        );
+        return service;
+      }))!;
+      final played = <Channel>[];
+      var openedSports = 0;
+
+      await pumpHome(
+        tester,
+        const _Catalog(channels: [..._channels, eventChannel]),
+        sports: const SportsCapability(
+          leagues: [
+            SportsLeague(
+              id: 'hockey/nhl',
+              name: 'NHL',
+              abbreviation: 'NHL',
+              isDefault: true,
+            ),
+          ],
+        ),
+        sportsEditor: editor,
+        onChannelSelect: played.add,
+        onSportsMore: () => openedSports++,
+      );
+      for (var i = 0; i < 4; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      final row = _section('Sports');
+      expect(row, findsOneWidget);
+      final game = find.descendant(
+        of: row,
+        matching: find.text('Toronto Maple Leafs'),
+      );
+      expect(game, findsOneWidget);
+      expect(
+        find.descendant(of: row, matching: find.text('1 channel')),
+        findsOneWidget,
+      );
+
+      await tester.tap(game);
+      await tester.pumpAndSettle();
+      expect(played.map((channel) => channel.id), [eventChannel.id]);
+
+      await tester.tap(
+        find.descendant(of: row, matching: find.text('View All')),
+      );
+      await tester.pumpAndSettle();
+      expect(openedSports, 1);
+
+      // Unmount so the score refresh timer is cancelled
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('rows keep their height while their first page loads', (
     tester,

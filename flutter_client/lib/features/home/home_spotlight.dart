@@ -3,8 +3,10 @@ import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:m3u_tv/features/sports/sports_fixture_card.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart'
     show HoverIntentCallback;
@@ -57,6 +59,17 @@ class ProgressSpotlightTarget extends HomeSpotlightTarget {
       ':${progress.upNext}';
 }
 
+/// A game in Home's Sports row, with the channels that carry it.
+class SportsSpotlightTarget extends HomeSpotlightTarget {
+  const SportsSpotlightTarget(this.fixture, {this.channelNames = const []});
+
+  final SportsFixture fixture;
+  final List<String> channelNames;
+
+  @override
+  String get key => 'sports:${fixture.league.id}:${fixture.id}';
+}
+
 /// A non-media card (DVR shortcut, "See all"): title and a line of text.
 class StaticSpotlightTarget extends HomeSpotlightTarget {
   const StaticSpotlightTarget({
@@ -94,6 +107,7 @@ class HomeSpotlight {
     this.footnote,
     this.endsAt,
     this.playLength,
+    this.crestUrls = const [],
   });
 
   final String key;
@@ -134,6 +148,10 @@ class HomeSpotlight {
   /// How long playing this would run from now (movie runtime, or what is
   /// left of a resume point); the hero clock adds it to the current time.
   final Duration? playLength;
+
+  /// Team crests shown large where backdrop art would be (a game has none),
+  /// in the matchup's order.
+  final List<String> crestUrls;
 }
 
 /// Debounces focus changes into the hero. A D-pad held down steps through a
@@ -400,9 +418,57 @@ HomeSpotlight resolveHomeSpotlight(
     case ProgressSpotlightTarget(:final progress):
       return _progressSpotlight(target, progress, enricher, format);
 
+    case SportsSpotlightTarget():
+      return _sportsSpotlight(target, format);
+
     case StaticSpotlightTarget(:final title, :final description):
       return HomeSpotlight(key: target.key, title: title, plot: description);
   }
+}
+
+HomeSpotlight _sportsSpotlight(
+  SportsSpotlightTarget target,
+  HomeSpotlightFormat format,
+) {
+  final l = format.l10n;
+  final fixture = target.fixture;
+  final sides = fixture.displayOrder;
+  final scored =
+      fixture.state == SportsFixtureState.live ||
+      fixture.state == SportsFixtureState.finished;
+  final scoreLine = scored && sides.length == 2
+      ? sides
+            .map((side) => '${side.team.displayName} ${side.score ?? '-'}')
+            .join('  ·  ')
+      : null;
+  final crests = sides
+      .map((side) => nullIfBlank(side.team.logoUrl))
+      .nonNulls
+      .toList();
+  final title = sportsFixtureTitle(l, fixture);
+  // The league's logo takes the title's place, as a clearlogo does for a
+  // movie; the matchup (with its score once on) then reads under it
+  final leagueLogo = nullIfBlank(fixture.leagueLogoUrl);
+  return HomeSpotlight(
+    key: target.key,
+    title: title,
+    clearLogoUrl: leagueLogo,
+    toneUrl: crests.firstOrNull,
+    crestUrls: crests,
+    badge: fixture.state == SportsFixtureState.live ? l.sportsLiveBadge : null,
+    kicker: leagueLogo == null ? fixture.league.name : null,
+    secondaryTitle: scoreLine ?? (leagueLogo == null ? null : title),
+    chips: [
+      if (fixture.state == SportsFixtureState.live)
+        ?nullIfBlank(fixture.statusDetail)
+      else if (fixture.state == SportsFixtureState.scheduled)
+        l.homeSportsStartsAt(format.timeOfDay(fixture.start.toLocal())),
+      ...fixture.broadcasts.take(3),
+    ],
+    footnote: target.channelNames.isEmpty
+        ? null
+        : l.homeSportsOnChannels(target.channelNames.take(3).join(', ')),
+  );
 }
 
 HomeSpotlight _channelSpotlight(

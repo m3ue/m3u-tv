@@ -561,6 +561,25 @@
   "homeNoMovies": "No Movies available",
   "homeMovie": "Movie",
   "homeBrowseLiveTv": "Browse every channel",
+  "homeBrowseSports": "Every game from your leagues, with live scores",
+  "homeSportsStartsAt": "Starts {time}",
+  "@homeSportsStartsAt": {
+    "description": "Spotlight chip for a game yet to start.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "homeSportsOnChannels": "On {channels}",
+  "@homeSportsOnChannels": {
+    "description": "Spotlight footnote: the channels carrying a game.",
+    "placeholders": {
+      "channels": {
+        "type": "String"
+      }
+    }
+  },
   "homeBrowseMovies": "Browse every movie",
   "homeBrowseSeries": "Browse every series",
   "homeNothingToShow": "This playlist has nothing to show yet",

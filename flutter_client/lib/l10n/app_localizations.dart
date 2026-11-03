@@ -1886,6 +1886,24 @@ abstract class AppLocalizations {
   /// **'Browse every channel'**
   String get homeBrowseLiveTv;
 
+  /// No description provided for @homeBrowseSports.
+  ///
+  /// In en, this message translates to:
+  /// **'Every game from your leagues, with live scores'**
+  String get homeBrowseSports;
+
+  /// Spotlight chip for a game yet to start.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts {time}'**
+  String homeSportsStartsAt(String time);
+
+  /// Spotlight footnote: the channels carrying a game.
+  ///
+  /// In en, this message translates to:
+  /// **'On {channels}'**
+  String homeSportsOnChannels(String channels);
+
   /// No description provided for @homeBrowseMovies.
   ///
   /// In en, this message translates to:
