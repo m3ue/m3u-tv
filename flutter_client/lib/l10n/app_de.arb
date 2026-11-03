@@ -390,7 +390,7 @@
   "settingsStorageKeepPlaylists": "Auf diesem Gerät behaltene Playlists",
   "settingsStorageKeepPlaylistsValue": "{count, plural, =1{Nur die aktive Playlist} other{Die {count} zuletzt genutzten}}",
   "settingsStorageClearPlaylistTitle": "Gespeicherte Inhalte löschen?",
-  "settingsStorageClearPlaylistBody": "Kanäle, Filme und Serien von {name} werden von diesem Gerät entfernt. Sie werden beim nächsten Wechsel zu dieser Playlist neu geladen.",
+  "settingsStorageClearPlaylistBody": "Kanäle, Filme, Serien und Programmführer von {name} werden von diesem Gerät entfernt. Sie werden beim nächsten Wechsel zu dieser Playlist neu geladen.",
   "settingsStorageClearActiveBody": "Kanäle, Filme und Serien von {name} werden entfernt und jetzt neu geladen.",
   "settingsStorageClear": "Löschen",
   "settingsStorageCleared": "Gespeicherte Inhalte gelöscht.",

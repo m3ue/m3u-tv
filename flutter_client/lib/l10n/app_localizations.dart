@@ -1211,7 +1211,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsStorageClearPlaylistBody.
   ///
   /// In en, this message translates to:
-  /// **'{name}\'s channels, movies and series are removed from this device. They download again the next time you switch to it.'**
+  /// **'{name}\'s channels, movies, series and guide are removed from this device. They download again the next time you switch to it.'**
   String settingsStorageClearPlaylistBody(String name);
 
   /// No description provided for @settingsStorageClearActiveBody.

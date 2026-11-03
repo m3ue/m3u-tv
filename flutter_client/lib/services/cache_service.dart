@@ -1,5 +1,7 @@
 // ignore_for_file: prefer_initializing_formals
 
+import 'dart:convert';
+
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
@@ -29,9 +31,9 @@ class CacheEntry<T> {
   final bool isStale;
 }
 
-/// The small keys (`sourceType`, `viewers`), for rolling back a failed
-/// switch. Catalog rows need no snapshot: each playlist's are kept under its
-/// own source key, so loading another never touches the shown one's.
+/// The small shared keys (`sourceType`), for rolling back a failed switch.
+/// Everything else needs no snapshot: each playlist's is kept under its own
+/// source key, so loading another never touches the shown one's.
 class CacheSnapshot {
   const CacheSnapshot._(this._memory, this._persisted);
 
@@ -41,15 +43,15 @@ class CacheSnapshot {
 
 /// Layered cache for the source catalog.
 ///
-/// Small scalar/`Viewer` keys live in memory + the [PersistentJsonStore] blob.
-/// The large catalog keys (`liveStreams` / `vodStreams` / `seriesStreams`, the
-/// three `*Categories` keys, and `epgGuide`) are always backed by the SQLite
-/// [CatalogRepository]: reads hit the database (no full-list copy held here)
-/// and writes swap the relevant rows, so a cold start never parses a multi-MB
-/// JSON blob and a catalog refresh never re-serializes one. Each saved
-/// playlist's lists are kept apart under its own source key: reads follow
-/// [CatalogRepository.shownSource], and a load names the playlist it writes.
-/// The guide is kept for the shown playlist only.
+/// The small shared scalar keys (`sourceType`) live in memory + the
+/// [PersistentJsonStore] blob. The catalog keys (`liveStreams` / `vodStreams`
+/// / `seriesStreams`, the three `*Categories` keys, `epgGuide` and `viewers`)
+/// are always backed by the SQLite [CatalogRepository]: reads hit the
+/// database (no full-list copy held here) and writes swap the relevant rows,
+/// so a cold start never parses a multi-MB JSON blob and a catalog refresh
+/// never re-serializes one. Each saved playlist's are kept apart under its
+/// own source key: reads and writes are the [CatalogRepository.shownSource]'s
+/// unless they name another.
 ///
 /// There is no JSON code path for those keys. Production injects the on-disk
 /// repository (and app startup hard-fails if it can't be opened); a caller
@@ -84,19 +86,28 @@ class CacheService {
     'seriesCategories': kCatalogKindSeries,
   };
   static const String _epgKey = 'epgGuide';
+  static const String _viewersKey = 'viewers';
 
   bool _isRepoKey(String key) =>
       _itemKinds.containsKey(key) ||
       _categoryKinds.containsKey(key) ||
-      key == _epgKey;
+      key == _epgKey ||
+      key == _viewersKey;
 
-  /// The marker row for [key]: per source for the catalog lists, one for the
-  /// guide. The default source keeps the unprefixed names rows had before
-  /// each playlist had its own.
-  String _tsKey(String key, String sourceKey) =>
-      key == _epgKey || sourceKey == CatalogRepository.defaultSource
-      ? '__ts_$key'
-      : '$sourceKey/__ts_$key';
+  /// [sourceKey]'s key/value slot called [name]. The default source keeps
+  /// the unprefixed names slots had before each playlist had its own.
+  static String _sourceSlot(String name, String sourceKey) =>
+      sourceKey == CatalogRepository.defaultSource ? name : '$sourceKey/$name';
+
+  /// The marker row for [key]: [sourceKey]'s, written with its rows.
+  static String _tsKey(String key, String sourceKey) =>
+      _sourceSlot('__ts_$key', sourceKey);
+
+  /// Every key/value slot kept per source (see [catalogKeys]).
+  static List<String> _sourceSlots(String sourceKey) => [
+    for (final key in catalogKeys) _tsKey(key, sourceKey),
+    _sourceSlot(_viewersKey, sourceKey),
+  ];
 
   Future<void> set<T>(String key, T data) async {
     if (_isRepoKey(key)) {
@@ -114,8 +125,12 @@ class CacheService {
     }
   }
 
-  Future<CacheEntry<T>?> get<T>(String key) async {
-    if (_isRepoKey(key)) return _readRepoKey<T>(key);
+  /// [key]'s entry: the shown playlist's for a catalog key, unless
+  /// [sourceKey] names another.
+  Future<CacheEntry<T>?> get<T>(String key, {String? sourceKey}) async {
+    if (_isRepoKey(key)) {
+      return _readRepoKey<T>(key, sourceKey ?? _repo.shownSource);
+    }
 
     var value = _memory['m3ue_cache_$key'];
     if (value is! _StampedValue && _store != null) {
@@ -130,13 +145,14 @@ class CacheService {
   }
 
   /// How many rows a catalog item key (`liveStreams` / `vodStreams` /
-  /// `seriesStreams`) holds, or null when it has never been written. Lets a
-  /// caller check for cached content without decoding every row.
-  Future<int?> itemCount(String key) async {
+  /// `seriesStreams`) holds for the shown playlist (or [sourceKey]'s), or null
+  /// when it has never been written. Lets a caller check for cached content
+  /// without decoding every row.
+  Future<int?> itemCount(String key, {String? sourceKey}) async {
     final kind = _itemKinds[key];
     if (kind == null) throw ArgumentError.value(key, 'key', 'not an item key');
     final repo = _repo;
-    final source = repo.shownSource;
+    final source = sourceKey ?? repo.shownSource;
     if (repo.isClosed || await repo.kvUpdatedAt(_tsKey(key, source)) == null) {
       return null;
     }
@@ -158,7 +174,7 @@ class CacheService {
   /// for the guide, which `EpgService` writes through on its own.
   static const Object keepExisting = _KeepExisting();
 
-  /// Writes [values], wiping every cache key it leaves out. The catalog lists
+  /// Writes [values], wiping every cache key it leaves out. The catalog keys
   /// go under [sourceKey] (the shown playlist when null), leaving every other
   /// playlist's as they are.
   Future<void> replace(Map<String, Object?> values, {String? sourceKey}) async {
@@ -184,7 +200,7 @@ class CacheService {
     }
     // replace() wipes every cache key not in [values]; mirror that for the
     // repo-backed keys the caller left out.
-    for (final key in catalogKeys) {
+    for (final key in [...catalogKeys, _viewersKey]) {
       if (!values.containsKey(key)) await _clearRepoKey(key, source);
     }
     await _store?.replaceWhere(
@@ -216,43 +232,64 @@ class CacheService {
     await _repo.clearAll();
   }
 
-  /// Wipes what belongs to the shown session (the guide and the small keys),
-  /// keeping every playlist's lists.
+  /// Wipes the small shared keys, keeping what each playlist stored.
   Future<void> clearShared() async {
     _memory.removeWhere((key, _) => key.startsWith('m3ue_cache_'));
     await _store?.removeWhere((key) => key.startsWith('m3ue_cache_'));
-    if (_repo.isClosed) return;
-    await _clearRepoKey(_epgKey, _repo.shownSource);
   }
 
-  /// Every source key with lists stored.
+  /// Every source key with lists or a guide stored.
   Future<Set<String>> storedCatalogSources() async =>
       _repo.isClosed ? const <String>{} : _repo.storedSources();
 
-  /// Drops the lists stored for [sourceKey].
+  /// Drops everything stored for [sourceKey]: lists, guide and viewers.
   Future<void> dropCatalog(String sourceKey) async {
     final repo = _repo;
     if (repo.isClosed) return;
     await repo.deleteSource(sourceKey);
-    for (final key in catalogKeys) {
-      if (key != _epgKey) await repo.kvDelete(_tsKey(key, sourceKey));
+    for (final slot in _sourceSlots(sourceKey)) {
+      await repo.kvDelete(slot);
     }
   }
 
-  /// Moves the lists kept under [from] (with when they were written) to
-  /// [to], replacing whatever [to] had. A cheap no-op when [from] has none.
+  /// Moves everything kept under [from] (with when it was written) to [to],
+  /// replacing whatever [to] had. A cheap no-op when [from] has no lists.
   Future<void> moveCatalog(String from, String to) async {
     final repo = _repo;
     if (repo.isClosed || from == to) return;
     if (await repo.kvUpdatedAt(_tsKey('liveStreams', from)) == null) return;
+    final toSlots = _sourceSlots(to);
     await repo.moveSource(
       from,
       to,
       renameKeys: {
-        for (final key in catalogKeys)
-          if (key != _epgKey) _tsKey(key, from): _tsKey(key, to),
+        for (final (index, slot) in _sourceSlots(from).indexed)
+          slot: toSlots[index],
       },
     );
+  }
+
+  /// Gives [sourceKey] the viewers list stored before each playlist had its
+  /// own (the then shown playlist's), unless it has one already.
+  Future<void> adoptSharedViewers(String sourceKey) async {
+    const legacyKey = 'm3ue_cache_$_viewersKey';
+    final legacy = _decodeStampedValue<List<Viewer>>(
+      _viewersKey,
+      await _store?.read(legacyKey),
+    );
+    if (legacy == null) return;
+    final repo = _repo;
+    if (!repo.isClosed &&
+        await repo.kvUpdatedAt(_sourceSlot(_viewersKey, sourceKey)) == null) {
+      await _writeRepoKey(
+        _viewersKey,
+        legacy.data,
+        legacy.timestamp,
+        sourceKey,
+      );
+    }
+    _memory.remove(legacyKey);
+    await _store?.removeWhere((key) => key == legacyKey);
   }
 
   /// When [sourceKey]'s lists were last written, or null if never.
@@ -267,7 +304,7 @@ class CacheService {
   /// The cache keys backed by the SQLite [CatalogRepository] rather than the
   /// JSON store. `main` uses this to purge only the pre-SQLite catalog blobs
   /// from the legacy JSON stores, without touching the scalar keys
-  /// (`sourceType`, `viewers`) that still legitimately live there.
+  /// (`sourceType`) that still legitimately live there.
   static List<String> get catalogKeys => <String>[
     ..._itemKinds.keys,
     ..._categoryKinds.keys,
@@ -284,6 +321,15 @@ class CacheService {
     // A debounced catalog/EPG persist can land after the owning controller was
     // disposed and closed the database; drop it rather than throw.
     if (repo.isClosed) return;
+    if (key == _viewersKey) {
+      final viewers = (data as List?)?.cast<Viewer>() ?? const <Viewer>[];
+      await repo.kvPut(
+        _sourceSlot(_viewersKey, sourceKey),
+        jsonEncode([for (final viewer in viewers) viewer.toJson()]),
+        updatedAtMs: timestamp.millisecondsSinceEpoch,
+      );
+      return;
+    }
     final itemKind = _itemKinds[key];
     if (itemKind != null) {
       await repo.replaceItems(
@@ -300,6 +346,7 @@ class CacheService {
     } else {
       await repo.replaceProgrammes(
         (data as List?)?.cast<EpgProgram>() ?? const <EpgProgram>[],
+        sourceKey: sourceKey,
       );
     }
     // One marker row per catalog key: its presence means "cached", and its
@@ -315,6 +362,10 @@ class CacheService {
   Future<void> _clearRepoKey(String key, String sourceKey) async {
     final repo = _repo;
     if (repo.isClosed) return;
+    if (key == _viewersKey) {
+      await repo.kvDelete(_sourceSlot(_viewersKey, sourceKey));
+      return;
+    }
     if (_itemKinds.containsKey(key)) {
       await repo.replaceItems(
         sourceKey: sourceKey,
@@ -328,15 +379,18 @@ class CacheService {
         categories: const <Category>[],
       );
     } else {
-      await repo.replaceProgrammes(const <EpgProgram>[]);
+      await repo.replaceProgrammes(
+        const <EpgProgram>[],
+        sourceKey: sourceKey,
+      );
     }
     await repo.kvDelete(_tsKey(key, sourceKey));
   }
 
-  Future<CacheEntry<T>?> _readRepoKey<T>(String key) async {
+  Future<CacheEntry<T>?> _readRepoKey<T>(String key, String source) async {
     final repo = _repo;
     if (repo.isClosed) return null;
-    final source = repo.shownSource;
+    if (key == _viewersKey) return _readViewers<T>(source);
     final writtenMs = await repo.kvUpdatedAt(_tsKey(key, source));
     if (writtenMs == null) return null;
 
@@ -353,15 +407,32 @@ class CacheService {
     } else {
       data = await repo.programmesEndingAfter(
         DateTime.fromMillisecondsSinceEpoch(0),
+        sourceKey: source,
       );
     }
 
-    final age = DateTime.now().millisecondsSinceEpoch - writtenMs;
-    return CacheEntry<T>(
-      data: data as T,
-      isStale: age > refreshInterval.inMilliseconds,
-    );
+    return CacheEntry<T>(data: data as T, isStale: _isStale(writtenMs));
   }
+
+  Future<CacheEntry<T>?> _readViewers<T>(String source) async {
+    final slot = _sourceSlot(_viewersKey, source);
+    final raw = await _repo.kvGet(slot);
+    final writtenMs = await _repo.kvUpdatedAt(slot);
+    if (raw == null || writtenMs == null) return null;
+    final List<Viewer> viewers;
+    try {
+      viewers = (jsonDecode(raw) as List)
+          .map((item) => Viewer.fromJson(asMap(item)))
+          .toList(growable: false);
+    } on Object {
+      return null;
+    }
+    return CacheEntry<T>(data: viewers as T, isStale: _isStale(writtenMs));
+  }
+
+  bool _isStale(int writtenMs) =>
+      DateTime.now().millisecondsSinceEpoch - writtenMs >
+      refreshInterval.inMilliseconds;
 }
 
 class _StampedValue<T> {
@@ -371,12 +442,10 @@ class _StampedValue<T> {
   final DateTime timestamp;
 }
 
-// Only the small non-catalog keys reach the JSON store now (`sourceType`,
-// `viewers`); the catalog lists are owned by the SQLite [CatalogRepository].
+// Only the small shared keys reach the JSON store now (`sourceType`); the
+// catalog keys are owned by the SQLite [CatalogRepository]. The viewers list
+// is still decoded here to adopt one stored before each playlist kept its own.
 Object? _encodeCacheData(String key, Object? data) {
-  if (data is List<Viewer>) {
-    return data.map((viewer) => viewer.toJson()).toList(growable: false);
-  }
   if (data is String || data is num || data is bool || data == null) {
     return data;
   }

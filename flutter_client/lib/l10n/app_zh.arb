@@ -390,7 +390,7 @@
   "settingsStorageKeepPlaylists": "在此设备上保留的播放列表",
   "settingsStorageKeepPlaylistsValue": "{count, plural, =1{仅当前播放列表} other{最近使用的 {count} 个}}",
   "settingsStorageClearPlaylistTitle": "清除已保存的内容？",
-  "settingsStorageClearPlaylistBody": "将从此设备移除 {name} 的频道、电影和剧集。下次切换到该播放列表时会重新下载。",
+  "settingsStorageClearPlaylistBody": "将从此设备移除 {name} 的频道、电影、剧集和节目指南。下次切换到该播放列表时会重新下载。",
   "settingsStorageClearActiveBody": "将移除 {name} 的频道、电影和剧集，并立即重新下载。",
   "settingsStorageClear": "清除",
   "settingsStorageCleared": "已清除保存的内容。",

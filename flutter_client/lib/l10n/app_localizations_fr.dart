@@ -638,7 +638,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String settingsStorageClearPlaylistBody(String name) {
-    return 'Les chaînes, films et séries de $name sont supprimés de cet appareil. Ils sont téléchargés de nouveau la prochaine fois que vous passez à cette playlist.';
+    return 'Les chaînes, films, séries et le guide de $name sont supprimés de cet appareil. Ils sont téléchargés de nouveau la prochaine fois que vous passez à cette playlist.';
   }
 
   @override

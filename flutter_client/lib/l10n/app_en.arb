@@ -355,7 +355,7 @@
     }
   },
   "settingsStorageClearPlaylistTitle": "Clear stored content?",
-  "settingsStorageClearPlaylistBody": "{name}'s channels, movies and series are removed from this device. They download again the next time you switch to it.",
+  "settingsStorageClearPlaylistBody": "{name}'s channels, movies, series and guide are removed from this device. They download again the next time you switch to it.",
   "@settingsStorageClearPlaylistBody": {
     "placeholders": {
       "name": {

@@ -52,6 +52,14 @@ typedef MediaRequestOwner = ({
   UserCredentials? credentials,
 });
 
+/// What a playlist stored on this device paints before its server answers.
+typedef _StoredSession = ({
+  List<Category> liveCategories,
+  List<Category> vodCategories,
+  List<Category> seriesCategories,
+  List<Viewer> viewers,
+});
+
 class AppStateController extends ChangeNotifier {
   factory AppStateController({
     AuthNotifier? authNotifier,
@@ -653,14 +661,13 @@ class AppStateController extends ChangeNotifier {
     // state then moved off the unscoped keys like every other playlist's.
     if (credentials != null) await _rememberPlaylist(credentials);
     await _scopeUnscopedPlaylists();
-    // The catalog cached before each playlist had its own is this login's.
+    // What was cached before each playlist kept its own is this login's.
     if (credentials != null) {
+      final source = _catalogSource(savedPlaylists.scopeFor(credentials));
       await _bestEffort(
-        () => cacheService.moveCatalog(
-          CatalogRepository.defaultSource,
-          _catalogSource(savedPlaylists.scopeFor(credentials)),
-        ),
+        () => cacheService.moveCatalog(CatalogRepository.defaultSource, source),
       );
+      await _bestEffort(() => cacheService.adoptSharedViewers(source));
     }
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     _publishLogin(credentials);
@@ -1430,6 +1437,9 @@ class AppStateController extends ChangeNotifier {
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     await secureStorage.delete(_sourceKey);
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
+    // The stored guide went with the playlist's catalog above. Drop the one in
+    // memory, and any write not yet stored, before the shown source moves.
+    _epg.resetSession();
     _publishLogin(null);
     // Before the final notify, so the connect screen never lists a playlist
     // that was just signed out of.
@@ -1443,9 +1453,6 @@ class AppStateController extends ChangeNotifier {
       await _forgetPlaylists([signedOutPlaylist]);
     }
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
-    // cacheService.clear() above emptied the stored guide, but a sweep write
-    // can still land during the awaits since; wipe again behind it.
-    _epg.resetSession(wipeStore: true);
     _sourceType = AppSourceType.none;
     _viewers = const <Viewer>[];
     _viewerOperationGeneration.advance();
@@ -1469,6 +1476,17 @@ class AppStateController extends ChangeNotifier {
     if (isConfigured && sameCredentials(authNotifier.credentials, normalized)) {
       return null;
     }
+    if (isConfigured) {
+      switch (await _switchToStoredPlaylist(normalized)) {
+        case true:
+          return null;
+        case false:
+          // Another switch or sign-out took over.
+          return '';
+        case null:
+          break;
+      }
+    }
     final hadSession = isConfigured;
     final previousError = _error;
     final switching = connectXtream(normalized);
@@ -1484,6 +1502,97 @@ class AppStateController extends ChangeNotifier {
       notifyListeners();
     }
     return message;
+  }
+
+  /// Shows the saved playlist [credentials] straight from what this device
+  /// stored for it, then signs in and refreshes it in the background, as a
+  /// cold start does: a failed sign-in leaves it on screen with the error.
+  /// Null (nothing changed) when it has nothing stored; false when another
+  /// operation took over while reading it.
+  Future<bool?> _switchToStoredPlaylist(UserCredentials credentials) async {
+    final startGeneration = _sourceOperationGeneration.current;
+    await savedPlaylists.load();
+    final playlist = savedPlaylists.find(credentials);
+    if (playlist == null) return null;
+    final stored = await _readStoredSession(_catalogSource(playlist.scope));
+    if (stored == null) return null;
+    final activeViewer = await viewerService.resolveActiveViewer(
+      stored.viewers,
+      loginKey: _loginKeyFor(credentials, playlist.scope),
+    );
+    final progress = activeViewer == null
+        ? const <Progress>[]
+        : await _storedRecentlyWatched(activeViewer.ulid);
+    if (_disposed || _sourceOperationGeneration.isStale(startGeneration)) {
+      return false;
+    }
+
+    // From here to the notify nothing awaits, so no other switch, refresh or
+    // sign-out can interleave with the swap.
+    final sourceGeneration = _sourceOperationGeneration.advance();
+    // A connect this supersedes must not roll back over it.
+    _sourceRollbackGeneration.advance();
+    _viewerOperationGeneration.advance();
+    final notificationGeneration = _notifications.sessionGeneration.advance();
+    _notifications.endSession();
+    final sessionSaved = authNotifier.beginOfflineSession(credentials);
+    // The outgoing guide stays stored under its playlist; only memory goes.
+    _epg.resetSession();
+    _sourceType = AppSourceType.xtream;
+    _publishLogin(credentials);
+    _liveCategories = stored.liveCategories;
+    _vodCategories = stored.vodCategories;
+    _seriesCategories = stored.seriesCategories;
+    _dvr.reset();
+    _requests.reset();
+    aiostreamsApiService.clearCache();
+    _viewers = stored.viewers;
+    _activeViewer = activeViewer;
+    _progressList = progress;
+    _isLoadingContent = false;
+    _error = null;
+    notifyListeners();
+
+    unawaited(_epg.restoreCachedGuide());
+    _runBackgroundPersistence(
+      _confirmSwitchedPlaylist(
+        credentials,
+        sessionSaved,
+        sourceGeneration: sourceGeneration,
+        notificationGeneration: notificationGeneration,
+      ),
+    );
+    await _rememberPlaylist(credentials);
+    _runBackgroundPersistence(_trimCachedCatalogs());
+    return true;
+  }
+
+  /// The background half of [_switchToStoredPlaylist]: leaves the outgoing
+  /// playlist's notification session, then signs in and refreshes.
+  Future<void> _confirmSwitchedPlaylist(
+    UserCredentials credentials,
+    Future<void> sessionSaved, {
+    required int sourceGeneration,
+    required int notificationGeneration,
+  }) async {
+    try {
+      await sessionSaved;
+      await _notifications.disconnectReverb();
+      if (_disposed || _sourceOperationGeneration.isStale(sourceGeneration)) {
+        return;
+      }
+      await _notifications.unregisterPushToken();
+      if (_disposed || _sourceOperationGeneration.isStale(sourceGeneration)) {
+        return;
+      }
+      await _validateCredentialsAndRefresh(
+        credentials,
+        sourceGeneration: sourceGeneration,
+        notificationGeneration: notificationGeneration,
+      );
+    } on Object catch (error) {
+      debugPrint('Saved playlists: could not refresh after switching: $error');
+    }
   }
 
   /// Removes a saved playlist. Removing the active one signs out of it, the
@@ -1619,25 +1728,27 @@ class AppStateController extends ChangeNotifier {
   /// What the app is storing, for Settings > Storage.
   Future<StorageUsage> storageUsage() async {
     final catalog = await _catalogRepository.storageUsage();
-    final playlists = <PlaylistStorage>[
-      for (final playlist in savedPlaylists.playlists)
+    final shown = catalog.sources[_catalogRepository.shownSource];
+    final playlists = <PlaylistStorage>[];
+    for (final playlist in savedPlaylists.playlists) {
+      final source = _catalogSource(playlist.scope);
+      final usage = catalog.sources[source];
+      playlists.add(
         PlaylistStorage(
           playlist: playlist,
-          usage: catalog.sources[_catalogSource(playlist.scope)],
-          updatedAt: await cacheService.catalogUpdatedAt(
-            _catalogSource(playlist.scope),
-          ),
-          isShown:
-              _catalogSource(playlist.scope) == _catalogRepository.shownSource,
+          usage: usage,
+          updatedAt: await cacheService.catalogUpdatedAt(source),
+          isShown: source == _catalogRepository.shownSource,
           bytesOnDisk: catalog.onDisk(
-            catalog.sources[_catalogSource(playlist.scope)]?.bytes ?? 0,
+            (usage?.bytes ?? 0) + (usage?.guideBytes ?? 0),
           ),
         ),
-    ];
+      );
+    }
     return StorageUsage(
       playlists: playlists,
-      guideProgrammes: catalog.guideProgrammes,
-      guideBytes: catalog.onDisk(catalog.guideBytes),
+      guideProgrammes: shown?.programmes ?? 0,
+      guideBytes: catalog.onDisk(shown?.guideBytes ?? 0),
       catalogBytes: catalog.usedBytes,
       artworkBytes: await mediaImageCacheBytes(),
     );
@@ -1997,9 +2108,8 @@ class AppStateController extends ChangeNotifier {
             'vodStreams': vodItems,
             'seriesStreams': seriesList,
             'viewers': viewers,
-            // replace() wipes every cache key not in this map. The guide is
-            // the shown playlist's until the publish below; when the source
-            // is changing, the reset before it drops the stored guide.
+            // replace() wipes every cache key not in this map. EpgService
+            // writes each playlist's guide through itself.
             'epgGuide': CacheService.keepExisting,
           }, sourceKey: _catalogSource(targetScope));
           if (_sourceOperationGeneration.isStale(sourceGeneration)) {
@@ -2066,12 +2176,9 @@ class AppStateController extends ChangeNotifier {
           }
 
           if (invalidateEpgFreshness) {
-            // The replace above already emptied the stored guide; wipe it
-            // again behind any old-source write that landed since.
-            _epg.resetSession(
-              clearGuide: _sourceType != AppSourceType.none,
-              wipeStore: true,
-            );
+            // The outgoing guide stays stored under its own playlist; only
+            // memory (and any write not yet stored) goes.
+            _epg.resetSession(clearGuide: _sourceType != AppSourceType.none);
           }
           _sourceType = AppSourceType.xtream;
           _publishLogin(authNotifier.credentials);
@@ -2186,41 +2293,56 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> _hydrateCachedXtreamContent({
-    required int sourceGeneration,
-  }) async {
-    final source = await cacheService.get<String>('sourceType');
-    if (source?.data != 'xtream') return false;
-
-    final liveCategories =
-        (await cacheService.get<List<Category>>('liveCategories'))?.data ??
+  /// What the playlist stored under [sourceKey] needs to be painted before
+  /// its server answers, or null when nothing is stored.
+  Future<_StoredSession?> _readStoredSession(String sourceKey) async {
+    Future<List<Category>> categories(String key) async =>
+        (await cacheService.get<List<Category>>(
+          key,
+          sourceKey: sourceKey,
+        ))?.data ??
         const <Category>[];
-    final vodCategories =
-        (await cacheService.get<List<Category>>('vodCategories'))?.data ??
-        const <Category>[];
-    final seriesCategories =
-        (await cacheService.get<List<Category>>('seriesCategories'))?.data ??
-        const <Category>[];
+    final liveCategories = await categories('liveCategories');
+    final vodCategories = await categories('vodCategories');
+    final seriesCategories = await categories('seriesCategories');
     // Counts only: the screens page their rows from SQLite, so decoding
     // whole catalogs here just to test for content cost seconds of a cold
     // start on a large library.
     final itemCounts = await Future.wait([
       for (final key in const ['liveStreams', 'vodStreams', 'seriesStreams'])
-        cacheService.itemCount(key),
+        cacheService.itemCount(key, sourceKey: sourceKey),
     ]);
-    final viewers =
-        (await cacheService.get<List<Viewer>>('viewers'))?.data ??
-        const <Viewer>[];
     final hasContent =
         liveCategories.isNotEmpty ||
         vodCategories.isNotEmpty ||
         seriesCategories.isNotEmpty ||
         itemCounts.any((count) => (count ?? 0) > 0);
-    if (!hasContent) return false;
+    if (!hasContent) return null;
+    final viewers =
+        (await cacheService.get<List<Viewer>>(
+          'viewers',
+          sourceKey: sourceKey,
+        ))?.data ??
+        const <Viewer>[];
+    return (
+      liveCategories: liveCategories,
+      vodCategories: vodCategories,
+      seriesCategories: seriesCategories,
+      viewers: viewers,
+    );
+  }
+
+  Future<bool> _hydrateCachedXtreamContent({
+    required int sourceGeneration,
+  }) async {
+    final source = await cacheService.get<String>('sourceType');
+    if (source?.data != 'xtream') return false;
+    final stored = await _readStoredSession(_catalogRepository.shownSource);
+    if (stored == null) return false;
 
     final viewerGeneration = _viewerOperationGeneration.advance();
     final activeViewer = await viewerService.resolveActiveViewer(
-      viewers,
+      stored.viewers,
       loginKey: _currentLoginKey(),
     );
     if (_sourceOperationGeneration.isStale(sourceGeneration) ||
@@ -2240,12 +2362,12 @@ class AppStateController extends ChangeNotifier {
       return false;
     }
     _sourceType = AppSourceType.xtream;
-    _liveCategories = liveCategories;
-    _vodCategories = vodCategories;
-    _seriesCategories = seriesCategories;
+    _liveCategories = stored.liveCategories;
+    _vodCategories = stored.vodCategories;
+    _seriesCategories = stored.seriesCategories;
     _dvr.reset();
     _requests.reset();
-    _viewers = viewers;
+    _viewers = stored.viewers;
     _activeViewer = activeViewer;
     _progressList = progress;
     _error = null;

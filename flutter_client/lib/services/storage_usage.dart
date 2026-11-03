@@ -15,7 +15,7 @@ class PlaylistStorage {
 
   final SavedPlaylist playlist;
 
-  /// Its stored catalog, or null when none is kept.
+  /// Its stored catalog and guide, or null when none is kept.
   final CatalogSourceUsage? usage;
 
   /// When its catalog was last downloaded.
@@ -23,6 +23,8 @@ class PlaylistStorage {
 
   /// Whether it is the playlist on screen.
   final bool isShown;
+
+  /// Its catalog and guide together: what clearing it frees.
   final int bytesOnDisk;
 
   int get itemCount =>
@@ -41,10 +43,12 @@ class StorageUsage {
   });
 
   final List<PlaylistStorage> playlists;
+
+  /// The shown playlist's guide (each playlist keeps its own).
   final int guideProgrammes;
   final int guideBytes;
 
-  /// The whole catalog database: every playlist's lists plus the guide.
+  /// The whole catalog database: every playlist's lists and guide.
   final int catalogBytes;
 
   /// The artwork cache, or null where it can't be measured.

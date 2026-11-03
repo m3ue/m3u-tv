@@ -189,7 +189,8 @@ void main() {
         'epgGuide',
       },
     );
-    // `sourceType` / `viewers` still live in the JSON store; `main`'s legacy
+    // `sourceType` lives in the JSON store, and a `viewers` list stored there
+    // before each playlist kept its own is adopted at boot; `main`'s legacy
     // purge keys off this list, so they must not appear here.
     expect(CacheService.catalogKeys, isNot(contains('sourceType')));
     expect(CacheService.catalogKeys, isNot(contains('viewers')));
@@ -370,5 +371,85 @@ void main() {
       expect(await cache.catalogUpdatedAt('playlist-a'), isNull);
       expect(await cache.storedCatalogSources(), isEmpty);
     });
+
+    test('each playlist keeps its own viewers', () async {
+      final store = await newStore('m3u-tv-cache-viewers-');
+      final repo = newRepo()..shownSource = 'playlist-a';
+      final cache = CacheService(store: store, catalogRepository: repo);
+      const viewerA = Viewer(id: 1, ulid: 'viewer-a', name: 'A', isAdmin: true);
+      const viewerB = Viewer(id: 2, ulid: 'viewer-b', name: 'B', isAdmin: true);
+      await cache.replace(<String, Object?>{
+        'viewers': const [viewerA],
+      });
+      await cache.replace(<String, Object?>{
+        'viewers': const [viewerB],
+      }, sourceKey: 'playlist-b');
+
+      Future<List<String>> ulids({String? sourceKey}) async => [
+        for (final viewer
+            in (await cache.get<List<Viewer>>(
+                  'viewers',
+                  sourceKey: sourceKey,
+                ))?.data ??
+                const <Viewer>[])
+          viewer.ulid,
+      ];
+      expect(await ulids(), ['viewer-a']);
+      expect(await ulids(sourceKey: 'playlist-b'), ['viewer-b']);
+      expect(
+        (await store.snapshot()).keys,
+        isNot(contains('m3ue_cache_viewers')),
+      );
+
+      // moveCatalog only moves a source with lists stored.
+      await cache.moveCatalog('playlist-b', 'playlist-c');
+      expect(await ulids(sourceKey: 'playlist-c'), isEmpty);
+      await cache.replace(<String, Object?>{
+        'liveStreams': const <Channel>[],
+        'viewers': const [viewerB],
+      }, sourceKey: 'playlist-b');
+      await cache.moveCatalog('playlist-b', 'playlist-c');
+      expect(await ulids(sourceKey: 'playlist-b'), isEmpty);
+      expect(await ulids(sourceKey: 'playlist-c'), ['viewer-b']);
+
+      await cache.dropCatalog('playlist-c');
+      expect(await ulids(sourceKey: 'playlist-c'), isEmpty);
+      expect(await ulids(), ['viewer-a']);
+    });
+
+    test(
+      'viewers stored before playlists kept their own are adopted',
+      () async {
+        final store = await newStore('m3u-tv-cache-shared-viewers-');
+        await store.write('m3ue_cache_viewers', <String, Object?>{
+          'timestamp': DateTime.now().toIso8601String(),
+          'data': [
+            const Viewer(
+              id: 1,
+              ulid: 'viewer-a',
+              name: 'A',
+              isAdmin: true,
+            ).toJson(),
+          ],
+        });
+        final repo = newRepo()..shownSource = 'playlist-a';
+        final cache = CacheService(store: store, catalogRepository: repo);
+
+        await cache.adoptSharedViewers('playlist-a');
+
+        final viewers = await cache.get<List<Viewer>>('viewers');
+        expect(viewers!.data.single.ulid, 'viewer-a');
+        expect(
+          (await store.snapshot()).keys,
+          isNot(contains('m3ue_cache_viewers')),
+        );
+        // Only once: a later call finds nothing to adopt.
+        await cache.adoptSharedViewers('playlist-b');
+        expect(
+          await cache.get<List<Viewer>>('viewers', sourceKey: 'playlist-b'),
+          isNull,
+        );
+      },
+    );
   });
 }

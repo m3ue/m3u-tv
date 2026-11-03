@@ -606,6 +606,41 @@ void main() {
       },
     );
 
+    test('each source keeps its own guide', () async {
+      repo.shownSource = 'sports';
+      await repo.applyEpgOps([
+        EpgReplaceChannels({
+          'a': [show('a', 'Sports A', 0)],
+        }),
+      ]);
+      repo.shownSource = 'movies';
+      expect(await titles('a'), isEmpty);
+      await repo.applyEpgOps([
+        EpgReplaceChannels({
+          'a': [show('a', 'Movies A', 0)],
+        }),
+        EpgPruneBefore(base.add(const Duration(hours: 2))),
+      ]);
+      expect(await titles('a'), isEmpty);
+
+      // A prune is the shown source's only.
+      repo.shownSource = 'sports';
+      expect(await titles('a'), ['Sports A']);
+      final usage = await repo.storageUsage();
+      expect(usage.sources['sports']?.programmes, 1);
+      expect(usage.sources['movies'], isNull);
+
+      await repo.moveSource('sports', 'renamed');
+      expect(await titles('a'), isEmpty);
+      repo.shownSource = 'renamed';
+      expect(await titles('a'), ['Sports A']);
+      expect(await repo.storedSources(), {'renamed'});
+
+      await repo.deleteSource('renamed');
+      expect(await titles('a'), isEmpty);
+      expect(await repo.storedSources(), isEmpty);
+    });
+
     test('ops apply in order: replace, then merge, then prune', () async {
       await repo.applyEpgOps([
         EpgReplaceChannels({

@@ -93,11 +93,13 @@ class CatalogCategories extends Table {
   Set<Column> get primaryKey => {sourceKey, kind, categoryId};
 }
 
-/// EPG programmes, keyed by `(channelId, startMs)`. Replaces the capped
-/// `epgGuide` JSON blob `CacheService` persisted.
+/// EPG programmes, keyed by `(sourceKey, channelId, startMs)`. Replaces the
+/// capped `epgGuide` JSON blob `CacheService` persisted.
 @DataClassName('EpgProgrammeRow')
-@TableIndex(name: 'epg_programmes_end', columns: {#endMs})
+@TableIndex(name: 'epg_programmes_end', columns: {#sourceKey, #endMs})
 class EpgProgrammes extends Table {
+  /// The playlist this guide belongs to (see [CatalogItems.sourceKey]).
+  TextColumn get sourceKey => text()();
   TextColumn get channelId => text()();
   IntColumn get startMs => integer()();
   IntColumn get endMs => integer()();
@@ -119,7 +121,7 @@ class EpgProgrammes extends Table {
       boolean().withDefault(const Constant(false))();
 
   @override
-  Set<Column> get primaryKey => {channelId, startMs};
+  Set<Column> get primaryKey => {sourceKey, channelId, startMs};
 }
 
 /// Small key/value slots: the scalars that used to live as individual
@@ -166,16 +168,26 @@ class CatalogDatabase extends _$CatalogDatabase {
   ];
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    // The catalog is a disposable cache - there is nothing to migrate. On any
-    // schema change, drop every table and recreate at the new version; it
-    // refills from the source on the next load. (`_openCatalogRepository` in
-    // main.dart is the belt-and-braces path for a file too corrupt to even
-    // reach this.)
+    // The catalog is a disposable cache: on a schema change, drop every table
+    // and recreate at the new version; it refills from the source on the
+    // next load. (`_openCatalogRepository` in main.dart is the
+    // belt-and-braces path for a file too corrupt to even reach this.)
     onUpgrade: (m, from, to) async {
+      if (from == 7) {
+        // Each playlist now keeps its own guide. The stored one is whichever
+        // playlist was shown, so it starts over; the catalogs are kept.
+        await m.deleteTable(epgProgrammes.actualTableName);
+        await m.createTable(epgProgrammes);
+        await m.createIndex(epgProgrammesEnd);
+        await (delete(
+          kvCache,
+        )..where((t) => t.key.equals('__ts_epgGuide'))).go();
+        return;
+      }
       for (final table in allTables) {
         await m.deleteTable(table.actualTableName);
       }

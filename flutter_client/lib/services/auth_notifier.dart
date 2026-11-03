@@ -204,6 +204,23 @@ class AuthNotifier extends ChangeNotifier {
     }
   }
 
+  /// Makes [credentials] the session before the server confirms them, so
+  /// what this device stored for them can be shown meanwhile. As after
+  /// [loadSavedCredentialsOffline], [isConfigured] and [authResponse] wait
+  /// for [connect]. Saved as the login to restore on the next start.
+  Future<void> beginOfflineSession(UserCredentials credentials) async {
+    _connectionGeneration += 1;
+    final normalized = credentials.normalized();
+    xtreamService.replaceCredentialsOffline(normalized);
+    _isConfigured = false;
+    _authResponse = null;
+    _credentials = normalized;
+    _error = null;
+    _isLoading = false;
+    notifyListeners();
+    await _persistCredentials(normalized);
+  }
+
   /// Clears the current error message.
   void clearError() {
     _error = null;

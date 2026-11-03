@@ -390,7 +390,7 @@
   "settingsStorageKeepPlaylists": "Playlists conservées sur cet appareil",
   "settingsStorageKeepPlaylistsValue": "{count, plural, =1{Seulement la playlist active} other{Les {count} plus récentes}}",
   "settingsStorageClearPlaylistTitle": "Effacer le contenu enregistré ?",
-  "settingsStorageClearPlaylistBody": "Les chaînes, films et séries de {name} sont supprimés de cet appareil. Ils sont téléchargés de nouveau la prochaine fois que vous passez à cette playlist.",
+  "settingsStorageClearPlaylistBody": "Les chaînes, films, séries et le guide de {name} sont supprimés de cet appareil. Ils sont téléchargés de nouveau la prochaine fois que vous passez à cette playlist.",
   "settingsStorageClearActiveBody": "Les chaînes, films et séries de {name} sont supprimés puis téléchargés de nouveau maintenant.",
   "settingsStorageClear": "Effacer",
   "settingsStorageCleared": "Contenu enregistré effacé.",

@@ -2863,6 +2863,7 @@ class _BlockingSourceCacheStore extends PersistentJsonStore {
 
   final Completer<void> secondCachePersisted = Completer<void>();
   final Completer<void> releaseSecondCache = Completer<void>();
+  int _cacheReplacements = 0;
 
   @override
   Future<void> replaceWhere(
@@ -2870,10 +2871,11 @@ class _BlockingSourceCacheStore extends PersistentJsonStore {
     Map<String, Object?> replacement,
   ) async {
     await super.replaceWhere(test, replacement);
-    // The catalog itself is written to SQLite, not this JSON store, but the
-    // second source's `viewers` blob still lands here in the same atomic
-    // CacheService.replace() call - gate on that to know B has been staged.
-    if (jsonEncode(replacement).contains('viewer-server-b') &&
+    // The catalog and viewers are written to SQLite, not this JSON store, but
+    // each CacheService.replace() still swaps the shared keys here, after
+    // them: the second is B's, so B has been staged.
+    if (replacement.containsKey('m3ue_cache_sourceType') &&
+        ++_cacheReplacements == 2 &&
         !secondCachePersisted.isCompleted) {
       secondCachePersisted.complete();
       await releaseSecondCache.future;

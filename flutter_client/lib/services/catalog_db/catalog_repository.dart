@@ -606,40 +606,54 @@ class CatalogRepository implements EpgProgrammeStore {
   // EPG programmes
   // -------------------------------------------------------------------------
 
+  // Each playlist keeps its own guide; every read and write below is the
+  // [shownSource]'s, captured when called (before any await), so a write
+  // queued for the playlist being left can't land in the next one's.
+
   Future<void> upsertProgrammes(List<EpgProgram> programmes) {
     if (programmes.isEmpty) return Future.value();
+    final source = shownSource;
     if (!_offloadWrites || programmes.length < _offloadThresholdRows) {
-      return _upsertProgrammesOn(_db, programmes);
+      return _upsertProgrammesOn(_db, source, programmes);
     }
     return _db.computeWithDatabase(
       connect: CatalogDatabase.new,
-      computation: (db) => _upsertProgrammesOn(db, programmes),
+      computation: (db) => _upsertProgrammesOn(db, source, programmes),
     );
   }
 
-  /// Replace the entire programme table with [programmes] (clear + insert),
+  /// Replace a playlist's guide (the shown one's unless [sourceKey] names
+  /// another) with [programmes] (clear + insert),
   /// matching the "wipe and rewrite" semantics the persisted `epgGuide` blob
   /// had.
-  Future<void> replaceProgrammes(List<EpgProgram> programmes) {
+  Future<void> replaceProgrammes(
+    List<EpgProgram> programmes, {
+    String? sourceKey,
+  }) {
+    final source = sourceKey ?? shownSource;
     if (!_offloadWrites || programmes.length < _offloadThresholdRows) {
-      return _replaceProgrammesOn(_db, programmes);
+      return _replaceProgrammesOn(_db, source, programmes);
     }
     return _db.computeWithDatabase(
       connect: CatalogDatabase.new,
-      computation: (db) => _replaceProgrammesOn(db, programmes),
+      computation: (db) => _replaceProgrammesOn(db, source, programmes),
     );
   }
 
   static Future<void> _replaceProgrammesOn(
     CatalogDatabase db,
+    String source,
     List<EpgProgram> programmes,
   ) => db.transaction(() async {
-    await db.delete(db.epgProgrammes).go();
-    await _upsertProgrammesOn(db, programmes);
+    await (db.delete(
+      db.epgProgrammes,
+    )..where((t) => t.sourceKey.equals(source))).go();
+    await _upsertProgrammesOn(db, source, programmes);
   });
 
   static Future<void> _upsertProgrammesOn(
     CatalogDatabase db,
+    String source,
     List<EpgProgram> programmes,
   ) async {
     if (programmes.isEmpty) return;
@@ -648,6 +662,7 @@ class CatalogRepository implements EpgProgrammeStore {
         batch.insert(
           db.epgProgrammes,
           EpgProgrammesCompanion.insert(
+            sourceKey: source,
             channelId: program.channelId,
             startMs: program.start.millisecondsSinceEpoch,
             endMs: program.end.millisecondsSinceEpoch,
@@ -676,27 +691,33 @@ class CatalogRepository implements EpgProgrammeStore {
   /// Every programme ending at or after [cutoff], start-ordered. A full-guide
   /// read (boot hydration) can be 100k+ rows, so above the offload threshold
   /// both the query and the row mapping run on a background isolate.
-  Future<List<EpgProgram>> programmesEndingAfter(DateTime cutoff) async {
+  Future<List<EpgProgram>> programmesEndingAfter(
+    DateTime cutoff, {
+    String? sourceKey,
+  }) async {
+    final source = sourceKey ?? shownSource;
     if (_offloadWrites &&
-        await _countProgrammesEndingAfter(cutoff) >= _offloadThresholdRows) {
+        await _countProgrammesEndingAfter(source, cutoff) >=
+            _offloadThresholdRows) {
       // The computation must capture only sendable values (not `this` or a
       // drift expression), so it is built apart from the count query.
       return _db.computeWithDatabase(
         connect: CatalogDatabase.new,
-        computation: (db) => _programmesEndingAfterOn(db, cutoff),
+        computation: (db) => _programmesEndingAfterOn(db, source, cutoff),
       );
     }
-    return _programmesEndingAfterOn(_db, cutoff);
+    return _programmesEndingAfterOn(_db, source, cutoff);
   }
 
-  Future<int> _countProgrammesEndingAfter(DateTime cutoff) {
+  Future<int> _countProgrammesEndingAfter(String source, DateTime cutoff) {
     final count = _db.epgProgrammes.channelId.count();
     return (_db.selectOnly(_db.epgProgrammes)
           ..addColumns([count])
           ..where(
-            _db.epgProgrammes.endMs.isBiggerOrEqualValue(
-              cutoff.millisecondsSinceEpoch,
-            ),
+            _db.epgProgrammes.sourceKey.equals(source) &
+                _db.epgProgrammes.endMs.isBiggerOrEqualValue(
+                  cutoff.millisecondsSinceEpoch,
+                ),
           ))
         .map((row) => row.read(count) ?? 0)
         .getSingle();
@@ -704,14 +725,17 @@ class CatalogRepository implements EpgProgrammeStore {
 
   static Future<List<EpgProgram>> _programmesEndingAfterOn(
     CatalogDatabase db,
+    String source,
     DateTime cutoff,
   ) async {
     final rows =
         await (db.select(db.epgProgrammes)
               ..where(
-                (t) => t.endMs.isBiggerOrEqualValue(
-                  cutoff.millisecondsSinceEpoch,
-                ),
+                (t) =>
+                    t.sourceKey.equals(source) &
+                    t.endMs.isBiggerOrEqualValue(
+                      cutoff.millisecondsSinceEpoch,
+                    ),
               )
               ..orderBy([(t) => OrderingTerm(expression: t.startMs)]))
             .get();
@@ -719,10 +743,11 @@ class CatalogRepository implements EpgProgrammeStore {
   }
 
   Future<void> pruneProgrammesEndingBefore(DateTime cutoff) async {
+    final source = shownSource;
     await (_db.delete(_db.epgProgrammes)..where(
-          (t) => t.endMs.isSmallerThanValue(
-            cutoff.millisecondsSinceEpoch,
-          ),
+          (t) =>
+              t.sourceKey.equals(source) &
+              t.endMs.isSmallerThanValue(cutoff.millisecondsSinceEpoch),
         ))
         .go();
   }
@@ -730,6 +755,7 @@ class CatalogRepository implements EpgProgrammeStore {
   @override
   Future<void> applyEpgOps(List<EpgStoreOp> ops) {
     if (ops.isEmpty) return Future.value();
+    final source = shownSource;
     var rows = 0;
     for (final op in ops) {
       rows += switch (op) {
@@ -738,30 +764,34 @@ class CatalogRepository implements EpgProgrammeStore {
           0,
           (n, list) => n + list.length,
         ),
-        EpgPruneBefore() || EpgClearAll() => 0,
+        EpgPruneBefore() => 0,
       };
     }
     if (!_offloadWrites || rows < _offloadThresholdRows) {
-      return _applyEpgOpsOn(_db, ops);
+      return _applyEpgOpsOn(_db, source, ops);
     }
     return _db.computeWithDatabase(
       connect: CatalogDatabase.new,
-      computation: (db) => _applyEpgOpsOn(db, ops),
+      computation: (db) => _applyEpgOpsOn(db, source, ops),
     );
   }
 
   static Future<void> _applyEpgOpsOn(
     CatalogDatabase db,
+    String source,
     List<EpgStoreOp> ops,
   ) => db.transaction(() async {
     for (final op in ops) {
       switch (op) {
         case EpgReplaceChannels(:final byChannel):
           if (byChannel.isEmpty) continue;
-          await (db.delete(
-            db.epgProgrammes,
-          )..where((t) => t.channelId.isIn(byChannel.keys))).go();
-          await _upsertProgrammesOn(db, [
+          await (db.delete(db.epgProgrammes)..where(
+                (t) =>
+                    t.sourceKey.equals(source) &
+                    t.channelId.isIn(byChannel.keys),
+              ))
+              .go();
+          await _upsertProgrammesOn(db, source, [
             for (final programmes in byChannel.values) ...programmes,
           ]);
         case EpgMergeIntoChannels(:final byChannel):
@@ -772,6 +802,7 @@ class CatalogRepository implements EpgProgrammeStore {
             for (final (start, end) in epgDisjointSpans(sorted)) {
               await (db.delete(db.epgProgrammes)..where(
                     (t) =>
+                        t.sourceKey.equals(source) &
                         t.channelId.equals(channelId) &
                         t.startMs.isSmallerThanValue(
                           end.millisecondsSinceEpoch,
@@ -780,13 +811,12 @@ class CatalogRepository implements EpgProgrammeStore {
                   ))
                   .go();
             }
-            await _upsertProgrammesOn(db, programmes);
+            await _upsertProgrammesOn(db, source, programmes);
           }
-        case EpgClearAll():
-          await db.delete(db.epgProgrammes).go();
         case EpgPruneBefore(:final cutoff):
           await (db.delete(db.epgProgrammes)..where(
                 (t) =>
+                    t.sourceKey.equals(source) &
                     t.endMs.isSmallerThanValue(cutoff.millisecondsSinceEpoch),
               ))
               .go();
@@ -799,9 +829,13 @@ class CatalogRepository implements EpgProgrammeStore {
     Set<String> channelIds,
   ) async {
     if (channelIds.isEmpty) return const {};
+    final source = shownSource;
     final rows =
         await (_db.select(_db.epgProgrammes)
-              ..where((t) => t.channelId.isIn(channelIds))
+              ..where(
+                (t) =>
+                    t.sourceKey.equals(source) & t.channelId.isIn(channelIds),
+              )
               ..orderBy([(t) => OrderingTerm(expression: t.startMs)]))
             .get();
     return _groupByChannel(rows);
@@ -818,28 +852,40 @@ class CatalogRepository implements EpgProgrammeStore {
     Set<String>? channelIds,
   }) async {
     if (channelIds != null && channelIds.isEmpty) return const {};
+    final source = shownSource;
     final endAfterMs = endAfter.millisecondsSinceEpoch;
     final startBeforeMs = startBefore.millisecondsSinceEpoch;
     if (_offloadWrites &&
         channelIds == null &&
-        await _countProgrammesBetween(endAfterMs, startBeforeMs) >=
+        await _countProgrammesBetween(source, endAfterMs, startBeforeMs) >=
             _offloadThresholdRows) {
       return _db.computeWithDatabase(
         connect: CatalogDatabase.new,
         computation: (db) =>
-            _programmesBetweenOn(db, endAfterMs, startBeforeMs, null),
+            _programmesBetweenOn(db, source, endAfterMs, startBeforeMs, null),
       );
     }
-    return _programmesBetweenOn(_db, endAfterMs, startBeforeMs, channelIds);
+    return _programmesBetweenOn(
+      _db,
+      source,
+      endAfterMs,
+      startBeforeMs,
+      channelIds,
+    );
   }
 
-  Future<int> _countProgrammesBetween(int endAfterMs, int startBeforeMs) {
+  Future<int> _countProgrammesBetween(
+    String source,
+    int endAfterMs,
+    int startBeforeMs,
+  ) {
     final table = _db.epgProgrammes;
     final count = table.channelId.count();
     return (_db.selectOnly(table)
           ..addColumns([count])
           ..where(
-            table.endMs.isBiggerThanValue(endAfterMs) &
+            table.sourceKey.equals(source) &
+                table.endMs.isBiggerThanValue(endAfterMs) &
                 table.startMs.isSmallerThanValue(startBeforeMs),
           ))
         .map((row) => row.read(count) ?? 0)
@@ -848,6 +894,7 @@ class CatalogRepository implements EpgProgrammeStore {
 
   static Future<Map<String, List<EpgProgram>>> _programmesBetweenOn(
     CatalogDatabase db,
+    String source,
     int endAfterMs,
     int startBeforeMs,
     Set<String>? channelIds,
@@ -856,6 +903,7 @@ class CatalogRepository implements EpgProgrammeStore {
         await (db.select(db.epgProgrammes)
               ..where((t) {
                 final window =
+                    t.sourceKey.equals(source) &
                     t.endMs.isBiggerThanValue(endAfterMs) &
                     t.startMs.isSmallerThanValue(startBeforeMs);
                 return channelIds == null
@@ -958,7 +1006,7 @@ class CatalogRepository implements EpgProgrammeStore {
     });
   }
 
-  /// Every source key that has catalog rows stored.
+  /// Every source key that has catalog or guide rows stored.
   Future<Set<String>> storedSources() async {
     Future<Set<String>> distinct(
       TableInfo<Table, Object?> table,
@@ -973,10 +1021,11 @@ class CatalogRepository implements EpgProgrammeStore {
         _db.catalogCategories,
         _db.catalogCategories.sourceKey,
       ),
+      ...await distinct(_db.epgProgrammes, _db.epgProgrammes.sourceKey),
     };
   }
 
-  /// Deletes every item and category row stored for [sourceKey].
+  /// Deletes every item, category and guide row stored for [sourceKey].
   Future<void> deleteSource(String sourceKey) async {
     await _db.transaction(() async {
       await (_db.delete(
@@ -985,11 +1034,14 @@ class CatalogRepository implements EpgProgrammeStore {
       await (_db.delete(
         _db.catalogCategories,
       )..where((t) => t.sourceKey.equals(sourceKey))).go();
+      await (_db.delete(
+        _db.epgProgrammes,
+      )..where((t) => t.sourceKey.equals(sourceKey))).go();
     });
   }
 
-  /// Moves every item and category row from [from] to [to], replacing any
-  /// [to] already had, and renames the key/value slots in [renameKeys]
+  /// Moves every item, category and guide row from [from] to [to], replacing
+  /// any [to] already had, and renames the key/value slots in [renameKeys]
   /// (old key to new) in the same transaction.
   Future<void> moveSource(
     String from,
@@ -1009,12 +1061,18 @@ class CatalogRepository implements EpgProgrammeStore {
       await (_db.delete(
         _db.catalogCategories,
       )..where((t) => t.sourceKey.equals(to))).go();
+      await (_db.delete(
+        _db.epgProgrammes,
+      )..where((t) => t.sourceKey.equals(to))).go();
       await (_db.update(_db.catalogItems)
             ..where((t) => t.sourceKey.equals(from)))
           .write(CatalogItemsCompanion(sourceKey: Value(to)));
       await (_db.update(_db.catalogCategories)
             ..where((t) => t.sourceKey.equals(from)))
           .write(CatalogCategoriesCompanion(sourceKey: Value(to)));
+      await (_db.update(_db.epgProgrammes)
+            ..where((t) => t.sourceKey.equals(from)))
+          .write(EpgProgrammesCompanion(sourceKey: Value(to)));
     });
   }
 
@@ -1052,9 +1110,19 @@ class CatalogRepository implements EpgProgrammeStore {
                 coalesce([guide.backdropUrl.length, const Constant(0)]) +
                 guide.channelId.length)
             .sum();
-    final guideRow = await (_db.selectOnly(
-      guide,
-    )..addColumns([programmes, guideBytes])).getSingle();
+    final perGuide =
+        await (_db.selectOnly(guide)
+              ..addColumns([guide.sourceKey, programmes, guideBytes])
+              ..groupBy([guide.sourceKey]))
+            .get();
+    for (final row in perGuide) {
+      final source = row.read(guide.sourceKey)!;
+      sources[source] = (sources[source] ?? const CatalogSourceUsage())
+          .withGuide(
+            programmes: row.read(programmes) ?? 0,
+            bytes: row.read(guideBytes) ?? 0,
+          );
+    }
 
     Future<int> pragma(String name) async {
       final row = await _db.customSelect('PRAGMA $name').getSingle();
@@ -1066,8 +1134,6 @@ class CatalogRepository implements EpgProgrammeStore {
         await pragma('page_count') - await pragma('freelist_count');
     return CatalogStorageUsage(
       sources: sources,
-      guideProgrammes: guideRow.read(programmes) ?? 0,
-      guideBytes: guideRow.read(guideBytes) ?? 0,
       usedBytes: usedPages * pageSize,
     );
   }
@@ -1077,7 +1143,8 @@ class CatalogRepository implements EpgProgrammeStore {
   Future<void> compact() => _db.customStatement('VACUUM');
 }
 
-/// One source's rows, per kind (see [CatalogStorageUsage]).
+/// One source's rows: its catalog, per kind, and its guide (see
+/// [CatalogStorageUsage]).
 @immutable
 class CatalogSourceUsage {
   const CatalogSourceUsage({
@@ -1085,14 +1152,21 @@ class CatalogSourceUsage {
     this.movies = 0,
     this.series = 0,
     this.bytes = 0,
+    this.programmes = 0,
+    this.guideBytes = 0,
   });
 
   final int channels;
   final int movies;
   final int series;
 
-  /// Stored payload size, before SQLite's overhead.
+  /// The catalog's stored payload size, before SQLite's overhead.
   final int bytes;
+
+  final int programmes;
+
+  /// The guide's stored payload size, before SQLite's overhead.
+  final int guideBytes;
 
   CatalogSourceUsage add({
     required String kind,
@@ -1103,30 +1177,36 @@ class CatalogSourceUsage {
     movies: movies + (kind == kCatalogKindVod ? count : 0),
     series: series + (kind == kCatalogKindSeries ? count : 0),
     bytes: this.bytes + bytes,
+    programmes: programmes,
+    guideBytes: guideBytes,
   );
+
+  CatalogSourceUsage withGuide({required int programmes, required int bytes}) =>
+      CatalogSourceUsage(
+        channels: channels,
+        movies: movies,
+        series: series,
+        bytes: this.bytes,
+        programmes: programmes,
+        guideBytes: bytes,
+      );
 }
 
 /// See [CatalogRepository.storageUsage].
 @immutable
 class CatalogStorageUsage {
-  const CatalogStorageUsage({
-    required this.sources,
-    required this.guideProgrammes,
-    required this.guideBytes,
-    required this.usedBytes,
-  });
+  const CatalogStorageUsage({required this.sources, required this.usedBytes});
 
   final Map<String, CatalogSourceUsage> sources;
-  final int guideProgrammes;
-  final int guideBytes;
   final int usedBytes;
 
   /// [payloadBytes] scaled to its share of [usedBytes], so the parts add up to
   /// the space the file takes.
   int onDisk(int payloadBytes) {
-    final payload =
-        guideBytes +
-        sources.values.fold<int>(0, (sum, source) => sum + source.bytes);
+    final payload = sources.values.fold<int>(
+      0,
+      (sum, source) => sum + source.bytes + source.guideBytes,
+    );
     if (payload == 0) return 0;
     return (payloadBytes * usedBytes / payload).round();
   }

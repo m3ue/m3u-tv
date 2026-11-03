@@ -637,7 +637,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String settingsStorageClearPlaylistBody(String name) {
-    return 'Los canales, películas y series de $name se eliminan de este dispositivo. Se vuelven a descargar la próxima vez que cambies a esta lista.';
+    return 'Los canales, películas, series y la guía de $name se eliminan de este dispositivo. Se vuelven a descargar la próxima vez que cambies a esta lista.';
   }
 
   @override

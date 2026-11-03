@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -435,6 +436,102 @@ void main() {
         expect(byName['movies']!.usage?.channels, 1);
         expect(byName['movies']!.isShown, isTrue);
       });
+
+      test('a stored playlist is shown before its server answers', () async {
+        final fixture = _Fixture();
+        addTearDown(fixture.dispose);
+        final controller = fixture.controller;
+        expect(await controller.connectXtream(_sports), isTrue);
+        expect(await controller.switchToPlaylist(_movies), isNull);
+        await controller.drainBackgroundPersistence();
+
+        final signIn = Completer<void>();
+        fixture.transport.authGate = signIn;
+        expect(await controller.switchToPlaylist(_sports), isNull);
+
+        expect(controller.authNotifier.credentials?.username, 'sports');
+        expect(controller.authNotifier.isConfigured, isFalse);
+        expect(controller.isConfigured, isTrue);
+        expect(await shownChannelIds(controller), <int>[101]);
+        expect(controller.activeViewer?.ulid, 'viewer-sports');
+        final saved =
+            jsonDecode(
+                  (await fixture.storage.read(
+                    'm3ue_tv_credentials',
+                  ))!,
+                )
+                as Map<String, Object?>;
+        expect(saved['username'], 'sports');
+
+        signIn.complete();
+        await controller.drainBackgroundPersistence();
+        expect(controller.authNotifier.isConfigured, isTrue);
+        expect(controller.error, isNull);
+        expect(await shownChannelIds(controller), <int>[101]);
+      });
+
+      test('a stored playlist that fails to sign in stays shown', () async {
+        final fixture = _Fixture();
+        addTearDown(fixture.dispose);
+        final controller = fixture.controller;
+        expect(await controller.connectXtream(_sports), isTrue);
+        expect(await controller.switchToPlaylist(_movies), isNull);
+        await controller.drainBackgroundPersistence();
+
+        fixture.transport.rejected.add('sports');
+        expect(await controller.switchToPlaylist(_sports), isNull);
+        await controller.drainBackgroundPersistence();
+
+        expect(controller.authNotifier.credentials?.username, 'sports');
+        expect(controller.error, contains('Invalid credentials'));
+        expect(await shownChannelIds(controller), <int>[101]);
+      });
+
+      test('the last of several quick switches wins', () async {
+        final fixture = _Fixture();
+        addTearDown(fixture.dispose);
+        final controller = fixture.controller;
+        expect(await controller.connectXtream(_sports), isTrue);
+        expect(await controller.switchToPlaylist(_movies), isNull);
+        await controller.drainBackgroundPersistence();
+
+        final signIn = Completer<void>();
+        fixture.transport.authGate = signIn;
+        expect(await controller.switchToPlaylist(_sports), isNull);
+        expect(await controller.switchToPlaylist(_movies), isNull);
+        signIn.complete();
+        await controller.drainBackgroundPersistence();
+
+        expect(controller.authNotifier.credentials?.username, 'movies');
+        expect(controller.authNotifier.isConfigured, isTrue);
+        expect(controller.activeViewer?.ulid, 'viewer-movies');
+        expect(await shownChannelIds(controller), <int>[202]);
+      });
+
+      test('a playlist with nothing stored downloads before showing', () async {
+        final fixture = _Fixture();
+        addTearDown(fixture.dispose);
+        final controller = fixture.controller;
+        expect(await controller.connectXtream(_sports), isTrue);
+        expect(await controller.switchToPlaylist(_movies), isNull);
+        await controller.drainBackgroundPersistence();
+        await controller.clearPlaylistCache(sourceOf(controller, _sports));
+
+        final signIn = Completer<void>();
+        fixture.transport.authGate = signIn;
+        var switched = false;
+        final switching = controller.switchToPlaylist(_sports).then((error) {
+          switched = true;
+          return error;
+        });
+        await pumpEventQueue();
+        expect(switched, isFalse);
+        expect(await shownChannelIds(controller), <int>[202]);
+
+        signIn.complete();
+        expect(await switching, isNull);
+        expect(await shownChannelIds(controller), <int>[101]);
+      });
     });
 
     test('proxy preferences are kept per playlist', () async {
@@ -536,12 +633,16 @@ class _PlaylistTransport {
   final Set<String> failingContent = <String>{};
   int authRequests = 0;
 
+  /// Holds every sign-in until it completes.
+  Completer<void>? authGate;
+
   Future<Object?> call(XtreamRequest request) async {
     final action = request.action ?? 'auth';
     final username = request.credentials.username;
     switch (action) {
       case 'auth':
         authRequests += 1;
+        await authGate?.future;
         if (rejected.contains(username)) {
           return <String, Object?>{
             'user_info': <String, Object?>{

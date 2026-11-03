@@ -614,7 +614,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String settingsStorageClearPlaylistBody(String name) {
-    return '将从此设备移除 $name 的频道、电影和剧集。下次切换到该播放列表时会重新下载。';
+    return '将从此设备移除 $name 的频道、电影、剧集和节目指南。下次切换到该播放列表时会重新下载。';
   }
 
   @override

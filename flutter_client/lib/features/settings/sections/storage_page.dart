@@ -237,14 +237,10 @@ class _StoragePageState extends State<StoragePage> {
                 value: size(usage?.totalBytes),
               ),
               const Divider(),
+              // Each playlist's guide is counted in its own size.
               SettingsStatusRow(
                 label: l.settingsPlaylists,
                 value: size(playlistBytes),
-              ),
-              const Divider(),
-              SettingsStatusRow(
-                label: l.settingsStorageGuide,
-                value: size(usage?.guideBytes),
               ),
               const Divider(),
               SettingsStatusRow(
