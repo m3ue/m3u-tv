@@ -58,6 +58,7 @@ class SavedPlaylist {
     required this.credentials,
     this.name,
     this.usesBaseKeys = false,
+    this.lastUsed,
   });
 
   static SavedPlaylist? tryFromJson(Object? json) {
@@ -71,6 +72,7 @@ class SavedPlaylist {
       return null;
     }
     final name = json['name'];
+    final lastUsedMs = json['last_used'];
     return SavedPlaylist(
       id: id,
       credentials: UserCredentials(
@@ -80,6 +82,9 @@ class SavedPlaylist {
       ),
       name: name is String && name.trim().isNotEmpty ? name.trim() : null,
       usesBaseKeys: json['base_keys'] == true,
+      lastUsed: lastUsedMs is int
+          ? DateTime.fromMillisecondsSinceEpoch(lastUsedMs)
+          : null,
     );
   }
 
@@ -89,10 +94,13 @@ class SavedPlaylist {
   /// User-chosen label. Null shows [playlistDefaultName].
   final String? name;
 
-  /// True for the first playlist saved on a device. Its local state stays
-  /// under the keys used before multiple playlists existed, so an upgrade
-  /// never moves or drops it.
+  /// True for a login saved from before multiple playlists existed, until
+  /// its local state is moved from the unscoped keys to its own (at boot).
   final bool usesBaseKeys;
+
+  /// When it was last connected to. Decides which playlists' catalogs stay
+  /// on the device.
+  final DateTime? lastUsed;
 
   /// The scope passed to [playlistScopedKey] for this playlist's state.
   String? get scope => usesBaseKeys ? null : id;
@@ -107,7 +115,17 @@ class SavedPlaylist {
     credentials: credentials,
     name: name,
     usesBaseKeys: usesBaseKeys,
+    lastUsed: lastUsed,
   );
+
+  SavedPlaylist _with({bool? usesBaseKeys, DateTime? lastUsed}) =>
+      SavedPlaylist(
+        id: id,
+        credentials: credentials,
+        name: name,
+        usesBaseKeys: usesBaseKeys ?? this.usesBaseKeys,
+        lastUsed: lastUsed ?? this.lastUsed,
+      );
 
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
@@ -116,6 +134,7 @@ class SavedPlaylist {
     'password': credentials.password,
     if (name != null) 'name': name,
     if (usesBaseKeys) 'base_keys': true,
+    if (lastUsed != null) 'last_used': lastUsed!.millisecondsSinceEpoch,
   };
 }
 
@@ -143,6 +162,22 @@ class SavedPlaylistsService extends ChangeNotifier {
   List<SavedPlaylist> _playlists = const <SavedPlaylist>[];
 
   List<SavedPlaylist> get playlists => _playlists;
+
+  /// [playlists], most recently used first.
+  List<SavedPlaylist> get recentFirst {
+    final order = {
+      for (var i = 0; i < _playlists.length; i++) _playlists[i]: i,
+    };
+    int usedMs(SavedPlaylist playlist) =>
+        playlist.lastUsed?.millisecondsSinceEpoch ?? 0;
+    return [..._playlists]..sort((a, b) {
+      final byUse = usedMs(b).compareTo(usedMs(a));
+      return byUse != 0 ? byUse : order[a]!.compareTo(order[b]!);
+    });
+  }
+
+  /// The scopes of logins still connecting (see [scopeFor]).
+  Set<String> get pendingScopes => _pendingIds.values.toSet();
 
   /// Reads the saved list once. A failed read is retried by the next call,
   /// and nothing is written back until a read succeeds, so a transient
@@ -188,12 +223,12 @@ class SavedPlaylistsService extends ChangeNotifier {
 
   /// The scope per-playlist state is stored under while [credentials] is the
   /// active login: the saved entry's scope, else the scope [remember] will
-  /// save it with.
+  /// save it with. Null until the list is loaded, so nothing is written
+  /// under an id the saved list might not agree with.
   String? scopeFor(UserCredentials? credentials) {
-    if (credentials == null) return null;
+    if (credentials == null || !_loaded) return null;
     final saved = find(credentials);
     if (saved != null) return saved.scope;
-    if (_playlists.isEmpty) return null;
     return _pendingIds.putIfAbsent(_identity(credentials), _newId);
   }
 
@@ -204,16 +239,26 @@ class SavedPlaylistsService extends ChangeNotifier {
     return _pendingIds.remove(_identity(credentials));
   }
 
-  /// Saves [credentials] (no-op when already saved) and returns its entry.
+  /// Saves [credentials] (or marks it used, when already saved) and returns
+  /// its entry. A login that never connected through [scopeFor] (one saved
+  /// from before multiple playlists existed) keeps its state on the unscoped
+  /// keys until [markScoped].
   Future<SavedPlaylist> remember(UserCredentials credentials) async {
     await load();
+    final now = DateTime.now();
     final existing = find(credentials);
-    if (existing != null) return existing;
+    if (existing != null) {
+      final used = existing._with(lastUsed: now);
+      _replace(used);
+      await _persist();
+      return used;
+    }
     final pendingId = _pendingIds.remove(_identity(credentials));
     final playlist = SavedPlaylist(
       id: pendingId ?? _newId(),
       credentials: credentials,
       usesBaseKeys: pendingId == null && _playlists.isEmpty,
+      lastUsed: now,
     );
     _playlists = List<SavedPlaylist>.unmodifiable(<SavedPlaylist>[
       ..._playlists,
@@ -224,6 +269,22 @@ class SavedPlaylistsService extends ChangeNotifier {
     return playlist;
   }
 
+  /// Records that [id]'s state has moved off the unscoped keys.
+  Future<void> markScoped(String id) async {
+    final current = byId(id);
+    if (current == null || !current.usesBaseKeys) return;
+    _replace(current._with(usesBaseKeys: false));
+    notifyListeners();
+    await _persist();
+  }
+
+  void _replace(SavedPlaylist updated) {
+    _playlists = List<SavedPlaylist>.unmodifiable(<SavedPlaylist>[
+      for (final playlist in _playlists)
+        if (playlist.id == updated.id) updated else playlist,
+    ]);
+  }
+
   /// Sets the label for [id]; null or blank restores the default name.
   Future<void> rename(String id, String? name) async {
     await load();
@@ -231,10 +292,7 @@ class SavedPlaylistsService extends ChangeNotifier {
     final label = trimmed == null || trimmed.isEmpty ? null : trimmed;
     final current = byId(id);
     if (current == null || current.name == label) return;
-    _playlists = List<SavedPlaylist>.unmodifiable(<SavedPlaylist>[
-      for (final playlist in _playlists)
-        if (playlist.id == id) playlist.withName(label) else playlist,
-    ]);
+    _replace(current.withName(label));
     notifyListeners();
     await _persist();
   }

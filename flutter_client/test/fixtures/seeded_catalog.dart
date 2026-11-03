@@ -17,7 +17,7 @@ CatalogRepository catalogWith(List<Channel> channels) {
   addTearDown(repo.close);
   unawaited(
     repo.replaceItems(
-      sourceKey: CatalogRepository.activeSource,
+      sourceKey: CatalogRepository.defaultSource,
       kind: kCatalogKindLive,
       items: channels,
     ),

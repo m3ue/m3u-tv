@@ -290,33 +290,85 @@ void main() {
       expect(await cache.get<List<VodItem>>('vodStreams'), isNull);
     });
 
-    test('snapshot + restore round-trips the SQLite catalog', () async {
+    VodItem movie(int id, String name) => VodItem(
+      id: id,
+      name: name,
+      streamUrl: 'http://h/$id.mp4',
+      containerExtension: 'mp4',
+    );
+
+    test('snapshot + restore round-trips the small keys only', () async {
       final store = await newStore('m3u-tv-cache-repo-snap-');
       final repo = newRepo();
       final cache = CacheService(store: store, catalogRepository: repo);
 
-      await cache.set<List<VodItem>>('vodStreams', const <VodItem>[
-        VodItem(
-          id: 1,
-          name: 'Original',
-          streamUrl: 'http://h/1.mp4',
-          containerExtension: 'mp4',
-        ),
-      ]);
+      await cache.set<String>('sourceType', 'xtream');
+      await cache.set<List<VodItem>>('vodStreams', [movie(1, 'Original')]);
       final snapshot = await cache.snapshot();
 
-      await cache.set<List<VodItem>>('vodStreams', const <VodItem>[
-        VodItem(
-          id: 2,
-          name: 'Replacement',
-          streamUrl: 'http://h/2.mp4',
-          containerExtension: 'mp4',
-        ),
-      ]);
+      await cache.set<String>('sourceType', 'other');
+      await cache.set<List<VodItem>>('vodStreams', [movie(2, 'Replacement')]);
       await cache.restore(snapshot);
 
-      final restored = await cache.get<List<VodItem>>('vodStreams');
-      expect(restored!.data.single.name, 'Original');
+      expect((await cache.get<String>('sourceType'))!.data, 'xtream');
+      // Catalog rows need no snapshot (each playlist's are kept apart), so a
+      // restore leaves them as they are.
+      expect(
+        (await cache.get<List<VodItem>>('vodStreams'))!.data.single.name,
+        'Replacement',
+      );
+    });
+
+    test('a load for another playlist leaves the shown one alone', () async {
+      final repo = newRepo()..shownSource = 'playlist-a';
+      final cache = CacheService(catalogRepository: repo);
+      await cache.replace(<String, Object?>{
+        'vodStreams': [movie(1, 'A movie')],
+      });
+
+      await cache.replace(<String, Object?>{
+        'vodStreams': [movie(2, 'B movie')],
+      }, sourceKey: 'playlist-b');
+
+      expect(
+        (await cache.get<List<VodItem>>('vodStreams'))!.data.single.name,
+        'A movie',
+      );
+      repo.shownSource = 'playlist-b';
+      expect(
+        (await cache.get<List<VodItem>>('vodStreams'))!.data.single.name,
+        'B movie',
+      );
+      expect(await cache.storedCatalogSources(), {'playlist-a', 'playlist-b'});
+    });
+
+    test('a catalog moves and drops with its write times', () async {
+      final repo = newRepo();
+      final cache = CacheService(catalogRepository: repo);
+      // Rows cached before each playlist had its own.
+      await cache.replace(<String, Object?>{
+        'liveStreams': const <Channel>[],
+        'vodStreams': [movie(1, 'Cached')],
+      });
+      final written = await cache.catalogUpdatedAt(
+        CatalogRepository.defaultSource,
+      );
+
+      await cache.moveCatalog(CatalogRepository.defaultSource, 'playlist-a');
+
+      expect(await cache.get<List<VodItem>>('vodStreams'), isNull);
+      expect(await cache.catalogUpdatedAt('playlist-a'), written);
+      repo.shownSource = 'playlist-a';
+      expect(
+        (await cache.get<List<VodItem>>('vodStreams'))!.data.single.name,
+        'Cached',
+      );
+
+      await cache.dropCatalog('playlist-a');
+
+      expect(await cache.get<List<VodItem>>('vodStreams'), isNull);
+      expect(await cache.catalogUpdatedAt('playlist-a'), isNull);
+      expect(await cache.storedCatalogSources(), isEmpty);
     });
   });
 }

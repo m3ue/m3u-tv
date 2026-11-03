@@ -1784,7 +1784,9 @@ void main() {
 
         expect(fixture.controller.activeViewer?.ulid, 'viewer-server-a');
         expect(await fixture.controller.favoritesService.all(), <int>{101});
-        expect(await store.read('m3ue_favorites'), <int>[101]);
+        final first = fixture.controller.savedPlaylists.find(_firstCredentials);
+        final firstKey = 'm3ue_favorites_playlist_${first!.id}';
+        expect(await store.read(firstKey), <int>[101]);
         expect(staleNotifications, 0);
 
         transport.releaseThirdFavoritesPull.complete();
@@ -1794,7 +1796,7 @@ void main() {
 
         expect(await fixture.controller.favoritesService.all(), <int>{103});
         // Each playlist keeps its own favorites: the first one's are untouched.
-        expect(await store.read('m3ue_favorites'), <int>[101]);
+        expect(await store.read(firstKey), <int>[101]);
         final third = fixture.controller.savedPlaylists.find(_thirdCredentials);
         expect(
           await store.read('m3ue_favorites_playlist_${third!.id}'),
@@ -2192,12 +2194,12 @@ class _Fixture {
   /// VOD/series content lives in the shared catalog repository now, not on
   /// the controller.
   Future<List<VodItem>> get vodItems => catalogRepository.allItems<VodItem>(
-    CatalogRepository.activeSource,
+    catalogRepository.shownSource,
     kCatalogKindVod,
   );
 
   Future<List<Series>> get seriesList => catalogRepository.allItems<Series>(
-    CatalogRepository.activeSource,
+    catalogRepository.shownSource,
     kCatalogKindSeries,
   );
 }
@@ -3630,6 +3632,6 @@ Future<void> _waitForMigratedViewer(
 /// The live lineup as the catalog holds it.
 Future<List<Channel>> _liveChannels(AppStateController controller) =>
     controller.catalogRepository.allItems<Channel>(
-      CatalogRepository.activeSource,
+      controller.catalogRepository.shownSource,
       kCatalogKindLive,
     );

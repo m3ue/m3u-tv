@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show immutable, kIsWeb;
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -60,10 +60,14 @@ class CatalogRepository implements EpgProgrammeStore {
     await _db.close();
   }
 
-  /// The one `sourceKey` in use today. The column is multi-source-ready but a
-  /// source switch swaps every row wholesale, so callers that only ever touch
-  /// the live source use the `*Active` helpers below and never see it.
-  static const String activeSource = 'active';
+  /// Where rows lived before each saved playlist had its own (and still the
+  /// [shownSource] while no playlist is shown).
+  static const String defaultSource = 'active';
+
+  /// The playlist whose rows are on screen: the `*Active` helpers below read
+  /// it. Each saved playlist keeps its rows under its own source key, so
+  /// loading another playlist never disturbs the shown one's.
+  String shownSource = defaultSource;
 
   Future<List<T>> pageActiveItems<T>({
     required String kind,
@@ -75,7 +79,7 @@ class CatalogRepository implements EpgProgrammeStore {
     required int offset,
     required int limit,
   }) => pageItems<T>(
-    sourceKey: activeSource,
+    sourceKey: shownSource,
     kind: kind,
     categoryId: categoryId,
     search: search,
@@ -92,7 +96,7 @@ class CatalogRepository implements EpgProgrammeStore {
     String? search,
     Set<int>? ids,
   }) => countItems(
-    sourceKey: activeSource,
+    sourceKey: shownSource,
     kind: kind,
     categoryId: categoryId,
     search: search,
@@ -113,7 +117,7 @@ class CatalogRepository implements EpgProgrammeStore {
       ..where(
         _itemFilter(
           table,
-          activeSource,
+          shownSource,
           kCatalogKindLive,
           categoryId,
           search,
@@ -132,7 +136,7 @@ class CatalogRepository implements EpgProgrammeStore {
     final row =
         await (_db.select(_db.catalogItems)..where(
               (t) =>
-                  t.sourceKey.equals(activeSource) &
+                  t.sourceKey.equals(shownSource) &
                   t.kind.equals(kind) &
                   t.streamId.equals(id),
             ))
@@ -151,7 +155,7 @@ class CatalogRepository implements EpgProgrammeStore {
     final rows =
         await (_db.select(_db.catalogItems)..where(
               (t) =>
-                  t.sourceKey.equals(activeSource) &
+                  t.sourceKey.equals(shownSource) &
                   t.kind.equals(kind) &
                   t.streamId.isIn(ids),
             ))
@@ -407,7 +411,7 @@ class CatalogRepository implements EpgProgrammeStore {
     final query = _db.selectOnly(table)
       ..addColumns([table.streamId])
       ..where(
-        _itemFilter(table, activeSource, kind, categoryId, search, ids),
+        _itemFilter(table, shownSource, kind, categoryId, search, ids),
       )
       ..orderBy([
         for (final term in _orderingWithFavorites(sort, favoritesFirst))
@@ -954,45 +958,176 @@ class CatalogRepository implements EpgProgrammeStore {
     });
   }
 
-  /// Full dump of every table, for the rollback `CacheService` performs when a
-  /// source switch fails partway.
-  Future<CatalogSnapshot> snapshot() async => CatalogSnapshot(
-    items: await _db.select(_db.catalogItems).get(),
-    categories: await _db.select(_db.catalogCategories).get(),
-    programmes: await _db.select(_db.epgProgrammes).get(),
-    kv: await _db.select(_db.kvCache).get(),
-  );
+  /// Every source key that has catalog rows stored.
+  Future<Set<String>> storedSources() async {
+    Future<Set<String>> distinct(
+      TableInfo<Table, Object?> table,
+      GeneratedColumn<String> col,
+    ) => (_db.selectOnly(table, distinct: true)..addColumns([col]))
+        .map((row) => row.read(col)!)
+        .get()
+        .then((keys) => keys.toSet());
+    return {
+      ...await distinct(_db.catalogItems, _db.catalogItems.sourceKey),
+      ...await distinct(
+        _db.catalogCategories,
+        _db.catalogCategories.sourceKey,
+      ),
+    };
+  }
 
-  /// Replace every table's contents with [snapshot] in one transaction.
-  Future<void> restore(CatalogSnapshot snapshot) async {
+  /// Deletes every item and category row stored for [sourceKey].
+  Future<void> deleteSource(String sourceKey) async {
     await _db.transaction(() async {
-      await _db.delete(_db.catalogItems).go();
-      await _db.delete(_db.catalogCategories).go();
-      await _db.delete(_db.epgProgrammes).go();
-      await _db.delete(_db.kvCache).go();
-      await _db.batch((batch) {
-        batch
-          ..insertAll(_db.catalogItems, snapshot.items)
-          ..insertAll(_db.catalogCategories, snapshot.categories)
-          ..insertAll(_db.epgProgrammes, snapshot.programmes)
-          ..insertAll(_db.kvCache, snapshot.kv);
-      });
+      await (_db.delete(
+        _db.catalogItems,
+      )..where((t) => t.sourceKey.equals(sourceKey))).go();
+      await (_db.delete(
+        _db.catalogCategories,
+      )..where((t) => t.sourceKey.equals(sourceKey))).go();
     });
   }
+
+  /// Moves every item and category row from [from] to [to], replacing any
+  /// [to] already had, and renames the key/value slots in [renameKeys]
+  /// (old key to new) in the same transaction.
+  Future<void> moveSource(
+    String from,
+    String to, {
+    Map<String, String> renameKeys = const {},
+  }) async {
+    if (from == to) return;
+    await _db.transaction(() async {
+      for (final MapEntry(key: oldKey, value: newKey) in renameKeys.entries) {
+        await kvDelete(newKey);
+        await (_db.update(_db.kvCache)..where((t) => t.key.equals(oldKey)))
+            .write(KvCacheCompanion(key: Value(newKey)));
+      }
+      await (_db.delete(
+        _db.catalogItems,
+      )..where((t) => t.sourceKey.equals(to))).go();
+      await (_db.delete(
+        _db.catalogCategories,
+      )..where((t) => t.sourceKey.equals(to))).go();
+      await (_db.update(_db.catalogItems)
+            ..where((t) => t.sourceKey.equals(from)))
+          .write(CatalogItemsCompanion(sourceKey: Value(to)));
+      await (_db.update(_db.catalogCategories)
+            ..where((t) => t.sourceKey.equals(from)))
+          .write(CatalogCategoriesCompanion(sourceKey: Value(to)));
+    });
+  }
+
+  /// What the database holds, for the Storage settings page. Byte figures
+  /// are the stored payloads; `usedBytes` is what the file actually takes
+  /// (payloads plus SQLite's own overhead), so callers can scale by it.
+  Future<CatalogStorageUsage> storageUsage() async {
+    final items = _db.catalogItems;
+    final count = items.streamId.count();
+    final bytes = items.json.length.sum();
+    final perKind =
+        await (_db.selectOnly(items)
+              ..addColumns([items.sourceKey, items.kind, count, bytes])
+              ..groupBy([items.sourceKey, items.kind]))
+            .get();
+    final sources = <String, CatalogSourceUsage>{};
+    for (final row in perKind) {
+      final source = row.read(items.sourceKey)!;
+      final current = sources[source] ?? const CatalogSourceUsage();
+      sources[source] = current.add(
+        kind: row.read(items.kind)!,
+        count: row.read(count) ?? 0,
+        bytes: row.read(bytes) ?? 0,
+      );
+    }
+
+    final guide = _db.epgProgrammes;
+    final programmes = guide.startMs.count();
+    final guideBytes =
+        (guide.title.length +
+                guide.description.length +
+                coalesce([guide.subtitle.length, const Constant(0)]) +
+                coalesce([guide.iconUrl.length, const Constant(0)]) +
+                coalesce([guide.posterUrl.length, const Constant(0)]) +
+                coalesce([guide.backdropUrl.length, const Constant(0)]) +
+                guide.channelId.length)
+            .sum();
+    final guideRow = await (_db.selectOnly(
+      guide,
+    )..addColumns([programmes, guideBytes])).getSingle();
+
+    Future<int> pragma(String name) async {
+      final row = await _db.customSelect('PRAGMA $name').getSingle();
+      return (row.data.values.first as int?) ?? 0;
+    }
+
+    final pageSize = await pragma('page_size');
+    final usedPages =
+        await pragma('page_count') - await pragma('freelist_count');
+    return CatalogStorageUsage(
+      sources: sources,
+      guideProgrammes: guideRow.read(programmes) ?? 0,
+      guideBytes: guideRow.read(guideBytes) ?? 0,
+      usedBytes: usedPages * pageSize,
+    );
+  }
+
+  /// Gives the space freed by deletes back to the device: SQLite otherwise
+  /// keeps it in the file for reuse.
+  Future<void> compact() => _db.customStatement('VACUUM');
 }
 
-/// Opaque full-database snapshot passed between [CatalogRepository.snapshot]
-/// and [CatalogRepository.restore].
-class CatalogSnapshot {
-  const CatalogSnapshot({
-    required this.items,
-    required this.categories,
-    required this.programmes,
-    required this.kv,
+/// One source's rows, per kind (see [CatalogStorageUsage]).
+@immutable
+class CatalogSourceUsage {
+  const CatalogSourceUsage({
+    this.channels = 0,
+    this.movies = 0,
+    this.series = 0,
+    this.bytes = 0,
   });
 
-  final List<CatalogItemRow> items;
-  final List<CatalogCategoryRow> categories;
-  final List<EpgProgrammeRow> programmes;
-  final List<KvCacheRow> kv;
+  final int channels;
+  final int movies;
+  final int series;
+
+  /// Stored payload size, before SQLite's overhead.
+  final int bytes;
+
+  CatalogSourceUsage add({
+    required String kind,
+    required int count,
+    required int bytes,
+  }) => CatalogSourceUsage(
+    channels: channels + (kind == kCatalogKindLive ? count : 0),
+    movies: movies + (kind == kCatalogKindVod ? count : 0),
+    series: series + (kind == kCatalogKindSeries ? count : 0),
+    bytes: this.bytes + bytes,
+  );
+}
+
+/// See [CatalogRepository.storageUsage].
+@immutable
+class CatalogStorageUsage {
+  const CatalogStorageUsage({
+    required this.sources,
+    required this.guideProgrammes,
+    required this.guideBytes,
+    required this.usedBytes,
+  });
+
+  final Map<String, CatalogSourceUsage> sources;
+  final int guideProgrammes;
+  final int guideBytes;
+  final int usedBytes;
+
+  /// [payloadBytes] scaled to its share of [usedBytes], so the parts add up to
+  /// the space the file takes.
+  int onDisk(int payloadBytes) {
+    final payload =
+        guideBytes +
+        sources.values.fold<int>(0, (sum, source) => sum + source.bytes);
+    if (payload == 0) return 0;
+    return (payloadBytes * usedBytes / payload).round();
+  }
 }

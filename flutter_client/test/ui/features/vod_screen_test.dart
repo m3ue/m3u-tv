@@ -29,7 +29,7 @@ Future<CatalogRepository> _buildRepo(
     addTearDown(db.close);
     final repo = CatalogRepository(db);
     await repo.replaceItems(
-      sourceKey: CatalogRepository.activeSource,
+      sourceKey: CatalogRepository.defaultSource,
       kind: kCatalogKindVod,
       items: vodItems,
     );
@@ -204,7 +204,7 @@ void main() {
       ) async {
         await tester.runAsync(
           () => repo.replaceItems(
-            sourceKey: CatalogRepository.activeSource,
+            sourceKey: CatalogRepository.defaultSource,
             kind: kCatalogKindVod,
             items: reloadedItems,
           ),

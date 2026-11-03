@@ -84,7 +84,7 @@ Future<void> _fill(CatalogRepository repo, _Catalog catalog) async {
     (kCatalogKindSeries, catalog.series),
   ]) {
     await repo.replaceItems(
-      sourceKey: CatalogRepository.activeSource,
+      sourceKey: CatalogRepository.defaultSource,
       kind: kind,
       items: items,
     );

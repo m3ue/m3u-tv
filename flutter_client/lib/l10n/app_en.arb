@@ -321,22 +321,73 @@
   "settingsRetryConnection": "Retry connection",
   "settingsEditServer": "Edit server settings",
   "settingsActiveViewer": "Active Viewer",
-  "settingsClearCacheTitle": "Clear Cache & Refresh?",
-  "settingsClearCacheBody": "Choose what to clear. It will be reloaded from your source.",
   "settingsClearCacheConfirm": "Clear & Refresh",
   "settingsCacheCleared": "Cache cleared. Content is refreshing in the background.",
-  "settingsClearCacheAll": "Everything",
-  "settingsClearCacheAllHint": "Channels, movies, series, guide data and artwork",
-  "settingsClearCacheContent": "Content only",
-  "settingsClearCacheContentHint": "Channels, movies and series",
-  "settingsClearCacheEpg": "Guide (EPG) only",
   "settingsClearCacheEpgHint": "The current guide stays visible while it reloads",
-  "settingsClearCacheImages": "Images only",
   "settingsClearCacheImagesHint": "Posters and logos reload as you browse",
   "settingsEpgCacheCleared": "Guide data is refreshing in the background.",
   "settingsImageCacheCleared": "Image cache cleared.",
-  "settingsContentCache": "Content Cache",
   "settingsCacheSubtitle": "Cached content loads instantly. Data refreshes automatically in the background.",
+  "settingsStorage": "Storage",
+  "settingsStorageSubtitle": "Cached playlists, guide and artwork",
+  "settingsStorageTotal": "Total",
+  "settingsStorageGuide": "Guide",
+  "settingsStorageArtwork": "Artwork",
+  "settingsStorageCalculating": "Calculating...",
+  "settingsStorageUnavailable": "Unavailable",
+  "settingsStorageItems": "{count, plural, =1{1 item} other{{count} items}}",
+  "@settingsStorageItems": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "settingsStorageNotStored": "Not stored on this device",
+  "settingsStorageKeepPlaylists": "Playlists kept on this device",
+  "settingsStorageKeepPlaylistsValue": "{count, plural, =1{Only the active playlist} other{The {count} most recent}}",
+  "@settingsStorageKeepPlaylistsValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsStorageClearPlaylistTitle": "Clear stored content?",
+  "settingsStorageClearPlaylistBody": "{name}'s channels, movies and series are removed from this device. They download again the next time you switch to it.",
+  "@settingsStorageClearPlaylistBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsStorageClearActiveBody": "{name}'s channels, movies and series are removed and downloaded again now.",
+  "@settingsStorageClearActiveBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsStorageClear": "Clear",
+  "settingsStorageCleared": "Stored content cleared.",
+  "settingsStorageGuideData": "Guide data",
+  "settingsStorageProgrammes": "{count, plural, =1{1 programme} other{{count} programmes}}",
+  "@settingsStorageProgrammes": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "settingsStorageClearGuideTitle": "Refresh guide data?",
+  "settingsStorageArtworkCache": "Artwork cache",
+  "settingsStorageClearArtworkTitle": "Clear artwork?",
+  "settingsStorageClearAll": "Clear everything",
+  "settingsStorageClearAllBody": "Every playlist's channels, movies and series, the guide and artwork are removed. The active playlist downloads again now.",
   "settingsEpgRefreshInterval": "EPG refresh interval",
   "settingsEpgDurationMinutes": "{count} min",
   "@settingsEpgDurationMinutes": {

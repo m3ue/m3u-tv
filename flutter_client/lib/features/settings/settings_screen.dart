@@ -5,6 +5,7 @@ import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
 import 'package:m3u_tv/features/settings/sections/connected_view.dart';
 import 'package:m3u_tv/features/settings/sections/connection_section.dart';
 import 'package:m3u_tv/features/settings/sections/playlists_page.dart';
+import 'package:m3u_tv/features/settings/sections/storage_page.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
@@ -29,14 +30,11 @@ class SettingsScreen extends StatefulWidget {
     this.serverTimezone,
     this.sourceError,
     this.isConfiguredOverride,
-    this.epgRefreshInterval,
-    this.epgRefreshOptions = const [],
     this.onConnect,
     this.onDisconnect,
     this.onSwitchViewer,
     this.onCreateViewer,
     this.onClearCache,
-    this.onEpgIntervalChanged,
     this.loadDiagnosticsHeader,
     this.onUploadLogs,
     this.onConnected,
@@ -49,6 +47,7 @@ class SettingsScreen extends StatefulWidget {
     this.deviceType,
     this.onHandleTopLevelBack,
     this.playlists,
+    this.storage,
   });
 
   final AuthNotifier authNotifier;
@@ -72,10 +71,7 @@ class SettingsScreen extends StatefulWidget {
   final VoidCallback? onDisconnect;
   final void Function(Viewer viewer)? onSwitchViewer;
   final Future<Viewer?> Function(String name)? onCreateViewer;
-  final Duration? epgRefreshInterval;
-  final List<Duration> epgRefreshOptions;
   final ValueChanged<CacheClearScope>? onClearCache;
-  final void Function(Duration interval)? onEpgIntervalChanged;
 
   /// Logs & Diagnostics (Settings > General > App): builds the device header,
   /// and uploads a report to the editor returning the stored upload's id.
@@ -97,6 +93,9 @@ class SettingsScreen extends StatefulWidget {
   /// Playlists saved on this device: listed on the connect screen when
   /// signed out, and managed from Settings > Account when connected.
   final PlaylistManagement? playlists;
+
+  /// Settings > Storage. Hidden when null.
+  final StorageManagement? storage;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -173,14 +172,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         sourceLabel: widget.sourceLabel,
         serverTimezone: widget.serverTimezone,
         sourceError: widget.sourceError,
-        epgRefreshInterval: widget.epgRefreshInterval,
-        epgRefreshOptions: widget.epgRefreshOptions,
         onDisconnect:
             widget.onDisconnect ?? () => widget.authNotifier.disconnect(),
         onSwitchViewer: widget.onSwitchViewer,
         onCreateViewer: widget.onCreateViewer,
         onClearCache: widget.onClearCache,
-        onEpgIntervalChanged: widget.onEpgIntervalChanged,
         loadDiagnosticsHeader: widget.loadDiagnosticsHeader,
         onUploadLogs: widget.onUploadLogs,
         locale: widget.locale,
@@ -192,6 +188,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         deviceType: widget.deviceType,
         onHandleTopLevelBack: widget.onHandleTopLevelBack,
         playlists: widget.playlists,
+        storage: widget.storage,
         devicePairingService: widget.devicePairingService,
         onPlaylistSwitched: widget.onConnected,
       ),

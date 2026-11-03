@@ -30,7 +30,7 @@ Future<CatalogRepository> _buildRepo(
     addTearDown(db.close);
     final repo = CatalogRepository(db);
     await repo.replaceItems(
-      sourceKey: CatalogRepository.activeSource,
+      sourceKey: CatalogRepository.defaultSource,
       kind: kCatalogKindSeries,
       items: seriesList,
     );
@@ -117,7 +117,7 @@ void main() {
 
         await tester.runAsync(
           () => repo.replaceItems(
-            sourceKey: CatalogRepository.activeSource,
+            sourceKey: CatalogRepository.defaultSource,
             kind: kCatalogKindSeries,
             items: const <Series>[
               Series(id: 9, name: 'The Expanse', categoryId: '50'),

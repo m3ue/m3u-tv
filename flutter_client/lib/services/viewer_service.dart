@@ -49,6 +49,24 @@ class ViewerService {
     await _store?.write(key, viewer.ulid);
   }
 
+  /// Moves the active viewer saved under [from] to [to], unless [to] already
+  /// has one.
+  Future<void> moveActiveViewer({
+    required String from,
+    required String to,
+  }) async {
+    final fromKey = _keyFor(from);
+    final toKey = _keyFor(to);
+    final store = _store;
+    final ulid = store == null ? _memory[fromKey] : await store.read(fromKey);
+    final existing = store == null ? _memory[toKey] : await store.read(toKey);
+    if (ulid is String && existing == null) {
+      _memory[toKey] = ulid;
+      await store?.write(toKey, ulid);
+    }
+    await forgetActiveViewer(loginKey: from);
+  }
+
   Future<void> forgetActiveViewer({String? loginKey}) async {
     final key = _keyFor(loginKey);
     _memory.remove(key);

@@ -409,7 +409,7 @@ void main() {
     test('nameNatural matches compareNatural over generated names', () async {
       final names = generateNames(3000);
       await repo.replaceItems(
-        sourceKey: CatalogRepository.activeSource,
+        sourceKey: CatalogRepository.defaultSource,
         kind: kCatalogKindLive,
         items: [
           for (var i = 0; i < names.length; i++) _channel(i + 1, names[i]),
@@ -440,7 +440,7 @@ void main() {
       'channelNumber orders numbered channels first, then by name',
       () async {
         await repo.replaceItems(
-          sourceKey: CatalogRepository.activeSource,
+          sourceKey: CatalogRepository.defaultSource,
           kind: kCatalogKindLive,
           items: [
             _channel(1, 'Zed', number: 0),
@@ -462,7 +462,7 @@ void main() {
 
     test('ids limits a page and its count to those rows', () async {
       await repo.replaceItems(
-        sourceKey: CatalogRepository.activeSource,
+        sourceKey: CatalogRepository.defaultSource,
         kind: kCatalogKindLive,
         items: [_channel(1, 'One'), _channel(2, 'Two'), _channel(3, 'Three')],
       );
@@ -484,7 +484,7 @@ void main() {
       'maxActiveCatchupDays reads the deepest retention in a slice',
       () async {
         await repo.replaceItems(
-          sourceKey: CatalogRepository.activeSource,
+          sourceKey: CatalogRepository.defaultSource,
           kind: kCatalogKindLive,
           items: [
             _channel(1, 'None', category: 'a'),
@@ -689,12 +689,12 @@ void main() {
           _channel(i % 100 == 0 ? 7 : i + 1, 'Channel $i'),
       ];
       await repo.replaceItems(
-        sourceKey: CatalogRepository.activeSource,
+        sourceKey: CatalogRepository.defaultSource,
         kind: kCatalogKindLive,
         items: channels,
       );
       final stored = await repo.allItems<Channel>(
-        CatalogRepository.activeSource,
+        CatalogRepository.defaultSource,
         kCatalogKindLive,
       );
       expect(stored.map((c) => c.name), channels.map((c) => c.name));
@@ -744,7 +744,7 @@ void main() {
   group('activeItemById / activeItemsByIds', () {
     setUp(() async {
       await repo.replaceItems(
-        sourceKey: CatalogRepository.activeSource,
+        sourceKey: CatalogRepository.defaultSource,
         kind: kCatalogKindVod,
         items: [
           _vod(1, 'One'),
@@ -789,7 +789,7 @@ void main() {
 
   test('activeCategoryCounts matches per-category countActiveItems', () async {
     await repo.replaceItems(
-      sourceKey: CatalogRepository.activeSource,
+      sourceKey: CatalogRepository.defaultSource,
       kind: kCatalogKindVod,
       items: [
         _vod(1, 'A', category: '10'),

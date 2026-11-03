@@ -4,6 +4,8 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:m3u_tv/services/device_performance.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/media_image_http_file_service.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 /// Disk cache for media poster/thumbnail images.
 ///
@@ -84,6 +86,33 @@ MediaImageCacheManager? get mediaImageCacheManager =>
 // build is currently a feasibility test, not a release target, we're
 // leaving this as a known Safari-only limitation to revisit once Flutter
 // 3.49 reaches stable and brings the real fix with it.
+
+/// What the media image cache takes on disk, or null where it can't be
+/// measured (web, `flutter test`, an unreadable folder). flutter_cache_manager
+/// keeps the files in a folder named after the cache key inside the
+/// temporary directory.
+Future<int?> mediaImageCacheBytes() async {
+  if (HostPlatform.isWeb ||
+      HostPlatform.environment['FLUTTER_TEST'] == 'true') {
+    return null;
+  }
+  try {
+    final directory = Directory(
+      p.join(
+        (await getTemporaryDirectory()).path,
+        MediaImageCacheManager._key,
+      ),
+    );
+    if (!await directory.exists()) return 0;
+    var total = 0;
+    await for (final entity in directory.list(recursive: true)) {
+      if (entity is File) total += await entity.length();
+    }
+    return total;
+  } on Object {
+    return null;
+  }
+}
 
 /// Empties the media image cache, skipping under `flutter test` (which sets
 /// the `FLUTTER_TEST` environment variable). Constructing

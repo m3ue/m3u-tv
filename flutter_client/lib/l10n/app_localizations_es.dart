@@ -552,13 +552,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsActiveViewer => 'Usuario activo';
 
   @override
-  String get settingsClearCacheTitle => '¿Borrar caché y actualizar?';
-
-  @override
-  String get settingsClearCacheBody =>
-      'Elige qué borrar. Se volverá a cargar desde tu fuente.';
-
-  @override
   String get settingsClearCacheConfirm => 'Borrar y actualizar';
 
   @override
@@ -566,27 +559,8 @@ class AppLocalizationsEs extends AppLocalizations {
       'Caché borrada. El contenido se está actualizando en segundo plano.';
 
   @override
-  String get settingsClearCacheAll => 'Todo';
-
-  @override
-  String get settingsClearCacheAllHint =>
-      'Canales, películas, series, guía e imágenes';
-
-  @override
-  String get settingsClearCacheContent => 'Solo contenido';
-
-  @override
-  String get settingsClearCacheContentHint => 'Canales, películas y series';
-
-  @override
-  String get settingsClearCacheEpg => 'Solo guía (EPG)';
-
-  @override
   String get settingsClearCacheEpgHint =>
       'La guía actual sigue visible mientras se recarga';
-
-  @override
-  String get settingsClearCacheImages => 'Solo imágenes';
 
   @override
   String get settingsClearCacheImagesHint =>
@@ -600,11 +574,117 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsImageCacheCleared => 'Caché de imágenes borrada.';
 
   @override
-  String get settingsContentCache => 'Caché de contenido';
-
-  @override
   String get settingsCacheSubtitle =>
       'El contenido en caché carga al instante. Los datos se actualizan automáticamente en segundo plano.';
+
+  @override
+  String get settingsStorage => 'Almacenamiento';
+
+  @override
+  String get settingsStorageSubtitle => 'Listas guardadas, guía e imágenes';
+
+  @override
+  String get settingsStorageTotal => 'Total';
+
+  @override
+  String get settingsStorageGuide => 'Guía';
+
+  @override
+  String get settingsStorageArtwork => 'Imágenes';
+
+  @override
+  String get settingsStorageCalculating => 'Calculando...';
+
+  @override
+  String get settingsStorageUnavailable => 'No disponible';
+
+  @override
+  String settingsStorageItems(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString elementos',
+      one: '1 elemento',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsStorageNotStored => 'No guardada en este dispositivo';
+
+  @override
+  String get settingsStorageKeepPlaylists =>
+      'Listas guardadas en este dispositivo';
+
+  @override
+  String settingsStorageKeepPlaylistsValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Las $count más recientes',
+      one: 'Solo la lista activa',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsStorageClearPlaylistTitle =>
+      '¿Borrar el contenido guardado?';
+
+  @override
+  String settingsStorageClearPlaylistBody(String name) {
+    return 'Los canales, películas y series de $name se eliminan de este dispositivo. Se vuelven a descargar la próxima vez que cambies a esta lista.';
+  }
+
+  @override
+  String settingsStorageClearActiveBody(String name) {
+    return 'Los canales, películas y series de $name se eliminan y se vuelven a descargar ahora.';
+  }
+
+  @override
+  String get settingsStorageClear => 'Borrar';
+
+  @override
+  String get settingsStorageCleared => 'Contenido guardado borrado.';
+
+  @override
+  String get settingsStorageGuideData => 'Datos de la guía';
+
+  @override
+  String settingsStorageProgrammes(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString programas',
+      one: '1 programa',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsStorageClearGuideTitle =>
+      '¿Actualizar los datos de la guía?';
+
+  @override
+  String get settingsStorageArtworkCache => 'Caché de imágenes';
+
+  @override
+  String get settingsStorageClearArtworkTitle => '¿Borrar las imágenes?';
+
+  @override
+  String get settingsStorageClearAll => 'Borrar todo';
+
+  @override
+  String get settingsStorageClearAllBody =>
+      'Se eliminan los canales, películas y series de todas las listas, la guía y las imágenes. La lista activa se vuelve a descargar ahora.';
 
   @override
   String get settingsEpgRefreshInterval => 'Intervalo de actualización de EPG';

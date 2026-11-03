@@ -61,6 +61,22 @@ class ProxyPlaybackSettings extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Moves the preferences kept on the unscoped key (a login from before
+  /// multiple playlists) to [scope]'s, unless it already has its own.
+  Future<void> adoptUnscoped(String scope) async {
+    final store = _store;
+    if (store == null) return;
+    final value = await store.read(_storeKey);
+    final key = playlistScopedKey(_storeKey, scope);
+    if (value != null && await store.read(key) == null) {
+      await store.write(key, value);
+    }
+    await store.delete(_storeKey);
+    // Values loaded from the unscoped key are this playlist's: read them
+    // again from where they live now.
+    if (_loadedScope == null) _loaded = false;
+  }
+
   /// Drops the preferences stored for a removed playlist's [scope].
   Future<void> clearPlaylistState(String? scope) async {
     await _store?.delete(playlistScopedKey(_storeKey, scope));

@@ -542,37 +542,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsActiveViewer => '当前用户';
 
   @override
-  String get settingsClearCacheTitle => '清除缓存并刷新？';
-
-  @override
-  String get settingsClearCacheBody => '选择要清除的内容，它将从您的来源重新加载。';
-
-  @override
   String get settingsClearCacheConfirm => '清除并刷新';
 
   @override
   String get settingsCacheCleared => '缓存已清除，内容正在后台刷新。';
 
   @override
-  String get settingsClearCacheAll => '全部';
-
-  @override
-  String get settingsClearCacheAllHint => '频道、电影、剧集、节目指南和图片';
-
-  @override
-  String get settingsClearCacheContent => '仅内容';
-
-  @override
-  String get settingsClearCacheContentHint => '频道、电影和剧集';
-
-  @override
-  String get settingsClearCacheEpg => '仅节目指南 (EPG)';
-
-  @override
   String get settingsClearCacheEpgHint => '重新加载期间仍显示当前节目指南';
-
-  @override
-  String get settingsClearCacheImages => '仅图片';
 
   @override
   String get settingsClearCacheImagesHint => '海报和台标将在浏览时重新加载';
@@ -584,10 +560,101 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsImageCacheCleared => '图片缓存已清除。';
 
   @override
-  String get settingsContentCache => '内容缓存';
+  String get settingsCacheSubtitle => '缓存内容即时加载，数据在后台自动刷新。';
 
   @override
-  String get settingsCacheSubtitle => '缓存内容即时加载，数据在后台自动刷新。';
+  String get settingsStorage => '存储空间';
+
+  @override
+  String get settingsStorageSubtitle => '已保存的播放列表、节目指南和图片';
+
+  @override
+  String get settingsStorageTotal => '总计';
+
+  @override
+  String get settingsStorageGuide => '节目指南';
+
+  @override
+  String get settingsStorageArtwork => '图片';
+
+  @override
+  String get settingsStorageCalculating => '正在计算...';
+
+  @override
+  String get settingsStorageUnavailable => '不可用';
+
+  @override
+  String settingsStorageItems(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '$countString 项';
+  }
+
+  @override
+  String get settingsStorageNotStored => '未保存在此设备上';
+
+  @override
+  String get settingsStorageKeepPlaylists => '在此设备上保留的播放列表';
+
+  @override
+  String settingsStorageKeepPlaylistsValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '最近使用的 $count 个',
+      one: '仅当前播放列表',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsStorageClearPlaylistTitle => '清除已保存的内容？';
+
+  @override
+  String settingsStorageClearPlaylistBody(String name) {
+    return '将从此设备移除 $name 的频道、电影和剧集。下次切换到该播放列表时会重新下载。';
+  }
+
+  @override
+  String settingsStorageClearActiveBody(String name) {
+    return '将移除 $name 的频道、电影和剧集，并立即重新下载。';
+  }
+
+  @override
+  String get settingsStorageClear => '清除';
+
+  @override
+  String get settingsStorageCleared => '已清除保存的内容。';
+
+  @override
+  String get settingsStorageGuideData => '节目指南数据';
+
+  @override
+  String settingsStorageProgrammes(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    return '$countString 个节目';
+  }
+
+  @override
+  String get settingsStorageClearGuideTitle => '刷新节目指南数据？';
+
+  @override
+  String get settingsStorageArtworkCache => '图片缓存';
+
+  @override
+  String get settingsStorageClearArtworkTitle => '清除图片？';
+
+  @override
+  String get settingsStorageClearAll => '全部清除';
+
+  @override
+  String get settingsStorageClearAllBody =>
+      '将移除所有播放列表的频道、电影和剧集，以及节目指南和图片。当前播放列表会立即重新下载。';
 
   @override
   String get settingsEpgRefreshInterval => 'EPG 刷新间隔';

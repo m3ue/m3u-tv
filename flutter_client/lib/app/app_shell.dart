@@ -22,6 +22,7 @@ import 'package:m3u_tv/features/requests/request_screen.dart';
 import 'package:m3u_tv/features/search/search_screen.dart';
 import 'package:m3u_tv/features/series/series_screen.dart';
 import 'package:m3u_tv/features/settings/sections/playlists_page.dart';
+import 'package:m3u_tv/features/settings/sections/storage_page.dart';
 import 'package:m3u_tv/features/settings/settings_screen.dart';
 import 'package:m3u_tv/features/vod/vod_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -1700,8 +1701,6 @@ class AppShellState extends ConsumerState<AppShell>
           serverTimezone: _appState.serverTimezone,
           sourceError: _appState.error,
           isConfiguredOverride: _appState.isConfigured,
-          epgRefreshInterval: _appState.epgRefreshInterval,
-          epgRefreshOptions: AppStateController.epgRefreshOptions,
           traktService: _appState.traktService,
           devicePairingService: _appState.devicePairingService,
           onConnect: _appState.connectXtream,
@@ -1710,8 +1709,6 @@ class AppShellState extends ConsumerState<AppShell>
           onCreateViewer: _appState.createViewer,
           onClearCache: (scope) =>
               unawaited(_appState.clearAndRefresh(scope: scope)),
-          onEpgIntervalChanged: (d) =>
-              unawaited(_appState.setEpgRefreshInterval(d)),
           loadDiagnosticsHeader: () =>
               _appState.diagnosticsHeader(layout: widget.deviceType.name),
           onUploadLogs: _appState.isConfigured
@@ -1730,6 +1727,18 @@ class AppShellState extends ConsumerState<AppShell>
             onSwitch: _appState.switchToPlaylist,
             onRename: _appState.renamePlaylist,
             onRemove: _appState.removePlaylist,
+          ),
+          storage: StorageManagement(
+            loadUsage: _appState.storageUsage,
+            onClearPlaylist: _appState.clearPlaylistCache,
+            onClear: (scope) => _appState.clearAndRefresh(scope: scope),
+            cachedPlaylistLimit: () => _appState.cachedPlaylistLimit,
+            cachedPlaylistLimitOptions:
+                AppStateController.cachedPlaylistLimitOptions,
+            onCachedPlaylistLimitChanged: _appState.setCachedPlaylistLimit,
+            epgRefreshInterval: () => _appState.epgRefreshInterval,
+            epgRefreshOptions: AppStateController.epgRefreshOptions,
+            onEpgRefreshIntervalChanged: _appState.setEpgRefreshInterval,
           ),
         ),
       ),

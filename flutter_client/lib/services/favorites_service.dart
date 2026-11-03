@@ -171,6 +171,16 @@ class FavoritesService extends ChangeNotifier {
   /// are now another playlist's.
   void notifyPlaylistChanged() => notifyListeners();
 
+  /// Moves the favorites kept on the unscoped key (a login from before
+  /// multiple playlists) to [scope]'s, unless it already has its own.
+  Future<void> adoptUnscoped(String scope) => _mutationQueue.run(() async {
+    final value = await _read(_favoritesKey);
+    final key = playlistScopedKey(_favoritesKey, scope);
+    if (value != null && await _read(key) == null) await _write(key, value);
+    _memory.remove(_favoritesKey);
+    await _store?.delete(_favoritesKey);
+  });
+
   /// Drops the favorites stored for a removed playlist's [scope].
   Future<void> clearPlaylistState(String? scope) =>
       _mutationQueue.run(() async {

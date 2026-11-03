@@ -29,12 +29,14 @@ class CacheEntry<T> {
   final bool isStale;
 }
 
+/// The small keys (`sourceType`, `viewers`), for rolling back a failed
+/// switch. Catalog rows need no snapshot: each playlist's are kept under its
+/// own source key, so loading another never touches the shown one's.
 class CacheSnapshot {
-  const CacheSnapshot._(this._memory, this._persisted, this._catalog);
+  const CacheSnapshot._(this._memory, this._persisted);
 
   final Map<String, Object?> _memory;
   final Map<String, Object?> _persisted;
-  final CatalogSnapshot _catalog;
 }
 
 /// Layered cache for the source catalog.
@@ -44,7 +46,10 @@ class CacheSnapshot {
 /// three `*Categories` keys, and `epgGuide`) are always backed by the SQLite
 /// [CatalogRepository]: reads hit the database (no full-list copy held here)
 /// and writes swap the relevant rows, so a cold start never parses a multi-MB
-/// JSON blob and a catalog refresh never re-serializes one.
+/// JSON blob and a catalog refresh never re-serializes one. Each saved
+/// playlist's lists are kept apart under its own source key: reads follow
+/// [CatalogRepository.shownSource], and a load names the playlist it writes.
+/// The guide is kept for the shown playlist only.
 ///
 /// There is no JSON code path for those keys. Production injects the on-disk
 /// repository (and app startup hard-fails if it can't be opened); a caller
@@ -68,8 +73,6 @@ class CacheService {
   /// The SQLite catalog the large keys are stored in.
   CatalogRepository get catalogRepository => _repo;
 
-  static const String _sourceKey = CatalogRepository.activeSource;
-
   static const Map<String, String> _itemKinds = {
     'liveStreams': kCatalogKindLive,
     'vodStreams': kCatalogKindVod,
@@ -87,11 +90,17 @@ class CacheService {
       _categoryKinds.containsKey(key) ||
       key == _epgKey;
 
-  String _tsKey(String key) => '__ts_$key';
+  /// The marker row for [key]: per source for the catalog lists, one for the
+  /// guide. The default source keeps the unprefixed names rows had before
+  /// each playlist had its own.
+  String _tsKey(String key, String sourceKey) =>
+      key == _epgKey || sourceKey == CatalogRepository.defaultSource
+      ? '__ts_$key'
+      : '$sourceKey/__ts_$key';
 
   Future<void> set<T>(String key, T data) async {
     if (_isRepoKey(key)) {
-      await _writeRepoKey(key, data, DateTime.now());
+      await _writeRepoKey(key, data, DateTime.now(), _repo.shownSource);
       return;
     }
     final stamped = _StampedValue<T>(data, DateTime.now());
@@ -127,10 +136,11 @@ class CacheService {
     final kind = _itemKinds[key];
     if (kind == null) throw ArgumentError.value(key, 'key', 'not an item key');
     final repo = _repo;
-    if (repo.isClosed || await repo.kvUpdatedAt(_tsKey(key)) == null) {
+    final source = repo.shownSource;
+    if (repo.isClosed || await repo.kvUpdatedAt(_tsKey(key, source)) == null) {
       return null;
     }
-    return repo.countItems(sourceKey: _sourceKey, kind: kind);
+    return repo.countItems(sourceKey: source, kind: kind);
   }
 
   Future<CacheSnapshot> snapshot() async {
@@ -140,7 +150,7 @@ class CacheService {
     final persisted = Map<String, Object?>.from(
       await _store?.snapshot() ?? const <String, Object?>{},
     )..removeWhere((key, _) => !key.startsWith('m3ue_cache_'));
-    return CacheSnapshot._(memory, persisted, await _repo.snapshot());
+    return CacheSnapshot._(memory, persisted);
   }
 
   /// A [replace] value meaning "leave this key's stored data as it is"
@@ -148,14 +158,18 @@ class CacheService {
   /// for the guide, which `EpgService` writes through on its own.
   static const Object keepExisting = _KeepExisting();
 
-  Future<void> replace(Map<String, Object?> values) async {
+  /// Writes [values], wiping every cache key it leaves out. The catalog lists
+  /// go under [sourceKey] (the shown playlist when null), leaving every other
+  /// playlist's as they are.
+  Future<void> replace(Map<String, Object?> values, {String? sourceKey}) async {
+    final source = sourceKey ?? _repo.shownSource;
     final timestamp = DateTime.now();
     final memory = <String, Object?>{};
     final persisted = <String, Object?>{};
     for (final entry in values.entries) {
       if (identical(entry.value, keepExisting)) continue;
       if (_isRepoKey(entry.key)) {
-        await _writeRepoKey(entry.key, entry.value, timestamp);
+        await _writeRepoKey(entry.key, entry.value, timestamp, source);
         continue;
       }
       final key = 'm3ue_cache_${entry.key}';
@@ -171,7 +185,7 @@ class CacheService {
     // replace() wipes every cache key not in [values]; mirror that for the
     // repo-backed keys the caller left out.
     for (final key in catalogKeys) {
-      if (!values.containsKey(key)) await _clearRepoKey(key);
+      if (!values.containsKey(key)) await _clearRepoKey(key, source);
     }
     await _store?.replaceWhere(
       (key) => key.startsWith('m3ue_cache_'),
@@ -190,16 +204,64 @@ class CacheService {
         snapshot._persisted,
       );
     }
-    await _repo.restore(snapshot._catalog);
     _memory
       ..removeWhere((key, _) => key.startsWith('m3ue_cache_'))
       ..addAll(snapshot._memory);
   }
 
+  /// Wipes everything: every playlist's lists, the guide and the small keys.
   Future<void> clear() async {
     _memory.removeWhere((key, _) => key.startsWith('m3ue_cache_'));
     await _store?.removeWhere((key) => key.startsWith('m3ue_cache_'));
     await _repo.clearAll();
+  }
+
+  /// Wipes what belongs to the shown session (the guide and the small keys),
+  /// keeping every playlist's lists.
+  Future<void> clearShared() async {
+    _memory.removeWhere((key, _) => key.startsWith('m3ue_cache_'));
+    await _store?.removeWhere((key) => key.startsWith('m3ue_cache_'));
+    if (_repo.isClosed) return;
+    await _clearRepoKey(_epgKey, _repo.shownSource);
+  }
+
+  /// Every source key with lists stored.
+  Future<Set<String>> storedCatalogSources() async =>
+      _repo.isClosed ? const <String>{} : _repo.storedSources();
+
+  /// Drops the lists stored for [sourceKey].
+  Future<void> dropCatalog(String sourceKey) async {
+    final repo = _repo;
+    if (repo.isClosed) return;
+    await repo.deleteSource(sourceKey);
+    for (final key in catalogKeys) {
+      if (key != _epgKey) await repo.kvDelete(_tsKey(key, sourceKey));
+    }
+  }
+
+  /// Moves the lists kept under [from] (with when they were written) to
+  /// [to], replacing whatever [to] had. A cheap no-op when [from] has none.
+  Future<void> moveCatalog(String from, String to) async {
+    final repo = _repo;
+    if (repo.isClosed || from == to) return;
+    if (await repo.kvUpdatedAt(_tsKey('liveStreams', from)) == null) return;
+    await repo.moveSource(
+      from,
+      to,
+      renameKeys: {
+        for (final key in catalogKeys)
+          if (key != _epgKey) _tsKey(key, from): _tsKey(key, to),
+      },
+    );
+  }
+
+  /// When [sourceKey]'s lists were last written, or null if never.
+  Future<DateTime?> catalogUpdatedAt(String sourceKey) async {
+    if (_repo.isClosed) return null;
+    final writtenMs = await _repo.kvUpdatedAt(_tsKey('liveStreams', sourceKey));
+    return writtenMs == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(writtenMs);
   }
 
   /// The cache keys backed by the SQLite [CatalogRepository] rather than the
@@ -216,6 +278,7 @@ class CacheService {
     String key,
     Object? data,
     DateTime timestamp,
+    String sourceKey,
   ) async {
     final repo = _repo;
     // A debounced catalog/EPG persist can land after the owning controller was
@@ -224,13 +287,13 @@ class CacheService {
     final itemKind = _itemKinds[key];
     if (itemKind != null) {
       await repo.replaceItems(
-        sourceKey: _sourceKey,
+        sourceKey: sourceKey,
         kind: itemKind,
         items: (data as List?)?.cast<Object>() ?? const <Object>[],
       );
     } else if (_categoryKinds.containsKey(key)) {
       await repo.replaceCategories(
-        sourceKey: _sourceKey,
+        sourceKey: sourceKey,
         kind: _categoryKinds[key]!,
         categories: (data as List?)?.cast<Category>() ?? const <Category>[],
       );
@@ -243,49 +306,50 @@ class CacheService {
     // `updatedAtMs` (read back via kvUpdatedAt) is the write time the staleness
     // check in _readRepoKey uses. The value column is unused for these rows.
     await repo.kvPut(
-      _tsKey(key),
+      _tsKey(key, sourceKey),
       '',
       updatedAtMs: timestamp.millisecondsSinceEpoch,
     );
   }
 
-  Future<void> _clearRepoKey(String key) async {
+  Future<void> _clearRepoKey(String key, String sourceKey) async {
     final repo = _repo;
     if (repo.isClosed) return;
     if (_itemKinds.containsKey(key)) {
       await repo.replaceItems(
-        sourceKey: _sourceKey,
+        sourceKey: sourceKey,
         kind: _itemKinds[key]!,
         items: const <Object>[],
       );
     } else if (_categoryKinds.containsKey(key)) {
       await repo.replaceCategories(
-        sourceKey: _sourceKey,
+        sourceKey: sourceKey,
         kind: _categoryKinds[key]!,
         categories: const <Category>[],
       );
     } else {
       await repo.replaceProgrammes(const <EpgProgram>[]);
     }
-    await repo.kvDelete(_tsKey(key));
+    await repo.kvDelete(_tsKey(key, sourceKey));
   }
 
   Future<CacheEntry<T>?> _readRepoKey<T>(String key) async {
     final repo = _repo;
     if (repo.isClosed) return null;
-    final writtenMs = await repo.kvUpdatedAt(_tsKey(key));
+    final source = repo.shownSource;
+    final writtenMs = await repo.kvUpdatedAt(_tsKey(key, source));
     if (writtenMs == null) return null;
 
     final Object data;
     final itemKind = _itemKinds[key];
     if (itemKind != null) {
       data = switch (itemKind) {
-        kCatalogKindLive => await repo.allItems<Channel>(_sourceKey, itemKind),
-        kCatalogKindVod => await repo.allItems<VodItem>(_sourceKey, itemKind),
-        _ => await repo.allItems<Series>(_sourceKey, itemKind),
+        kCatalogKindLive => await repo.allItems<Channel>(source, itemKind),
+        kCatalogKindVod => await repo.allItems<VodItem>(source, itemKind),
+        _ => await repo.allItems<Series>(source, itemKind),
       };
     } else if (_categoryKinds.containsKey(key)) {
-      data = await repo.allCategories(_sourceKey, _categoryKinds[key]!);
+      data = await repo.allCategories(source, _categoryKinds[key]!);
     } else {
       data = await repo.programmesEndingAfter(
         DateTime.fromMillisecondsSinceEpoch(0),

@@ -552,13 +552,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsActiveViewer => 'Aktiver Nutzer';
 
   @override
-  String get settingsClearCacheTitle => 'Cache löschen und aktualisieren?';
-
-  @override
-  String get settingsClearCacheBody =>
-      'Wähle aus, was gelöscht werden soll. Es wird von deiner Quelle neu geladen.';
-
-  @override
   String get settingsClearCacheConfirm => 'Löschen und aktualisieren';
 
   @override
@@ -566,27 +559,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Cache geleert. Inhalte werden im Hintergrund aktualisiert.';
 
   @override
-  String get settingsClearCacheAll => 'Alles';
-
-  @override
-  String get settingsClearCacheAllHint =>
-      'Kanäle, Filme, Serien, Programmdaten und Bilder';
-
-  @override
-  String get settingsClearCacheContent => 'Nur Inhalte';
-
-  @override
-  String get settingsClearCacheContentHint => 'Kanäle, Filme und Serien';
-
-  @override
-  String get settingsClearCacheEpg => 'Nur Programmführer (EPG)';
-
-  @override
   String get settingsClearCacheEpgHint =>
       'Der aktuelle Programmführer bleibt beim Neuladen sichtbar';
-
-  @override
-  String get settingsClearCacheImages => 'Nur Bilder';
 
   @override
   String get settingsClearCacheImagesHint =>
@@ -600,11 +574,117 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsImageCacheCleared => 'Bild-Cache geleert.';
 
   @override
-  String get settingsContentCache => 'Inhaltscache';
-
-  @override
   String get settingsCacheSubtitle =>
       'Gecachte Inhalte laden sofort. Daten werden automatisch im Hintergrund aktualisiert.';
+
+  @override
+  String get settingsStorage => 'Speicher';
+
+  @override
+  String get settingsStorageSubtitle =>
+      'Gespeicherte Playlists, Programmführer und Bilder';
+
+  @override
+  String get settingsStorageTotal => 'Gesamt';
+
+  @override
+  String get settingsStorageGuide => 'Programmführer';
+
+  @override
+  String get settingsStorageArtwork => 'Bilder';
+
+  @override
+  String get settingsStorageCalculating => 'Wird berechnet...';
+
+  @override
+  String get settingsStorageUnavailable => 'Nicht verfügbar';
+
+  @override
+  String settingsStorageItems(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString Einträge',
+      one: '1 Eintrag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsStorageNotStored => 'Nicht auf diesem Gerät gespeichert';
+
+  @override
+  String get settingsStorageKeepPlaylists =>
+      'Auf diesem Gerät behaltene Playlists';
+
+  @override
+  String settingsStorageKeepPlaylistsValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Die $count zuletzt genutzten',
+      one: 'Nur die aktive Playlist',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsStorageClearPlaylistTitle =>
+      'Gespeicherte Inhalte löschen?';
+
+  @override
+  String settingsStorageClearPlaylistBody(String name) {
+    return 'Kanäle, Filme und Serien von $name werden von diesem Gerät entfernt. Sie werden beim nächsten Wechsel zu dieser Playlist neu geladen.';
+  }
+
+  @override
+  String settingsStorageClearActiveBody(String name) {
+    return 'Kanäle, Filme und Serien von $name werden entfernt und jetzt neu geladen.';
+  }
+
+  @override
+  String get settingsStorageClear => 'Löschen';
+
+  @override
+  String get settingsStorageCleared => 'Gespeicherte Inhalte gelöscht.';
+
+  @override
+  String get settingsStorageGuideData => 'Programmdaten';
+
+  @override
+  String settingsStorageProgrammes(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString Sendungen',
+      one: '1 Sendung',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsStorageClearGuideTitle => 'Programmdaten aktualisieren?';
+
+  @override
+  String get settingsStorageArtworkCache => 'Bilder-Cache';
+
+  @override
+  String get settingsStorageClearArtworkTitle => 'Bilder löschen?';
+
+  @override
+  String get settingsStorageClearAll => 'Alles löschen';
+
+  @override
+  String get settingsStorageClearAllBody =>
+      'Kanäle, Filme und Serien aller Playlists, der Programmführer und die Bilder werden entfernt. Die aktive Playlist wird jetzt neu geladen.';
 
   @override
   String get settingsEpgRefreshInterval => 'EPG-Aktualisierungsintervall';

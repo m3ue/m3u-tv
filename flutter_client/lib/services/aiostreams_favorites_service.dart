@@ -75,6 +75,25 @@ class AIOStreamsFavoritesService extends ChangeNotifier {
   /// are now another playlist's.
   void notifyPlaylistChanged() => notifyListeners();
 
+  /// Moves the favorites kept on the unscoped key (a login from before
+  /// multiple playlists) to [scope]'s, unless it already has its own.
+  Future<void> adoptUnscoped(String scope) => _mutationQueue.run(() async {
+    final store = _store;
+    if (store == null) {
+      final unscoped = _caches.remove(null);
+      if (unscoped != null) _caches.putIfAbsent(scope, () => unscoped);
+      return;
+    }
+    final value = await store.read(_key);
+    final key = playlistScopedKey(_key, scope);
+    if (value != null && await store.read(key) == null) {
+      await store.write(key, value);
+      _caches.remove(scope);
+    }
+    _caches.remove(null);
+    await store.delete(_key);
+  });
+
   /// Drops the favorites stored for a removed playlist's [scope].
   Future<void> clearPlaylistState(String? scope) =>
       _mutationQueue.run(() async {

@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
-import 'package:m3u_tv/features/settings/clear_cache_dialog.dart';
 import 'package:m3u_tv/features/settings/diagnostics_screen.dart';
 import 'package:m3u_tv/features/settings/release_notes_view.dart';
 import 'package:m3u_tv/features/settings/sections/app_version_card.dart';
 import 'package:m3u_tv/features/settings/sections/playback_settings_page.dart';
 import 'package:m3u_tv/features/settings/sections/playlists_page.dart';
 import 'package:m3u_tv/features/settings/sections/settings_status_row.dart';
+import 'package:m3u_tv/features/settings/sections/storage_page.dart';
 import 'package:m3u_tv/features/settings/sections/trakt_card.dart';
 import 'package:m3u_tv/features/settings/sections/view_settings_section.dart';
 import 'package:m3u_tv/features/settings/sections/viewer_management_dialog.dart';
@@ -42,13 +42,10 @@ class ConnectedView extends StatefulWidget {
     this.sourceLabel,
     this.serverTimezone,
     this.sourceError,
-    this.epgRefreshInterval,
-    this.epgRefreshOptions = const [],
     required this.onDisconnect,
     this.onSwitchViewer,
     this.onCreateViewer,
     this.onClearCache,
-    this.onEpgIntervalChanged,
     this.loadDiagnosticsHeader,
     this.onUploadLogs,
     this.locale,
@@ -60,6 +57,7 @@ class ConnectedView extends StatefulWidget {
     this.deviceType,
     this.onHandleTopLevelBack,
     this.playlists,
+    this.storage,
     this.devicePairingService,
     this.onPlaylistSwitched,
   });
@@ -77,13 +75,10 @@ class ConnectedView extends StatefulWidget {
   final String? sourceLabel;
   final String? serverTimezone;
   final String? sourceError;
-  final Duration? epgRefreshInterval;
-  final List<Duration> epgRefreshOptions;
   final VoidCallback onDisconnect;
   final void Function(Viewer viewer)? onSwitchViewer;
   final Future<Viewer?> Function(String name)? onCreateViewer;
   final ValueChanged<CacheClearScope>? onClearCache;
-  final void Function(Duration interval)? onEpgIntervalChanged;
   final Future<String> Function()? loadDiagnosticsHeader;
   final Future<int> Function(String report)? onUploadLogs;
   final Locale? locale;
@@ -91,6 +86,9 @@ class ConnectedView extends StatefulWidget {
 
   /// Saved playlists. The Playlists row is hidden when null.
   final PlaylistManagement? playlists;
+
+  /// What the app stores on the device. The Storage row is hidden when null.
+  final StorageManagement? storage;
 
   /// For pairing a new playlist from the Playlists page.
   final DevicePairingService? devicePairingService;
@@ -116,22 +114,6 @@ class _ConnectedViewState extends State<ConnectedView> {
           onCreateViewer: widget.onCreateViewer,
         ),
       ),
-    );
-  }
-
-  Future<void> _handleClearCache() async {
-    final scope = await showClearCacheDialog(context);
-    if (scope == null || !mounted) return;
-    widget.onClearCache?.call(scope);
-    if (!mounted) return;
-    final l = AppLocalizations.of(context);
-    final message = switch (scope) {
-      CacheClearScope.all || CacheClearScope.content => l.settingsCacheCleared,
-      CacheClearScope.epg => l.settingsEpgCacheCleared,
-      CacheClearScope.images => l.settingsImageCacheCleared,
-    };
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
     );
   }
 
@@ -217,15 +199,30 @@ class _ConnectedViewState extends State<ConnectedView> {
                       proxyPlaybackSettings: widget.proxyPlaybackSettings,
                       comskipSettings: widget.comskipSettings,
                       viewSettingsService: widget.viewSettingsService,
-                      epgRefreshInterval: widget.epgRefreshInterval,
-                      epgRefreshOptions: widget.epgRefreshOptions,
-                      onEpgIntervalChanged: widget.onEpgIntervalChanged,
-                      onClearCache: _handleClearCache,
                       onHandleTopLevelBack: widget.onHandleTopLevelBack,
                     ),
                   ),
                 ),
               ),
+              if (widget.storage case final storage?)
+                SettingsRow(
+                  title: l.settingsStorage,
+                  subtitle: l.settingsStorageSubtitle,
+                  icon: Icons.storage_outlined,
+                  trailing: const SettingsChevron(),
+                  onTap: () => unawaited(
+                    pushSettingsSubpage<void>(
+                      context,
+                      title: (context) =>
+                          AppLocalizations.of(context).settingsStorage,
+                      onBack: widget.onHandleTopLevelBack,
+                      builder: (_) => StoragePage(
+                        storage: storage,
+                        onHandleTopLevelBack: widget.onHandleTopLevelBack,
+                      ),
+                    ),
+                  ),
+                ),
               SettingsRow(
                 title: l.settingsIntegrations,
                 subtitle: l.settingsIntegrationsSubtitle,

@@ -550,13 +550,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsActiveViewer => 'Active Viewer';
 
   @override
-  String get settingsClearCacheTitle => 'Clear Cache & Refresh?';
-
-  @override
-  String get settingsClearCacheBody =>
-      'Choose what to clear. It will be reloaded from your source.';
-
-  @override
   String get settingsClearCacheConfirm => 'Clear & Refresh';
 
   @override
@@ -564,27 +557,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Cache cleared. Content is refreshing in the background.';
 
   @override
-  String get settingsClearCacheAll => 'Everything';
-
-  @override
-  String get settingsClearCacheAllHint =>
-      'Channels, movies, series, guide data and artwork';
-
-  @override
-  String get settingsClearCacheContent => 'Content only';
-
-  @override
-  String get settingsClearCacheContentHint => 'Channels, movies and series';
-
-  @override
-  String get settingsClearCacheEpg => 'Guide (EPG) only';
-
-  @override
   String get settingsClearCacheEpgHint =>
       'The current guide stays visible while it reloads';
-
-  @override
-  String get settingsClearCacheImages => 'Images only';
 
   @override
   String get settingsClearCacheImagesHint =>
@@ -598,11 +572,114 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsImageCacheCleared => 'Image cache cleared.';
 
   @override
-  String get settingsContentCache => 'Content Cache';
-
-  @override
   String get settingsCacheSubtitle =>
       'Cached content loads instantly. Data refreshes automatically in the background.';
+
+  @override
+  String get settingsStorage => 'Storage';
+
+  @override
+  String get settingsStorageSubtitle => 'Cached playlists, guide and artwork';
+
+  @override
+  String get settingsStorageTotal => 'Total';
+
+  @override
+  String get settingsStorageGuide => 'Guide';
+
+  @override
+  String get settingsStorageArtwork => 'Artwork';
+
+  @override
+  String get settingsStorageCalculating => 'Calculating...';
+
+  @override
+  String get settingsStorageUnavailable => 'Unavailable';
+
+  @override
+  String settingsStorageItems(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsStorageNotStored => 'Not stored on this device';
+
+  @override
+  String get settingsStorageKeepPlaylists => 'Playlists kept on this device';
+
+  @override
+  String settingsStorageKeepPlaylistsValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'The $count most recent',
+      one: 'Only the active playlist',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsStorageClearPlaylistTitle => 'Clear stored content?';
+
+  @override
+  String settingsStorageClearPlaylistBody(String name) {
+    return '$name\'s channels, movies and series are removed from this device. They download again the next time you switch to it.';
+  }
+
+  @override
+  String settingsStorageClearActiveBody(String name) {
+    return '$name\'s channels, movies and series are removed and downloaded again now.';
+  }
+
+  @override
+  String get settingsStorageClear => 'Clear';
+
+  @override
+  String get settingsStorageCleared => 'Stored content cleared.';
+
+  @override
+  String get settingsStorageGuideData => 'Guide data';
+
+  @override
+  String settingsStorageProgrammes(int count) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$countString programmes',
+      one: '1 programme',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsStorageClearGuideTitle => 'Refresh guide data?';
+
+  @override
+  String get settingsStorageArtworkCache => 'Artwork cache';
+
+  @override
+  String get settingsStorageClearArtworkTitle => 'Clear artwork?';
+
+  @override
+  String get settingsStorageClearAll => 'Clear everything';
+
+  @override
+  String get settingsStorageClearAllBody =>
+      'Every playlist\'s channels, movies and series, the guide and artwork are removed. The active playlist downloads again now.';
 
   @override
   String get settingsEpgRefreshInterval => 'EPG refresh interval';

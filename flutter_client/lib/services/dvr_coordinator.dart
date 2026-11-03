@@ -302,7 +302,7 @@ class DvrCoordinator {
       final next = await fetch();
       if (!ownsWork() || _disposed) return false;
       await catalogRepository.replaceItems(
-        sourceKey: CatalogRepository.activeSource,
+        sourceKey: catalogRepository.shownSource,
         kind: kind,
         items: next,
       );

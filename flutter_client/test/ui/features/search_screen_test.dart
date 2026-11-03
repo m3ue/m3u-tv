@@ -69,17 +69,17 @@ void main() {
       testDb = CatalogDatabase.memory();
       testRepo = CatalogRepository(testDb);
       await testRepo.replaceItems(
-        sourceKey: CatalogRepository.activeSource,
+        sourceKey: CatalogRepository.defaultSource,
         kind: kCatalogKindVod,
         items: testVodItems,
       );
       await testRepo.replaceItems(
-        sourceKey: CatalogRepository.activeSource,
+        sourceKey: CatalogRepository.defaultSource,
         kind: kCatalogKindSeries,
         items: testSeriesList,
       );
       await testRepo.replaceItems(
-        sourceKey: CatalogRepository.activeSource,
+        sourceKey: CatalogRepository.defaultSource,
         kind: kCatalogKindLive,
         items: testChannels,
       );
@@ -163,7 +163,7 @@ void main() {
       expect(find.text('Matrix Reloaded'), findsOneWidget);
 
       await testRepo.replaceItems(
-        sourceKey: CatalogRepository.activeSource,
+        sourceKey: CatalogRepository.defaultSource,
         kind: kCatalogKindVod,
         items: const <VodItem>[
           VodItem(

@@ -10,7 +10,7 @@ import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 
 // ---------------------------------------------------------------------------
-// Playback settings sub-page (proxy, content cache, DVR)
+// Playback settings sub-page (proxy, live TV, DVR)
 // ---------------------------------------------------------------------------
 
 class PlaybackSettingsPage extends StatelessWidget {
@@ -19,10 +19,6 @@ class PlaybackSettingsPage extends StatelessWidget {
     required this.proxyCapability,
     required this.proxyPlaybackSettings,
     required this.comskipSettings,
-    required this.epgRefreshInterval,
-    required this.epgRefreshOptions,
-    required this.onEpgIntervalChanged,
-    required this.onClearCache,
     this.viewSettingsService,
     this.onHandleTopLevelBack,
   });
@@ -31,10 +27,6 @@ class PlaybackSettingsPage extends StatelessWidget {
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
   final ViewSettingsService? viewSettingsService;
-  final Duration? epgRefreshInterval;
-  final List<Duration> epgRefreshOptions;
-  final void Function(Duration interval)? onEpgIntervalChanged;
-  final VoidCallback onClearCache;
   final bool Function()? onHandleTopLevelBack;
 
   // Pre-buffering is an mpv option. Android plays through ExoPlayer, which
@@ -85,9 +77,6 @@ class PlaybackSettingsPage extends StatelessWidget {
             ),
           ),
         ],
-
-        SettingsSectionHeader(l.settingsContentCache),
-        _buildCacheGroup(context, l),
 
         if (comskipSettings != null) ...[
           SettingsSectionHeader(l.settingsDvr),
@@ -207,50 +196,4 @@ class PlaybackSettingsPage extends StatelessWidget {
       ),
     );
   }
-
-  Widget _buildCacheGroup(BuildContext context, AppLocalizations l) {
-    final rows = <Widget>[];
-    if (epgRefreshOptions.isNotEmpty && epgRefreshInterval != null) {
-      final options = [
-        for (final d in epgRefreshOptions)
-          SettingsPickerOption(value: d, label: _intervalLabel(l, d)),
-      ];
-      rows.add(
-        SettingsRow(
-          title: l.settingsEpgRefreshInterval,
-          subtitle: _intervalLabel(l, epgRefreshInterval!),
-          icon: Icons.schedule,
-          trailing: const SettingsChevron(),
-          onTap: () => unawaited(
-            pushSettingsPicker<Duration>(
-              context,
-              title: (context) =>
-                  AppLocalizations.of(context).settingsEpgRefreshInterval,
-              onBack: onHandleTopLevelBack,
-              options: options,
-              selected: epgRefreshInterval!,
-              onSelected: (d) => onEpgIntervalChanged?.call(d),
-            ),
-          ),
-        ),
-      );
-    }
-    rows.add(
-      SettingsRow(
-        title: l.settingsClearCacheConfirm,
-        subtitle: l.settingsCacheSubtitle,
-        icon: Icons.refresh,
-        onTap: onClearCache,
-      ),
-    );
-    return SettingsGroup(children: rows);
-  }
-}
-
-String _intervalLabel(AppLocalizations l, Duration d) {
-  if (d.inHours >= 1) {
-    final h = d.inHours;
-    return h == 1 ? l.settingsEpgDurationHour : l.settingsEpgDurationHours(h);
-  }
-  return l.settingsEpgDurationMinutes(d.inMinutes);
 }

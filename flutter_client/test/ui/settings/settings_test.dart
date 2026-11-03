@@ -5,6 +5,7 @@ import 'package:flutter/services.dart' show SystemChannels;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
 import 'package:m3u_tv/features/settings/diagnostics_screen.dart';
+import 'package:m3u_tv/features/settings/sections/storage_page.dart';
 import 'package:m3u_tv/features/settings/settings_screen.dart';
 import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -14,6 +15,7 @@ import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/storage_usage.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
@@ -598,7 +600,7 @@ void main() {
       expect(find.text('Disconnect'), findsOneWidget);
     });
 
-    testWidgets('shows cache section when configured', (tester) async {
+    testWidgets('shows Storage when configured', (tester) async {
       final storage = InMemorySecureStorage();
       final transport = _FakeTransport({
         'auth': _xtreamAuth(auth: 1),
@@ -618,14 +620,37 @@ void main() {
         ),
       );
 
-      await tester.pumpWidget(_settingsApp(notifier));
+      await tester.pumpWidget(
+        _settingsApp(
+          notifier,
+          storage: StorageManagement(
+            loadUsage: () async => const StorageUsage(
+              playlists: [],
+              guideProgrammes: 0,
+              guideBytes: 0,
+              catalogBytes: 0,
+              artworkBytes: null,
+            ),
+            onClearPlaylist: (_) async {},
+            onClear: (_) async {},
+            cachedPlaylistLimit: () => 3,
+            cachedPlaylistLimitOptions: const [1, 3],
+            onCachedPlaylistLimitChanged: (_) async {},
+            epgRefreshInterval: () => const Duration(hours: 6),
+            epgRefreshOptions: const [Duration(hours: 6)],
+            onEpgRefreshIntervalChanged: (_) async {},
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
 
-      // Content Cache lives inside the Playback sub-page.
-      await tester.tap(find.text('Playback'));
+      // The guide and cache settings live on their own Storage page.
+      await tester.tap(find.text('Storage'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Content Cache'), findsOneWidget);
+      expect(find.text('Guide data'), findsOneWidget);
+      expect(find.text('EPG refresh interval'), findsOneWidget);
+      expect(find.text('Artwork cache'), findsOneWidget);
     });
 
     testWidgets('Playback page toggles live pre-buffering', (tester) async {
@@ -1106,6 +1131,7 @@ Widget _settingsApp(
   DevicePairingService? devicePairingService,
   DeviceType? deviceType,
   ViewSettingsService? viewSettingsService,
+  StorageManagement? storage,
 }) {
   return MaterialApp(
     theme: ThemeData.dark(useMaterial3: true),
@@ -1123,6 +1149,7 @@ Widget _settingsApp(
         onClearCache: onClearCache,
         onDisconnect: onDisconnect ?? () => notifier.disconnect(),
         viewSettingsService: viewSettingsService,
+        storage: storage,
       ),
     ),
   );

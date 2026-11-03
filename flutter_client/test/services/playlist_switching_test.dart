@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/cache_service.dart';
+import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
@@ -50,8 +51,8 @@ void main() {
         'sports',
         'movies',
       ]);
-      expect(saved.find(_sports)?.usesBaseKeys, isTrue);
-      expect(saved.find(_movies)?.usesBaseKeys, isFalse);
+      // Each one keeps its state under its own id, the first one included.
+      expect(saved.playlists.where((p) => p.usesBaseKeys), isEmpty);
     });
 
     test(
@@ -68,14 +69,26 @@ void main() {
         );
         final fixture = _Fixture(storage: storage);
         addTearDown(fixture.dispose);
+        // Its state from before multiple playlists, on the unscoped keys.
+        fixture.memory['m3ue_favorites'] = <int>[101];
+        fixture.memory['m3ue_tv_active_viewer_${_sports.server}|sports'] =
+            'viewer-sports';
 
         await fixture.controller.boot();
 
         final saved = fixture.controller.savedPlaylists.playlists;
         expect(saved, hasLength(1));
         expect(saved.single.credentials.username, 'sports');
-        // Its existing favorites and viewer keys stay where they were.
-        expect(saved.single.usesBaseKeys, isTrue);
+        // Moved to its own keys, so nothing is left for another login.
+        expect(saved.single.usesBaseKeys, isFalse);
+        final id = saved.single.id;
+        expect(fixture.memory['m3ue_favorites_playlist_$id'], <int>[101]);
+        expect(fixture.memory.containsKey('m3ue_favorites'), isFalse);
+        expect(
+          fixture.memory['m3ue_tv_active_viewer_playlist_$id'],
+          'viewer-sports',
+        );
+        expect(await fixture.controller.favoritesService.all(), <int>{101});
       },
     );
 
@@ -99,8 +112,11 @@ void main() {
         expect(await controller.switchToPlaylist(_movies), isNull);
         await pumpEventQueue();
         expect(await controller.favoritesService.all(), <int>{202});
+        final sports = controller.savedPlaylists.find(_sports)!;
         final movies = controller.savedPlaylists.find(_movies)!;
-        expect(fixture.memory['m3ue_favorites'], <int>[101]);
+        expect(fixture.memory['m3ue_favorites_playlist_${sports.id}'], <int>[
+          101,
+        ]);
         expect(fixture.memory['m3ue_favorites_playlist_${movies.id}'], <int>[
           202,
         ]);
@@ -186,7 +202,10 @@ void main() {
           fixture.memory.containsKey('m3ue_favorites_playlist_${movies.id}'),
           isFalse,
         );
-        expect(fixture.memory['m3ue_favorites'], <int>[101]);
+        final sports = controller.savedPlaylists.find(_sports)!;
+        expect(fixture.memory['m3ue_favorites_playlist_${sports.id}'], <int>[
+          101,
+        ]);
       },
     );
 
@@ -325,6 +344,97 @@ void main() {
       expect(await controller.switchToPlaylist(_sports), isNull);
       await pumpEventQueue();
       expect(titles(), <String>['Sports Movie']);
+    });
+
+    group('catalogs', () {
+      Future<List<int>> shownChannelIds(AppStateController controller) async =>
+          (await controller.catalogRepository.pageActiveItems<Channel>(
+            kind: kCatalogKindLive,
+            offset: 0,
+            limit: 10,
+          )).map((channel) => channel.id).toList();
+
+      String sourceOf(AppStateController controller, UserCredentials login) =>
+          controller.savedPlaylists.find(login)!.id;
+
+      test('each playlist keeps its own, and the shown one is read', () async {
+        final fixture = _Fixture();
+        addTearDown(fixture.dispose);
+        final controller = fixture.controller;
+        expect(await controller.connectXtream(_sports), isTrue);
+        expect(await controller.switchToPlaylist(_movies), isNull);
+        await controller.drainBackgroundPersistence();
+
+        expect(await shownChannelIds(controller), <int>[202]);
+        expect(await controller.cacheService.storedCatalogSources(), {
+          sourceOf(controller, _sports),
+          sourceOf(controller, _movies),
+        });
+
+        expect(await controller.switchToPlaylist(_sports), isNull);
+        expect(await shownChannelIds(controller), <int>[101]);
+      });
+
+      test('only the most recently used ones are kept', () async {
+        final fixture = _Fixture();
+        addTearDown(fixture.dispose);
+        final controller = fixture.controller;
+        await controller.setCachedPlaylistLimit(2);
+        expect(await controller.connectXtream(_sports), isTrue);
+        expect(await controller.switchToPlaylist(_movies), isNull);
+        expect(await controller.switchToPlaylist(_otherEditor), isNull);
+        await controller.drainBackgroundPersistence();
+
+        expect(await controller.cacheService.storedCatalogSources(), {
+          sourceOf(controller, _movies),
+          sourceOf(controller, _otherEditor),
+        });
+
+        await controller.setCachedPlaylistLimit(1);
+        expect(await controller.cacheService.storedCatalogSources(), {
+          sourceOf(controller, _otherEditor),
+        });
+      });
+
+      test('removing a playlist drops its catalog', () async {
+        final fixture = _Fixture();
+        addTearDown(fixture.dispose);
+        final controller = fixture.controller;
+        expect(await controller.connectXtream(_sports), isTrue);
+        expect(await controller.switchToPlaylist(_movies), isNull);
+        await controller.drainBackgroundPersistence();
+        final sports = sourceOf(controller, _sports);
+
+        await controller.removePlaylist(sports);
+
+        expect(await controller.cacheService.storedCatalogSources(), {
+          sourceOf(controller, _movies),
+        });
+      });
+
+      test('clearing another playlist frees its catalog only', () async {
+        final fixture = _Fixture();
+        addTearDown(fixture.dispose);
+        final controller = fixture.controller;
+        expect(await controller.connectXtream(_sports), isTrue);
+        expect(await controller.switchToPlaylist(_movies), isNull);
+        await controller.drainBackgroundPersistence();
+
+        await controller.clearPlaylistCache(sourceOf(controller, _sports));
+
+        expect(await controller.cacheService.storedCatalogSources(), {
+          sourceOf(controller, _movies),
+        });
+        expect(await shownChannelIds(controller), <int>[202]);
+        final usage = await controller.storageUsage();
+        final byName = {
+          for (final entry in usage.playlists)
+            entry.playlist.credentials.username: entry,
+        };
+        expect(byName['sports']!.usage, isNull);
+        expect(byName['movies']!.usage?.channels, 1);
+        expect(byName['movies']!.isShown, isTrue);
+      });
     });
 
     test('proxy preferences are kept per playlist', () async {

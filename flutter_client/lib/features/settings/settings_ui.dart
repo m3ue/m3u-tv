@@ -118,6 +118,7 @@ class SettingsRow extends StatelessWidget {
     this.subtitle,
     this.icon,
     this.leading,
+    this.titleTrailing,
     this.trailing,
     this.onTap,
     this.destructive = false,
@@ -130,6 +131,9 @@ class SettingsRow extends StatelessWidget {
 
   /// Custom leading visual (e.g. a service logo) shown in place of [icon].
   final Widget? leading;
+
+  /// A small marker (e.g. the active item's check) shown right after [title].
+  final Widget? titleTrailing;
   final Widget? trailing;
   final VoidCallback? onTap;
   final bool destructive;
@@ -140,6 +144,13 @@ class SettingsRow extends StatelessWidget {
     final theme = Theme.of(context);
     final scale = FontSizeScope.scaleOf(context);
     final titleColor = destructive ? theme.colorScheme.error : null;
+    final titleText = Text(
+      title,
+      style: theme.textTheme.bodyLarge?.copyWith(
+        color: titleColor,
+        fontWeight: FontWeight.w500,
+      ),
+    );
     final content = Padding(
       padding: EdgeInsets.symmetric(
         horizontal: 16 * scale,
@@ -163,13 +174,16 @@ class SettingsRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  title,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: titleColor,
-                    fontWeight: FontWeight.w500,
+                if (titleTrailing == null)
+                  titleText
+                else
+                  Row(
+                    children: [
+                      Flexible(child: titleText),
+                      SizedBox(width: 8 * scale),
+                      titleTrailing!,
+                    ],
                   ),
-                ),
                 if (subtitle != null) ...[
                   SizedBox(height: 2 * scale),
                   Text(
