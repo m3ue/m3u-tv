@@ -455,6 +455,8 @@ void main() {
 
         api.releaseSecondAccount();
         await _waitForNotificationTitle(fixture.controller, 'Account B public');
+        // The unread count, then the toast, follow the stored notification.
+        await _waitForPresented(presented, 'Account B public');
         final accountBNotifications = await fixture.controller.notificationStore
             .all();
         expect(
@@ -3569,6 +3571,17 @@ Future<void> _waitForNotificationTitle(
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }
   fail('Timed out waiting for notification: $title');
+}
+
+Future<void> _waitForPresented(
+  List<TvNotificationItem> presented,
+  String title,
+) async {
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    if (presented.any((item) => item.title == title)) return;
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  fail('Timed out waiting for a toast: $title');
 }
 
 Future<void> _waitForProgress(
