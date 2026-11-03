@@ -3745,6 +3745,204 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Playback error'**
   String get playerErrorTitle;
+
+  /// No description provided for @navSports.
+  ///
+  /// In en, this message translates to:
+  /// **'Sports'**
+  String get navSports;
+
+  /// No description provided for @sportsRangeYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get sportsRangeYesterday;
+
+  /// No description provided for @sportsRangeToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get sportsRangeToday;
+
+  /// No description provided for @sportsRangeUpcoming.
+  ///
+  /// In en, this message translates to:
+  /// **'Upcoming'**
+  String get sportsRangeUpcoming;
+
+  /// No description provided for @sportsScopeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All Leagues'**
+  String get sportsScopeAll;
+
+  /// No description provided for @sportsScopeMyTeams.
+  ///
+  /// In en, this message translates to:
+  /// **'My Teams'**
+  String get sportsScopeMyTeams;
+
+  /// No description provided for @sportsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search teams'**
+  String get sportsSearchHint;
+
+  /// No description provided for @sportsLeaguesButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Leagues'**
+  String get sportsLeaguesButton;
+
+  /// No description provided for @sportsLeaguesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show leagues'**
+  String get sportsLeaguesTitle;
+
+  /// No description provided for @sportsDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get sportsDone;
+
+  /// No description provided for @sportsLiveNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Now'**
+  String get sportsLiveNow;
+
+  /// No description provided for @sportsLiveBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE'**
+  String get sportsLiveBadge;
+
+  /// No description provided for @sportsFinal.
+  ///
+  /// In en, this message translates to:
+  /// **'Final'**
+  String get sportsFinal;
+
+  /// No description provided for @sportsPostponed.
+  ///
+  /// In en, this message translates to:
+  /// **'Postponed'**
+  String get sportsPostponed;
+
+  /// No description provided for @sportsNoGames.
+  ///
+  /// In en, this message translates to:
+  /// **'No games in this range'**
+  String get sportsNoGames;
+
+  /// No description provided for @sportsNoLeagues.
+  ///
+  /// In en, this message translates to:
+  /// **'No leagues selected. Choose some with Leagues.'**
+  String get sportsNoLeagues;
+
+  /// No description provided for @sportsMyTeamsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'You aren\'t following any teams yet. Long-press a game to follow its teams.'**
+  String get sportsMyTeamsEmpty;
+
+  /// No description provided for @sportsMyTeamsNoGames.
+  ///
+  /// In en, this message translates to:
+  /// **'None of your teams play in this range'**
+  String get sportsMyTeamsNoGames;
+
+  /// No description provided for @sportsChannelCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 channel} other{{count} channels}}'**
+  String sportsChannelCount(int count);
+
+  /// No description provided for @sportsNoChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'No channel'**
+  String get sportsNoChannel;
+
+  /// No description provided for @sportsNoChannelFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No channel in your playlist is showing this game yet'**
+  String get sportsNoChannelFound;
+
+  /// No description provided for @sportsGameOver.
+  ///
+  /// In en, this message translates to:
+  /// **'This game has ended'**
+  String get sportsGameOver;
+
+  /// No description provided for @sportsEventChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Event channel'**
+  String get sportsEventChannel;
+
+  /// No description provided for @sportsWatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Watch'**
+  String get sportsWatch;
+
+  /// No description provided for @sportsFollowTeam.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow {team}'**
+  String sportsFollowTeam(String team);
+
+  /// No description provided for @sportsUnfollowTeam.
+  ///
+  /// In en, this message translates to:
+  /// **'Unfollow {team}'**
+  String sportsUnfollowTeam(String team);
+
+  /// No description provided for @sportsFollowingTeam.
+  ///
+  /// In en, this message translates to:
+  /// **'Following {team}'**
+  String sportsFollowingTeam(String team);
+
+  /// No description provided for @sportsUnfollowedTeam.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped following {team}'**
+  String sportsUnfollowedTeam(String team);
+
+  /// No description provided for @sportsAddedToMultiview.
+  ///
+  /// In en, this message translates to:
+  /// **'Added {channel} to Multiview'**
+  String sportsAddedToMultiview(String channel);
+
+  /// No description provided for @sportsFixtureAt.
+  ///
+  /// In en, this message translates to:
+  /// **'{away} at {home}'**
+  String sportsFixtureAt(String away, String home);
+
+  /// No description provided for @sportsFixtureVs.
+  ///
+  /// In en, this message translates to:
+  /// **'{home} vs {away}'**
+  String sportsFixtureVs(String home, String away);
+
+  /// No description provided for @sportsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Sports isn\'t turned on for this server. An admin can enable it in M3U Editor under Settings > Integrations > Sports.'**
+  String get sportsUnavailable;
+
+  /// No description provided for @sportsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load games. Retrying shortly.'**
+  String get sportsLoadFailed;
 }
 
 class _AppLocalizationsDelegate

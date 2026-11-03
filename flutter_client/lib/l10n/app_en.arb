@@ -1187,5 +1187,100 @@
   "settingsCreateViewerFailed": "Failed to create viewer. Please try again.",
   "searchNoResults": "No results found",
   "playerLoadTimedOut": "Stream loading timed out. The server may be unreachable or the stream URL is invalid.",
-  "playerErrorTitle": "Playback error"
+  "playerErrorTitle": "Playback error",
+  "navSports": "Sports",
+  "sportsRangeYesterday": "Yesterday",
+  "sportsRangeToday": "Today",
+  "sportsRangeUpcoming": "Upcoming",
+  "sportsScopeAll": "All Leagues",
+  "sportsScopeMyTeams": "My Teams",
+  "sportsSearchHint": "Search teams",
+  "sportsLeaguesButton": "Leagues",
+  "sportsLeaguesTitle": "Show leagues",
+  "sportsDone": "Done",
+  "sportsLiveNow": "Live Now",
+  "sportsLiveBadge": "LIVE",
+  "sportsFinal": "Final",
+  "sportsPostponed": "Postponed",
+  "sportsNoGames": "No games in this range",
+  "sportsNoLeagues": "No leagues selected. Choose some with Leagues.",
+  "sportsMyTeamsEmpty": "You aren't following any teams yet. Long-press a game to follow its teams.",
+  "sportsMyTeamsNoGames": "None of your teams play in this range",
+  "sportsChannelCount": "{count, plural, =1{1 channel} other{{count} channels}}",
+  "@sportsChannelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sportsNoChannel": "No channel",
+  "sportsNoChannelFound": "No channel in your playlist is showing this game yet",
+  "sportsGameOver": "This game has ended",
+  "sportsEventChannel": "Event channel",
+  "sportsWatch": "Watch",
+  "sportsFollowTeam": "Follow {team}",
+  "@sportsFollowTeam": {
+    "placeholders": {
+      "team": {
+        "type": "String"
+      }
+    }
+  },
+  "sportsUnfollowTeam": "Unfollow {team}",
+  "@sportsUnfollowTeam": {
+    "placeholders": {
+      "team": {
+        "type": "String"
+      }
+    }
+  },
+  "sportsFollowingTeam": "Following {team}",
+  "@sportsFollowingTeam": {
+    "placeholders": {
+      "team": {
+        "type": "String"
+      }
+    }
+  },
+  "sportsUnfollowedTeam": "Stopped following {team}",
+  "@sportsUnfollowedTeam": {
+    "placeholders": {
+      "team": {
+        "type": "String"
+      }
+    }
+  },
+  "sportsAddedToMultiview": "Added {channel} to Multiview",
+  "@sportsAddedToMultiview": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "sportsFixtureAt": "{away} at {home}",
+  "@sportsFixtureAt": {
+    "placeholders": {
+      "away": {
+        "type": "String"
+      },
+      "home": {
+        "type": "String"
+      }
+    }
+  },
+  "sportsFixtureVs": "{home} vs {away}",
+  "@sportsFixtureVs": {
+    "placeholders": {
+      "home": {
+        "type": "String"
+      },
+      "away": {
+        "type": "String"
+      }
+    }
+  },
+  "sportsUnavailable": "Sports isn't turned on for this server. An admin can enable it in M3U Editor under Settings > Integrations > Sports.",
+  "sportsLoadFailed": "Couldn't load games. Retrying shortly."
 }

@@ -2056,4 +2056,125 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get playerErrorTitle => '播放错误';
+
+  @override
+  String get navSports => '体育';
+
+  @override
+  String get sportsRangeYesterday => '昨天';
+
+  @override
+  String get sportsRangeToday => '今天';
+
+  @override
+  String get sportsRangeUpcoming => '即将开赛';
+
+  @override
+  String get sportsScopeAll => '全部联赛';
+
+  @override
+  String get sportsScopeMyTeams => '我的球队';
+
+  @override
+  String get sportsSearchHint => '搜索球队';
+
+  @override
+  String get sportsLeaguesButton => '联赛';
+
+  @override
+  String get sportsLeaguesTitle => '显示联赛';
+
+  @override
+  String get sportsDone => '完成';
+
+  @override
+  String get sportsLiveNow => '正在直播';
+
+  @override
+  String get sportsLiveBadge => '直播';
+
+  @override
+  String get sportsFinal => '已结束';
+
+  @override
+  String get sportsPostponed => '已延期';
+
+  @override
+  String get sportsNoGames => '此时间段内没有比赛';
+
+  @override
+  String get sportsNoLeagues => '未选择联赛。请在“联赛”中选择。';
+
+  @override
+  String get sportsMyTeamsEmpty => '你还没有关注任何球队。长按一场比赛即可关注其球队。';
+
+  @override
+  String get sportsMyTeamsNoGames => '你关注的球队在此时间段内没有比赛';
+
+  @override
+  String sportsChannelCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个频道',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sportsNoChannel => '无频道';
+
+  @override
+  String get sportsNoChannelFound => '你的播放列表中还没有频道播出这场比赛';
+
+  @override
+  String get sportsGameOver => '这场比赛已结束';
+
+  @override
+  String get sportsEventChannel => '赛事频道';
+
+  @override
+  String get sportsWatch => '观看';
+
+  @override
+  String sportsFollowTeam(String team) {
+    return '关注 $team';
+  }
+
+  @override
+  String sportsUnfollowTeam(String team) {
+    return '取消关注 $team';
+  }
+
+  @override
+  String sportsFollowingTeam(String team) {
+    return '已关注 $team';
+  }
+
+  @override
+  String sportsUnfollowedTeam(String team) {
+    return '已取消关注 $team';
+  }
+
+  @override
+  String sportsAddedToMultiview(String channel) {
+    return '已将 $channel 添加到多画面';
+  }
+
+  @override
+  String sportsFixtureAt(String away, String home) {
+    return '$away 客场对阵 $home';
+  }
+
+  @override
+  String sportsFixtureVs(String home, String away) {
+    return '$home 对阵 $away';
+  }
+
+  @override
+  String get sportsUnavailable =>
+      '此服务器未开启体育功能。管理员可以在 M3U Editor 的 设置 > 集成 > 体育 中启用。';
+
+  @override
+  String get sportsLoadFailed => '无法加载比赛，稍后将重试。';
 }

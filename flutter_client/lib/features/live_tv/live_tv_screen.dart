@@ -1,14 +1,14 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/foundation.dart'
-    show ValueListenable, kIsWeb, setEquals;
+import 'package:flutter/foundation.dart' show ValueListenable, setEquals;
 import 'package:flutter/services.dart' show SystemSound, SystemSoundType;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/features/epg/epg_preview_player.dart';
 import 'package:m3u_tv/features/epg/epg_recording_index.dart';
 import 'package:m3u_tv/features/epg/timeline_epg_view.dart';
 import 'package:m3u_tv/features/live_tv/catchup_shows_dialog.dart';
+import 'package:m3u_tv/features/multiview/multiview_controller.dart';
 import 'package:m3u_tv/features/multiview/multiview_manage_dialog.dart';
 import 'package:m3u_tv/features/multiview/multiview_screen.dart';
 import 'package:m3u_tv/features/player/player_source_settings.dart';
@@ -37,7 +37,6 @@ import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/epg_show_results.dart';
 import 'package:m3u_tv/shared/epg_show_search_controller.dart';
-import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/media_category_nav.dart';
@@ -172,25 +171,6 @@ class LiveTvScreen extends ConsumerStatefulWidget {
 
 class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  // Multiview drives several concurrent player instances. tvOS, iOS, and
-  // Android multiplex them over their one native channel pair by playerId
-  // (see AvKitPlaybackPlugin.swift / Media3PlaybackPlugin.kt); macOS and
-  // Linux/Windows (the in-process libmpv backend) are multi-instance by
-  // design already.
-  static const Set<String> _multiviewSupportedOperatingSystems = {
-    'tvos',
-    'ios',
-    'android',
-    'macos',
-    'linux',
-    'windows',
-  };
-  static final bool _multiviewSupported =
-      !kIsWeb &&
-      _multiviewSupportedOperatingSystems.contains(
-        HostPlatform.operatingSystem,
-      );
-
   static const _favoritesCategoryId = '__FAVORITES__';
   String? _selectedCategory;
   String _query = '';
@@ -311,7 +291,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   /// Creates or drops the preview player to match the loaded settings.
   Future<void> _syncPreviewPlayer() async {
     final wanted =
-        _multiviewSupported &&
+        multiviewSupported &&
         widget.useSidebarLayout &&
         _epgPreviewPlayback != EpgPreviewPlayback.off;
     final current = _previewPlayer;
@@ -863,7 +843,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
                         dialogContext,
                       ).pop(_ChannelContextAction.catchupShows),
                     ),
-                  if (_multiviewSupported)
+                  if (multiviewSupported)
                     _ContextMenuOption(
                       icon: isInMultiview
                           ? Icons.grid_view
@@ -1166,7 +1146,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
 
   Widget? _buildMultiviewButton() {
     final multiviewCount = ref.watch(multiviewChannelsProvider).length;
-    if (!_multiviewSupported || multiviewCount == 0) return null;
+    if (!multiviewSupported || multiviewCount == 0) return null;
     return AppButton(
       icon: Icons.grid_view,
       badgeCount: multiviewCount,

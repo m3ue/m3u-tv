@@ -2151,4 +2151,131 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get playerErrorTitle => 'Erreur de lecture';
+
+  @override
+  String get navSports => 'Sports';
+
+  @override
+  String get sportsRangeYesterday => 'Hier';
+
+  @override
+  String get sportsRangeToday => 'Aujourd\'hui';
+
+  @override
+  String get sportsRangeUpcoming => 'À venir';
+
+  @override
+  String get sportsScopeAll => 'Toutes les ligues';
+
+  @override
+  String get sportsScopeMyTeams => 'Mes équipes';
+
+  @override
+  String get sportsSearchHint => 'Rechercher des équipes';
+
+  @override
+  String get sportsLeaguesButton => 'Ligues';
+
+  @override
+  String get sportsLeaguesTitle => 'Afficher les ligues';
+
+  @override
+  String get sportsDone => 'Terminé';
+
+  @override
+  String get sportsLiveNow => 'En direct';
+
+  @override
+  String get sportsLiveBadge => 'EN DIRECT';
+
+  @override
+  String get sportsFinal => 'Terminé';
+
+  @override
+  String get sportsPostponed => 'Reporté';
+
+  @override
+  String get sportsNoGames => 'Aucun match sur cette période';
+
+  @override
+  String get sportsNoLeagues =>
+      'Aucune ligue sélectionnée. Choisissez-en dans Ligues.';
+
+  @override
+  String get sportsMyTeamsEmpty =>
+      'Vous ne suivez encore aucune équipe. Appuyez longuement sur un match pour suivre ses équipes.';
+
+  @override
+  String get sportsMyTeamsNoGames =>
+      'Aucune de vos équipes ne joue sur cette période';
+
+  @override
+  String sportsChannelCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count chaînes',
+      one: '1 chaîne',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sportsNoChannel => 'Aucune chaîne';
+
+  @override
+  String get sportsNoChannelFound =>
+      'Aucune chaîne de votre playlist ne diffuse encore ce match';
+
+  @override
+  String get sportsGameOver => 'Ce match est terminé';
+
+  @override
+  String get sportsEventChannel => 'Chaîne de l\'événement';
+
+  @override
+  String get sportsWatch => 'Regarder';
+
+  @override
+  String sportsFollowTeam(String team) {
+    return 'Suivre $team';
+  }
+
+  @override
+  String sportsUnfollowTeam(String team) {
+    return 'Ne plus suivre $team';
+  }
+
+  @override
+  String sportsFollowingTeam(String team) {
+    return 'Vous suivez $team';
+  }
+
+  @override
+  String sportsUnfollowedTeam(String team) {
+    return 'Vous ne suivez plus $team';
+  }
+
+  @override
+  String sportsAddedToMultiview(String channel) {
+    return '$channel ajoutée à Multiview';
+  }
+
+  @override
+  String sportsFixtureAt(String away, String home) {
+    return '$away chez $home';
+  }
+
+  @override
+  String sportsFixtureVs(String home, String away) {
+    return '$home contre $away';
+  }
+
+  @override
+  String get sportsUnavailable =>
+      'Les sports ne sont pas activés sur ce serveur. Un administrateur peut les activer dans M3U Editor sous Paramètres > Intégrations > Sports.';
+
+  @override
+  String get sportsLoadFailed =>
+      'Impossible de charger les matchs. Nouvelle tentative sous peu.';
 }

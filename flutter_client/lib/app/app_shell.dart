@@ -23,6 +23,7 @@ import 'package:m3u_tv/features/series/series_screen.dart';
 import 'package:m3u_tv/features/settings/sections/playlists_page.dart';
 import 'package:m3u_tv/features/settings/sections/storage_page.dart';
 import 'package:m3u_tv/features/settings/settings_screen.dart';
+import 'package:m3u_tv/features/sports/sports_screen.dart';
 import 'package:m3u_tv/features/vod/vod_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -240,6 +241,9 @@ class AppShellState extends ConsumerState<AppShell>
       .where((route) => route != RouteNames.dvr || _appState.hasDvrFeature)
       .where(
         (route) => route != RouteNames.requests || _appState.hasRequestsFeature,
+      )
+      .where(
+        (route) => route != RouteNames.sports || _appState.hasSportsFeature,
       )
       .toList(growable: false);
 
@@ -1600,6 +1604,15 @@ class AppShellState extends ConsumerState<AppShell>
         onShowSelect: _openShow,
         onPreviewHandoff: _openPreviewHandoff,
       ),
+      RouteNames.sports => SportsScreen(
+        onChannelSelect: _openChannel,
+        useSidebarLayout: shouldUseSidebar(widget.deviceType),
+        onSidebarActivate: _activateSidebar,
+        onEntryFocusScopeReady: (node) =>
+            _registerContentEntryFocus(RouteNames.sports, node),
+        onEnterFullScreenDetail: _enterFullScreenDetail,
+        onExitFullScreenDetail: _exitFullScreenDetail,
+      ),
       RouteNames.vod => VodScreen(
         onVodSelect: _openVod,
         favoritesService: _appState.vodFavoritesService,
@@ -2242,6 +2255,7 @@ class AppShellState extends ConsumerState<AppShell>
     RouteNames.home => Icons.home,
     RouteNames.search => Icons.search,
     RouteNames.liveTv => Icons.live_tv,
+    RouteNames.sports => Icons.stadium,
     RouteNames.vod => Icons.movie,
     RouteNames.series => Icons.tv,
     RouteNames.aiostreams => Icons.subscriptions,

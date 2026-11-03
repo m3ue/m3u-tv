@@ -2126,4 +2126,129 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playerErrorTitle => 'Playback error';
+
+  @override
+  String get navSports => 'Sports';
+
+  @override
+  String get sportsRangeYesterday => 'Yesterday';
+
+  @override
+  String get sportsRangeToday => 'Today';
+
+  @override
+  String get sportsRangeUpcoming => 'Upcoming';
+
+  @override
+  String get sportsScopeAll => 'All Leagues';
+
+  @override
+  String get sportsScopeMyTeams => 'My Teams';
+
+  @override
+  String get sportsSearchHint => 'Search teams';
+
+  @override
+  String get sportsLeaguesButton => 'Leagues';
+
+  @override
+  String get sportsLeaguesTitle => 'Show leagues';
+
+  @override
+  String get sportsDone => 'Done';
+
+  @override
+  String get sportsLiveNow => 'Live Now';
+
+  @override
+  String get sportsLiveBadge => 'LIVE';
+
+  @override
+  String get sportsFinal => 'Final';
+
+  @override
+  String get sportsPostponed => 'Postponed';
+
+  @override
+  String get sportsNoGames => 'No games in this range';
+
+  @override
+  String get sportsNoLeagues =>
+      'No leagues selected. Choose some with Leagues.';
+
+  @override
+  String get sportsMyTeamsEmpty =>
+      'You aren\'t following any teams yet. Long-press a game to follow its teams.';
+
+  @override
+  String get sportsMyTeamsNoGames => 'None of your teams play in this range';
+
+  @override
+  String sportsChannelCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count channels',
+      one: '1 channel',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sportsNoChannel => 'No channel';
+
+  @override
+  String get sportsNoChannelFound =>
+      'No channel in your playlist is showing this game yet';
+
+  @override
+  String get sportsGameOver => 'This game has ended';
+
+  @override
+  String get sportsEventChannel => 'Event channel';
+
+  @override
+  String get sportsWatch => 'Watch';
+
+  @override
+  String sportsFollowTeam(String team) {
+    return 'Follow $team';
+  }
+
+  @override
+  String sportsUnfollowTeam(String team) {
+    return 'Unfollow $team';
+  }
+
+  @override
+  String sportsFollowingTeam(String team) {
+    return 'Following $team';
+  }
+
+  @override
+  String sportsUnfollowedTeam(String team) {
+    return 'Stopped following $team';
+  }
+
+  @override
+  String sportsAddedToMultiview(String channel) {
+    return 'Added $channel to Multiview';
+  }
+
+  @override
+  String sportsFixtureAt(String away, String home) {
+    return '$away at $home';
+  }
+
+  @override
+  String sportsFixtureVs(String home, String away) {
+    return '$home vs $away';
+  }
+
+  @override
+  String get sportsUnavailable =>
+      'Sports isn\'t turned on for this server. An admin can enable it in M3U Editor under Settings > Integrations > Sports.';
+
+  @override
+  String get sportsLoadFailed => 'Couldn\'t load games. Retrying shortly.';
 }

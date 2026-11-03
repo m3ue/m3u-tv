@@ -9,6 +9,7 @@ enum DefaultStartPage {
   home('home', RouteNames.home),
   search('search', RouteNames.search),
   liveTv('liveTv', RouteNames.liveTv),
+  sports('sports', RouteNames.sports),
   movies('movies', RouteNames.vod),
   series('series', RouteNames.series);
 

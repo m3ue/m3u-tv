@@ -915,6 +915,136 @@ class CatalogRepository implements EpgProgrammeStore {
     return _groupByChannel(rows);
   }
 
+  /// Real (non-placeholder) programmes on air at some point between
+  /// [endAfter] and [startBefore] whose title, subtitle or description head
+  /// contains any of [needles], start-ordered. The needles are only a SQL
+  /// `LIKE` prefilter (case-insensitive for ASCII), so callers still verify
+  /// what each row actually names.
+  Future<List<EpgProgram>> programmesMentioning({
+    required DateTime endAfter,
+    required DateTime startBefore,
+    required Set<String> needles,
+    int limit = 2000,
+  }) async {
+    if (needles.isEmpty) return const [];
+    final source = shownSource;
+    final endAfterMs = endAfter.millisecondsSinceEpoch;
+    final startBeforeMs = startBefore.millisecondsSinceEpoch;
+    final needleList = needles.toList(growable: false);
+    final byKey = <(String, int), EpgProgrammeRow>{};
+    for (var i = 0; i < needleList.length; i += _likeChunkSize) {
+      final chunk = needleList.skip(i).take(_likeChunkSize);
+      final rows =
+          await (_db.select(_db.epgProgrammes)
+                ..where((t) {
+                  Expression<bool>? mentions;
+                  for (final needle in chunk) {
+                    final pattern = '%${_escapeLike(needle)}%';
+                    final hit =
+                        _like(t.title, pattern) |
+                        _like(t.subtitle, pattern) |
+                        _like(
+                          t.description.substr(1, _descriptionScanLength),
+                          pattern,
+                        );
+                    mentions = mentions == null ? hit : mentions | hit;
+                  }
+                  return t.sourceKey.equals(source) &
+                      t.endMs.isBiggerThanValue(endAfterMs) &
+                      t.startMs.isSmallerThanValue(startBeforeMs) &
+                      t.isPlaceholder.equals(false) &
+                      mentions!;
+                })
+                ..limit(limit))
+              .get();
+      for (final row in rows) {
+        byKey[(row.channelId, row.startMs)] = row;
+      }
+    }
+    final rows = byKey.values.toList()
+      ..sort((a, b) => a.startMs.compareTo(b.startMs));
+    return rows.map(_programFromRow).toList(growable: false);
+  }
+
+  /// The live channels whose guide is stored under any of [guideIds]. A
+  /// channel's guide is keyed by its EPG channel id, else its tvg-name, else
+  /// its name (see `EpgService.lookupForChannel`), so all three are matched.
+  Future<List<Channel>> liveChannelsForGuideIds(Set<String> guideIds) async {
+    if (guideIds.isEmpty) return const [];
+    final source = shownSource;
+    final ids = guideIds.toList(growable: false);
+    final byId = <int, Channel>{};
+    for (var i = 0; i < ids.length; i += _likeChunkSize) {
+      final chunk = ids.skip(i).take(_likeChunkSize).toList(growable: false);
+      final marks = List.filled(chunk.length, '?').join(', ');
+      final rows = await _db
+          .customSelect(
+            'SELECT json FROM catalog_items '
+            'WHERE source_key = ? AND kind = ? AND ( '
+            "json_extract(json, '\$.epg_channel_id') IN ($marks) OR "
+            "json_extract(json, '\$.tvg_name') IN ($marks) OR "
+            'name IN ($marks))',
+            variables: [
+              Variable.withString(source),
+              Variable.withString(kCatalogKindLive),
+              for (var pass = 0; pass < 3; pass++)
+                for (final id in chunk) Variable.withString(id),
+            ],
+            readsFrom: {_db.catalogItems},
+          )
+          .get();
+      for (final row in rows) {
+        final channel = _decodeRow(kCatalogKindLive, row.read<String>('json'));
+        if (channel is Channel) byId[channel.id] = channel;
+      }
+    }
+    return byId.values.toList(growable: false);
+  }
+
+  /// Live channels whose name contains any of [needles] (lowercase), in
+  /// provider order, at most [limit]. A `LIKE` prefilter like
+  /// [programmesMentioning].
+  Future<List<Channel>> liveChannelsNamedLike(
+    Set<String> needles, {
+    int limit = 1000,
+  }) async {
+    if (needles.isEmpty) return const [];
+    final source = shownSource;
+    final needleList = needles.toList(growable: false);
+    final byId = <int, Channel>{};
+    for (var i = 0; i < needleList.length; i += _likeChunkSize) {
+      final chunk = needleList.skip(i).take(_likeChunkSize);
+      final rows =
+          await (_db.select(_db.catalogItems)
+                ..where((t) {
+                  Expression<bool>? named;
+                  for (final needle in chunk) {
+                    final hit = _likeContains(t.nameFold, needle);
+                    named = named == null ? hit : named | hit;
+                  }
+                  return t.sourceKey.equals(source) &
+                      t.kind.equals(kCatalogKindLive) &
+                      named!;
+                })
+                ..orderBy([(t) => OrderingTerm(expression: t.sortIndex)])
+                ..limit(limit))
+              .get();
+      for (final row in rows) {
+        final channel = _decodeRow(kCatalogKindLive, row.json);
+        if (channel is Channel) byId[channel.id] = channel;
+      }
+    }
+    return byId.values.toList(growable: false);
+  }
+
+  /// Bound values per `LIKE`/`IN` query, well under SQLite's variable limit
+  /// even with three columns tested per needle.
+  static const int _likeChunkSize = 200;
+
+  /// How much of a description the sports matcher searches: a listing names
+  /// its fixture up front; the tail is filler.
+  static const int _descriptionScanLength = 400;
+
   static Map<String, List<EpgProgram>> _groupByChannel(
     List<EpgProgrammeRow> rows,
   ) {

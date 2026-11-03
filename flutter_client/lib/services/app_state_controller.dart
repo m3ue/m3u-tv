@@ -31,6 +31,8 @@ import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/reverb_service.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/sports_models.dart';
+import 'package:m3u_tv/services/sports_settings.dart';
 import 'package:m3u_tv/services/storage_usage.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
@@ -81,6 +83,7 @@ class AppStateController extends ChangeNotifier {
     AIOStreamsFavoritesService? aioFavoritesService,
     ProxyPlaybackSettings? proxyPlaybackSettings,
     ComskipSettings? comskipSettings,
+    SportsSettings? sportsSettings,
     IntroDbSettings? introDbSettings,
     PushNotificationService? pushNotificationService,
     DevicePairingService? devicePairingService,
@@ -158,6 +161,7 @@ class AppStateController extends ChangeNotifier {
       proxyPlaybackSettings:
           proxyPlaybackSettings ?? ProxyPlaybackSettings(store: store),
       comskipSettings: comskipSettings ?? ComskipSettings(store: store),
+      sportsSettings: sportsSettings ?? SportsSettings(store: store),
       introDbSettings: introDbSettings ?? IntroDbSettings(store: store),
       pushNotificationService:
           pushNotificationService ?? PushNotificationService(),
@@ -192,6 +196,7 @@ class AppStateController extends ChangeNotifier {
     required this.aioFavoritesService,
     required this.proxyPlaybackSettings,
     required this.comskipSettings,
+    required this.sportsSettings,
     required this.introDbSettings,
     required this._pushNotificationService,
     required this.viewSettingsService,
@@ -323,6 +328,7 @@ class AppStateController extends ChangeNotifier {
   final AIOStreamsFavoritesService aioFavoritesService;
   final ProxyPlaybackSettings proxyPlaybackSettings;
   final ComskipSettings comskipSettings;
+  final SportsSettings sportsSettings;
   final IntroDbSettings introDbSettings;
   final ViewSettingsService viewSettingsService;
 
@@ -592,6 +598,9 @@ class AppStateController extends ChangeNotifier {
       authNotifier.authResponse?.hasFeature('requests') ?? false;
   RequestsCapability? get requestsCapability =>
       authNotifier.authResponse?.requests;
+  bool get hasSportsFeature => authNotifier.authResponse?.hasSports ?? false;
+  SportsCapability? get sportsCapability =>
+      hasSportsFeature ? authNotifier.authResponse?.sports : null;
   MediaRequestOwner get mediaRequestOwner => (
     sourceGeneration: _sourceOperationGeneration.current,
     notificationGeneration: _notifications.sessionGeneration.current,
@@ -619,6 +628,7 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
     unawaited(traktService.init());
     unawaited(comskipSettings.load());
+    unawaited(sportsSettings.load());
     unawaited(introDbSettings.load());
 
     // One-time move of the content cache into its own file for installs that

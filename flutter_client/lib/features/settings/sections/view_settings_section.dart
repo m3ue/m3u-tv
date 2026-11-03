@@ -455,6 +455,7 @@ String _startPageLabel(AppLocalizations l, DefaultStartPage page) =>
       DefaultStartPage.home => l.navHome,
       DefaultStartPage.search => l.navSearch,
       DefaultStartPage.liveTv => l.navLiveTv,
+      DefaultStartPage.sports => l.navSports,
       DefaultStartPage.movies => l.navVod,
       DefaultStartPage.series => l.navSeries,
     };

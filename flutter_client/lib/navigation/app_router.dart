@@ -265,8 +265,8 @@ PlaybackOrchestrator buildPlaybackOrchestrator({
 /// Builds one Multiview grid tile's player: an isolated [MultiviewBackend]
 /// instance wrapped in its own orchestrator, so each tile gets independent
 /// retry/error handling for free. Only offered on platforms whose native
-/// backend can host several concurrent players (see `_multiviewSupported`
-/// in `live_tv_screen.dart`): tvOS, iOS, and Android key native player state
+/// backend can host several concurrent players (see `multiviewSupported`
+/// in `multiview_controller.dart`): tvOS, iOS, and Android key native player state
 /// by [playerId] to multiplex over their one channel pair; macOS
 /// (`MacMpvNativeBackend`, keyed by its own internally-generated `_viewId`)
 /// and Linux/Windows (the in-process libmpv backend) are multi-instance by

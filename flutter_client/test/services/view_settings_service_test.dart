@@ -36,6 +36,7 @@ void main() {
       expect(DefaultStartPage.home.route, RouteNames.home);
       expect(DefaultStartPage.search.route, RouteNames.search);
       expect(DefaultStartPage.liveTv.route, RouteNames.liveTv);
+      expect(DefaultStartPage.sports.route, RouteNames.sports);
       expect(DefaultStartPage.movies.route, RouteNames.vod);
       expect(DefaultStartPage.series.route, RouteNames.series);
     });

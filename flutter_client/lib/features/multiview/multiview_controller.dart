@@ -1,11 +1,32 @@
 import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
+
+// Multiview drives several concurrent player instances. tvOS, iOS, and
+// Android multiplex them over their one native channel pair by playerId
+// (see AvKitPlaybackPlugin.swift / Media3PlaybackPlugin.kt); macOS and
+// Linux/Windows (the in-process libmpv backend) are multi-instance by
+// design already.
+const Set<String> _multiviewSupportedOperatingSystems = {
+  'tvos',
+  'ios',
+  'android',
+  'macos',
+  'linux',
+  'windows',
+};
+
+/// Whether this platform can run the Multiview grid (and anything else that
+/// needs a second concurrent player, like the guide preview).
+final bool multiviewSupported =
+    !kIsWeb &&
+    _multiviewSupportedOperatingSystems.contains(HostPlatform.operatingSystem);
 
 /// Holds the set of live channels queued for the Multiview grid.
 ///
 /// Purely an in-memory session selection — like the single player's "now
 /// playing" state, it is not persisted and resets on app restart. Channels
-/// are added/removed from the Live TV context menu; the Multiview grid
+/// are added/removed from the Live TV and Sports menus; the Multiview grid
 /// screen reads the current list when it opens and owns the actual player
 /// instances.
 class MultiviewController extends ChangeNotifier {

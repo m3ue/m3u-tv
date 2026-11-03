@@ -320,16 +320,29 @@ class MetaCreditLineText extends StatelessWidget {
   }
 }
 
-/// Metadata chip used across item detail screens (year, genre, rating, …).
+/// Metadata chip used across item detail screens (year, genre, rating, …)
+/// and on the Sports game cards, where its opaque surface keeps the label
+/// readable over any team-colour wash.
 class MetadataChip extends StatelessWidget {
-  const MetadataChip({super.key, required this.label});
+  const MetadataChip({super.key, required this.label, this.icon});
 
   final String label;
+
+  /// A small leading icon, e.g. the channel-count chip's TV.
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final icon = this.icon;
     return Chip(
+      avatar: icon == null
+          ? null
+          : Icon(
+              icon,
+              size: 18 * FontSizeScope.scaleOf(context),
+              color: colorScheme.primary,
+            ),
       label: Text(label),
       backgroundColor: colorScheme.surfaceContainerHighest,
       side: BorderSide(color: colorScheme.outlineVariant),

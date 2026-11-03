@@ -483,7 +483,18 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 3: VOD (details/:vodId is a top-level route - see below)
+          // Branch 3: Sports
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteNames.sports,
+                pageBuilder: (context, state) => NoTransitionPage(
+                  child: _withGradient(_tabScreen(context, RouteNames.sports)),
+                ),
+              ),
+            ],
+          ),
+          // Branch 4: VOD (details/:vodId is a top-level route - see below)
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -494,7 +505,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 4: Series (details/:seriesId is a top-level route - see below)
+          // Branch 5: Series (details/:seriesId is a top-level route - see below)
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -505,7 +516,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 5: AIOStreams with nested item detail
+          // Branch 6: AIOStreams with nested item detail
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -547,7 +558,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 6: DVR (show-detail is a top-level route - see below).
+          // Branch 7: DVR (show-detail is a top-level route - see below).
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -558,7 +569,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 7: Requests. Its result-detail screen is NOT nested here -
+          // Branch 8: Requests. Its result-detail screen is NOT nested here -
           // see the top-level `RouteNames.requestsDetailsPath` route below,
           // for the same reason VOD/Series/AIOStreams details are top-level.
           StatefulShellBranch(
@@ -573,7 +584,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 8: Notifications
+          // Branch 9: Notifications
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -586,7 +597,7 @@ GoRouter createGoRouter({
               ),
             ],
           ),
-          // Branch 9: Settings
+          // Branch 10: Settings
           StatefulShellBranch(
             routes: [
               GoRoute(

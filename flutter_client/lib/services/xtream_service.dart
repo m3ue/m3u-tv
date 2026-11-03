@@ -9,6 +9,7 @@ import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/json_isolate.dart';
+import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/services/xtream_http_transport_stub.dart'
     if (dart.library.io) 'xtream_http_transport_io.dart'
     if (dart.library.js_interop) 'xtream_http_transport_web.dart';
@@ -365,6 +366,7 @@ class XtreamAuthResponse {
     this.aiostreamsIntegrations = const <AIOStreamsIntegration>[],
     this.proxy,
     this.requests,
+    this.sports,
   });
 
   final bool isAuthenticated;
@@ -374,12 +376,14 @@ class XtreamAuthResponse {
   final List<AIOStreamsIntegration> aiostreamsIntegrations;
   final ProxyCapability? proxy;
   final RequestsCapability? requests;
+  final SportsCapability? sports;
 
   bool hasFeature(String feature) => features.contains(feature);
   bool get hasAioStreams =>
       hasFeature('aiostreams') && aiostreamsIntegrations.isNotEmpty;
   bool get hasProxy => hasFeature('proxy') && proxy != null;
   bool get hasRequests => hasFeature('requests') && requests != null;
+  bool get hasSports => hasFeature('sports') && sports != null;
 }
 
 class XtreamSessionSnapshot {
@@ -514,6 +518,10 @@ class XtreamService {
     final requests = requestsJson is Map<String, dynamic>
         ? RequestsCapability.fromJson(requestsJson)
         : null;
+    final sportsJson = m3uEditor['sports'];
+    final sports = sportsJson is Map<String, dynamic>
+        ? SportsCapability.fromJson(sportsJson)
+        : null;
     final authResponse = XtreamAuthResponse(
       isAuthenticated: true,
       status: status,
@@ -522,6 +530,7 @@ class XtreamService {
       aiostreamsIntegrations: aiostreamsIntegrations,
       proxy: proxy,
       requests: requests,
+      sports: sports,
     );
     if (!_authenticationGeneration.isStale(authenticationGeneration)) {
       _credentials = normalized;
@@ -1550,6 +1559,22 @@ class XtreamService {
       response,
     ).map((item) => EpgShow.fromXtream(_asMap(item))).toList(growable: false);
   }
+
+  /// Games of [leagueIds] starting in [from, to) from m3u-editor's Sports
+  /// integration ([SportsCapability.fixturesAction]), as the raw response.
+  Future<Object?> getSportsFixtures(
+    SportsCapability capability, {
+    required Iterable<String> leagueIds,
+    required DateTime from,
+    required DateTime to,
+  }) => _request(
+    capability.fixturesAction,
+    params: {
+      'leagues': leagueIds.join(','),
+      'from': '${from.millisecondsSinceEpoch ~/ 1000}',
+      'to': '${to.millisecondsSinceEpoch ~/ 1000}',
+    },
+  );
 
   Future<List<Category>> _categories(String action) async {
     final sessionGeneration = _sessionGeneration.current;

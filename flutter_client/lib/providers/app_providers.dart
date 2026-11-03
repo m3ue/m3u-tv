@@ -10,6 +10,9 @@ import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/sports_models.dart';
+import 'package:m3u_tv/services/sports_service.dart';
+import 'package:m3u_tv/services/sports_settings.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart'
     show TvNotificationItem;
 import 'package:m3u_tv/services/tv_notification_store.dart';
@@ -191,6 +194,24 @@ final tvNotificationsStreamProvider = Provider<Stream<TvNotificationItem>>(
 /// can read and update layout preferences without touching credentials.
 final viewSettingsServiceProvider = Provider<ViewSettingsService>((ref) {
   return ref.read(appStateControllerProvider).appState.viewSettingsService;
+});
+
+/// Sports preferences (listed competitions, followed teams). Its own
+/// ChangeNotifier, so watchers rebuild only on a Sports change.
+final sportsSettingsProvider = ChangeNotifierProvider<SportsSettings>((ref) {
+  return ref.read(appStateControllerProvider).appState.sportsSettings;
+});
+
+/// Fixtures from M3U Editor's Sports integration (it reads ESPN for us).
+final sportsServiceProvider = Provider<SportsService>((ref) {
+  return SportsService(
+    ref.read(appStateControllerProvider).appState.xtreamService,
+  );
+});
+
+/// What the editor's Sports integration offers; null while it's off.
+final sportsCapabilityProvider = Provider<SportsCapability?>((ref) {
+  return ref.watch(appStateControllerProvider).appState.sportsCapability;
 });
 
 /// Shared by every player's orchestrator (full-screen and Multiview tiles) so
