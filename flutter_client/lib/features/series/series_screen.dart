@@ -12,6 +12,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/catalog_window.dart';
 import 'package:m3u_tv/shared/catalog_window_grid.dart';
 import 'package:m3u_tv/shared/formatters.dart';
@@ -303,7 +304,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
     ref.listen<List<Category>>(seriesCategoriesProvider, _onCatalogReloaded);
 
     if (isBootstrapping) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: AppLoadingIndicator()));
     }
 
     if (!isConfigured) {
@@ -353,7 +354,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
 
   Widget _buildFavoritesContent() {
     if (!_favoritesLoadedOnce) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: AppLoadingIndicator());
     }
     if (_favoriteItems.isEmpty) {
       return Center(
@@ -437,7 +438,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
       animation: window,
       builder: (context, _) {
         if (!window.hasLoadedOnce && window.error == null) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: AppLoadingIndicator());
         }
         // A database that never opens must not strand the user on a spinner
         // forever.

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -116,7 +117,7 @@ class _CatchupShowsListState extends State<_CatchupShowsList> {
                       const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: AppLoadingIndicator(strokeWidth: 2),
                       ),
                       const SizedBox(width: 12),
                       Expanded(

@@ -9,6 +9,7 @@ import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/continue_watching_items.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/formatters.dart';
@@ -253,7 +254,7 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(child: AppLoadingIndicator()),
                 ),
               ),
             if (_hasMore && !_loading && _items.isNotEmpty)

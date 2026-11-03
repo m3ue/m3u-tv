@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_page_route.dart';
+import 'package:m3u_tv/shared/app_switch.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -257,7 +259,7 @@ class SettingsSwitchRow extends StatelessWidget {
       subtitle: subtitle,
       icon: icon,
       leading: leading,
-      trailing: Switch(value: value, onChanged: onChanged),
+      trailing: AppSwitch(value: value, onChanged: onChanged),
       onTap: () => onChanged(!value),
     );
   }
@@ -426,8 +428,9 @@ Future<T?> _pushImmersive<T>(
   required WidgetBuilder content,
 }) {
   return Navigator.of(context, rootNavigator: true).push<T>(
-    PageRouteBuilder<T>(
-      pageBuilder: (context, animation, secondaryAnimation) => Stack(
+    appPageRoute<T>(
+      context,
+      builder: (context) => Stack(
         fit: StackFit.expand,
         children: [
           const ColoredBox(color: _kSettingsSubpageBackground),
@@ -435,13 +438,6 @@ Future<T?> _pushImmersive<T>(
             _withTopLevelBackHandling(onBack, Builder(builder: content)),
           ),
         ],
-      ),
-      transitionsBuilder: (context, animation, _, child) => SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(1, 0),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
-        child: child,
       ),
     ),
   );

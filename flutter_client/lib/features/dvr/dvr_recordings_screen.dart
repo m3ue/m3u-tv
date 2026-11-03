@@ -7,6 +7,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
@@ -219,7 +220,7 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
         ],
         Expanded(
           child: widget.isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(child: AppLoadingIndicator())
               : widget.recordings.isEmpty
               ? Center(
                   child: Text(

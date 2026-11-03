@@ -11,6 +11,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/embedded_origin.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -742,7 +743,7 @@ class _DevicePairingInstructions extends StatelessWidget {
             const SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: AppLoadingIndicator(strokeWidth: 2),
             ),
             const SizedBox(width: 12),
             Flexible(

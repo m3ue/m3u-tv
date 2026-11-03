@@ -4,6 +4,7 @@ import 'package:m3u_tv/playback/native_video_surface.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Builds the preview's player: the same orchestrator the full-screen
@@ -333,7 +334,7 @@ class EpgPreviewVideo extends StatelessWidget {
                 const Center(
                   child: SizedBox.square(
                     dimension: 32,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: AppLoadingIndicator(strokeWidth: 2),
                   ),
                 ),
               if (channel != null)

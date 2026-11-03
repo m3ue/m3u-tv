@@ -8,6 +8,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
     show kCatalogKindLive, kCatalogKindSeries, kCatalogKindVod;
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/epg_show_results.dart';
@@ -209,7 +210,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     });
 
     if (isBootstrapping) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: AppLoadingIndicator()));
     }
 
     if (!isConfigured) {

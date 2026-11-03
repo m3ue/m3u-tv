@@ -10,6 +10,7 @@ import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -320,7 +321,7 @@ class _SwitchingDialogState extends State<_SwitchingDialog> {
             padding: const EdgeInsets.all(24),
             child: Row(
               children: [
-                const CircularProgressIndicator(),
+                const AppLoadingIndicator(),
                 SizedBox(width: 24 * scale),
                 Expanded(
                   child: Column(

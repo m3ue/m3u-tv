@@ -320,6 +320,7 @@ These compile-time flags are for local development and debugging. Pass them via 
 |---|---|---|
 | `TRAKT_CLIENT_ID` | built-in app client id | Overrides the default Trakt API client ID. See [Trakt setup](#trakt-setup). |
 | `M3U_TV_SHOW_PLAYBACK_DIAGNOSTICS` | `false` | Renders the in-player backend diagnostics panel and fallback reason badge. Useful when debugging playback fallback behaviour. |
+| `M3U_TV_DESIGN` | platform default | `material` or `cupertino` forces that design on every platform. By default iPhone, iPad and macOS use Cupertino and everything else (including Apple TV) uses Material. |
 
 Example enabling diagnostics on a debug run:
 
@@ -327,6 +328,12 @@ Example enabling diagnostics on a debug run:
 flutter run \
   --dart-define=M3U_TV_SHOW_PLAYBACK_DIAGNOSTICS=true \
   -d <device-id>
+```
+
+Example reviewing the Material design on a Mac (or `cupertino` to review the Apple look on Android):
+
+```bash
+flutter run --dart-define=M3U_TV_DESIGN=material -d macos
 ```
 
 ## Project structure

@@ -1,5 +1,6 @@
 import 'dart:async' show unawaited;
 
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoPage;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart'
@@ -25,6 +26,9 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
     show kCatalogKindSeries, kCatalogKindVod;
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_background.dart';
+import 'package:m3u_tv/shared/app_design.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
+import 'package:m3u_tv/shared/app_page_route.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -59,20 +63,19 @@ Widget _topLevelSafeArea(Widget screen) => Builder(
       : SafeArea(bottom: false, child: screen),
 );
 
-CustomTransitionPage<void> _slidePage(Widget screen) =>
-    CustomTransitionPage<void>(
-      child: ColoredBox(
-        color: const Color(0xFF09090b),
-        child: _topLevelSafeArea(screen),
-      ),
-      transitionsBuilder: (context, animation, _, child) => SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(1, 0),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
-        child: child,
-      ),
-    );
+/// The go_router page counterpart of [appPageRoute].
+Page<void> _slidePage(BuildContext context, Widget screen) {
+  final child = ColoredBox(
+    color: const Color(0xFF09090b),
+    child: _topLevelSafeArea(screen),
+  );
+  return AppDesignScope.isCupertino(context)
+      ? CupertinoPage<void>(child: child)
+      : CustomTransitionPage<void>(
+          child: child,
+          transitionsBuilder: appSlideTransition,
+        );
+}
 
 /// Hardware Back/Escape for the top-level VOD/Series detail routes.
 ///
@@ -262,7 +265,7 @@ class _AsyncVodDetails extends StatelessWidget {
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+              body: Center(child: AppLoadingIndicator()),
             );
           }
           final item = snapshot.data;
@@ -320,7 +323,7 @@ class _AsyncSeriesDetails extends StatelessWidget {
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+              body: Center(child: AppLoadingIndicator()),
             );
           }
           final series = snapshot.data;
@@ -448,6 +451,7 @@ GoRouter createGoRouter({
                     pageBuilder: (context, state) {
                       final actions = ContentActions.of(context);
                       return _slidePage(
+                        context,
                         ListenableBuilder(
                           listenable: actions.appState,
                           builder: (ctx, _) => ContinueWatchingScreen(
@@ -525,6 +529,7 @@ GoRouter createGoRouter({
                     pageBuilder: (context, state) {
                       final actions = ContentActions.of(context);
                       return _slidePage(
+                        context,
                         AIOStreamsSearchScreen(
                           integrations: actions.appState.aiostreamsIntegrations,
                           apiService: actions.appState.aiostreamsApiService,
@@ -622,6 +627,7 @@ GoRouter createGoRouter({
           final item = state.extra as VodItem?;
           if (item != null) {
             return _slidePage(
+              context,
               _withTopLevelBackHandling(
                 appShellKey,
                 ListenableBuilder(
@@ -646,6 +652,7 @@ GoRouter createGoRouter({
           // No object in hand (deep link / push notification / restored
           // route) - resolve it from the catalog.
           return _slidePage(
+            context,
             _AsyncVodDetails(
               vodId: vodId,
               actions: actions,
@@ -674,6 +681,7 @@ GoRouter createGoRouter({
               state.extra as AIOStreamsItem? ??
               AIOStreamsItem(id: id, type: type, name: id);
           return _slidePage(
+            context,
             _withTopLevelBackHandling(
               appShellKey,
               AIOStreamsDetailScreen(
@@ -729,6 +737,7 @@ GoRouter createGoRouter({
           final actions = _topLevelActions(appShellKey, appState);
           final requestOwner = actions.appState.mediaRequestOwner;
           return _slidePage(
+            context,
             _withTopLevelBackHandling(
               appShellKey,
               ListenableBuilder(
@@ -764,6 +773,7 @@ GoRouter createGoRouter({
           final series = state.extra as Series?;
           if (series != null) {
             return _slidePage(
+              context,
               _withTopLevelBackHandling(
                 appShellKey,
                 ListenableBuilder(
@@ -792,6 +802,7 @@ GoRouter createGoRouter({
           // No object in hand (deep link / push notification / restored
           // route) - resolve it from the catalog.
           return _slidePage(
+            context,
             _AsyncSeriesDetails(
               seriesId: seriesId,
               actions: actions,
@@ -820,6 +831,7 @@ GoRouter createGoRouter({
           }
           final actions = _topLevelActions(appShellKey, appState);
           return _slidePage(
+            context,
             _withTopLevelBackHandling(
               appShellKey,
               ShowDetailScreen(
@@ -856,6 +868,7 @@ GoRouter createGoRouter({
               ? null
               : int.tryParse(aiostreamsIntegrationIdParam);
           return _slidePage(
+            context,
             _withTopLevelBackHandling(
               appShellKey,
               PersonDetailScreen(

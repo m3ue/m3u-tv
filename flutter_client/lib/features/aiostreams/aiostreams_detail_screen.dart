@@ -6,6 +6,7 @@ import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/formatters.dart';
@@ -197,7 +198,7 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
           final colorMatchReady = _colorMatchResolved || snapshot.hasError;
           if (_isSeries) {
             if (isLoading) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: AppLoadingIndicator());
             }
             return _SeriesBody(
               item: item,
@@ -677,7 +678,7 @@ class _AIOStreamsStreamPickerSheetState
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const CircularProgressIndicator(),
+                            const AppLoadingIndicator(),
                             const SizedBox(height: 12),
                             Text(l.aiostreamsLoadingStreams),
                           ],

@@ -1,4 +1,6 @@
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:dpad/dpad.dart';
+import 'package:m3u_tv/shared/app_design.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -114,6 +116,66 @@ ButtonStyle _ghostStyle(
       BorderSide(color: tint.withValues(alpha: borderAlpha)),
     ),
   );
+}
+
+/// Matches [kStadiumFocusEffects]' radius, so a Cupertino button's capsule
+/// sits exactly inside the shared focus ring.
+const _kCupertinoCapsule = BorderRadius.all(Radius.circular(50));
+
+/// [AppButtonVariant]s in the Cupertino design: `primary` is the filled
+/// accent button, `primaryInverted` a white filled one (the hero play action
+/// over artwork), `tonal` a gray tinted button and `destructive` a red
+/// tinted one. Given the same footprint as the Material buttons, so a row of
+/// them lays out the same in either design.
+CupertinoButton _cupertinoButton(
+  BuildContext context, {
+  required AppButtonVariant variant,
+  required VoidCallback? onPressed,
+  required Size minimumSize,
+  required EdgeInsetsGeometry padding,
+  required Widget child,
+}) {
+  final enabled = onPressed != null;
+  switch (variant) {
+    case AppButtonVariant.primary:
+    case AppButtonVariant.primaryInverted:
+      final inverted = variant == AppButtonVariant.primaryInverted;
+      return CupertinoButton.filled(
+        sizeStyle: CupertinoButtonSize.small,
+        minimumSize: minimumSize,
+        padding: padding,
+        borderRadius: _kCupertinoCapsule,
+        color: inverted ? _kWhite : null,
+        foregroundColor: inverted && enabled ? _kBlack : null,
+        onPressed: onPressed,
+        child: child,
+      );
+    case AppButtonVariant.tonal:
+    case AppButtonVariant.destructive:
+      final tint = variant == AppButtonVariant.destructive
+          ? CupertinoColors.systemRed
+          : CupertinoColors.systemGrey;
+      return CupertinoButton.tinted(
+        sizeStyle: CupertinoButtonSize.small,
+        minimumSize: minimumSize,
+        padding: padding,
+        borderRadius: _kCupertinoCapsule,
+        color: tint,
+        // A tinted button draws its label in the theme's accent color, not
+        // its own tint. Left null while disabled so it falls back to the
+        // dimmed disabled label instead of staying full strength.
+        foregroundColor: enabled
+            ? CupertinoDynamicColor.resolve(
+                variant == AppButtonVariant.destructive
+                    ? tint
+                    : CupertinoColors.label,
+                context,
+              )
+            : null,
+        onPressed: onPressed,
+        child: child,
+      );
+  }
 }
 
 /// Wraps [DpadFocusable] so hovering with a mouse also moves real D-pad
@@ -293,7 +355,22 @@ class AppButton extends StatelessWidget {
     final effectiveOnPressed = loading ? null : onPressed;
 
     Widget button;
-    if (loading) {
+    if (AppDesignScope.isCupertino(context)) {
+      button = _cupertinoButton(
+        context,
+        variant: variant,
+        onPressed: effectiveOnPressed,
+        minimumSize: _minSize(scale),
+        padding: _padding(scale),
+        child: loading
+            ? CupertinoActivityIndicator(radius: 10 * scale)
+            : inlineProgressValue != null
+            ? _inlineProgressContent(scale)
+            : footer != null
+            ? _footerContent(scale)
+            : _labelRow(scale),
+      );
+    } else if (loading) {
       final child = SizedBox(
         width: 20 * scale,
         height: 20 * scale,
@@ -336,29 +413,7 @@ class AppButton extends StatelessWidget {
               label: Text(label),
             );
     } else if (inlineProgressValue != null) {
-      // A fixed-width track keeps the bar readable at a glance regardless of
-      // how long the trailing label text ends up being in a given locale.
-      final child = Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 18 * scale),
-            SizedBox(width: 10 * scale),
-          ],
-          SizedBox(
-            width: 72 * scale,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: inlineProgressValue,
-                minHeight: 4,
-              ),
-            ),
-          ),
-          SizedBox(width: 10 * scale),
-          Text(label),
-        ],
-      );
+      final child = _inlineProgressContent(scale);
       button = isPrimary
           ? ElevatedButton(
               style: style,
@@ -371,34 +426,7 @@ class AppButton extends StatelessWidget {
               child: child,
             );
     } else {
-      // [footer] present: build the label/icon row by hand (rather than the
-      // `.icon` convenience constructors above, which own their own Row
-      // internally with no seam to attach anything below it) and stack it
-      // over the footer inside one `IntrinsicWidth` column, so the footer —
-      // typically a bare `LinearProgressIndicator`, which otherwise wants
-      // infinite width — matches the label row's natural width exactly.
-      final labelRow = icon == null
-          ? Text(label)
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 18 * scale),
-                SizedBox(width: 8 * scale),
-                Text(label),
-              ],
-            );
-      final child = IntrinsicWidth(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(child: labelRow),
-            SizedBox(height: 8 * scale),
-            footer!,
-          ],
-        ),
-      );
+      final child = _footerContent(scale);
       button = isPrimary
           ? ElevatedButton(
               style: style,
@@ -445,6 +473,62 @@ class AppButton extends StatelessWidget {
       ],
     );
   }
+
+  /// Icon (if any) and [label] on one centered row.
+  Widget _labelRow(double scale) => icon == null
+      ? Text(label)
+      : Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18 * scale),
+            SizedBox(width: 8 * scale),
+            Text(label),
+          ],
+        );
+
+  /// The [inlineProgressValue] layout. A fixed-width track keeps the bar
+  /// readable at a glance regardless of how long the trailing label text
+  /// ends up being in a given locale.
+  Widget _inlineProgressContent(double scale) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      if (icon != null) ...[
+        Icon(icon, size: 18 * scale),
+        SizedBox(width: 10 * scale),
+      ],
+      SizedBox(
+        width: 72 * scale,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: inlineProgressValue,
+            minHeight: 4,
+          ),
+        ),
+      ),
+      SizedBox(width: 10 * scale),
+      Text(label),
+    ],
+  );
+
+  /// The [footer] layout: the label/icon row built by hand (rather than the
+  /// Material `.icon` convenience constructors, which own their own Row
+  /// internally with no seam to attach anything below it) and stacked over
+  /// the footer inside one `IntrinsicWidth` column, so the footer -
+  /// typically a bare `LinearProgressIndicator`, which otherwise wants
+  /// infinite width - matches the label row's natural width exactly.
+  Widget _footerContent(double scale) => IntrinsicWidth(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(child: _labelRow(scale)),
+        SizedBox(height: 8 * scale),
+        footer!,
+      ],
+    ),
+  );
 }
 
 class _CountBadge extends StatelessWidget {
@@ -539,7 +623,24 @@ class AppIconButton extends StatelessWidget {
     };
 
     Widget rawButton;
-    if (variant == AppButtonVariant.primary ||
+    if (AppDesignScope.isCupertino(context)) {
+      final size = dense ? _denseIconButtonSize(scale) : _iconButtonSize(scale);
+      final cupertinoButton = SizedBox.fromSize(
+        size: size,
+        child: _cupertinoButton(
+          context,
+          variant: variant,
+          onPressed: onPressed,
+          minimumSize: size,
+          padding: EdgeInsets.zero,
+          child: Icon(icon, size: (dense ? 20 : 24) * scale),
+        ),
+      );
+      final tooltipMessage = tooltip;
+      rawButton = tooltipMessage == null
+          ? cupertinoButton
+          : Tooltip(message: tooltipMessage, child: cupertinoButton);
+    } else if (variant == AppButtonVariant.primary ||
         variant == AppButtonVariant.primaryInverted) {
       // No IconButton variant renders elevated — use a plain ElevatedButton
       // with an icon child instead, matching AppButton's primary treatment.

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
 import 'package:clock/clock.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, listEquals;
 import 'package:flutter/services.dart';
@@ -41,6 +42,8 @@ import 'package:m3u_tv/services/dvr_actions.dart';
 import 'package:m3u_tv/services/memory_watchdog.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/shared/app_background.dart';
+import 'package:m3u_tv/shared/app_design.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/dvr_schedule_feedback.dart';
@@ -1640,7 +1643,7 @@ class AppShellState extends ConsumerState<AppShell>
         builder: (_, _) {
           if (_appState.isBootstrapping) {
             return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+              body: Center(child: AppLoadingIndicator()),
             );
           }
           return DvrRecordingsScreen(
@@ -1668,7 +1671,7 @@ class AppShellState extends ConsumerState<AppShell>
         builder: (_, _) {
           if (_appState.isBootstrapping) {
             return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+              body: Center(child: AppLoadingIndicator()),
             );
           }
           return RequestScreen(
@@ -2164,37 +2167,52 @@ class AppShellState extends ConsumerState<AppShell>
         ? _currentIndex
         : moreTabIndex;
 
+    final cupertino = AppDesignScope.isCupertino(context);
+    void onTap(int index) {
+      if (index == moreTabIndex) {
+        unawaited(_showMoreSheet(overflowRoutes, primaryCount, unreadCount));
+      } else {
+        _navigateTo(index);
+      }
+    }
+
+    final items = [
+      ...routes.take(primaryCount).map((route) {
+        return BottomNavigationBarItem(
+          icon: Icon(_routeIcon(route)),
+          label: navigationRouteLabel(context, route),
+        );
+      }),
+      if (overflowRoutes.isNotEmpty)
+        BottomNavigationBarItem(
+          icon: Badge(
+            isLabelVisible: overflowUnread > 0,
+            label: Text('$overflowUnread'),
+            child: Icon(cupertino ? CupertinoIcons.ellipsis : Icons.more_vert),
+          ),
+          label: AppLocalizations.of(context).navMore,
+        ),
+    ];
+
     return Scaffold(
       body: contentShell,
       bottomNavigationBar: _fullScreenDetailActive
           ? null
+          : cupertino
+          ? CupertinoTabBar(
+              currentIndex: displayedIndex,
+              onTap: onTap,
+              items: items,
+            )
           : BottomNavigationBar(
               type: BottomNavigationBarType.fixed,
               currentIndex: displayedIndex,
-              onTap: (index) => index == moreTabIndex
-                  ? _showMoreSheet(overflowRoutes, primaryCount, unreadCount)
-                  : _navigateTo(index),
+              onTap: onTap,
               selectedItemColor: Theme.of(context).colorScheme.primary,
               unselectedItemColor: Theme.of(
                 context,
               ).colorScheme.onSurfaceVariant,
-              items: [
-                ...routes.take(primaryCount).map((route) {
-                  return BottomNavigationBarItem(
-                    icon: Icon(_routeIcon(route)),
-                    label: navigationRouteLabel(context, route),
-                  );
-                }),
-                if (overflowRoutes.isNotEmpty)
-                  BottomNavigationBarItem(
-                    icon: Badge(
-                      isLabelVisible: overflowUnread > 0,
-                      label: Text('$overflowUnread'),
-                      child: const Icon(Icons.more_vert),
-                    ),
-                    label: AppLocalizations.of(context).navMore,
-                  ),
-              ],
+              items: items,
             ),
     );
   }
@@ -2208,6 +2226,40 @@ class AppShellState extends ConsumerState<AppShell>
     // Calling _navigateTo synchronously inside ListTile.onTap while the sheet
     // is still in the overlay can cause a double interaction event on some
     // platforms (goBranch fires a route change mid-pop animation).
+    if (AppDesignScope.isCupertino(context)) {
+      final index = await showCupertinoModalPopup<int>(
+        context: context,
+        builder: (sheetContext) => CupertinoActionSheet(
+          actions: [
+            for (var i = 0; i < overflowRoutes.length; i++)
+              CupertinoActionSheetAction(
+                onPressed: () =>
+                    Navigator.of(sheetContext).pop(primaryCount + i),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(navigationRouteLabel(sheetContext, overflowRoutes[i])),
+                    if (overflowRoutes[i] == RouteNames.notifications &&
+                        unreadCount > 0) ...[
+                      const SizedBox(width: 8),
+                      Badge(label: Text('$unreadCount')),
+                    ],
+                  ],
+                ),
+              ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(sheetContext).pop(),
+            child: Text(
+              CupertinoLocalizations.of(sheetContext).cancelButtonLabel,
+            ),
+          ),
+        ),
+      );
+      if (index != null && mounted) _navigateTo(index);
+      return;
+    }
     final index = await showModalBottomSheet<int>(
       context: context,
       builder: (sheetContext) => SafeArea(
@@ -2236,19 +2288,33 @@ class AppShellState extends ConsumerState<AppShell>
     if (index != null && mounted) _navigateTo(index);
   }
 
-  IconData _routeIcon(String route) => switch (route) {
-    RouteNames.home => Icons.home,
-    RouteNames.search => Icons.search,
-    RouteNames.liveTv => Icons.live_tv,
-    RouteNames.vod => Icons.movie,
-    RouteNames.series => Icons.tv,
-    RouteNames.aiostreams => Icons.subscriptions,
-    RouteNames.dvr => Icons.video_library,
-    RouteNames.requests => Icons.playlist_add,
-    RouteNames.notifications => Icons.notifications,
-    RouteNames.settings => Icons.settings,
-    _ => Icons.circle,
-  };
+  IconData _routeIcon(String route) => AppDesignScope.isCupertino(context)
+      ? switch (route) {
+          RouteNames.home => CupertinoIcons.house_fill,
+          RouteNames.search => CupertinoIcons.search,
+          RouteNames.liveTv => CupertinoIcons.tv_fill,
+          RouteNames.vod => CupertinoIcons.film_fill,
+          RouteNames.series => CupertinoIcons.play_rectangle_fill,
+          RouteNames.aiostreams => CupertinoIcons.rectangle_stack_fill,
+          RouteNames.dvr => CupertinoIcons.recordingtape,
+          RouteNames.requests => CupertinoIcons.text_badge_plus,
+          RouteNames.notifications => CupertinoIcons.bell_fill,
+          RouteNames.settings => CupertinoIcons.gear_alt_fill,
+          _ => CupertinoIcons.circle_fill,
+        }
+      : switch (route) {
+          RouteNames.home => Icons.home,
+          RouteNames.search => Icons.search,
+          RouteNames.liveTv => Icons.live_tv,
+          RouteNames.vod => Icons.movie,
+          RouteNames.series => Icons.tv,
+          RouteNames.aiostreams => Icons.subscriptions,
+          RouteNames.dvr => Icons.video_library,
+          RouteNames.requests => Icons.playlist_add,
+          RouteNames.notifications => Icons.notifications,
+          RouteNames.settings => Icons.settings,
+          _ => Icons.circle,
+        };
 }
 
 extension _FirstWhereOrNull<T> on Iterable<T> {

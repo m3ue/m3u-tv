@@ -15,6 +15,7 @@ import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -640,7 +641,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                 Center(
                   child: SizedBox.square(
                     dimension: 36 * scale,
-                    child: const CircularProgressIndicator(strokeWidth: 2),
+                    child: const AppLoadingIndicator(strokeWidth: 2),
                   ),
                 ),
               Positioned(

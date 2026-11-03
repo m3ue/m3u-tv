@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:clock/clock.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +16,7 @@ import 'package:m3u_tv/features/player/player_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
+import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
@@ -31,6 +33,7 @@ import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/app_design.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
@@ -1423,6 +1426,66 @@ void main() {
   );
 
   testWidgets(
+    'Cupertino phone layout uses the iOS tab bar and a More action sheet',
+    (tester) async {
+      await tester.pumpWidget(
+        const _TestApp(
+          deviceType: DeviceType.phone,
+          design: AppDesign.cupertino,
+        ),
+      );
+      await _pumpAppFrame(tester);
+
+      expect(find.byType(BottomNavigationBar), findsNothing);
+      int currentTab() => tester
+          .widget<CupertinoTabBar>(find.byType(CupertinoTabBar))
+          .currentIndex;
+      expect(currentTab(), 0);
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(CupertinoTabBar),
+          matching: find.text('Search'),
+        ),
+      );
+      await _pumpAppFrame(tester);
+      expect(currentTab(), 1);
+
+      Future<void> openMore() async {
+        await tester.tap(
+          find.descendant(
+            of: find.byType(CupertinoTabBar),
+            matching: find.text('More'),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+      }
+
+      await openMore();
+      expect(find.byType(CupertinoActionSheet), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(CupertinoActionSheet), findsNothing);
+      expect(currentTab(), 1);
+
+      await openMore();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(CupertinoActionSheet),
+          matching: find.text('Settings'),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await _pumpAppFrame(tester);
+      expect(find.byType(CupertinoActionSheet), findsNothing);
+      expect(currentTab(), RouteNames.mobilePrimaryCount);
+    },
+  );
+
+  testWidgets(
     'Android root Back from another tab returns to the start page first',
     (tester) async {
       await tester.pumpWidget(const _TestApp(deviceType: DeviceType.phone));
@@ -2812,9 +2875,11 @@ class _TestApp extends StatefulWidget {
     this.systemUiPolicy,
     this.playbackOrchestratorBuilder,
     this.useProductionPlayer = false,
+    this.design = AppDesign.material,
   });
 
   final DeviceType deviceType;
+  final AppDesign design;
   final AppStateController? appState;
   final Widget Function(PlayerArgs args)? playerRouteBuilder;
   final SystemUiPolicy? systemUiPolicy;
@@ -2858,12 +2923,15 @@ class _TestAppState extends State<_TestApp> {
   Widget build(BuildContext context) {
     return ProviderScope(
       overrides: [overrideAppState(_appState)],
-      child: MaterialApp.router(
-        title: 'M3U TV Test',
-        theme: ThemeData.dark(useMaterial3: true),
-        routerConfig: _router,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
+      child: AppDesignScope(
+        design: widget.design,
+        child: MaterialApp.router(
+          title: 'M3U TV Test',
+          theme: ThemeData.dark(useMaterial3: true),
+          routerConfig: _router,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+        ),
       ),
     );
   }

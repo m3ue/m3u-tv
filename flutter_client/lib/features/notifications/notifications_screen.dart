@@ -6,6 +6,7 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/tv_notification_store.dart'
     show StoredTvNotification, TvNotificationChannel, TvNotificationStore;
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
@@ -110,7 +111,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
     final isConfigured = ref.watch(isConfiguredProvider);
 
     if (isBootstrapping) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: AppLoadingIndicator()));
     }
 
     if (!isConfigured) {
@@ -177,7 +178,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
         if (!_loaded)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 48),
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(child: AppLoadingIndicator()),
           )
         else if (filtered.isEmpty)
           Padding(
@@ -224,7 +225,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
         ),
         const SizedBox(height: 16),
         if (!_loaded)
-          const Center(child: CircularProgressIndicator())
+          const Center(child: AppLoadingIndicator())
         else ...[
           _ChannelFilterChip(
             label: l.notificationsAllChannels,

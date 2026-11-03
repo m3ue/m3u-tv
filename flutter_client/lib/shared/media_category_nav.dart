@@ -1,6 +1,7 @@
 import 'package:dpad/dpad.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_page_route.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:material_ui/material_ui.dart';
@@ -310,15 +311,11 @@ class MediaCategoryNavState extends State<MediaCategoryNav> {
 
   Future<void> _openFilterScreen(BuildContext context) async {
     final result = await Navigator.of(context).push<String>(
-      PageRouteBuilder<String>(
-        // Mirrors go_router_config.dart's `_slidePage`: an opaque backing
-        // color (the shared TV-layout gradient's dominant end tone) plus a
-        // pure slide, no fade. Without this, a raw MaterialPageRoute uses
-        // Material 3's default fade transition over a transparent Scaffold
-        // (scaffoldBackgroundColor is transparent app-wide, relying on
-        // AppShell's shared gradient to show through) and briefly renders
-        // see-through during the push.
-        pageBuilder: (context, animation, secondaryAnimation) => Stack(
+      appPageRoute<String>(
+        context,
+        // Opaque backing (the shared TV-layout gradient's dominant end
+        // tone) - see appSlideTransition for why it's needed.
+        builder: (context) => Stack(
           fit: StackFit.expand,
           children: [
             const ColoredBox(color: Color(0xFF09090b)),
@@ -329,13 +326,6 @@ class MediaCategoryNavState extends State<MediaCategoryNav> {
               counts: widget.categoryCounts,
             ),
           ],
-        ),
-        transitionsBuilder: (context, animation, _, child) => SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(1, 0),
-            end: Offset.zero,
-          ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
-          child: child,
         ),
       ),
     );

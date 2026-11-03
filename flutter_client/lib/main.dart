@@ -27,6 +27,7 @@ import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/production_storage.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/window_state_service.dart';
+import 'package:m3u_tv/shared/app_design.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -433,6 +434,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  final AppDesign _design = resolveAppDesign();
   late final GoRouter _router = createGoRouter(
     appState: widget.appState ?? AppStateController(),
     nativeTelevisionHint: widget.nativeTelevisionHint,
@@ -530,7 +532,10 @@ class _MyAppState extends State<MyApp> {
           stored: viewSettings?.fontSizeSyncOrNull,
           isTv: deviceType == DeviceType.tv,
         );
-        final routerChild = child ?? const SizedBox.shrink();
+        final routerChild = AppDesignScope(
+          design: _design,
+          child: child ?? const SizedBox.shrink(),
+        );
         return Dpad(
           theme: const DpadThemeData(
             effects: [
