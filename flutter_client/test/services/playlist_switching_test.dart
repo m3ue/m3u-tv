@@ -553,19 +553,17 @@ void main() {
       await proxy.setEnabled(enabled: true);
       await proxy.setLiveProfileId(5);
 
+      // In place as soon as the playlist is shown, before any stream starts.
       expect(await controller.switchToPlaylist(_movies), isNull);
-      await pumpEventQueue();
       expect(proxy.enabled, isFalse);
       expect(proxy.liveProfileId, isNull);
       await proxy.setLiveProfileId(7);
 
       expect(await controller.switchToPlaylist(_sports), isNull);
-      await pumpEventQueue();
       expect(proxy.enabled, isTrue);
       expect(proxy.liveProfileId, 5);
 
       expect(await controller.switchToPlaylist(_movies), isNull);
-      await pumpEventQueue();
       expect(proxy.liveProfileId, 7);
     });
   });

@@ -4,6 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 
+/// One playlist's stored proxy playback preferences (see
+/// [ProxyPlaybackSettings.readFor]).
+typedef ProxyPlaybackValues = ({
+  bool enabled,
+  int? liveProfileId,
+  int? vodProfileId,
+});
+
 /// Per-device proxy playback preferences.
 ///
 /// Mirrors the m3u-editor "In-App Player Transcoding" preferences: the user can
@@ -42,22 +50,40 @@ class ProxyPlaybackSettings extends ChangeNotifier {
   /// has none stored. Without a store the in-memory values are kept.
   Future<void> load() async {
     final scope = playlistScope?.call();
-    final store = _store;
-    if (store == null) {
+    if (_store == null) {
       _loaded = true;
       _loadedScope = scope;
       return;
     }
-    final raw = await store.read(playlistScopedKey(_storeKey, scope));
+    final values = await readFor(scope);
     // A newer load for the playlist that has since become active owns the
     // values now.
     if (playlistScope?.call() != scope) return;
+    useFor(scope, values!);
+  }
+
+  /// The preferences stored for the playlist with [scope], read ahead of
+  /// showing it so they go in place with it ([useFor]). Null without a store.
+  Future<ProxyPlaybackValues?> readFor(String? scope) async {
+    final store = _store;
+    if (store == null) return null;
+    final raw = await store.read(playlistScopedKey(_storeKey, scope));
+    final values = raw is Map ? raw : const <Object?, Object?>{};
+    return (
+      enabled: values['enabled'] == true,
+      liveProfileId: _asProfileId(values['live_profile_id']),
+      vodProfileId: _asProfileId(values['vod_profile_id']),
+    );
+  }
+
+  /// Makes [values] (from [readFor]) the current preferences, as the
+  /// playlist with [scope]'s.
+  void useFor(String? scope, ProxyPlaybackValues values) {
     _loaded = true;
     _loadedScope = scope;
-    final values = raw is Map ? raw : const <Object?, Object?>{};
-    _enabled = values['enabled'] == true;
-    _liveProfileId = _asProfileId(values['live_profile_id']);
-    _vodProfileId = _asProfileId(values['vod_profile_id']);
+    _enabled = values.enabled;
+    _liveProfileId = values.liveProfileId;
+    _vodProfileId = values.vodProfileId;
     notifyListeners();
   }
 

@@ -246,13 +246,20 @@ class AppStateController extends ChangeNotifier {
     return login == null ? null : _loginKeyFor(login, _playlistScope());
   }
 
-  void _publishLogin(UserCredentials? credentials) {
+  /// [proxy] is the incoming playlist's proxy preferences when the caller
+  /// read them ahead, so they are in place the moment it is shown.
+  void _publishLogin(
+    UserCredentials? credentials, {
+    ProxyPlaybackValues? proxy,
+  }) {
     final previousScope = _playlistScope();
     _publishedLogin = credentials;
     final scope = _playlistScope();
     _catalogRepository.shownSource = _catalogSource(scope);
-    // Proxy preferences are held in memory: load the shown playlist's.
-    if (!proxyPlaybackSettings.isLoadedFor(scope)) {
+    // Proxy preferences are held in memory: put the shown playlist's there.
+    if (proxy != null) {
+      proxyPlaybackSettings.useFor(scope, proxy);
+    } else if (!proxyPlaybackSettings.isLoadedFor(scope)) {
       unawaited(proxyPlaybackSettings.load());
     }
     if (scope == previousScope) return;
@@ -1523,6 +1530,7 @@ class AppStateController extends ChangeNotifier {
     final progress = activeViewer == null
         ? const <Progress>[]
         : await _storedRecentlyWatched(activeViewer.ulid);
+    final proxy = await proxyPlaybackSettings.readFor(playlist.scope);
     if (_disposed || _sourceOperationGeneration.isStale(startGeneration)) {
       return false;
     }
@@ -1539,7 +1547,7 @@ class AppStateController extends ChangeNotifier {
     // The outgoing guide stays stored under its playlist; only memory goes.
     _epg.resetSession();
     _sourceType = AppSourceType.xtream;
-    _publishLogin(credentials);
+    _publishLogin(credentials, proxy: proxy);
     _liveCategories = stored.liveCategories;
     _vodCategories = stored.vodCategories;
     _seriesCategories = stored.seriesCategories;
@@ -2092,6 +2100,20 @@ class AppStateController extends ChangeNotifier {
       // The playlist being loaded: the shown one on a refresh, the incoming
       // one on a switch, whose favorites are staged before it is shown.
       final targetScope = savedPlaylists.scopeFor(authNotifier.credentials);
+      // On a switch, read the incoming playlist's proxy preferences while the
+      // catalog is stored, to put them in place as it is shown. Not awaited:
+      // if the read hasn't landed by then, they load just after instead.
+      ProxyPlaybackValues? proxy;
+      if (targetScope != _playlistScope()) {
+        unawaited(
+          proxyPlaybackSettings
+              .readFor(targetScope)
+              .then<void>((values) {
+                proxy = values;
+              })
+              .catchError((Object _) {}),
+        );
+      }
 
       Future<bool> commit() async {
         if (_sourceOperationGeneration.isStale(sourceGeneration)) return false;
@@ -2181,7 +2203,7 @@ class AppStateController extends ChangeNotifier {
             _epg.resetSession(clearGuide: _sourceType != AppSourceType.none);
           }
           _sourceType = AppSourceType.xtream;
-          _publishLogin(authNotifier.credentials);
+          _publishLogin(authNotifier.credentials, proxy: proxy);
           _liveCategories = liveCategories;
           _vodCategories = vodCategories;
           _seriesCategories = seriesCategories;
