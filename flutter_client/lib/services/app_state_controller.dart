@@ -668,14 +668,6 @@ class AppStateController extends ChangeNotifier {
     // state then moved off the unscoped keys like every other playlist's.
     if (credentials != null) await _rememberPlaylist(credentials);
     await _scopeUnscopedPlaylists();
-    // What was cached before each playlist kept its own is this login's.
-    if (credentials != null) {
-      final source = _catalogSource(savedPlaylists.scopeFor(credentials));
-      await _bestEffort(
-        () => cacheService.moveCatalog(CatalogRepository.defaultSource, source),
-      );
-      await _bestEffort(() => cacheService.adoptSharedViewers(source));
-    }
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     _publishLogin(credentials);
     _runBackgroundPersistence(_trimCachedCatalogs());
@@ -841,9 +833,13 @@ class AppStateController extends ChangeNotifier {
     var restoredPreviousSource = false;
     Future<void> restorePreviousSource({required bool allowStaleSource}) async {
       if (_sourceRollbackGeneration.isStale(rollbackGeneration)) {
+        // A sign-out or a switch took over while this connect was writing.
+        // Drop what it stored for a login that was never saved (every saved
+        // playlist keeps its own), and after a sign-out the shared keys.
         if (_sourceType == AppSourceType.none) {
-          await _bestEffort(cacheService.clear);
+          await _bestEffort(cacheService.clearShared);
         }
+        await _discardPendingPlaylist(credentials);
         return;
       }
       if (restoredPreviousSource) return;
@@ -1422,7 +1418,9 @@ class AppStateController extends ChangeNotifier {
   Future<void> signOutDevice() => _signOut(forgetEditor: true);
 
   Future<void> _signOut({required bool forgetEditor}) async {
-    final signedOutLogin = authNotifier.credentials;
+    // The playlist on screen: mid-connect the auth session already holds the
+    // incoming login.
+    final signedOutLogin = _publishedLogin;
     final signedOutPlaylist = savedPlaylists.find(signedOutLogin);
     final signedOutSource = _catalogRepository.shownSource;
     final sourceGeneration = _sourceOperationGeneration.advance();
@@ -1436,17 +1434,22 @@ class AppStateController extends ChangeNotifier {
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     await authNotifier.disconnect();
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
-    // Other saved playlists keep their catalogs; the forgotten ones' go below.
+    // Drop the guide held in memory and any write not yet stored, and wait
+    // out one in flight, so none lands after the playlist's storage goes.
+    _epg.resetSession();
+    await epgService.flushStore();
+    if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
+    // Other saved playlists keep what they stored; the forgotten ones' goes
+    // below, with the rest of their state.
     await cacheService.clearShared();
-    await cacheService.dropCatalog(signedOutSource);
+    if (signedOutPlaylist == null) {
+      await cacheService.dropCatalog(signedOutSource);
+    }
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     await _bestEffort(emptyMediaImageCacheIfAvailable);
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
     await secureStorage.delete(_sourceKey);
     if (_sourceOperationGeneration.isStale(sourceGeneration)) return;
-    // The stored guide went with the playlist's catalog above. Drop the one in
-    // memory, and any write not yet stored, before the shown source moves.
-    _epg.resetSession();
     _publishLogin(null);
     // Before the final notify, so the connect screen never lists a playlist
     // that was just signed out of.
@@ -1616,7 +1619,7 @@ class AppStateController extends ChangeNotifier {
   Future<void> removePlaylist(String id) async {
     final playlist = savedPlaylists.byId(id);
     if (playlist == null) return;
-    if (savedPlaylists.find(authNotifier.credentials)?.id == id) {
+    if (savedPlaylists.find(_publishedLogin)?.id == id) {
       await disconnect();
       return;
     }
@@ -1675,6 +1678,10 @@ class AppStateController extends ChangeNotifier {
             to: _loginKeyFor(playlist.credentials, scope),
           ),
         ]);
+        // The single catalog and viewers list kept before each playlist had
+        // its own are this login's too.
+        await cacheService.moveCatalog(CatalogRepository.defaultSource, scope);
+        await cacheService.adoptSharedViewers(scope);
         await savedPlaylists.markScoped(playlist.id);
       } on Object catch (error) {
         // Stays on the unscoped keys, where it still works; retried next boot.
@@ -1686,7 +1693,8 @@ class AppStateController extends ChangeNotifier {
   /// Keeps the catalogs of the [cachedPlaylistLimit] most recently used
   /// playlists (always the shown one) and drops every other stored catalog,
   /// including any left by a removed playlist or a failed connect.
-  Future<void> _trimCachedCatalogs() async {
+  /// Whether it dropped anything.
+  Future<bool> _trimCachedCatalogs() async {
     final keep = <String>{
       _catalogRepository.shownSource,
       ...savedPlaylists.pendingScopes,
@@ -1695,15 +1703,19 @@ class AppStateController extends ChangeNotifier {
       ))
         _catalogSource(playlist.scope),
     };
+    var dropped = false;
     try {
       for (final source in await cacheService.storedCatalogSources()) {
-        if (_disposed) return;
-        if (!keep.contains(source)) await cacheService.dropCatalog(source);
+        if (_disposed) return dropped;
+        if (keep.contains(source)) continue;
+        await cacheService.dropCatalog(source);
+        dropped = true;
       }
     } on Object catch (error) {
       // Housekeeping: whatever is left is trimmed after the next connect.
       debugPrint('Saved playlists: could not trim cached catalogs: $error');
     }
+    return dropped;
   }
 
   /// Drops every stored catalog but the shown playlist's, and gives the space
@@ -1722,8 +1734,10 @@ class AppStateController extends ChangeNotifier {
     _cachedPlaylistLimit = limit;
     notifyListeners();
     await secureStorage.write(_cachedPlaylistsKey, '$limit');
-    await _trimCachedCatalogs();
-    await _bestEffort(_catalogRepository.compact);
+    // A VACUUM rewrites the whole file: only worth it when space was freed.
+    if (await _trimCachedCatalogs()) {
+      await _bestEffort(_catalogRepository.compact);
+    }
   }
 
   /// Frees the catalog stored for the saved playlist [id]. The shown
@@ -2326,12 +2340,14 @@ class AppStateController extends ChangeNotifier {
   /// What the playlist stored under [sourceKey] needs to be painted before
   /// its server answers, or null when nothing is stored.
   Future<_StoredSession?> _readStoredSession(String sourceKey) async {
+    // A new list even when none is stored: screens tell a reload by the
+    // list's identity, which a shared const list would hide.
     Future<List<Category>> categories(String key) async =>
         (await cacheService.get<List<Category>>(
           key,
           sourceKey: sourceKey,
         ))?.data ??
-        const <Category>[];
+        <Category>[];
     final liveCategories = await categories('liveCategories');
     final vodCategories = await categories('vodCategories');
     final seriesCategories = await categories('seriesCategories');

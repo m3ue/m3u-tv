@@ -187,6 +187,42 @@ void main() {
       expect(find.text('Matrix Reloaded'), findsNothing);
     });
 
+    testWidgets('a playlist switch re-runs the search', (tester) async {
+      final playlistKeyState = StateProvider<String?>((_) => 'first');
+      await tester.pumpWidget(
+        _TestApp(
+          catalogRepository: testRepo,
+          playlistKeyState: playlistKeyState,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'matrix');
+      await tester.pumpAndSettle();
+      expect(find.text('Matrix Reloaded'), findsOneWidget);
+
+      await testRepo.replaceItems(
+        sourceKey: CatalogRepository.defaultSource,
+        kind: kCatalogKindVod,
+        items: const <VodItem>[
+          VodItem(
+            id: 30,
+            name: 'Matrix Resurrections',
+            streamUrl: 'http://example.com/30.mp4',
+            containerExtension: 'mp4',
+            categoryId: '20',
+          ),
+        ],
+      );
+      // Both playlists have no live categories: the same empty list.
+      ProviderScope.containerOf(
+        tester.element(find.byType(SearchScreen)),
+      ).read(playlistKeyState.notifier).state = 'second';
+      await tester.pumpAndSettle();
+
+      expect(find.text('Matrix Resurrections'), findsOneWidget);
+      expect(find.text('Matrix Reloaded'), findsNothing);
+    });
+
     testWidgets('Live TV tab shows only channels', (tester) async {
       await tester.pumpWidget(
         _TestApp(
@@ -723,6 +759,7 @@ class _TestApp extends StatelessWidget {
     this.onSearchShows,
     this.onShowSelect,
     this.categoriesState,
+    this.playlistKeyState,
   });
 
   final CatalogRepository catalogRepository;
@@ -738,6 +775,9 @@ class _TestApp extends StatelessWidget {
   /// mounted, the way every catalog load does.
   final StateProvider<List<Category>>? categoriesState;
 
+  /// When set, a test can switch the shown playlist.
+  final StateProvider<String?>? playlistKeyState;
+
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
@@ -749,6 +789,11 @@ class _TestApp extends StatelessWidget {
           (ref) => categoriesState == null
               ? const <Category>[]
               : ref.watch(categoriesState!),
+        ),
+        shownPlaylistKeyProvider.overrideWith(
+          (ref) => playlistKeyState == null
+              ? 'playlist'
+              : ref.watch(playlistKeyState!),
         ),
       ],
       child: MaterialApp(

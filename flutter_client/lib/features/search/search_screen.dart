@@ -203,6 +203,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     ref.listen<List<Category>>(liveCategoriesProvider, (previous, next) {
       if (!identical(previous, next)) setState(() => _catalogResultsFor = null);
     });
+    // A switch is caught even when both playlists' lists look the same.
+    ref.listen<String?>(shownPlaylistKeyProvider, (previous, next) {
+      if (previous != next) setState(() => _catalogResultsFor = null);
+    });
 
     if (isBootstrapping) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));

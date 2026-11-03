@@ -665,15 +665,26 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
     unawaited(() async {
       final favoritesQuery = LiveChannelQuery(ids: favorites);
       var query = favoritesQuery;
-      var channels = favorites.isEmpty
-          ? const <Channel>[]
-          : await query.page(repo, 0, widget.rowItemLimit);
-      final showsFavorites = channels.isNotEmpty;
-      if (!showsFavorites) {
-        query = const LiveChannelQuery();
-        channels = await query.page(repo, 0, widget.rowItemLimit);
+      var channels = const <Channel>[];
+      var showsFavorites = false;
+      var length = 0;
+      try {
+        if (favorites.isNotEmpty) {
+          channels = await query.page(repo, 0, widget.rowItemLimit);
+        }
+        showsFavorites = channels.isNotEmpty;
+        if (!showsFavorites) {
+          query = const LiveChannelQuery();
+          channels = await query.page(repo, 0, widget.rowItemLimit);
+        }
+        length = await query.count(repo);
+      } on Object catch (error) {
+        // Hide the row rather than leave its placeholder up; the next
+        // catalog load tries again.
+        debugPrint('Home: could not read channels: $error');
+        channels = const <Channel>[];
+        showsFavorites = false;
       }
-      final length = await query.count(repo);
       if (!mounted || _fetchedFor != key) return;
       setState(() {
         _windowSlice = (
@@ -808,20 +819,25 @@ class _MoviesRowState extends ConsumerState<_MoviesRow> {
 
   void _fetch(List<Category> categories, CatalogRepository repo) {
     _fetchedFor = categories;
-    unawaited(
-      repo
-          .pageActiveItems<VodItem>(
-            kind: kCatalogKindVod,
-            offset: 0,
-            limit: widget.rowItemLimit,
-          )
-          .then((items) {
-            if (mounted && identical(_fetchedFor, categories)) {
-              setState(() => _items = items);
-              widget.onLoaded(items.isNotEmpty);
-            }
-          }),
-    );
+    unawaited(() async {
+      List<VodItem> items;
+      try {
+        items = await repo.pageActiveItems<VodItem>(
+          kind: kCatalogKindVod,
+          offset: 0,
+          limit: widget.rowItemLimit,
+        );
+      } on Object catch (error) {
+        // Hide the row rather than leave its placeholder up; the next
+        // catalog load tries again.
+        debugPrint('Home: could not read movies: $error');
+        items = const <VodItem>[];
+      }
+      if (mounted && identical(_fetchedFor, categories)) {
+        setState(() => _items = items);
+        widget.onLoaded(items.isNotEmpty);
+      }
+    }());
   }
 
   @override
@@ -915,20 +931,25 @@ class _SeriesRowState extends ConsumerState<_SeriesRow> {
 
   void _fetch(List<Category> categories, CatalogRepository repo) {
     _fetchedFor = categories;
-    unawaited(
-      repo
-          .pageActiveItems<Series>(
-            kind: kCatalogKindSeries,
-            offset: 0,
-            limit: widget.rowItemLimit,
-          )
-          .then((items) {
-            if (mounted && identical(_fetchedFor, categories)) {
-              setState(() => _items = items);
-              widget.onLoaded(items.isNotEmpty);
-            }
-          }),
-    );
+    unawaited(() async {
+      List<Series> items;
+      try {
+        items = await repo.pageActiveItems<Series>(
+          kind: kCatalogKindSeries,
+          offset: 0,
+          limit: widget.rowItemLimit,
+        );
+      } on Object catch (error) {
+        // Hide the row rather than leave its placeholder up; the next
+        // catalog load tries again.
+        debugPrint('Home: could not read series: $error');
+        items = const <Series>[];
+      }
+      if (mounted && identical(_fetchedFor, categories)) {
+        setState(() => _items = items);
+        widget.onLoaded(items.isNotEmpty);
+      }
+    }());
   }
 
   @override

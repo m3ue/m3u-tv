@@ -130,12 +130,15 @@ void main() {
     _Catalog catalog, {
     VoidCallback? onMoviesMore,
     FavoritesService? liveFavorites,
+    bool unreadable = false,
   }) async {
     // A TV screen: every row is on it.
     await tester.binding.setSurfaceSize(const Size(1920, 1080));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     shown = StateProvider<(String, _Catalog)>((_) => ('first', catalog));
     final repo = await _buildRepo(tester, catalog);
+    // Every read throws, as after the database closes during a sign-out.
+    if (unreadable) await tester.runAsync(repo.close);
     final memory = <String, Object?>{};
     await tester.pumpWidget(
       ProviderScope(
@@ -226,6 +229,19 @@ void main() {
     expect(find.text('Series'), findsNothing);
     expect(find.text('No Series available'), findsNothing);
     expect(find.text('This playlist has nothing to show yet'), findsNothing);
+  });
+
+  testWidgets('rows that cannot be read are hidden, not left loading', (
+    tester,
+  ) async {
+    await pumpHome(
+      tester,
+      const _Catalog(channels: _channels, movies: _movies, series: _series),
+      unreadable: true,
+    );
+    await _settle(tester);
+
+    expect(find.byType(MediaPreviewSection), findsNothing);
   });
 
   testWidgets('says so when the playlist has nothing to show', (tester) async {

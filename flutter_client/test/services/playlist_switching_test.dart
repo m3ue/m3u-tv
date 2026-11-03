@@ -549,6 +549,105 @@ void main() {
         expect(await shownChannelIds(controller), <int>[202]);
       });
 
+      test('signing out mid-connect forgets the shown playlist only', () async {
+        final storage = _GatedSecureStorage();
+        final fixture = _Fixture(storage: storage);
+        addTearDown(fixture.dispose);
+        final controller = fixture.controller;
+        expect(await controller.connectXtream(_sports), isTrue);
+        expect(await controller.switchToPlaylist(_movies), isNull);
+        await controller.drainBackgroundPersistence();
+        final sports = sourceOf(controller, _sports);
+
+        // The new login's catalog is stored; its commit is held there.
+        final held = storage.hold('m3ue_tv_source');
+        final connecting = controller.connectXtream(_otherEditor);
+        await held;
+        await controller.disconnect();
+        storage.release();
+        expect(await connecting, isFalse);
+        await controller.drainBackgroundPersistence();
+
+        // Movies was on screen; the login being connected never was.
+        expect(
+          controller.savedPlaylists.playlists.map(
+            (p) => p.credentials.username,
+          ),
+          <String>['sports'],
+        );
+        expect(await controller.cacheService.storedCatalogSources(), {sports});
+      });
+
+      test('a revoke mid-connect forgets the shown editor', () async {
+        final storage = _GatedSecureStorage();
+        final fixture = _Fixture(storage: storage);
+        addTearDown(fixture.dispose);
+        final controller = fixture.controller;
+        expect(await controller.connectXtream(_sports), isTrue);
+        expect(await controller.switchToPlaylist(_movies), isNull);
+        await controller.drainBackgroundPersistence();
+
+        final held = storage.hold('m3ue_tv_source');
+        final connecting = controller.connectXtream(_otherEditor);
+        await held;
+        await controller.signOutDevice();
+        storage.release();
+        expect(await connecting, isFalse);
+        await controller.drainBackgroundPersistence();
+
+        expect(controller.savedPlaylists.playlists, isEmpty);
+        expect(await controller.cacheService.storedCatalogSources(), isEmpty);
+      });
+
+      test("the catalog cached before playlists is the old login's", () async {
+        final storage = InMemorySecureStorage();
+        // The login from before multiple playlists, then one added since,
+        // which is the one signed in now.
+        await storage.write(
+          'm3ue_tv_saved_playlists',
+          jsonEncode([
+            <String, Object?>{
+              'id': 'legacy',
+              'server': _sports.server,
+              'username': _sports.username,
+              'password': _sports.password,
+              'base_keys': true,
+            },
+            <String, Object?>{
+              'id': 'added',
+              'server': _movies.server,
+              'username': _movies.username,
+              'password': _movies.password,
+            },
+          ]),
+        );
+        await storage.write(
+          'm3ue_tv_credentials',
+          jsonEncode(<String, String>{
+            'server': _movies.server,
+            'username': _movies.username,
+            'password': _movies.password,
+          }),
+        );
+        final fixture = _Fixture(storage: storage);
+        addTearDown(fixture.dispose);
+        final controller = fixture.controller;
+        await controller.cacheService.replace(<String, Object?>{
+          'liveStreams': const <Channel>[
+            Channel(id: 101, name: 'Sports One', streamUrl: 'http://h/1.ts'),
+          ],
+        });
+
+        await controller.boot();
+        await controller.drainBackgroundPersistence();
+
+        expect(
+          await controller.cacheService.catalogUpdatedAt('legacy'),
+          isNotNull,
+        );
+        expect(await shownChannelIds(controller), <int>[202]);
+      });
+
       test('a playlist with nothing stored downloads before showing', () async {
         final fixture = _Fixture();
         addTearDown(fixture.dispose);
@@ -655,6 +754,32 @@ class _Fixture {
   Future<void> dispose() async {
     controller.dispose();
     await controller.drainBackgroundPersistence();
+  }
+}
+
+/// Holds the next write of one key until [release], to land another
+/// operation in the middle of the one writing it.
+class _GatedSecureStorage extends InMemorySecureStorage {
+  String? _key;
+  Completer<void>? _reached;
+  final Completer<void> _released = Completer<void>();
+
+  /// Completes once the next write of [key] has started.
+  Future<void> hold(String key) {
+    _key = key;
+    return (_reached = Completer<void>()).future;
+  }
+
+  void release() => _released.complete();
+
+  @override
+  Future<void> write(String key, String value) async {
+    final reached = _reached;
+    if (key == _key && reached != null && !reached.isCompleted) {
+      reached.complete();
+      await _released.future;
+    }
+    await super.write(key, value);
   }
 }
 

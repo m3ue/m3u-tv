@@ -46,6 +46,20 @@ class ProxyPlaybackSettings extends ChangeNotifier {
   /// Whether the current values were loaded for the playlist with [scope].
   bool isLoadedFor(String? scope) => _loaded && _loadedScope == scope;
 
+  /// True while the values held are another playlist's: the shown one
+  /// changed and its own haven't loaded yet. Profile ids are per editor, so
+  /// until then streams get the server defaults and changes wait for them.
+  bool get _heldForOtherPlaylist =>
+      _loaded && _loadedScope != playlistScope?.call();
+
+  /// Loads the shown playlist's values first when another's are held, so a
+  /// change is made to, and saved under, the right playlist. False when they
+  /// still aren't in (the shown playlist changed again meanwhile).
+  Future<bool> _holdsShownPlaylist() async {
+    if (_heldForOtherPlaylist) await load();
+    return !_heldForOtherPlaylist;
+  }
+
   /// Loads the active playlist's preferences, falling back to defaults when it
   /// has none stored. Without a store the in-memory values are kept.
   Future<void> load() async {
@@ -114,18 +128,21 @@ class ProxyPlaybackSettings extends ChangeNotifier {
   }
 
   Future<void> setEnabled({required bool enabled}) async {
+    if (!await _holdsShownPlaylist()) return;
     _enabled = enabled;
     await _persist();
     notifyListeners();
   }
 
   Future<void> setLiveProfileId(int? id) async {
+    if (!await _holdsShownPlaylist()) return;
     _liveProfileId = id;
     await _persist();
     notifyListeners();
   }
 
   Future<void> setVodProfileId(int? id) async {
+    if (!await _holdsShownPlaylist()) return;
     _vodProfileId = id;
     await _persist();
     notifyListeners();
@@ -179,10 +196,14 @@ class ProxyPlaybackSettings extends ChangeNotifier {
     String streamUrl, {
     required bool forced,
     required String serverBase,
-  }) => streamUrl.startsWith(serverBase) && (_enabled || forced);
+  }) =>
+      streamUrl.startsWith(serverBase) &&
+      ((_enabled && !_heldForOtherPlaylist) || forced);
 
-  int? _profileIdFor(String type) =>
-      type == 'live' || type == 'catchup' ? _liveProfileId : _vodProfileId;
+  int? _profileIdFor(String type) {
+    if (_heldForOtherPlaylist) return null;
+    return type == 'live' || type == 'catchup' ? _liveProfileId : _vodProfileId;
+  }
 
   Future<void> _persist() async {
     await _store?.write(
