@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/dvr/dvr_series_rule_options_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Builds a minimal MaterialApp wrapper with l10n + ProviderScope, with a
 /// button that pushes the options screen via [openDvrSeriesRuleOptions].

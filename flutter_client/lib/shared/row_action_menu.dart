@@ -1,9 +1,8 @@
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Visual treatment for a [RowAction]. `danger` reads as destructive (red
 /// ghost button / red menu item) — for actions like Stop or Delete.

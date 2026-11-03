@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// "Now playing" info overlay for VOD/Series (and AIOStreams on-demand)
 /// playback, shown in the upper-left corner mirroring the live TV EPG

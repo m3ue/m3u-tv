@@ -1,5 +1,4 @@
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/series/series_details_screen.dart';
@@ -11,6 +10,7 @@ import 'package:m3u_tv/shared/cast_member_row.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/series_detail_widgets.dart';
+import 'package:material_ui/material_ui.dart';
 
 Episode _ep(int season, int number) => Episode(
   id: '${season}0$number',

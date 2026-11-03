@@ -1,7 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A dark "frosted glass" panel for chrome that floats over artwork (the
 /// Home spotlight clock, a detail page's title pill). Blurs what is behind

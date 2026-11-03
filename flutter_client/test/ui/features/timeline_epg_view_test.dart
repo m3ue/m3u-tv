@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/epg/epg_preview_player.dart';
@@ -15,6 +14,7 @@ import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/channel_rows.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../fixtures/list_channel_rows.dart';
 

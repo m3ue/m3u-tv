@@ -1,10 +1,10 @@
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_sort.dart';
 import 'package:m3u_tv/shared/sort_option_row.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Shows the "Sort By" modal shared by every sortable media grid (VOD,
 /// Series). Returns the newly selected [MediaSortOption], or null if the

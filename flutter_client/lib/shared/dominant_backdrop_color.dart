@@ -4,9 +4,9 @@ import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart'
     show CachedNetworkImageProvider;
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/services/json_isolate.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:palette_generator_master/palette_generator_master.dart';
 
 /// Extracts the dominant swatch from an image so an immersive detail page

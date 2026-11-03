@@ -1,6 +1,5 @@
-import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Rounded-square leading icon tile for list rows, shared by the DVR section
 /// (recordings, series rules) and the Shows episode list. Centralizing the

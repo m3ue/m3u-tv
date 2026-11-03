@@ -1,7 +1,7 @@
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Below this dialog-available width (phones in portrait) the option dialogs
 /// trade the roomy TV padding for the tighter mobile gutter, so the nested

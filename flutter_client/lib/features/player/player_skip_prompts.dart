@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Brief, non-interactive indicator shown when a commercial segment was
 /// auto-skipped. Self-dismisses via `PlayerScreen`'s `_flashComskipSkippedBadge`.

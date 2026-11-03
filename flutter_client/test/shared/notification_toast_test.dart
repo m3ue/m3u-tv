@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/shared/notification_toast.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   const item = TvNotificationItem(

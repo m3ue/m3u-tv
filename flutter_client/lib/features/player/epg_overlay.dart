@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// EPG overlay widget showing current/next program info for live TV.
 ///

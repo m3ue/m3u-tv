@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Extract a user-facing message from an error, stripping technical prefixes
 /// like "Xtream HTTP 503 for POST ...".

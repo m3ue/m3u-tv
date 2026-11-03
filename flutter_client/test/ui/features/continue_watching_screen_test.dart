@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/continue_watching/continue_watching_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -7,6 +6,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Builds a fresh in-memory catalog repository populated with [vodItems]/
 /// [seriesList], via `tester.runAsync` since drift's real I/O does not

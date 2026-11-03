@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart'
     show isHandheldLayout;
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -9,6 +8,7 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/list_picker_sheet.dart';
 import 'package:m3u_tv/shared/sort_option_row.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Track selector widget for audio and subtitle track selection: buttons
 /// that open the shared [ListPickerSheet] with one checked row per track.

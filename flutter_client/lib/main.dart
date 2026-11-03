@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,7 +13,6 @@ import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/app/launch_splash.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/app/text_input_reporting_binding.dart';
-import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
@@ -36,6 +34,7 @@ import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 import 'package:m3u_tv/shared/notification_toast.dart';
 import 'package:m3u_tv/shared/tv_remote_input_governor_scope.dart';
 import 'package:m3u_tv/shared/tvos_scroll_semantics.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:window_manager/window_manager.dart';
@@ -515,7 +514,7 @@ class _MyAppState extends State<MyApp> {
       ),
       routerConfig: _router,
       scrollBehavior: HostPlatform.isTvOS ? const TvosScrollBehavior() : null,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: appSupportedLocales,
       locale: locale == null ? null : qualifiedAppLocale(locale),
       builder: (context, child) {

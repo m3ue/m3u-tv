@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Compact single-select pill - a leading check icon marks the selected
 /// chip, matching `AppButton`'s primary/tonal colour language without

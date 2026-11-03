@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/shared/catalog_window.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A [ScrollbarGridView] driven by a [CatalogWindow]: it renders
 /// `window.totalCount` slots, asks the window to load the indices it is about

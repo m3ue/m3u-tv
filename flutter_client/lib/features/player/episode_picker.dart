@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:m3u_tv/features/player/playback_controls.dart'
     show isHandheldLayout;
@@ -13,6 +12,7 @@ import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart'
     show ResilientMediaImage;
 import 'package:m3u_tv/shared/selectable_chip.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Seasons from [info] that actually have at least one episode - the only
 /// ones the picker can show. Exposed so a caller can decide whether the

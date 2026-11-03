@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/series/episode_player_args.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -13,6 +12,7 @@ import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/series_detail_widgets.dart';
 import 'package:m3u_tv/shared/trailer_button.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Below this window width the series detail lays out for a phone: smaller
 /// poster, full-width description, narrower episode cards. The episode-card

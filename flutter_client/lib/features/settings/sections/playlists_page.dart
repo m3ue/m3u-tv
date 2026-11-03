@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
 import 'package:m3u_tv/features/settings/sections/connection_section.dart';
 import 'package:m3u_tv/features/settings/settings_ui.dart';
@@ -12,6 +11,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// What the Playlists settings page needs from the app.
 class PlaylistManagement {

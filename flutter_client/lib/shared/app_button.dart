@@ -1,9 +1,8 @@
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Stadium-radius focus border shared by every pill/circular button in the
 /// app. A large radius makes the dpad focus border match the pill shape

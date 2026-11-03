@@ -1,7 +1,6 @@
 // B8: Toggle state — verifies that ShowDetailScreen renders the "Series rule
 // active" state (not the Record Series button) when hasSeriesRule is true and
 // a matching rule exists in dvrSeriesRulesProvider.
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/shows/show_detail_screen.dart';
@@ -9,6 +8,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   testWidgets(

@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/player/resume_modal.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Pumps a host with a button that opens the resume modal and records its
 /// result. Returns a getter for the captured result (null until the modal is

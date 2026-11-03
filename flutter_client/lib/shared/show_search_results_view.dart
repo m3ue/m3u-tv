@@ -1,11 +1,11 @@
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/epg_show_results.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Renders the All / On Now / Upcoming sub-tab view used by both
 /// LiveTvScreen and SearchScreen when a qualifying EPG show search is

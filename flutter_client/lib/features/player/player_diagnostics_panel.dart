@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
+import 'package:material_ui/material_ui.dart';
 
 class PlaybackDiagnosticsPanel extends StatelessWidget {
   const PlaybackDiagnosticsPanel({

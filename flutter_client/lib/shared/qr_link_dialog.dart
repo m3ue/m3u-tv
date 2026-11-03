@@ -1,8 +1,8 @@
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 /// A titled QR code for a link the device can't open itself (a TV with no

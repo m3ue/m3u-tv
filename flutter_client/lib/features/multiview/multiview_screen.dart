@@ -1,10 +1,8 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:m3u_tv/features/multiview/multiview_controller.dart';
 import 'package:m3u_tv/features/multiview/multiview_grid_math.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart'
@@ -20,6 +18,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 enum _LayoutMode { grid, featured, pip }
 

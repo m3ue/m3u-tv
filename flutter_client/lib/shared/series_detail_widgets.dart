@@ -1,11 +1,9 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show KeyDownEvent, KeyEvent, KeyRepeatEvent, LogicalKeyboardKey;
 import 'package:intl/intl.dart';
-
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
@@ -23,6 +21,7 @@ import 'package:m3u_tv/shared/item_detail_scaffold.dart'
     show detailAppBarHeight;
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/poster_strip.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Shared building blocks for the series-style detail screens (Xtream Series
 /// and the AIOStreams series body): the season picker, the locked-focus

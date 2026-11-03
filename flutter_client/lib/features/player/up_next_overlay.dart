@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/cached_media_thumbnail.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// "Up next" card shown late in a series episode (a few seconds past the
 /// credits mark, or ~90% in when TheIntroDB has no credits segment). It rides

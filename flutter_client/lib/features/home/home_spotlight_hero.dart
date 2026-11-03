@@ -1,10 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:m3u_tv/features/epg/epg_program_details.dart'
     show epgDurationLabel, epgTimeLabel;
 import 'package:m3u_tv/features/home/home_spotlight.dart';
@@ -18,6 +16,7 @@ import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/system_clock.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// The rich Home layout: a fixed spotlight hero (backdrop, colour-matched
 /// wash, title and metadata for the focused card) over the scrolling [rows].

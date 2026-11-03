@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
 import 'package:m3u_tv/features/settings/diagnostics_screen.dart';
@@ -27,6 +26,7 @@ import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 // ---------------------------------------------------------------------------
 // Connected settings view
@@ -102,17 +102,15 @@ class ConnectedView extends StatefulWidget {
 
 class _ConnectedViewState extends State<ConnectedView> {
   void _openViewerManagement(BuildContext context) {
-    unawaited(
-      showDialog<void>(
-        context: context,
-        builder: (_) => ViewerManagementDialog(
-          viewers: widget.viewers.isNotEmpty
-              ? widget.viewers
-              : [widget.activeViewer!],
-          activeViewer: widget.activeViewer!,
-          onSwitch: widget.onSwitchViewer ?? (_) {},
-          onCreateViewer: widget.onCreateViewer,
-        ),
+    showDialog<void>(
+      context: context,
+      builder: (_) => ViewerManagementDialog(
+        viewers: widget.viewers.isNotEmpty
+            ? widget.viewers
+            : [widget.activeViewer!],
+        activeViewer: widget.activeViewer!,
+        onSwitch: widget.onSwitchViewer ?? (_) {},
+        onCreateViewer: widget.onCreateViewer,
       ),
     );
   }

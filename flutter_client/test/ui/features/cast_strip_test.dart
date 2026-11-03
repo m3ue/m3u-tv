@@ -1,9 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/cast_strip.dart';
+import 'package:material_ui/material_ui.dart';
 
 CastMember _m({required String name, int? id}) =>
     CastMember(name: name, id: id);

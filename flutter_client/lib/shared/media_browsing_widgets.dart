@@ -5,7 +5,6 @@ import 'package:cached_network_image/cached_network_image.dart'
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show KeyDownEvent, KeyEvent, LogicalKeyboardKey;
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -17,6 +16,7 @@ import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 import 'package:m3u_tv/shared/sized_image_url.dart';
+import 'package:material_ui/material_ui.dart';
 
 class CategoryTabData {
   const CategoryTabData({required this.id, required this.name});

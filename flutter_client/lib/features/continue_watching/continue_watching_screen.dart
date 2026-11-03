@@ -1,6 +1,4 @@
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -8,6 +6,7 @@ import 'package:m3u_tv/shared/continue_watching_items.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Full "Continue Watching" list, pushed from the Home row's overflow tile
 /// once there are more resumable titles than fit in the row (see

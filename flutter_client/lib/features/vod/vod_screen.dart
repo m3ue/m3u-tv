@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show setEquals;
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
@@ -21,6 +20,7 @@ import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/media_category_nav.dart';
 import 'package:m3u_tv/shared/media_sort.dart';
 import 'package:m3u_tv/shared/media_sort_dialog.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// VOD (Movies) screen with category filtering and poster grid.
 ///

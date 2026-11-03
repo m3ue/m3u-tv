@@ -1,6 +1,6 @@
 import 'dart:ui' show SemanticsAction, SemanticsActionEventCallback;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// tvOS only: keeps UIKit's focus engine from scrolling Flutter scrollables.
 ///

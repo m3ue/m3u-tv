@@ -1,8 +1,7 @@
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A [DpadFocusable] + [Material] + [InkWell] composite that guarantees the
 /// focus border appears on tap and fast-tap, not just D-pad navigation.

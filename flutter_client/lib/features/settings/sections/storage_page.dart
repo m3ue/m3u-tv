@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/settings/sections/settings_status_row.dart';
 import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -9,6 +8,7 @@ import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/services/storage_usage.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// What Settings > Storage reads and changes.
 class StorageManagement {

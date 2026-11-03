@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dialog_option_tiles.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// What the viewer chose in the resume dialog.
 enum ResumeAction {

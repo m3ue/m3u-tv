@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/shared/catalog_window.dart';
 import 'package:m3u_tv/shared/catalog_window_grid.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// In-memory source with a controllable delay so a fetch can be observed
 /// mid-flight (the grid should show a placeholder until it lands).

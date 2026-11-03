@@ -4,7 +4,6 @@ import 'dart:ui' show ImageFilter;
 import 'package:clock/clock.dart';
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, listEquals;
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -49,6 +48,7 @@ import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/notification_toast.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:window_manager/window_manager.dart';
 
 /// Height of the hidden-titlebar drag strip on macOS desktop - keeps the

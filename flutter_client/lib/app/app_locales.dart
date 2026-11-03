@@ -1,5 +1,17 @@
 import 'package:flutter/widgets.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:material_ui/material_ui.dart' show GlobalMaterialLocalizations;
+
+/// [AppLocalizations.localizationsDelegates] with `material_ui`'s Material and
+/// Cupertino delegates in place of `flutter_localizations`' (which gen-l10n
+/// still emits). `material_ui` widgets look up their own
+/// `MaterialLocalizations` type, and its `MaterialApp` only bundles the
+/// English default, so without these any non-English locale finds no
+/// localizations at all.
+const List<LocalizationsDelegate<dynamic>> appLocalizationsDelegates = [
+  AppLocalizations.delegate,
+  ...GlobalMaterialLocalizations.delegates,
+];
 
 /// [AppLocalizations.supportedLocales] as handed to Flutter's `Localizations`,
 /// each passed through [qualifiedAppLocale].

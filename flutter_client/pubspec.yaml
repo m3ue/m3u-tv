@@ -31,6 +31,7 @@ dependencies:
   go_router: ^18.1.1
   http: ^1.2.0
   intl: ^0.20.2
+  material_ui: ^1.7.0
   palette_generator_master: ^1.1.0
   path: ^1.9.0
   path_provider: ^2.1.0

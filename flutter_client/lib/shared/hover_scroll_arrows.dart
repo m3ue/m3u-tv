@@ -1,8 +1,7 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/shared/dpad_tab_bar.dart' show isDesktopPlatform;
+import 'package:material_ui/material_ui.dart';
 
 /// Wraps a horizontally-scrolling child with hover-activated left / right
 /// navigation arrows for mouse users.

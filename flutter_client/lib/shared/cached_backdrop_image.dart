@@ -1,9 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart'
     show CachedNetworkImageProvider;
-import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 import 'package:m3u_tv/shared/sized_image_url.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Full-bleed backdrop image for detail screens, disk-cached via
 /// [MediaImageCacheManager] (the same cache posters use) so revisiting a

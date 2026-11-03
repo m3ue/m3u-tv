@@ -2,12 +2,11 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/foundation.dart' show Factory;
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show PlatformViewHitTestBehavior;
 import 'package:flutter/services.dart';
-
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Renders whichever of [platformView] (a `PlatformViewProvider`-backed
 /// native mpv core), [nativePlane] (a `NativePlaneProvider`-backed backend

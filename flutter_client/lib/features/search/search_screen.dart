@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
@@ -16,6 +15,7 @@ import 'package:m3u_tv/shared/epg_show_search_controller.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/show_search_results_view.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Hard cap on VOD/series search matches fetched from the catalog. A real
 /// query already narrows results at the SQL layer (unlike the old in-memory

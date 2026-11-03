@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -11,6 +10,7 @@ import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   group('production backend policy', () {

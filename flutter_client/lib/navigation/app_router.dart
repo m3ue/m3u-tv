@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/playback/android_mpv_backend.dart';
 import 'package:m3u_tv/playback/android_playback_adapter.dart';
 import 'package:m3u_tv/playback/apple_avkit_backend.dart';
@@ -13,6 +12,7 @@ import 'package:m3u_tv/playback/web_video_backend.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Placeholder screen used when a route target cannot be resolved.
 class PlaceholderScreen extends StatelessWidget {

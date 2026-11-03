@@ -17,6 +17,7 @@ This is the TV frontend for the `m3u-editor` system. It focuses on video playbac
 - **State**: Riverpod 3 (`flutter_riverpod`), currently through its `legacy.dart` APIs (`ChangeNotifierProvider`, `StateProvider`); prefer `Notifier`/`AsyncNotifier` for new standalone state. Providers live in `lib/providers/app_providers.dart`. `AppStateController` is the underlying orchestrator - Riverpod owns a thin `_AppStateProxy` wrapper so widgets never reference `AppStateController` directly.
 - **Player**: `PlaybackOrchestrator` over per-platform backends (ExoPlayer and mpv on Android, mpv/AVKit on Apple, libmpv on desktop, `<video>` on web, server transcode fallback). There is no `video_player` dependency.
 - **UI**: Material 3, `DpadFocusable` for all interactive items, `DpadRegion` for focus grouping.
+- **Design library**: Material comes from the `material_ui` package - import `package:material_ui/material_ui.dart`, never `package:flutter/material.dart` (the framework copy is frozen, and its types don't match the ones `go_router`/`cached_network_image` already use). The `StatefulShellRoute` in `go_router_config.dart` pins its page to `NoTransitionPage` on purpose; don't switch it back to `builder`.
 
 ## Rules
 
@@ -32,9 +33,10 @@ The app uses Flutter `gen_l10n`. All user-visible strings **must** be localized 
 
 - **ARB files**: `lib/l10n/app_en.arb` (source of truth) + `app_de.arb`, `app_es.arb`, `app_fr.arb`, `app_zh.arb`.
 - **Usage**: `AppLocalizations.of(context).<key>` — throws if delegates are missing, so always add `localizationsDelegates: AppLocalizations.localizationsDelegates` to every `MaterialApp` (including test helpers).
+- **App delegates**: The app's own `MaterialApp` uses `appLocalizationsDelegates` (`lib/app/app_locales.dart`), not the generated list: gen-l10n still emits `flutter_localizations`' Material/Cupertino delegates, which `material_ui` widgets don't read, so the generated list only covers English.
 - **Generated files**: Run `flutter gen-l10n` after adding/changing ARB keys; never edit `lib/l10n/app_localizations*.dart` directly.
 - **Import order**: `package:m3u_tv/l10n/app_localizations.dart` sorts under `l10n/` — place it after all `features/` imports and before `navigation/` imports.
-- **Tests**: Every `MaterialApp` that renders a localized widget must include `localizationsDelegates: AppLocalizations.localizationsDelegates` and `supportedLocales: AppLocalizations.supportedLocales`.
+- **Tests**: Every `MaterialApp` that renders a localized widget must include `localizationsDelegates: AppLocalizations.localizationsDelegates` and `supportedLocales: AppLocalizations.supportedLocales`. A test that sets a non-English `locale` must use `appLocalizationsDelegates` instead, or Material widgets find no localizations.
 - **New keys**: Add to all five ARBs before running gen-l10n. Keys follow the `<screen><Concept>` pattern (e.g. `settingsAccount`, `liveTvRecord`).
 
 ### State Management (Riverpod — mandatory for new features)

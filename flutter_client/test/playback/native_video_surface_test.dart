@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/playback/native_video_surface.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   testWidgets('active native plane has no black surface wrapper', (

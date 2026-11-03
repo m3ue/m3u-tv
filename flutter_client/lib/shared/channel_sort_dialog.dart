@@ -1,9 +1,9 @@
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/sort_option_row.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Shows the Live TV "Sort By" modal - the channel-list counterpart of
 /// `showMediaSortDialog`, kept separate because [ChannelSortOption]'s cases

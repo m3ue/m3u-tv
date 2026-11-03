@@ -1,6 +1,4 @@
 import 'package:dpad/dpad.dart' show DpadEdgeBehavior, DpadRegion;
-import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
@@ -9,6 +7,7 @@ import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/poster_strip.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Actor filmography screen: TMDB bio/photo header over a poster grid of
 /// their other movies/TV credits, mirroring m3u-editor's own

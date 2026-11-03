@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Holds a zero-height slot until the async-loaded [castRow] arrives *and*
 /// the page's push transition has settled, then eases it into place:

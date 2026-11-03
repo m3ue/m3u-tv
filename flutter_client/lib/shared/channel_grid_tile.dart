@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -6,6 +5,7 @@ import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/recording_dot.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Channel card used by the Live TV "Grid" view and the Home Live TV row:
 /// logo, current-program progress bar, channel name, current program title

@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/app_log_buffer.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Upload cap; matches m3u-editor's `TvDeviceLog::MAX_BYTES`. The export
 /// keeps the device header and the newest lines that fit.

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Small rounded, alpha-bordered pill used for compact EPG/channel badges
 /// (catchup availability, recording indicators). Wraps a small child, usually

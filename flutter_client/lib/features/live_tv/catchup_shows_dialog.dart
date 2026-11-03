@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Presents [channel]'s replayable catchup programs (most-recent first) as a
 /// D-pad-navigable list, mirroring the row styling of the Live TV long-press

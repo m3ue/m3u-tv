@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart'
     show ValueListenable, kIsWeb, setEquals;
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemSound, SystemSoundType;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/features/epg/epg_preview_player.dart';
@@ -40,6 +39,7 @@ import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/media_category_nav.dart';
 import 'package:m3u_tv/shared/recording_dot.dart';
 import 'package:m3u_tv/shared/show_search_results_view.dart';
+import 'package:material_ui/material_ui.dart';
 
 enum _ViewMode { list, logoGrid, epgGrid }
 

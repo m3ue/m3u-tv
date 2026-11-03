@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/features/player/track_selector.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -12,6 +11,7 @@ import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/system_clock.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Edge padding for [PlaybackControls]' back-button corner. tvOS gets a
 /// much smaller value since `SafeArea` already insets for its focus-safe

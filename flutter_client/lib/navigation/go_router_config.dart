@@ -1,6 +1,5 @@
 import 'dart:async' show unawaited;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart'
@@ -27,6 +26,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_background.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
+import 'package:material_ui/material_ui.dart';
 
 Widget _withGradient(Widget screen) => DecoratedBox(
   decoration: kAppGradientBg,
@@ -403,24 +403,36 @@ GoRouter createGoRouter({
   return GoRouter(
     initialLocation: initialLocation,
     routes: [
+      // A `builder` here gets whatever page go_router picks for the app
+      // type, and go_router only recognises material_ui's MaterialApp: on the
+      // framework's own MaterialApp it fell back to a NoTransitionPage, and
+      // since the material_ui migration it would pick a MaterialPage,
+      // wrapping the whole shell (player and native video plane included)
+      // in the platform page transition. Pinned to the page it always got.
       StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) {
-          final deviceType =
-              deviceTypeOverride ??
-              resolveDeviceType(
-                context,
-                nativeTelevisionHint: nativeTelevisionHint,
-              );
-          return AppShell(
-            key: appShellKey,
-            navigationShell: navigationShell,
-            deviceType: deviceType,
-            appState: appState,
-            playbackOrchestratorBuilder: playbackOrchestratorBuilder,
-            playerRouteBuilder: playerRouteBuilder,
-            systemUiPolicy: systemUiPolicy,
-          );
-        },
+        pageBuilder: (context, state, navigationShell) =>
+            NoTransitionPage<void>(
+              key: state.pageKey,
+              child: Builder(
+                builder: (context) {
+                  final deviceType =
+                      deviceTypeOverride ??
+                      resolveDeviceType(
+                        context,
+                        nativeTelevisionHint: nativeTelevisionHint,
+                      );
+                  return AppShell(
+                    key: appShellKey,
+                    navigationShell: navigationShell,
+                    deviceType: deviceType,
+                    appState: appState,
+                    playbackOrchestratorBuilder: playbackOrchestratorBuilder,
+                    playerRouteBuilder: playerRouteBuilder,
+                    systemUiPolicy: systemUiPolicy,
+                  );
+                },
+              ),
+            ),
         branches: [
           // Branch 0: Home
           StatefulShellBranch(

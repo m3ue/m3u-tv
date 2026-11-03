@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/services/device_performance.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Provides image quality settings (oversample factor and filter quality)
 /// to the widget tree based on the user's [OptimizeFor] preference.

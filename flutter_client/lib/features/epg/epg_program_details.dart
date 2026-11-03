@@ -2,9 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
-import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
 import 'package:m3u_tv/features/epg/epg_recording_state.dart';
 import 'package:m3u_tv/features/epg/program_recording_indicator.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -15,6 +13,7 @@ import 'package:m3u_tv/shared/auto_scroll_text.dart';
 import 'package:m3u_tv/shared/cached_media_thumbnail.dart';
 import 'package:m3u_tv/shared/epg_icon_pill.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// What activating (OK / tap) the guide's selection does.
 enum EpgGuideAction {

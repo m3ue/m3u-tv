@@ -1,15 +1,14 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart' show DpadFocusState;
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show KeyDownEvent, KeyEvent, KeyRepeatEvent, LogicalKeyboardKey;
-
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:material_ui/material_ui.dart';
 
 const double _kCardWidth = 150;
 const double _kAvatarSize = 72;

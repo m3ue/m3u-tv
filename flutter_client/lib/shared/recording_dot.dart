@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Small themed dot marking a channel as currently recording. Deliberately
 /// compact (no text label) so it holds up on narrow mobile widths; the

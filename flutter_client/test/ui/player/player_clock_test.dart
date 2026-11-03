@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/shared/system_clock.dart';
+import 'package:material_ui/material_ui.dart';
 
 Widget _app(Widget child, {bool use24Hour = false}) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,

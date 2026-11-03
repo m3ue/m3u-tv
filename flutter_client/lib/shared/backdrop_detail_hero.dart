@@ -1,6 +1,5 @@
-import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/shared/cached_backdrop_image.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Backdrop that stays visually fixed in place while [content] scrolls over
 /// it, fading into the page background via a vertical gradient scrim.

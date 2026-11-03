@@ -1,10 +1,9 @@
 import 'dart:ui' show SemanticsAction, SemanticsActionEvent;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show SemanticsData, SemanticsNode;
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:m3u_tv/shared/tvos_scroll_semantics.dart';
+import 'package:material_ui/material_ui.dart';
 
 Widget _strip({ScrollBehavior? behavior}) => MaterialApp(
   scrollBehavior: behavior,

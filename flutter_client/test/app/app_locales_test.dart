@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:m3u_tv/app/app_locales.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   const simplifiedChinese = Locale.fromSubtags(
@@ -32,7 +32,7 @@ void main() {
         late String time;
         await tester.pumpWidget(
           MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: appSupportedLocales,
             locale: qualifiedAppLocale(requested),
             home: Builder(

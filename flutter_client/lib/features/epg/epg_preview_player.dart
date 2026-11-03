@@ -1,11 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/playback/native_video_surface.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Builds the preview's player: the same orchestrator the full-screen
 /// player uses (`buildPlaybackOrchestrator`), so the full-screen player can

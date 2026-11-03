@@ -1,8 +1,6 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
@@ -15,6 +13,7 @@ import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/movie_detail_body.dart';
 import 'package:m3u_tv/shared/series_detail_widgets.dart';
+import 'package:material_ui/material_ui.dart';
 
 class AIOStreamsDetailScreen extends StatefulWidget {
   const AIOStreamsDetailScreen({
@@ -117,49 +116,47 @@ class _AIOStreamsDetailScreenState extends State<AIOStreamsDetailScreen> {
     required String title,
     AIOStreamsVideo? video,
   }) {
-    unawaited(
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => AIOStreamsStreamPickerSheet(
-          integrationId: widget.integrationId,
-          type: type,
-          id: id,
-          apiService: widget.apiService,
-          onStreamSelected: (stream) {
-            Navigator.of(context).pop();
-            widget.onPlay(
-              PlayerArgs(
-                streamUrl: stream.url,
-                title: title,
-                type: type == 'series' ? 'series' : 'vod',
-                headers: _proxyRequestHeaders(stream.behaviorHints),
-                metadata: <String, Object?>{
-                  'aiostreams': true,
-                  'aio_item_id': widget.item.id,
-                  'aio_integration_id': widget.integrationId,
-                  // For series: title is the series name; series_name drives the
-                  // Trakt show/episode branch in _scrobble().
-                  'title': widget.item.name,
-                  if (type == 'series') 'series_name': widget.item.name,
-                  // Episodes use episode thumb; movies/series fall back to backdrop, then poster.
-                  'thumbnail_url':
-                      video?.thumbnail ?? item.background ?? item.poster,
-                  'backdrop_url': item.background ?? item.poster,
-                  if (video != null) 'season_number': video.season,
-                  if (video != null) 'episode_number': video.episode,
-                  if (video != null) 'episode_title': video.title,
-                  if (item.year != null) 'year': item.year,
-                  if (item.imdbRating != null) 'rating': item.imdbRating,
-                  if (item.description != null) 'plot': item.description,
-                  'source': stream.name,
-                  'quality': stream.title,
-                },
-              ),
-            );
-          },
-        ),
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => AIOStreamsStreamPickerSheet(
+        integrationId: widget.integrationId,
+        type: type,
+        id: id,
+        apiService: widget.apiService,
+        onStreamSelected: (stream) {
+          Navigator.of(context).pop();
+          widget.onPlay(
+            PlayerArgs(
+              streamUrl: stream.url,
+              title: title,
+              type: type == 'series' ? 'series' : 'vod',
+              headers: _proxyRequestHeaders(stream.behaviorHints),
+              metadata: <String, Object?>{
+                'aiostreams': true,
+                'aio_item_id': widget.item.id,
+                'aio_integration_id': widget.integrationId,
+                // For series: title is the series name; series_name drives the
+                // Trakt show/episode branch in _scrobble().
+                'title': widget.item.name,
+                if (type == 'series') 'series_name': widget.item.name,
+                // Episodes use episode thumb; movies/series fall back to backdrop, then poster.
+                'thumbnail_url':
+                    video?.thumbnail ?? item.background ?? item.poster,
+                'backdrop_url': item.background ?? item.poster,
+                if (video != null) 'season_number': video.season,
+                if (video != null) 'episode_number': video.episode,
+                if (video != null) 'episode_title': video.title,
+                if (item.year != null) 'year': item.year,
+                if (item.imdbRating != null) 'rating': item.imdbRating,
+                if (item.description != null) 'plot': item.description,
+                'source': stream.name,
+                'quality': stream.title,
+              },
+            ),
+          );
+        },
       ),
     );
   }

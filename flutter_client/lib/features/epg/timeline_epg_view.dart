@@ -2,12 +2,10 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
     show BoxParentData, PipelineOwner, RenderShiftedBox, ScrollCacheExtent;
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-
 import 'package:m3u_tv/features/epg/epg_guide_navigation.dart';
 import 'package:m3u_tv/features/epg/epg_preview_player.dart';
 import 'package:m3u_tv/features/epg/epg_program_details.dart';
@@ -27,6 +25,7 @@ import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/recording_dot.dart';
+import 'package:material_ui/material_ui.dart';
 
 typedef CatchupProgramSelect =
     void Function(Channel channel, EpgProgram program);

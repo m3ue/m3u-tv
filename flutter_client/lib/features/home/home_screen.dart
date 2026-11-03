@@ -1,10 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show setEquals;
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:m3u_tv/features/home/home_spotlight.dart';
 import 'package:m3u_tv/features/home/home_spotlight_hero.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -22,6 +20,7 @@ import 'package:m3u_tv/shared/channel_grid_tile.dart';
 import 'package:m3u_tv/shared/continue_watching_items.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:material_ui/material_ui.dart';
 
 class _OfflineBanner extends StatelessWidget {
   const _OfflineBanner({required this.message});

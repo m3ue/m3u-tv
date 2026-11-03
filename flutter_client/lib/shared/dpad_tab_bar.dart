@@ -1,7 +1,7 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A [TabBar] replacement that integrates with the D-pad focus system.
 ///

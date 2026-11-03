@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -13,6 +12,7 @@ import 'package:m3u_tv/shared/app_callout.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/qr_link_dialog.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Settings "What's New" sub-page: read the `m3u-tv` GitHub release notes one
@@ -200,16 +200,14 @@ class _ReleaseNotesViewState extends State<ReleaseNotesView> {
 
   void _openGithub() {
     if (widget.isTv) {
-      unawaited(
-        showDialog<void>(
-          context: context,
-          builder: (dialogContext) => QrLinkDialog(
-            title: AppLocalizations.of(
-              dialogContext,
-            ).settingsReleaseNotesViewOnGithub,
-            url: _githubReleasesUrl,
-            memoryKey: 'release-notes-github-qr',
-          ),
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) => QrLinkDialog(
+          title: AppLocalizations.of(
+            dialogContext,
+          ).settingsReleaseNotesViewOnGithub,
+          url: _githubReleasesUrl,
+          memoryKey: 'release-notes-github-qr',
         ),
       );
       return;

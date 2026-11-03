@@ -1,10 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart'
     show CachedNetworkImageProvider;
-import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 import 'package:m3u_tv/shared/sized_image_url.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Thumbnail (channel logo, episode/video preview, favorites tile, poster
 /// grid cell, ...) disk-cached via [MediaImageCacheManager] and decoded at

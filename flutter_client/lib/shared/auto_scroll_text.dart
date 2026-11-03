@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Description text in the height its parent leaves it (capped at
 /// [maxLines] when set). Shows whole lines only, fading out the last one when

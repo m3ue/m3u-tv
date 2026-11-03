@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
-
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -12,6 +10,7 @@ import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/movie_detail_body.dart';
 import 'package:m3u_tv/shared/trailer_button.dart';
+import 'package:material_ui/material_ui.dart';
 
 class VodDetailsScreen extends StatefulWidget {
   const VodDetailsScreen({

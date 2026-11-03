@@ -1,9 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart'
     show CachedNetworkImageProvider;
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:material_ui/material_ui.dart';
 
 // devicePixelRatio 1, so the expected decode size is just the layout size
 // times ImageQualityScope's default (quality-mode) 2x oversample.

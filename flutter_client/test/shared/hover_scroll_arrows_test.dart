@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   Widget harness(ScrollController controller) {

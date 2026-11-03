@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
 import 'package:m3u_tv/features/settings/sections/connected_view.dart';
 import 'package:m3u_tv/features/settings/sections/connection_section.dart';
@@ -17,6 +16,7 @@ import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
+import 'package:material_ui/material_ui.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({

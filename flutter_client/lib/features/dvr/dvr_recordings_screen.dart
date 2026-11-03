@@ -1,6 +1,5 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/features/dvr/dvr_series_rule_options_screen.dart';
 import 'package:m3u_tv/features/shows/shows_screen.dart';
@@ -17,6 +16,7 @@ import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/leading_tile.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/row_action_menu.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Fallback for detecting the expand-in-place row actions (desktop/TV) vs.
 /// the tap-to-open overflow menu (touch/mobile), used only when
