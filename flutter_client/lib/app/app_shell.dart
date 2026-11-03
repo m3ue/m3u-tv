@@ -1703,7 +1703,10 @@ class AppShellState extends ConsumerState<AppShell>
           isConfiguredOverride: _appState.isConfigured,
           traktService: _appState.traktService,
           devicePairingService: _appState.devicePairingService,
-          onConnect: _appState.connectXtream,
+          // A saved playlist that is still stored opens at once, as a
+          // switch does.
+          onConnect: (credentials) async =>
+              await _appState.switchToPlaylist(credentials) == null,
           onDisconnect: () => unawaited(_appState.disconnect()),
           onSwitchViewer: (viewer) => unawaited(_appState.switchViewer(viewer)),
           onCreateViewer: _appState.createViewer,

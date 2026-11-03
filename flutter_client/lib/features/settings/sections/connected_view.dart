@@ -448,9 +448,11 @@ class _ConnectedViewState extends State<ConnectedView> {
                     autofocus: true,
                     icon: Icons.refresh,
                     label: l.settingsRetryConnection,
+                    // Reconnects and reloads the shown playlist only; the
+                    // others' stored content and the artwork stay.
                     onPressed: widget.onClearCache == null
                         ? null
-                        : () => widget.onClearCache!(CacheClearScope.all),
+                        : () => widget.onClearCache!(CacheClearScope.content),
                   ),
                 ),
                 const SizedBox(height: 8),

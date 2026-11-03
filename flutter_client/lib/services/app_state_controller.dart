@@ -1483,16 +1483,14 @@ class AppStateController extends ChangeNotifier {
     if (isConfigured && sameCredentials(authNotifier.credentials, normalized)) {
       return null;
     }
-    if (isConfigured) {
-      switch (await _switchToStoredPlaylist(normalized)) {
-        case true:
-          return null;
-        case false:
-          // Another switch or sign-out took over.
-          return '';
-        case null:
-          break;
-      }
+    switch (await _switchToStoredPlaylist(normalized)) {
+      case true:
+        return null;
+      case false:
+        // Another switch or sign-out took over.
+        return '';
+      case null:
+        break;
     }
     final hadSession = isConfigured;
     final previousError = _error;
@@ -1514,6 +1512,7 @@ class AppStateController extends ChangeNotifier {
   /// Shows the saved playlist [credentials] straight from what this device
   /// stored for it, then signs in and refreshes it in the background, as a
   /// cold start does: a failed sign-in leaves it on screen with the error.
+  /// Also used from the connect screen, where no playlist is shown.
   /// Null (nothing changed) when it has nothing stored; false when another
   /// operation took over while reading it.
   Future<bool?> _switchToStoredPlaylist(UserCredentials credentials) async {
@@ -1570,6 +1569,15 @@ class AppStateController extends ChangeNotifier {
         notificationGeneration: notificationGeneration,
       ),
     );
+    // Picked on the connect screen, after a sign-out cleared them: the next
+    // start has to know there is a session to restore.
+    await _bestEffort(() async {
+      await secureStorage.write(
+        _sourceKey,
+        jsonEncode(<String, Object?>{'type': 'xtream'}),
+      );
+      await cacheService.set<String>('sourceType', 'xtream');
+    });
     await _rememberPlaylist(credentials);
     _runBackgroundPersistence(_trimCachedCatalogs());
     return true;

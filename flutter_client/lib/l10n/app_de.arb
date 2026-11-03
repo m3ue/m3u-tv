@@ -213,7 +213,7 @@
   "settingsAppearance": "Erscheinungsbild",
   "settingsAppearanceSubtitle": "Layout, EPG und Anzeige",
   "settingsPlayback": "Wiedergabe",
-  "settingsPlaybackSubtitle": "Proxy, Cache und DVR",
+  "settingsPlaybackSubtitle": "Proxy und DVR",
   "settingsReleaseNotesSubtitle": "Neuigkeiten in dieser Version",
   "settingsSectionLanguageRegion": "Sprache & Region",
   "settingsSectionLayout": "Layout",
@@ -400,7 +400,7 @@
   "settingsStorageArtworkCache": "Bilder-Cache",
   "settingsStorageClearArtworkTitle": "Bilder löschen?",
   "settingsStorageClearAll": "Alles löschen",
-  "settingsStorageClearAllBody": "Kanäle, Filme und Serien aller Playlists, der Programmführer und die Bilder werden entfernt. Die aktive Playlist wird jetzt neu geladen.",
+  "settingsStorageClearAllBody": "Die gespeicherten Inhalte der anderen Playlists und alle Bilder werden entfernt. Kanäle, Filme, Serien und Programmführer der aktiven Playlist werden jetzt neu geladen.",
   "settingsEpgRefreshInterval": "EPG-Aktualisierungsintervall",
   "settingsEpgDurationMinutes": "{count} Min",
   "@settingsEpgDurationMinutes": {

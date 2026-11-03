@@ -458,7 +458,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPlayback => '播放';
 
   @override
-  String get settingsPlaybackSubtitle => '代理、缓存和 DVR';
+  String get settingsPlaybackSubtitle => '代理和 DVR';
 
   @override
   String get settingsReleaseNotesSubtitle => '本版本的更新内容';
@@ -654,7 +654,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsStorageClearAllBody =>
-      '将移除所有播放列表的频道、电影和剧集，以及节目指南和图片。当前播放列表会立即重新下载。';
+      '将移除其他播放列表已保存的内容和所有图片。当前播放列表的频道、电影、剧集和节目指南会立即重新下载。';
 
   @override
   String get settingsEpgRefreshInterval => 'EPG 刷新间隔';

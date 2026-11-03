@@ -213,7 +213,7 @@
   "settingsAppearance": "外观",
   "settingsAppearanceSubtitle": "布局、节目单和显示",
   "settingsPlayback": "播放",
-  "settingsPlaybackSubtitle": "代理、缓存和 DVR",
+  "settingsPlaybackSubtitle": "代理和 DVR",
   "settingsReleaseNotesSubtitle": "本版本的更新内容",
   "settingsSectionLanguageRegion": "语言和地区",
   "settingsSectionLayout": "布局",
@@ -400,7 +400,7 @@
   "settingsStorageArtworkCache": "图片缓存",
   "settingsStorageClearArtworkTitle": "清除图片？",
   "settingsStorageClearAll": "全部清除",
-  "settingsStorageClearAllBody": "将移除所有播放列表的频道、电影和剧集，以及节目指南和图片。当前播放列表会立即重新下载。",
+  "settingsStorageClearAllBody": "将移除其他播放列表已保存的内容和所有图片。当前播放列表的频道、电影、剧集和节目指南会立即重新下载。",
   "settingsEpgRefreshInterval": "EPG 刷新间隔",
   "settingsEpgDurationMinutes": "{count} 分钟",
   "@settingsEpgDurationMinutes": {

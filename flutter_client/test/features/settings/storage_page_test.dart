@@ -11,16 +11,16 @@ import 'package:m3u_tv/services/storage_usage.dart';
 const _sports = SavedPlaylist(
   id: 'sports',
   credentials: UserCredentials(
-    server: 'https://sports.invalid',
-    username: 'owner-login',
+    server: 'https://editor.invalid',
+    username: 'sports-login',
     password: 'sports-secret',
   ),
 );
 const _movies = SavedPlaylist(
   id: 'movies',
   credentials: UserCredentials(
-    server: 'https://movies.invalid',
-    username: 'owner-login',
+    server: 'https://editor.invalid',
+    username: 'movies-login',
     password: 'movies-secret',
   ),
 );
@@ -101,31 +101,31 @@ void main() {
 
     expect(find.text('6 MB'), findsOneWidget); // Total (no artwork size)
     expect(find.text('4 MB'), findsOneWidget); // Playlists
-    expect(find.text('sports.invalid'), findsOneWidget);
+    expect(find.text('sports-login'), findsOneWidget);
     expect(find.text('1,500 items'), findsOneWidget);
     expect(find.text('3 MB'), findsOneWidget);
-    expect(find.text('movies.invalid'), findsOneWidget);
+    expect(find.text('movies-login'), findsOneWidget);
     expect(find.text('40 items'), findsOneWidget);
     // The active playlist is marked by a check next to its name.
     expect(find.byIcon(Icons.check), findsOneWidget);
     expect(
       find.descendant(
-        of: find.widgetWithText(Row, 'sports.invalid'),
+        of: find.widgetWithText(Row, 'sports-login'),
         matching: find.byIcon(Icons.check),
       ),
       findsWidgets,
     );
     expect(
       find.descendant(
-        of: find.widgetWithText(Row, 'movies.invalid'),
+        of: find.widgetWithText(Row, 'movies-login'),
         matching: find.byIcon(Icons.check),
       ),
       findsNothing,
     );
     expect(find.text('2 MB · 5,000 programmes'), findsOneWidget);
     expect(find.text('The 3 most recent'), findsOneWidget);
-    // Never credentials.
-    expect(find.textContaining('owner-login'), findsNothing);
+    // Never a password.
+    expect(find.textContaining('secret'), findsNothing);
   });
 
   testWidgets('clearing another playlist frees it after asking', (
@@ -133,7 +133,7 @@ void main() {
   ) async {
     await openPage(tester);
 
-    await tester.tap(find.text('movies.invalid'));
+    await tester.tap(find.text('movies-login'));
     await tester.pumpAndSettle();
     expect(find.text('Clear stored content?'), findsOneWidget);
     await tester.tap(find.text('Clear'));
@@ -150,7 +150,7 @@ void main() {
     storage.stored.remove('movies');
     await openPage(tester);
 
-    await tester.tap(find.text('movies.invalid'));
+    await tester.tap(find.text('movies-login'));
     await tester.pumpAndSettle();
 
     expect(find.text('Clear stored content?'), findsNothing);

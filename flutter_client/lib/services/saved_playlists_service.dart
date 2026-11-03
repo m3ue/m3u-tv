@@ -35,18 +35,28 @@ String playlistDisplayName(
   List<SavedPlaylist> playlists,
 ) => playlist.name ?? playlistDefaultName(playlist, playlists);
 
-/// The server's host, numbered when several of [playlists] share it. Never
-/// the username or password: settings must not put credentials on screen,
-/// and the editor's handshake carries no playlist name to use instead.
+/// The login's username: a Playlist Auth or alias has its own, which tells
+/// playlists on one editor apart better than the host they share. The host
+/// is added when the same username is saved for another editor, and the
+/// owner's login (the same username on every playlist it opens) is numbered.
+/// Never the password.
 String playlistDefaultName(
   SavedPlaylist playlist,
   List<SavedPlaylist> playlists,
 ) {
-  final host = playlist.host;
-  final sameHost = playlists.where((other) => other.host == host).toList();
-  final position = sameHost.indexWhere((other) => other.id == playlist.id);
-  if (sameHost.length < 2 || position < 0) return host;
-  return '$host (${position + 1})';
+  final username = playlist.credentials.username;
+  final sameUsername = playlists
+      .where((other) => other.credentials.username == username)
+      .toList();
+  final label = sameUsername.any((other) => other.host != playlist.host)
+      ? '$username@${playlist.host}'
+      : username;
+  final sameLabel = sameUsername
+      .where((other) => other.host == playlist.host)
+      .toList();
+  final position = sameLabel.indexWhere((other) => other.id == playlist.id);
+  if (sameLabel.length < 2 || position < 0) return label;
+  return '$label (${position + 1})';
 }
 
 /// One editor login saved on this device. The editor resolves every Xtream

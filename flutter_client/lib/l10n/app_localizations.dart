@@ -929,7 +929,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsPlaybackSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Proxy, cache, and DVR'**
+  /// **'Proxy and DVR'**
   String get settingsPlaybackSubtitle;
 
   /// No description provided for @settingsReleaseNotesSubtitle.
@@ -1271,7 +1271,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsStorageClearAllBody.
   ///
   /// In en, this message translates to:
-  /// **'Every playlist\'s channels, movies and series, the guide and artwork are removed. The active playlist downloads again now.'**
+  /// **'Your other playlists\' stored content and all artwork are removed. The active playlist\'s channels, movies, series and guide download again now.'**
   String get settingsStorageClearAllBody;
 
   /// No description provided for @settingsEpgRefreshInterval.

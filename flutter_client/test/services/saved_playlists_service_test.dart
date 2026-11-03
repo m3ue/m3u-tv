@@ -182,26 +182,42 @@ void main() {
   });
 
   group('playlist labels', () {
-    test('use the server host, numbered when hosts repeat', () async {
+    test('use the username, numbered when the owner login repeats', () async {
       final service = SavedPlaylistsService(storage: InMemorySecureStorage());
       final sports = await service.remember(_sports);
       final movies = await service.remember(_movies);
       final other = await service.remember(_other);
       final all = service.playlists;
 
-      expect(playlistDefaultName(sports, all), 'editor.example (1)');
-      expect(playlistDefaultName(movies, all), 'editor.example (2)');
-      expect(playlistDefaultName(other, all), 'other.example');
+      expect(playlistDefaultName(sports, all), 'owner (1)');
+      expect(playlistDefaultName(movies, all), 'owner (2)');
+      expect(playlistDefaultName(other, all), 'guest');
     });
 
-    test('never show the username or password', () async {
+    test('add the host when a username is saved for two editors', () async {
+      final service = SavedPlaylistsService(storage: InMemorySecureStorage());
+      final sports = await service.remember(_sports);
+      final elsewhere = await service.remember(
+        const UserCredentials(
+          server: 'https://other.example:8443',
+          username: 'owner',
+          password: 'other-playlist-uuid',
+        ),
+      );
+      final all = service.playlists;
+
+      expect(playlistDefaultName(sports, all), 'owner@editor.example');
+      expect(playlistDefaultName(elsewhere, all), 'owner@other.example');
+    });
+
+    test('never show the password', () async {
       final service = SavedPlaylistsService(storage: InMemorySecureStorage());
       await service.remember(_sports);
+      await service.remember(_movies);
       await service.remember(_other);
 
       for (final playlist in service.playlists) {
         final label = playlistDisplayName(playlist, service.playlists);
-        expect(label, isNot(contains(playlist.credentials.username)));
         expect(label, isNot(contains(playlist.credentials.password)));
       }
     });

@@ -465,7 +465,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPlayback => 'Playback';
 
   @override
-  String get settingsPlaybackSubtitle => 'Proxy, cache, and DVR';
+  String get settingsPlaybackSubtitle => 'Proxy and DVR';
 
   @override
   String get settingsReleaseNotesSubtitle => 'See what\'s new in this version';
@@ -679,7 +679,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsStorageClearAllBody =>
-      'Every playlist\'s channels, movies and series, the guide and artwork are removed. The active playlist downloads again now.';
+      'Your other playlists\' stored content and all artwork are removed. The active playlist\'s channels, movies, series and guide download again now.';
 
   @override
   String get settingsEpgRefreshInterval => 'EPG refresh interval';

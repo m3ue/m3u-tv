@@ -1131,8 +1131,8 @@ void main() {
         expect(find.text('Connection'), findsOneWidget);
         expect(find.text('Source'), findsOneWidget);
         expect(find.text('Xtream'), findsOneWidget);
+        // The username names the playlist; the password never shows.
         expect(_visibleText(tester), isNot(contains('fixture-password')));
-        expect(_visibleText(tester), isNot(contains('fixture-user')));
 
         final restarted = _controller(
           storage: storage,

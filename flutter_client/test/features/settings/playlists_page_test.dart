@@ -98,16 +98,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('lists playlists by host and marks the active one', (
+  testWidgets('lists playlists by login and marks the active one', (
     tester,
   ) async {
     await openPage(tester, management());
 
-    expect(find.text('editor.invalid (1)'), findsOneWidget);
-    expect(find.text('editor.invalid (2)'), findsOneWidget);
+    // The owner's login opens both, so they are numbered.
+    expect(find.text('owner-login (1)'), findsOneWidget);
+    expect(find.text('owner-login (2)'), findsOneWidget);
     expect(find.text('Active playlist'), findsOneWidget);
     expect(find.text('Add Playlist'), findsOneWidget);
-    expect(find.textContaining('owner-login'), findsNothing);
+    // Never a password.
     expect(find.textContaining('secret'), findsNothing);
   });
 
@@ -128,7 +129,7 @@ void main() {
       onSwitched: () => switched += 1,
     );
 
-    await tester.tap(find.text('editor.invalid (2)'));
+    await tester.tap(find.text('owner-login (2)'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Switch to Playlist'));
     await tester.pump();
@@ -142,7 +143,7 @@ void main() {
 
     expect(switched, 1);
     expect(find.text('Open playlists'), findsOneWidget);
-    expect(find.text('editor.invalid (2)'), findsNothing);
+    expect(find.text('owner-login (2)'), findsNothing);
   });
 
   testWidgets('the switch starts only once the dialog has been built', (
@@ -163,7 +164,7 @@ void main() {
       appState: appState,
     );
 
-    await tester.tap(find.text('editor.invalid (2)'));
+    await tester.tap(find.text('owner-login (2)'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Switch to Playlist'));
     await tester.pumpAndSettle();
@@ -183,7 +184,7 @@ void main() {
       onSwitched: () => switched += 1,
     );
 
-    await tester.tap(find.text('editor.invalid (2)'));
+    await tester.tap(find.text('owner-login (2)'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Switch to Playlist'));
     await tester.pumpAndSettle();
@@ -193,7 +194,7 @@ void main() {
       find.text("Couldn't switch playlists: Server unreachable"),
       findsOneWidget,
     );
-    expect(find.text('editor.invalid (2)'), findsOneWidget);
+    expect(find.text('owner-login (2)'), findsOneWidget);
   });
 
   testWidgets('renaming shows the new name with the default beneath', (
@@ -201,7 +202,7 @@ void main() {
   ) async {
     await openPage(tester, management());
 
-    await tester.tap(find.text('editor.invalid (2)'));
+    await tester.tap(find.text('owner-login (2)'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Rename Playlist'));
     await tester.pumpAndSettle();
@@ -210,7 +211,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Movies'), findsOneWidget);
-    expect(find.text('editor.invalid (2)'), findsOneWidget);
+    expect(find.text('owner-login (2)'), findsOneWidget);
   });
 
   testWidgets('the connect screen offers saved playlists first', (
@@ -244,7 +245,7 @@ void main() {
     expect(find.text('Saved'), findsOneWidget);
     expect(find.text('Saved Playlists'), findsOneWidget);
 
-    await tester.tap(find.text('editor.invalid (2)'));
+    await tester.tap(find.text('owner-login (2)'));
     await tester.pumpAndSettle();
 
     expect(connected?.password, _movies.password);

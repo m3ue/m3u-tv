@@ -213,7 +213,7 @@
   "settingsAppearance": "Apparence",
   "settingsAppearanceSubtitle": "Disposition, EPG et affichage",
   "settingsPlayback": "Lecture",
-  "settingsPlaybackSubtitle": "Proxy, cache et DVR",
+  "settingsPlaybackSubtitle": "Proxy et DVR",
   "settingsReleaseNotesSubtitle": "Nouveautés de cette version",
   "settingsSectionLanguageRegion": "Langue et région",
   "settingsSectionLayout": "Disposition",
@@ -400,7 +400,7 @@
   "settingsStorageArtworkCache": "Cache des images",
   "settingsStorageClearArtworkTitle": "Effacer les images ?",
   "settingsStorageClearAll": "Tout effacer",
-  "settingsStorageClearAllBody": "Les chaînes, films et séries de toutes les playlists, le guide et les images sont supprimés. La playlist active est téléchargée de nouveau maintenant.",
+  "settingsStorageClearAllBody": "Le contenu enregistré des autres playlists et toutes les images sont supprimés. Les chaînes, films, séries et le guide de la playlist active sont téléchargés de nouveau maintenant.",
   "settingsEpgRefreshInterval": "Intervalle de rafraîchissement EPG",
   "settingsEpgDurationMinutes": "{count} min",
   "@settingsEpgDurationMinutes": {

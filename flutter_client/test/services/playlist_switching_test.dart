@@ -508,6 +508,47 @@ void main() {
         expect(await shownChannelIds(controller), <int>[202]);
       });
 
+      test('a stored playlist opens at once from the connect screen', () async {
+        final fixture = _Fixture();
+        addTearDown(fixture.dispose);
+        final controller = fixture.controller;
+        expect(await controller.connectXtream(_sports), isTrue);
+        expect(await controller.switchToPlaylist(_movies), isNull);
+        await controller.drainBackgroundPersistence();
+        // Signs out of movies; sports stays saved and stored.
+        await controller.disconnect();
+        expect(controller.isConfigured, isFalse);
+
+        final signIn = Completer<void>();
+        fixture.transport.authGate = signIn;
+        expect(await controller.switchToPlaylist(_sports), isNull);
+
+        expect(controller.isConfigured, isTrue);
+        expect(await shownChannelIds(controller), <int>[101]);
+        // The next start restores it.
+        expect(await fixture.storage.read('m3ue_tv_source'), isNotNull);
+        signIn.complete();
+        await controller.drainBackgroundPersistence();
+        expect(controller.authNotifier.isConfigured, isTrue);
+      });
+
+      test('reloading the shown playlist keeps the others', () async {
+        final fixture = _Fixture();
+        addTearDown(fixture.dispose);
+        final controller = fixture.controller;
+        expect(await controller.connectXtream(_sports), isTrue);
+        expect(await controller.switchToPlaylist(_movies), isNull);
+        await controller.drainBackgroundPersistence();
+
+        await controller.clearAndRefresh(scope: CacheClearScope.content);
+
+        expect(await controller.cacheService.storedCatalogSources(), {
+          sourceOf(controller, _sports),
+          sourceOf(controller, _movies),
+        });
+        expect(await shownChannelIds(controller), <int>[202]);
+      });
+
       test('a playlist with nothing stored downloads before showing', () async {
         final fixture = _Fixture();
         addTearDown(fixture.dispose);

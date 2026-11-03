@@ -293,7 +293,7 @@
   "settingsAppearance": "Appearance",
   "settingsAppearanceSubtitle": "Layout, EPG, and display",
   "settingsPlayback": "Playback",
-  "settingsPlaybackSubtitle": "Proxy, cache, and DVR",
+  "settingsPlaybackSubtitle": "Proxy and DVR",
   "settingsReleaseNotesSubtitle": "See what's new in this version",
   "settingsSectionLanguageRegion": "Language & Region",
   "settingsSectionLayout": "Layout",
@@ -387,7 +387,7 @@
   "settingsStorageArtworkCache": "Artwork cache",
   "settingsStorageClearArtworkTitle": "Clear artwork?",
   "settingsStorageClearAll": "Clear everything",
-  "settingsStorageClearAllBody": "Every playlist's channels, movies and series, the guide and artwork are removed. The active playlist downloads again now.",
+  "settingsStorageClearAllBody": "Your other playlists' stored content and all artwork are removed. The active playlist's channels, movies, series and guide download again now.",
   "settingsEpgRefreshInterval": "EPG refresh interval",
   "settingsEpgDurationMinutes": "{count} min",
   "@settingsEpgDurationMinutes": {

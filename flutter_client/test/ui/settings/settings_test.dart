@@ -530,7 +530,7 @@ void main() {
     testWidgets('shows outage actions instead of setup copy when configured', (
       tester,
     ) async {
-      var retried = false;
+      CacheClearScope? retried;
       var edited = false;
       final notifier = AuthNotifier(
         xtreamService: XtreamService(transport: _FakeTransport({}).call),
@@ -542,7 +542,7 @@ void main() {
           notifier,
           sourceError: 'Server is currently unavailable.',
           isConfiguredOverride: true,
-          onClearCache: (_) => retried = true,
+          onClearCache: (scope) => retried = scope,
           onDisconnect: () => edited = true,
         ),
       );
@@ -559,7 +559,8 @@ void main() {
 
       await tester.tap(find.text('Retry connection'));
       await tester.pumpAndSettle();
-      expect(retried, isTrue);
+      // Reloads the shown playlist, keeping the others' stored content.
+      expect(retried, CacheClearScope.content);
 
       await tester.tap(find.text('Edit server settings'));
       await tester.pumpAndSettle();
