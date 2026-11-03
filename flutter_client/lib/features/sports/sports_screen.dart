@@ -8,6 +8,7 @@ import 'package:m3u_tv/features/multiview/multiview_controller.dart';
 import 'package:m3u_tv/features/multiview/multiview_manage_dialog.dart';
 import 'package:m3u_tv/features/multiview/multiview_screen.dart';
 import 'package:m3u_tv/features/sports/sports_fixture_card.dart';
+import 'package:m3u_tv/features/sports/sports_teams_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -595,6 +596,13 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
 
   Future<void> _showLeagues() async {
     final available = _capability?.leagues ?? const <SportsLeague>[];
+    final bySport = <String, List<SportsLeague>>{};
+    for (final league in available) {
+      (bySport[league.sport] ??= []).add(league);
+    }
+    if (bySport.length <= 1) {
+      return _showLeagueOptions(available, available: available);
+    }
     await showAppDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -608,7 +616,59 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    for (final (index, league) in available.indexed)
+                    for (final (index, leagues) in bySport.values.indexed)
+                      AppMenuOption(
+                        icon: _sportIcon(leagues.first.sport),
+                        label: leagues.first.sportName,
+                        subtitle: l10n.sportsLeaguesShownCount(
+                          leagues.where(_settings.isLeagueEnabled).length,
+                          leagues.length,
+                        ),
+                        autofocus: index == 0,
+                        onTap: () => unawaited(
+                          _showLeagueOptions(
+                            leagues,
+                            available: available,
+                            title: leagues.first.sportName,
+                          ),
+                        ),
+                      ),
+                    AppMenuOption(
+                      icon: Icons.check,
+                      label: l10n.sportsDone,
+                      onTap: () => Navigator.of(dialogContext).pop(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Checkboxes for [leagues]; [available] is the whole catalog, which
+  /// the settings need to turn the defaults into explicit picks.
+  Future<void> _showLeagueOptions(
+    List<SportsLeague> leagues, {
+    required List<SportsLeague> available,
+    String? title,
+  }) async {
+    await showAppDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        final l10n = AppLocalizations.of(dialogContext);
+        return ListenableBuilder(
+          listenable: _settings,
+          builder: (context, _) => AppMenuDialog(
+            title: Text(title ?? l10n.sportsLeaguesTitle),
+            children: [
+              DpadRegion(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final (index, league) in leagues.indexed)
                       AppMenuOption(
                         icon: _settings.isLeagueEnabled(league)
                             ? Icons.check_box
@@ -636,6 +696,35 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
         );
       },
     );
+  }
+
+  static IconData _sportIcon(String sport) => switch (sport) {
+    'football' => Icons.sports_football,
+    'basketball' => Icons.sports_basketball,
+    'baseball' => Icons.sports_baseball,
+    'hockey' || 'field-hockey' => Icons.sports_hockey,
+    'soccer' => Icons.sports_soccer,
+    'rugby' || 'rugby-league' || 'australian-football' => Icons.sports_rugby,
+    'volleyball' => Icons.sports_volleyball,
+    _ => Icons.sports,
+  };
+
+  Future<void> _openTeams() async {
+    widget.onEnterFullScreenDetail?.call();
+    try {
+      await Navigator.of(context).push<void>(
+        appPageRoute<void>(
+          builder: (context) => SportsTeamsScreen(
+            useSidebarLayout: widget.useSidebarLayout,
+            initialLeagueId: _scope == _scopeAll || _scope == _scopeMyTeams
+                ? null
+                : _scope,
+          ),
+        ),
+      );
+    } finally {
+      widget.onExitFullScreenDetail?.call();
+    }
   }
 
   Future<void> _openMultiview() async {
@@ -710,6 +799,12 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
           label: l10n.sportsLeaguesButton,
           onPressed: () => unawaited(_showLeagues()),
         ),
+        if (ref.watch(sportsCapabilityProvider)?.listsTeams ?? false)
+          AppButton(
+            icon: Icons.groups,
+            label: l10n.sportsTeamsButton,
+            onPressed: () => unawaited(_openTeams()),
+          ),
       ],
       onSidebarActivate: widget.onSidebarActivate,
       gridFocusScopeNode: _listFocusNode,

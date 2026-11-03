@@ -1038,6 +1038,7 @@
   "sportsSearchHint": "Rechercher des équipes",
   "sportsLeaguesButton": "Ligues",
   "sportsLeaguesTitle": "Afficher les ligues",
+  "sportsLeaguesShownCount": "{shown} sur {total} affichées",
   "sportsDone": "Terminé",
   "sportsLiveNow": "En direct",
   "sportsLiveBadge": "EN DIRECT",
@@ -1045,7 +1046,7 @@
   "sportsPostponed": "Reporté",
   "sportsNoGames": "Aucun match sur cette période",
   "sportsNoLeagues": "Aucune ligue sélectionnée. Choisissez-en dans Ligues.",
-  "sportsMyTeamsEmpty": "Vous ne suivez encore aucune équipe. Appuyez longuement sur un match pour suivre ses équipes.",
+  "sportsMyTeamsEmpty": "Vous ne suivez encore aucune équipe. Utilisez Équipes pour choisir les vôtres, ou appuyez longuement sur un match.",
   "sportsMyTeamsNoGames": "Aucune de vos équipes ne joue sur cette période",
   "sportsChannelCount": "{count, plural, =1{1 chaîne} other{{count} chaînes}}",
   "sportsNoChannel": "Aucune chaîne",
@@ -1061,5 +1062,9 @@
   "sportsFixtureAt": "{away} chez {home}",
   "sportsFixtureVs": "{home} contre {away}",
   "sportsUnavailable": "Les sports ne sont pas activés sur ce serveur. Un administrateur peut les activer dans M3U Editor sous Paramètres > Intégrations > Sports.",
-  "sportsLoadFailed": "Impossible de charger les matchs. Nouvelle tentative sous peu."
+  "sportsLoadFailed": "Impossible de charger les matchs. Nouvelle tentative sous peu.",
+  "sportsTeamsButton": "Équipes",
+  "sportsTeamsTitle": "Choisissez vos équipes",
+  "sportsTeamsLoadFailed": "Impossible de charger les équipes. Choisissez à nouveau la ligue pour réessayer.",
+  "sportsNoTeams": "Aucune équipe trouvée"
 }

@@ -2172,6 +2172,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sportsLeaguesTitle => 'Ligen anzeigen';
 
   @override
+  String sportsLeaguesShownCount(int shown, int total) {
+    return '$shown von $total angezeigt';
+  }
+
+  @override
   String get sportsDone => 'Fertig';
 
   @override
@@ -2195,7 +2200,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get sportsMyTeamsEmpty =>
-      'Du folgst noch keinen Teams. Halte ein Spiel gedrückt, um seinen Teams zu folgen.';
+      'Du folgst noch keinen Teams. Wähle sie unter Teams aus oder halte ein Spiel gedrückt.';
 
   @override
   String get sportsMyTeamsNoGames =>
@@ -2270,4 +2275,17 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get sportsLoadFailed =>
       'Spiele konnten nicht geladen werden. Neuer Versuch in Kürze.';
+
+  @override
+  String get sportsTeamsButton => 'Teams';
+
+  @override
+  String get sportsTeamsTitle => 'Wähle deine Teams';
+
+  @override
+  String get sportsTeamsLoadFailed =>
+      'Teams konnten nicht geladen werden. Wähle die Liga erneut, um es noch einmal zu versuchen.';
+
+  @override
+  String get sportsNoTeams => 'Keine Teams gefunden';
 }

@@ -1576,6 +1576,64 @@ class XtreamService {
     },
   );
 
+  /// Every team of [leagueId] ([SportsCapability.teamsAction]), raw.
+  Future<Object?> getSportsTeams(
+    SportsCapability capability,
+    String leagueId,
+  ) => _request(capability.teamsAction!, params: {'league': leagueId});
+
+  /// [viewerId]'s followed teams.
+  Future<List<FollowedSportsTeam>> getSportsFollows(
+    SportsCapability capability,
+    String viewerId,
+  ) async => _sportsFollows(
+    await _request(capability.followsAction!, params: {'viewer_id': viewerId}),
+  );
+
+  /// Follows [team] for [viewerId], or stops following it; returns the
+  /// viewer's whole list.
+  Future<List<FollowedSportsTeam>> toggleSportsFollow(
+    SportsCapability capability, {
+    required String viewerId,
+    required FollowedSportsTeam team,
+    required bool followed,
+  }) async => _sportsFollows(
+    await _request(
+      capability.toggleFollowAction!,
+      method: 'POST',
+      body: {
+        'viewer_id': viewerId,
+        'team_key': team.key,
+        'name': team.name,
+        'followed': '$followed',
+      },
+    ),
+  );
+
+  /// Unions [follows] into [viewerId]'s (never removing any) and returns the
+  /// merged list.
+  Future<List<FollowedSportsTeam>> syncSportsFollows(
+    SportsCapability capability, {
+    required String viewerId,
+    required List<FollowedSportsTeam> follows,
+  }) async => _sportsFollows(
+    await _request(
+      capability.syncFollowsAction!,
+      method: 'POST',
+      body: {
+        'viewer_id': viewerId,
+        'follows': [
+          for (final team in follows) {'team_key': team.key, 'name': team.name},
+        ],
+      },
+    ),
+  );
+
+  static List<FollowedSportsTeam> _sportsFollows(Object? response) => [
+    for (final raw in _asList(_asMap(response)['follows']))
+      ?FollowedSportsTeam.fromServer(raw),
+  ];
+
   Future<List<Category>> _categories(String action) async {
     final sessionGeneration = _sessionGeneration.current;
     final response = await _request(action);

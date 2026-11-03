@@ -4,48 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/sports_models.dart';
 
-/// A followed team as "My Teams" lists it, kept with enough to render the
-/// row without a fetch.
-class FollowedSportsTeam {
-  const FollowedSportsTeam({
-    required this.key,
-    required this.name,
-    this.logoUrl,
-  });
-
-  factory FollowedSportsTeam.fromTeam(SportsTeam team) => FollowedSportsTeam(
-    key: team.key,
-    name: team.displayName,
-    logoUrl: team.logoUrl,
-  );
-
-  final String key;
-  final String name;
-  final String? logoUrl;
-
-  Map<String, Object?> toJson() => {
-    'key': key,
-    'name': name,
-    if (logoUrl != null) 'logo': logoUrl,
-  };
-
-  static FollowedSportsTeam? fromJson(Object? raw) {
-    if (raw is! Map) return null;
-    final key = raw['key'];
-    final name = raw['name'];
-    if (key is! String || name is! String) return null;
-    final logo = raw['logo'];
-    return FollowedSportsTeam(
-      key: key,
-      name: name,
-      logoUrl: logo is String ? logo : null,
-    );
-  }
-}
-
-/// Per-device Sports preferences: which competitions are listed and which
-/// teams "My Teams" follows. Device-level rather than per playlist, since
-/// neither depends on the provider.
+/// Sports preferences: which competitions are listed (per device) and which
+/// teams "My Teams" follows.
+///
+/// Follows sync per viewer through M3U Editor when it offers that (see
+/// `AppStateController._syncSportsFollows`): the list held here is then the
+/// active viewer's, replaced from the server on every viewer sync, and each
+/// local change is pushed through [onFollowChanged]. Without sync it is
+/// simply this device's own list.
 class SportsSettings extends ChangeNotifier {
   SportsSettings({PersistentJsonStore? store}) : _store = store;
 
@@ -57,6 +23,14 @@ class SportsSettings extends ChangeNotifier {
   /// lists the editor's defaults.
   Set<String>? _leagueIds;
   List<FollowedSportsTeam> _followedTeams = const [];
+
+  /// Viewers whose follows have been reconciled with the server at least
+  /// once, so this device's own list is only merged in the first time.
+  Set<String> _syncedViewers = const {};
+
+  /// Called after a local follow or unfollow, to push it to the server.
+  void Function(FollowedSportsTeam team, {required bool followed})?
+  onFollowChanged;
 
   /// The competitions of [available] (the editor's, in its order) to list.
   List<SportsLeague> enabledLeagues(List<SportsLeague> available) => [
@@ -76,6 +50,13 @@ class SportsSettings extends ChangeNotifier {
   bool isFollowing(String teamKey) =>
       _followedTeams.any((team) => team.key == teamKey);
 
+  Future<void>? _loading;
+
+  /// Loads the stored preferences once; later calls wait on that load.
+  /// Anything that replaces stored state (a follows sync) must wait for it,
+  /// or the load would land afterwards and restore the stale list.
+  Future<void> ensureLoaded() => _loading ??= load();
+
   Future<void> load() async {
     final raw = await _store?.read(_storeKey);
     if (raw is! Map) return;
@@ -84,6 +65,13 @@ class SportsSettings extends ChangeNotifier {
       _leagueIds = {
         for (final id in leagues)
           if (id is String) id,
+      };
+    }
+    final synced = raw['synced_viewers'];
+    if (synced is List) {
+      _syncedViewers = {
+        for (final ulid in synced)
+          if (ulid is String) ulid,
       };
     }
     final teams = raw['teams'];
@@ -120,18 +108,39 @@ class SportsSettings extends ChangeNotifier {
   /// followed.
   Future<bool> toggleFollow(SportsTeam team) async {
     final following = isFollowing(team.key);
+    final followed = FollowedSportsTeam.fromTeam(team);
     _followedTeams = following
         ? [..._followedTeams.where((t) => t.key != team.key)]
-        : [..._followedTeams, FollowedSportsTeam.fromTeam(team)];
+        : [..._followedTeams, followed];
     notifyListeners();
     await _persist();
+    onFollowChanged?.call(followed, followed: !following);
     return !following;
+  }
+
+  /// Whether [viewerUlid]'s follows were ever reconciled with the server.
+  bool hasSynced(String viewerUlid) => _syncedViewers.contains(viewerUlid);
+
+  /// Whether any viewer's were, i.e. this device's own list has already
+  /// been merged into an account once.
+  bool get hasSyncedAnyViewer => _syncedViewers.isNotEmpty;
+
+  /// Takes the server's list for [viewerUlid] as the followed teams.
+  Future<void> replaceFollows(
+    List<FollowedSportsTeam> follows, {
+    required String viewerUlid,
+  }) async {
+    _followedTeams = List.unmodifiable(follows);
+    _syncedViewers = {..._syncedViewers, viewerUlid};
+    notifyListeners();
+    await _persist();
   }
 
   Future<void> _persist() async {
     await _store?.write(_storeKey, <String, Object?>{
       if (_leagueIds case final ids?) 'leagues': ids.toList(),
       'teams': [for (final team in _followedTeams) team.toJson()],
+      'synced_viewers': _syncedViewers.toList(),
     });
   }
 }

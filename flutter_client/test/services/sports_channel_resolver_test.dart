@@ -97,6 +97,38 @@ void main() {
       );
     });
 
+    test('a college is named by its school, never its nickname alone', () {
+      const team = SportsTeam(
+        leagueId: 'basketball/mens-college-basketball',
+        id: '79',
+        displayName: 'Southern Illinois Salukis',
+        shortName: 'S Illinois',
+        nickname: 'Salukis',
+        abbreviation: 'SIU',
+        location: 'Southern Illinois',
+      );
+      final phrases = SportsMatcher.phrasesFor(team);
+      expect(phrases, contains('southern illinois'));
+      expect(phrases, isNot(contains('salukis')));
+
+      const cougars = SportsTeam(
+        leagueId: 'basketball/mens-college-basketball',
+        id: '2',
+        displayName: 'Charleston Cougars',
+        shortName: 'Charleston',
+        nickname: 'Cougars',
+        abbreviation: 'COFC',
+        location: 'Charleston',
+      );
+      expect(
+        SportsMatcher.mentions(
+          SportsMatcher.normalize('Burlington Cougars vs Georgetown'),
+          SportsMatcher.phrasesFor(cougars),
+        ),
+        isFalse,
+      );
+    });
+
     test('needles skip words a shorter phrase already covers', () {
       // "toronto" would also pull in every Raptors and Blue Jays listing.
       expect(SportsMatcher.needlesFor(_leafs), {'maple'});

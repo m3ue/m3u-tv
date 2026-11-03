@@ -30,6 +30,7 @@ Map<String, Object?> _sportsPayload() => {
       'default': false,
     },
   ],
+  'sport_names': {'soccer': 'Soccer'},
 };
 
 Map<String, Object?> _side(String id, String name, String nickname) => {
@@ -109,6 +110,10 @@ void main() {
     ]);
     expect(sports.leagueById('soccer/eng.1')!.soccerStyle, isTrue);
     expect(sports.leagueById('hockey/nhl')!.isDefault, isTrue);
+    // The sport comes from the id; its name from the editor when sent.
+    expect(sports.leagueById('soccer/eng.1')!.sport, 'soccer');
+    expect(sports.leagueById('soccer/eng.1')!.sportName, 'Soccer');
+    expect(sports.leagueById('hockey/nhl')!.sportName, 'hockey');
   });
 
   test('without the feature there is no sports capability', () async {
@@ -179,6 +184,38 @@ void main() {
 
     final to = from.add(const Duration(days: 3));
     expect(requests.last.params['to'], '${to.millisecondsSinceEpoch ~/ 1000}');
+  });
+
+  test('reads the optional team and follow actions', () {
+    final full = SportsCapability.fromJson({
+      ..._sportsPayload(),
+      'actions': {
+        'fixtures': 'get_sports_fixtures',
+        'teams': 'get_sports_teams',
+        'follows': 'get_sports_follows',
+        'toggle_follow': 'toggle_sports_follow',
+        'sync_follows': 'sync_sports_follows',
+      },
+    });
+    expect(full.listsTeams, isTrue);
+    expect(full.syncsFollows, isTrue);
+
+    // An editor from before the team browser: fixtures only.
+    final older = SportsCapability.fromJson(_sportsPayload());
+    expect(older.listsTeams, isFalse);
+    expect(older.syncsFollows, isFalse);
+  });
+
+  test("maps a league's teams", () {
+    final teams = SportsService.parseTeams({
+      'teams': [
+        _side('ana', 'Anaheim Ducks', 'Ducks')['team'],
+        'junk',
+        _side('tor', 'Toronto Maple Leafs', 'Maple Leafs')['team'],
+      ],
+    }, 'hockey/nhl');
+    expect(teams.map((team) => team.key), ['hockey/nhl:ana', 'hockey/nhl:tor']);
+    expect(teams.last.logoUrl, contains('/logo-proxy/'));
   });
 
   test('tolerates junk replies', () {

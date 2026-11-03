@@ -1197,6 +1197,18 @@
   "sportsSearchHint": "Search teams",
   "sportsLeaguesButton": "Leagues",
   "sportsLeaguesTitle": "Show leagues",
+  "sportsLeaguesShownCount": "{shown} of {total} shown",
+  "@sportsLeaguesShownCount": {
+    "description": "Under a sport in the Sports league picker: how many of its leagues are shown.",
+    "placeholders": {
+      "shown": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "sportsDone": "Done",
   "sportsLiveNow": "Live Now",
   "sportsLiveBadge": "LIVE",
@@ -1204,7 +1216,7 @@
   "sportsPostponed": "Postponed",
   "sportsNoGames": "No games in this range",
   "sportsNoLeagues": "No leagues selected. Choose some with Leagues.",
-  "sportsMyTeamsEmpty": "You aren't following any teams yet. Long-press a game to follow its teams.",
+  "sportsMyTeamsEmpty": "You aren't following any teams yet. Use Teams to pick yours, or long-press a game.",
   "sportsMyTeamsNoGames": "None of your teams play in this range",
   "sportsChannelCount": "{count, plural, =1{1 channel} other{{count} channels}}",
   "@sportsChannelCount": {
@@ -1282,5 +1294,9 @@
     }
   },
   "sportsUnavailable": "Sports isn't turned on for this server. An admin can enable it in M3U Editor under Settings > Integrations > Sports.",
-  "sportsLoadFailed": "Couldn't load games. Retrying shortly."
+  "sportsLoadFailed": "Couldn't load games. Retrying shortly.",
+  "sportsTeamsButton": "Teams",
+  "sportsTeamsTitle": "Pick your teams",
+  "sportsTeamsLoadFailed": "Couldn't load teams. Choose the league again to retry.",
+  "sportsNoTeams": "No teams found"
 }

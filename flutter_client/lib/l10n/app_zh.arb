@@ -1038,6 +1038,7 @@
   "sportsSearchHint": "搜索球队",
   "sportsLeaguesButton": "联赛",
   "sportsLeaguesTitle": "显示联赛",
+  "sportsLeaguesShownCount": "显示 {shown}/{total}",
   "sportsDone": "完成",
   "sportsLiveNow": "正在直播",
   "sportsLiveBadge": "直播",
@@ -1045,7 +1046,7 @@
   "sportsPostponed": "已延期",
   "sportsNoGames": "此时间段内没有比赛",
   "sportsNoLeagues": "未选择联赛。请在“联赛”中选择。",
-  "sportsMyTeamsEmpty": "你还没有关注任何球队。长按一场比赛即可关注其球队。",
+  "sportsMyTeamsEmpty": "你还没有关注任何球队。使用“球队”来选择，或长按一场比赛。",
   "sportsMyTeamsNoGames": "你关注的球队在此时间段内没有比赛",
   "sportsChannelCount": "{count, plural, other{{count} 个频道}}",
   "sportsNoChannel": "无频道",
@@ -1061,5 +1062,9 @@
   "sportsFixtureAt": "{away} 客场对阵 {home}",
   "sportsFixtureVs": "{home} 对阵 {away}",
   "sportsUnavailable": "此服务器未开启体育功能。管理员可以在 M3U Editor 的 设置 > 集成 > 体育 中启用。",
-  "sportsLoadFailed": "无法加载比赛，稍后将重试。"
+  "sportsLoadFailed": "无法加载比赛，稍后将重试。",
+  "sportsTeamsButton": "球队",
+  "sportsTeamsTitle": "选择你的球队",
+  "sportsTeamsLoadFailed": "无法加载球队。请重新选择该联赛以重试。",
+  "sportsNoTeams": "未找到球队"
 }

@@ -26,6 +26,7 @@ const _otherChannel = Channel(
 );
 
 const _capability = SportsCapability(
+  teamsAction: 'get_sports_teams',
   leagues: [
     SportsLeague(
       id: 'hockey/nhl',
@@ -49,6 +50,14 @@ Map<String, Object?> _team(String id, String name, String nickname) => {
 Future<XtreamService> _editor() async {
   final service = XtreamService(
     transport: (request) async {
+      if (request.action == 'get_sports_teams') {
+        return {
+          'teams': [
+            _team('tor', 'Toronto Maple Leafs', 'Maple Leafs'),
+            _team('uta', 'Utah Mammoth', 'Mammoth'),
+          ],
+        };
+      }
       if (request.action == null) {
         return {
           'user_info': {'auth': 1, 'status': 'Active'},
@@ -190,6 +199,96 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets('follows a team from the team browser into My Teams', (
+    tester,
+  ) async {
+    final repo = await _buildRepo(tester);
+    final editor = (await tester.runAsync(_editor))!;
+    final settings = SportsSettings();
+
+    await _pumpScreen(
+      tester,
+      repo: repo,
+      settings: settings,
+      capability: _capability,
+      editor: editor,
+    );
+
+    await tester.tap(find.text('Teams'));
+    await _settle(tester);
+    expect(find.text('Pick your teams'), findsOneWidget);
+
+    await tester.tap(find.text('Utah Mammoth'));
+    await _settle(tester);
+    expect(settings.isFollowing('hockey/nhl:uta'), isTrue);
+
+    await tester.tap(find.byTooltip('Back'));
+    await _settle(tester);
+    await tester.tap(find.text('My Teams'));
+    await _settle(tester);
+    expect(find.text('Toronto Maple Leafs'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('picks leagues by sport, then league', (tester) async {
+    final repo = await _buildRepo(tester);
+    final editor = (await tester.runAsync(_editor))!;
+    final settings = SportsSettings();
+    const capability = SportsCapability(
+      leagues: [
+        SportsLeague(
+          id: 'hockey/nhl',
+          name: 'NHL',
+          abbreviation: 'NHL',
+          isDefault: true,
+          sportDisplayName: 'Hockey',
+        ),
+        SportsLeague(
+          id: 'soccer/eng.1',
+          name: 'Premier League',
+          abbreviation: 'EPL',
+          sportDisplayName: 'Soccer',
+        ),
+        SportsLeague(
+          id: 'soccer/usa.ncaa.m.1',
+          name: "NCAA Men's Soccer",
+          abbreviation: 'CMSOC',
+          sportDisplayName: 'Soccer',
+        ),
+      ],
+    );
+
+    await _pumpScreen(
+      tester,
+      repo: repo,
+      settings: settings,
+      capability: capability,
+      editor: editor,
+    );
+
+    await tester.tap(find.text('Leagues'));
+    await _settle(tester);
+    expect(find.text('Hockey'), findsOneWidget);
+    expect(find.text('1 of 1 shown'), findsOneWidget);
+    expect(find.text('0 of 2 shown'), findsOneWidget);
+
+    await tester.tap(find.text('Soccer'));
+    await _settle(tester);
+    await tester.tap(find.text("NCAA Men's Soccer"));
+    await _settle(tester);
+    expect(settings.enabledLeagues(capability.leagues).map((l) => l.id), [
+      'hockey/nhl',
+      'soccer/usa.ncaa.m.1',
+    ]);
+
+    await tester.tap(find.text('Done').last);
+    await _settle(tester);
+    expect(find.text('1 of 2 shown'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('explains when the editor has Sports turned off', (
     tester,

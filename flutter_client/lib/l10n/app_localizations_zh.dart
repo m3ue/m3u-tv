@@ -2085,6 +2085,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sportsLeaguesTitle => '显示联赛';
 
   @override
+  String sportsLeaguesShownCount(int shown, int total) {
+    return '显示 $shown/$total';
+  }
+
+  @override
   String get sportsDone => '完成';
 
   @override
@@ -2106,7 +2111,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sportsNoLeagues => '未选择联赛。请在“联赛”中选择。';
 
   @override
-  String get sportsMyTeamsEmpty => '你还没有关注任何球队。长按一场比赛即可关注其球队。';
+  String get sportsMyTeamsEmpty => '你还没有关注任何球队。使用“球队”来选择，或长按一场比赛。';
 
   @override
   String get sportsMyTeamsNoGames => '你关注的球队在此时间段内没有比赛';
@@ -2177,4 +2182,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get sportsLoadFailed => '无法加载比赛，稍后将重试。';
+
+  @override
+  String get sportsTeamsButton => '球队';
+
+  @override
+  String get sportsTeamsTitle => '选择你的球队';
+
+  @override
+  String get sportsTeamsLoadFailed => '无法加载球队。请重新选择该联赛以重试。';
+
+  @override
+  String get sportsNoTeams => '未找到球队';
 }

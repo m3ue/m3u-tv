@@ -213,6 +213,7 @@ class AppStateController extends ChangeNotifier {
         _pushFavoriteChange('vod', streamId, favorited: favorited);
     seriesFavoritesService.onChanged = (streamId, {required favorited}) =>
         _pushFavoriteChange('series', streamId, favorited: favorited);
+    sportsSettings.onFollowChanged = _pushSportsFollow;
     favoritesService.captureMutationOwnership =
         _captureFavoriteMutationOwnership;
     vodFavoritesService.captureMutationOwnership =
@@ -628,7 +629,7 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
     unawaited(traktService.init());
     unawaited(comskipSettings.load());
-    unawaited(sportsSettings.load());
+    unawaited(sportsSettings.ensureLoaded());
     unawaited(introDbSettings.load());
 
     // One-time move of the content cache into its own file for installs that
@@ -1262,6 +1263,9 @@ class AppStateController extends ChangeNotifier {
           viewerGeneration: viewerGeneration,
         );
     if (!isCurrent()) return false;
+    // My Teams follows sync on the same viewer changes as favorites, under
+    // the same ownership guard, but never decide this sync's outcome.
+    _runBackgroundPersistence(_syncSportsFollows(viewer, isCurrent: isCurrent));
     try {
       final migrated = await _readMigratedFavoriteViewers();
       if (!isCurrent()) return false;
@@ -1282,6 +1286,60 @@ class AppStateController extends ChangeNotifier {
       debugPrint('Favorites: sync failed for viewer ${viewer.ulid}: $error');
       return false;
     }
+  }
+
+  /// Reconciles My Teams follows for [viewer] with the server, when the
+  /// editor syncs them. The first time any viewer is synced on this device,
+  /// an admin viewer unions the device's own follows into the account
+  /// (`sync_sports_follows`, never deletes); every other time, including a
+  /// child viewer's first, just pulls. The server is then authoritative.
+  Future<void> _syncSportsFollows(
+    Viewer viewer, {
+    required bool Function() isCurrent,
+  }) async {
+    final sports = sportsCapability;
+    if (sports == null || !sports.syncsFollows) return;
+    try {
+      await sportsSettings.ensureLoaded();
+      if (!isCurrent()) return;
+      final follows =
+          viewer.isAdmin &&
+              !sportsSettings.hasSynced(viewer.ulid) &&
+              !sportsSettings.hasSyncedAnyViewer
+          ? await xtreamService.syncSportsFollows(
+              sports,
+              viewerId: viewer.ulid,
+              follows: sportsSettings.followedTeams,
+            )
+          : await xtreamService.getSportsFollows(sports, viewer.ulid);
+      if (!isCurrent()) return;
+      await sportsSettings.replaceFollows(follows, viewerUlid: viewer.ulid);
+    } on Object catch (error) {
+      debugPrint(
+        '[Sports] follows sync failed for viewer ${viewer.ulid}: $error',
+      );
+    }
+  }
+
+  /// Pushes a local follow change for the active viewer to the editor.
+  void _pushSportsFollow(FollowedSportsTeam team, {required bool followed}) {
+    if (_sourceType != AppSourceType.xtream) return;
+    final viewer = _activeViewer;
+    final sports = sportsCapability;
+    if (viewer == null || sports == null || !sports.syncsFollows) return;
+    unawaited(
+      xtreamService
+          .toggleSportsFollow(
+            sports,
+            viewerId: viewer.ulid,
+            team: team,
+            followed: followed,
+          )
+          .catchError((Object error) {
+            debugPrint('[Sports] follow push ${team.key} failed: $error');
+            return const <FollowedSportsTeam>[];
+          }),
+    );
   }
 
   Future<bool> _pushLocalFavoritesOnce(

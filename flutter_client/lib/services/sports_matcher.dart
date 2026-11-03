@@ -85,10 +85,19 @@ class SportsMatcher {
 
   static final RegExp _nonWord = RegExp(r'[^\p{L}\p{N}]+', unicode: true);
 
+  /// A college is named by its school (`location`: ESPN abbreviates its
+  /// short name to "S Illinois"), never by its nickname alone, since
+  /// hundreds of schools share "Wolves" or "Cougars". A pro nickname is
+  /// distinctive in its league, so pros keep it.
   static Iterable<String> _namesFor(SportsTeam team) sync* {
     yield team.displayName;
     yield team.shortName;
-    yield team.nickname;
+    if (team.leagueId.contains('college') || team.leagueId.contains('.ncaa.')) {
+      final location = team.location;
+      if (location != null) yield location;
+    } else {
+      yield team.nickname;
+    }
     final trimmed = _clubAffix.firstMatch(team.displayName);
     if (trimmed != null) yield trimmed.group(1)!;
     yield* _aliases[normalize(team.displayName).trim()] ?? const <String>[];

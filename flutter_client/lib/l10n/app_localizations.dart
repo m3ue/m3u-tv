@@ -3800,6 +3800,12 @@ abstract class AppLocalizations {
   /// **'Show leagues'**
   String get sportsLeaguesTitle;
 
+  /// Under a sport in the Sports league picker: how many of its leagues are shown.
+  ///
+  /// In en, this message translates to:
+  /// **'{shown} of {total} shown'**
+  String sportsLeaguesShownCount(int shown, int total);
+
   /// No description provided for @sportsDone.
   ///
   /// In en, this message translates to:
@@ -3845,7 +3851,7 @@ abstract class AppLocalizations {
   /// No description provided for @sportsMyTeamsEmpty.
   ///
   /// In en, this message translates to:
-  /// **'You aren\'t following any teams yet. Long-press a game to follow its teams.'**
+  /// **'You aren\'t following any teams yet. Use Teams to pick yours, or long-press a game.'**
   String get sportsMyTeamsEmpty;
 
   /// No description provided for @sportsMyTeamsNoGames.
@@ -3943,6 +3949,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t load games. Retrying shortly.'**
   String get sportsLoadFailed;
+
+  /// No description provided for @sportsTeamsButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Teams'**
+  String get sportsTeamsButton;
+
+  /// No description provided for @sportsTeamsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick your teams'**
+  String get sportsTeamsTitle;
+
+  /// No description provided for @sportsTeamsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load teams. Choose the league again to retry.'**
+  String get sportsTeamsLoadFailed;
+
+  /// No description provided for @sportsNoTeams.
+  ///
+  /// In en, this message translates to:
+  /// **'No teams found'**
+  String get sportsNoTeams;
 }
 
 class _AppLocalizationsDelegate

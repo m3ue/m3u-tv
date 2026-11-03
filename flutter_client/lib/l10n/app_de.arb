@@ -1038,6 +1038,7 @@
   "sportsSearchHint": "Teams suchen",
   "sportsLeaguesButton": "Ligen",
   "sportsLeaguesTitle": "Ligen anzeigen",
+  "sportsLeaguesShownCount": "{shown} von {total} angezeigt",
   "sportsDone": "Fertig",
   "sportsLiveNow": "Jetzt live",
   "sportsLiveBadge": "LIVE",
@@ -1045,7 +1046,7 @@
   "sportsPostponed": "Verschoben",
   "sportsNoGames": "Keine Spiele in diesem Zeitraum",
   "sportsNoLeagues": "Keine Ligen ausgewählt. Wähle welche unter Ligen.",
-  "sportsMyTeamsEmpty": "Du folgst noch keinen Teams. Halte ein Spiel gedrückt, um seinen Teams zu folgen.",
+  "sportsMyTeamsEmpty": "Du folgst noch keinen Teams. Wähle sie unter Teams aus oder halte ein Spiel gedrückt.",
   "sportsMyTeamsNoGames": "Keines deiner Teams spielt in diesem Zeitraum",
   "sportsChannelCount": "{count, plural, =1{1 Sender} other{{count} Sender}}",
   "sportsNoChannel": "Kein Sender",
@@ -1061,5 +1062,9 @@
   "sportsFixtureAt": "{away} bei {home}",
   "sportsFixtureVs": "{home} gegen {away}",
   "sportsUnavailable": "Sport ist auf diesem Server nicht aktiviert. Ein Admin kann es in M3U Editor unter Einstellungen > Integrationen > Sport aktivieren.",
-  "sportsLoadFailed": "Spiele konnten nicht geladen werden. Neuer Versuch in Kürze."
+  "sportsLoadFailed": "Spiele konnten nicht geladen werden. Neuer Versuch in Kürze.",
+  "sportsTeamsButton": "Teams",
+  "sportsTeamsTitle": "Wähle deine Teams",
+  "sportsTeamsLoadFailed": "Teams konnten nicht geladen werden. Wähle die Liga erneut, um es noch einmal zu versuchen.",
+  "sportsNoTeams": "Keine Teams gefunden"
 }
