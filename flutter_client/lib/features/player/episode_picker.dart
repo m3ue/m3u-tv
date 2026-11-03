@@ -7,6 +7,7 @@ import 'package:m3u_tv/features/player/playback_controls.dart'
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart'
@@ -63,7 +64,7 @@ Future<void> showEpisodePicker(
           maxWidth: math.min(screenWidth * 0.62, screenWidth - 48),
         );
 
-  return showModalBottomSheet<void>(
+  return showAppModalSheet<void>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,

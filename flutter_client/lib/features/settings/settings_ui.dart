@@ -3,6 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
+import 'package:m3u_tv/shared/app_page_route.dart';
+import 'package:m3u_tv/shared/app_switch.dart';
+import 'package:m3u_tv/shared/app_top_bar.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -257,7 +261,7 @@ class SettingsSwitchRow extends StatelessWidget {
       subtitle: subtitle,
       icon: icon,
       leading: leading,
-      trailing: Switch(value: value, onChanged: onChanged),
+      trailing: AppSwitch(value: value, onChanged: onChanged),
       onTap: () => onChanged(!value),
     );
   }
@@ -360,15 +364,6 @@ class SettingsSectionHeader extends StatelessWidget {
   }
 }
 
-/// Matches the shared TV-layout gradient's dominant end tone, mirroring the
-/// opaque backing `go_router_config.dart`'s top-level routes and
-/// `dvr_series_rule_options_screen.dart`'s `openDvrSeriesRuleOptions` use.
-/// A pushed route has a transparent `scaffoldBackgroundColor` (the theme
-/// relies on AppShell's own gradient showing through) and no Scaffold at all
-/// here, so without this the new page renders see-through over the old one
-/// until the push transition finishes, then "snaps" opaque.
-const Color _kSettingsSubpageBackground = Color(0xFF09090b);
-
 /// A `Scaffold` + `AppBar` matching the app's other immersive top-level
 /// pages byte-for-byte (`show_detail_screen.dart`,
 /// `dvr_series_rule_options_screen.dart`): same `AppIconButton` back button,
@@ -386,24 +381,11 @@ Widget _settingsSubpageScaffold(
       ? _kMacTrafficLightInset
       : 0.0;
   return Scaffold(
-    appBar: AppBar(
+    appBar: AppTopBar(
       title: Text(title(context)),
-      automaticallyImplyLeading: false,
-      toolbarHeight: kToolbarHeight * scale,
-      leadingWidth: (56 * scale) + macInset,
-      leading: Padding(
-        padding: EdgeInsets.fromLTRB(
-          8 * scale + macInset,
-          8 * scale,
-          8 * scale,
-          8 * scale,
-        ),
-        child: AppIconButton(
-          icon: Icons.arrow_back,
-          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-        ),
-      ),
+      scale: scale,
+      leadingInset: macInset,
+      onBack: () => Navigator.of(context, rootNavigator: true).pop(),
     ),
     body: Padding(padding: const EdgeInsets.all(24), child: body),
   );
@@ -426,22 +408,9 @@ Future<T?> _pushImmersive<T>(
   required WidgetBuilder content,
 }) {
   return Navigator.of(context, rootNavigator: true).push<T>(
-    PageRouteBuilder<T>(
-      pageBuilder: (context, animation, secondaryAnimation) => Stack(
-        fit: StackFit.expand,
-        children: [
-          const ColoredBox(color: _kSettingsSubpageBackground),
-          _topLevelSafeArea(
-            _withTopLevelBackHandling(onBack, Builder(builder: content)),
-          ),
-        ],
-      ),
-      transitionsBuilder: (context, animation, _, child) => SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(1, 0),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
-        child: child,
+    appPageRoute<T>(
+      builder: (context) => _topLevelSafeArea(
+        _withTopLevelBackHandling(onBack, Builder(builder: content)),
       ),
     ),
   );
@@ -551,7 +520,7 @@ Future<bool> showSettingsConfirmDialog(
   bool isDestructive = false,
 }) async {
   final theme = Theme.of(context);
-  final result = await showDialog<bool>(
+  final result = await showAppDialog<bool>(
     context: context,
     builder: (ctx) => Dialog(
       child: SizedBox(

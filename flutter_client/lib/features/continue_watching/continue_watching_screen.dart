@@ -2,6 +2,8 @@ import 'package:dpad/dpad.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/app_icons.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/continue_watching_items.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -100,7 +102,7 @@ class _ContinueWatchingScreenState extends State<ContinueWatchingScreen> {
                     borderRadius: const BorderRadius.all(Radius.circular(50)),
                     onTap: () => Navigator.of(context).maybePop(),
                     child: IconButton(
-                      icon: Icon(Icons.arrow_back, size: 24 * scale),
+                      icon: Icon(AppIcons.back(context), size: 24 * scale),
                       onPressed: () => Navigator.of(context).maybePop(),
                     ),
                   ),
@@ -114,7 +116,7 @@ class _ContinueWatchingScreenState extends State<ContinueWatchingScreen> {
             ),
             Expanded(
               child: isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(child: AppLoadingIndicator())
                   : items.isEmpty
                   ? Center(
                       child: Text(

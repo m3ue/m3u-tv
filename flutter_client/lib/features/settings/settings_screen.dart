@@ -16,6 +16,7 @@ import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:material_ui/material_ui.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -211,7 +212,7 @@ class _ConnectingScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircularProgressIndicator(),
+            const AppLoadingIndicator(),
             const SizedBox(height: 24),
             Text(
               AppLocalizations.of(context).settingsConnecting,

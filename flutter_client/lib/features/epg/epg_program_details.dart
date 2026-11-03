@@ -9,6 +9,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/auto_scroll_text.dart';
 import 'package:m3u_tv/shared/cached_media_thumbnail.dart';
 import 'package:m3u_tv/shared/epg_icon_pill.dart';
@@ -881,7 +882,7 @@ Future<void> showEpgProgramDetailsSheet(
   VoidCallback? onWatchReplay,
   VoidCallback? onMoreOptions,
 }) {
-  return showModalBottomSheet<void>(
+  return showAppModalSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

@@ -25,6 +25,8 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
     show kCatalogKindSeries, kCatalogKindVod;
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_background.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
+import 'package:m3u_tv/shared/app_page_route.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -62,16 +64,10 @@ Widget _topLevelSafeArea(Widget screen) => Builder(
 CustomTransitionPage<void> _slidePage(Widget screen) =>
     CustomTransitionPage<void>(
       child: ColoredBox(
-        color: const Color(0xFF09090b),
+        color: kAppPageBackground,
         child: _topLevelSafeArea(screen),
       ),
-      transitionsBuilder: (context, animation, _, child) => SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(1, 0),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
-        child: child,
-      ),
+      transitionsBuilder: appSlideTransition,
     );
 
 /// Hardware Back/Escape for the top-level VOD/Series detail routes.
@@ -262,7 +258,7 @@ class _AsyncVodDetails extends StatelessWidget {
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+              body: Center(child: AppLoadingIndicator()),
             );
           }
           final item = snapshot.data;
@@ -320,7 +316,7 @@ class _AsyncSeriesDetails extends StatelessWidget {
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+              body: Center(child: AppLoadingIndicator()),
             );
           }
           final series = snapshot.data;

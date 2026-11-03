@@ -7,6 +7,7 @@ import 'package:m3u_tv/features/player/track_selector.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_icons.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -257,7 +258,7 @@ class PlaybackControls extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.arrow_back,
+                AppIcons.back(context),
                 color: colorScheme.onSurface,
                 size: 24 * scale,
               ),

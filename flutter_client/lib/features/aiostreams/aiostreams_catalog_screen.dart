@@ -9,6 +9,9 @@ import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/app_icons.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/continue_watching_items.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/formatters.dart';
@@ -168,7 +171,10 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
                           ),
                           onTap: () => Navigator.of(context).maybePop(),
                           child: IconButton(
-                            icon: Icon(Icons.arrow_back, size: 24 * scale),
+                            icon: Icon(
+                              AppIcons.back(context),
+                              size: 24 * scale,
+                            ),
                             onPressed: () => Navigator.of(context).maybePop(),
                           ),
                         ),
@@ -253,7 +259,7 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(child: AppLoadingIndicator()),
                 ),
               ),
             if (_hasMore && !_loading && _items.isNotEmpty)
@@ -445,7 +451,7 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
         : progress.title ?? itemId;
 
     // 3. Show stream picker, then play.
-    await showModalBottomSheet<void>(
+    await showAppModalSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,

@@ -9,6 +9,8 @@ import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/services/release_notes_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/qr_link_dialog.dart';
@@ -200,7 +202,7 @@ class _ReleaseNotesViewState extends State<ReleaseNotesView> {
 
   void _openGithub() {
     if (widget.isTv) {
-      showDialog<void>(
+      showAppDialog<void>(
         context: context,
         builder: (dialogContext) => QrLinkDialog(
           title: AppLocalizations.of(
@@ -229,7 +231,7 @@ class _ReleaseNotesViewState extends State<ReleaseNotesView> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircularProgressIndicator(),
+            const AppLoadingIndicator(),
             const SizedBox(height: 16),
             Text(l.settingsReleaseNotesLoading),
           ],

@@ -10,6 +10,8 @@ import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -88,7 +90,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
     required bool isActive,
   }) async {
     final playlists = _service.playlists;
-    final action = await showDialog<_PlaylistAction>(
+    final action = await showAppDialog<_PlaylistAction>(
       context: context,
       builder: (_) => _PlaylistOptionsDialog(
         title: playlistDisplayName(playlist, playlists),
@@ -135,7 +137,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
   }
 
   Future<void> _rename(SavedPlaylist playlist) async {
-    final name = await showDialog<String>(
+    final name = await showAppDialog<String>(
       context: context,
       builder: (_) => _RenamePlaylistDialog(
         currentName: playlist.name,
@@ -269,7 +271,7 @@ Future<String?> _runSwitch(
   BuildContext context,
   Future<String?> Function() task,
 ) async {
-  final outcome = await showDialog<({String? error})>(
+  final outcome = await showAppDialog<({String? error})>(
     context: context,
     barrierDismissible: false,
     builder: (_) => _SwitchingDialog(task: task),
@@ -320,7 +322,7 @@ class _SwitchingDialogState extends State<_SwitchingDialog> {
             padding: const EdgeInsets.all(24),
             child: Row(
               children: [
-                const CircularProgressIndicator(),
+                const AppLoadingIndicator(),
                 SizedBox(width: 24 * scale),
                 Expanded(
                   child: Column(

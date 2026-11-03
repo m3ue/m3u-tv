@@ -6,6 +6,7 @@ import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
@@ -246,7 +247,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
     // rather than poster-wash -> surface -> backdrop.
     return ColoredBox(
       color: Theme.of(context).colorScheme.surface,
-      child: const Center(child: CircularProgressIndicator()),
+      child: const Center(child: AppLoadingIndicator()),
     );
   }
 

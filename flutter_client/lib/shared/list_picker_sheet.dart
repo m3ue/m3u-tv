@@ -1,6 +1,7 @@
 import 'package:dpad/dpad.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -69,7 +70,7 @@ class ListPickerSheet extends StatelessWidget {
     bool asDialog = false,
   }) {
     if (asDialog) {
-      return showDialog<void>(
+      return showAppDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
           clipBehavior: Clip.antiAlias,
@@ -87,7 +88,7 @@ class ListPickerSheet extends StatelessWidget {
         ),
       );
     }
-    return showModalBottomSheet<void>(
+    return showAppModalSheet<void>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

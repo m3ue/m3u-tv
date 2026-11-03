@@ -13,6 +13,7 @@ import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_top_bar.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/dvr_schedule_feedback.dart';
@@ -397,27 +398,11 @@ class _ShowDetailScreenState extends ConsumerState<ShowDetailScreen> {
         : 0.0;
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppTopBar(
         title: Text(l10n.showDetailTitle),
-        automaticallyImplyLeading: false,
-        // AppBar's default toolbarHeight is fixed and unscaled - without
-        // scaling it too, AppIconButton's larger footprint gets squeezed
-        // into that fixed height (see item_detail_scaffold.dart).
-        toolbarHeight: kToolbarHeight * scale,
-        leadingWidth: (56 * scale) + macInset,
-        leading: Padding(
-          padding: EdgeInsets.fromLTRB(
-            8 * scale + macInset,
-            8 * scale,
-            8 * scale,
-            8 * scale,
-          ),
-          child: AppIconButton(
-            icon: Icons.arrow_back,
-            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-            onPressed: () => context.pop(),
-          ),
-        ),
+        scale: scale,
+        leadingInset: macInset,
+        onBack: () => context.pop(),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -16,7 +17,7 @@ import 'package:material_ui/material_ui.dart';
 /// removing it from inside the grid, so the dialog closes itself once
 /// [multiviewChannelsProvider] goes empty.
 Future<void> showMultiviewManageDialog(BuildContext context) {
-  return showDialog<void>(
+  return showAppDialog<void>(
     context: context,
     builder: (dialogContext) => Consumer(
       builder: (context, ref, _) {

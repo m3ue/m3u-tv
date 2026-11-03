@@ -34,6 +34,8 @@ import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_icons.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/cached_backdrop_image.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -2014,7 +2016,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 12),
-                            const CircularProgressIndicator(
+                            const AppLoadingIndicator(
                               color: Colors.white,
                             ),
                             const SizedBox(height: 12),
@@ -2097,7 +2099,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               AppButton(
                                 focusNode: _errorButtonFocusNode,
                                 autofocus: true,
-                                icon: Icons.arrow_back,
+                                icon: AppIcons.back(context),
                                 label: AppLocalizations.of(
                                   context,
                                 ).playerGoBack,

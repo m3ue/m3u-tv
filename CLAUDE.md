@@ -19,6 +19,13 @@ This is the TV frontend for the `m3u-editor` system. It focuses on video playbac
 - **UI**: Material 3, `DpadFocusable` for all interactive items, `DpadRegion` for focus grouping.
 - **Design library**: Material comes from the `material_ui` package - import `package:material_ui/material_ui.dart`, never `package:flutter/material.dart` (the framework copy is frozen, and its types don't match the ones `go_router`/`cached_network_image` already use). The `StatefulShellRoute` in `go_router_config.dart` pins its page to `NoTransitionPage` on purpose; don't switch it back to `builder`.
 
+- **Shared UI building blocks**: screens build from the app's own widgets in `lib/shared`, not the raw Material ones, so the app's look can be changed in one place (e.g. a later Cupertino design for Apple):
+  - Top bar: `AppTopBar`, not `AppBar`.
+  - Dialogs and sheets: open with `showAppDialog` / `showAppModalSheet`, not `showDialog` / `showModalBottomSheet`. Use `AppAlertDialog` + `AppDialogAction` for title/message/buttons confirms and `AppMenuDialog` + `AppMenuOption` for option menus, not `AlertDialog` / `SimpleDialog`.
+  - Controls: `AppButton` / `AppIconButton`, `AppSwitch`, `AppLoadingIndicator`, `DpadTabBar` / `DpadTabBarView`, and `AppIcons.back(context)` for the back arrow.
+  - Pushed pages: `appPageRoute`, not `MaterialPageRoute` / `PageRouteBuilder`.
+  - These render exactly the Material they wrap. Add a new wrapper to `lib/shared` before using a new raw control in more than one place.
+
 ## Rules
 
 ### TV Interaction

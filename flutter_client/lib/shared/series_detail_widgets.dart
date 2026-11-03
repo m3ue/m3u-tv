@@ -6,7 +6,9 @@ import 'package:flutter/services.dart'
 import 'package:intl/intl.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/app_alert_dialog.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/backdrop_detail_hero.dart';
 import 'package:m3u_tv/shared/cast_member_row.dart';
 import 'package:m3u_tv/shared/cast_strip.dart';
@@ -64,7 +66,7 @@ Future<bool?> confirmMarkWatched(
   required String message,
   bool? presetWatched,
 }) {
-  return showDialog<bool>(
+  return showAppDialog<bool>(
     context: context,
     builder: (context) => _ConfirmMarkDialog(
       title: title,
@@ -120,43 +122,28 @@ class _ConfirmMarkDialogState extends State<_ConfirmMarkDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final preset = widget.presetWatched;
-    return AlertDialog(
-      title: Text(widget.title),
-      content: Text(widget.message),
+    return AppAlertDialog(
+      title: widget.title,
+      message: widget.message,
+      memoryKey: 'series/mark-watched-dialog-actions',
       actions: [
-        DpadRegion(
-          memoryKey: 'series/mark-watched-dialog-actions',
-          // OverflowBar (not Row) so the buttons stack vertically on a narrow
-          // dialog instead of overflowing. Same shared-button treatment as the
-          // resume and DVR modals.
-          child: OverflowBar(
-            alignment: MainAxisAlignment.end,
-            spacing: 8,
-            overflowSpacing: 8,
-            children: [
-              AppButton(
-                label: l.cancel,
-                onPressed: () => _pop(null),
-              ),
-              if (preset != true)
-                AppButton(
-                  label: l.seriesMarkUnwatched,
-                  variant: preset == false
-                      ? AppButtonVariant.primary
-                      : AppButtonVariant.tonal,
-                  autofocus: preset == false,
-                  onPressed: () => _pop(false),
-                ),
-              if (preset != false)
-                AppButton(
-                  label: l.seriesMarkWatched,
-                  variant: AppButtonVariant.primary,
-                  autofocus: true,
-                  onPressed: () => _pop(true),
-                ),
-            ],
+        AppDialogAction(label: l.cancel, onPressed: () => _pop(null)),
+        if (preset != true)
+          AppDialogAction(
+            label: l.seriesMarkUnwatched,
+            variant: preset == false
+                ? AppButtonVariant.primary
+                : AppButtonVariant.tonal,
+            autofocus: preset == false,
+            onPressed: () => _pop(false),
           ),
-        ),
+        if (preset != false)
+          AppDialogAction(
+            label: l.seriesMarkWatched,
+            variant: AppButtonVariant.primary,
+            autofocus: true,
+            onPressed: () => _pop(true),
+          ),
       ],
     );
   }
@@ -315,7 +302,7 @@ class SeasonPicker extends StatelessWidget {
       // Phone: a bottom sheet reads more naturally than a centered dialog and
       // keeps the tap targets in thumb reach.
       unawaited(
-        showModalBottomSheet<int>(
+        showAppModalSheet<int>(
           context: context,
           showDragHandle: true,
           isScrollControlled: true,
@@ -334,7 +321,7 @@ class SeasonPicker extends StatelessWidget {
     }
 
     unawaited(
-      showDialog<int>(
+      showAppDialog<int>(
         context: context,
         builder: (dialogContext) => AlertDialog(
           clipBehavior: Clip.antiAlias,

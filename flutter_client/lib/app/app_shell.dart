@@ -41,6 +41,8 @@ import 'package:m3u_tv/services/dvr_actions.dart';
 import 'package:m3u_tv/services/memory_watchdog.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/shared/app_background.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/dvr_schedule_feedback.dart';
@@ -1640,7 +1642,7 @@ class AppShellState extends ConsumerState<AppShell>
         builder: (_, _) {
           if (_appState.isBootstrapping) {
             return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+              body: Center(child: AppLoadingIndicator()),
             );
           }
           return DvrRecordingsScreen(
@@ -1668,7 +1670,7 @@ class AppShellState extends ConsumerState<AppShell>
         builder: (_, _) {
           if (_appState.isBootstrapping) {
             return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+              body: Center(child: AppLoadingIndicator()),
             );
           }
           return RequestScreen(
@@ -2208,7 +2210,7 @@ class AppShellState extends ConsumerState<AppShell>
     // Calling _navigateTo synchronously inside ListTile.onTap while the sheet
     // is still in the overlay can cause a double interaction event on some
     // platforms (goBranch fires a route change mid-pop animation).
-    final index = await showModalBottomSheet<int>(
+    final index = await showAppModalSheet<int>(
       context: context,
       builder: (sheetContext) => SafeArea(
         child: ListView(

@@ -2,6 +2,8 @@ import 'package:dpad/dpad.dart' show DpadEdgeBehavior, DpadRegion;
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
+import 'package:m3u_tv/shared/app_switch.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
@@ -225,7 +227,7 @@ class _PersonDetailBodyState extends State<_PersonDetailBody> {
                   if (hasFocus) _scrollToTop();
                 },
                 child: widget.isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Center(child: AppLoadingIndicator())
                     : widget.hasError
                     ? Text(l.personDetailsError)
                     : compact
@@ -472,7 +474,7 @@ class _LibraryFilterSwitch extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(width: 8),
-            Switch(value: showLibraryOnly, onChanged: onChanged),
+            AppSwitch(value: showLibraryOnly, onChanged: onChanged),
           ],
         ),
       ),

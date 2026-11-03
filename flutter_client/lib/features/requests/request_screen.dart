@@ -7,6 +7,8 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
+import 'package:m3u_tv/shared/app_top_bar.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -174,7 +176,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
 
     if (!widget.isConfigured) {
       return Scaffold(
-        appBar: AppBar(title: Text(l.navRequests)),
+        appBar: AppTopBar(title: Text(l.navRequests)),
         body: Center(
           child: Text(
             l.appNotConfigured,
@@ -263,7 +265,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
     List<MediaRequestSummary> myRequests,
   ) {
     if (_isSearching) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: AppLoadingIndicator());
     }
     if (_query.trim().length < 2) {
       return Center(
@@ -515,7 +517,7 @@ class _MyRequestCard extends StatelessWidget {
               const SizedBox(
                 width: 24,
                 height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: AppLoadingIndicator(strokeWidth: 2),
               )
             else
               AppIconButton(

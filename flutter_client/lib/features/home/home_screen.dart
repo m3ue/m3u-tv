@@ -15,6 +15,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/channel_grid_tile.dart';
 import 'package:m3u_tv/shared/continue_watching_items.dart';
@@ -334,7 +335,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     if (isBootstrapping) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: AppLoadingIndicator()));
     }
 
     if (!isConfigured) {

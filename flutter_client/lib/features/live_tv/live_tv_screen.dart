@@ -23,6 +23,10 @@ import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
+import 'package:m3u_tv/shared/app_menu_dialog.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
+import 'package:m3u_tv/shared/app_page_route.dart';
 import 'package:m3u_tv/shared/catalog_window.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/channel_grid_tile.dart';
@@ -786,11 +790,11 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     final multiview = ref.read(multiviewControllerProvider);
     final isInMultiview = multiview.contains(channel.id);
 
-    final action = await showDialog<_ChannelContextAction>(
+    final action = await showAppDialog<_ChannelContextAction>(
       context: context,
       builder: (dialogContext) {
         final scale = FontSizeScope.scaleOf(dialogContext);
-        return SimpleDialog(
+        return AppMenuDialog(
           title: Row(
             children: [
               Icon(Icons.tv, size: 18 * scale),
@@ -965,25 +969,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     widget.onEnterFullScreenDetail?.call();
     try {
       await Navigator.of(context).push<void>(
-        PageRouteBuilder<void>(
-          pageBuilder: (context, animation, secondaryAnimation) => const Stack(
-            fit: StackFit.expand,
-            children: [
-              ColoredBox(color: Color(0xFF09090b)),
-              MultiviewScreen(),
-            ],
-          ),
-          transitionsBuilder: (context, animation, _, child) => SlideTransition(
-            position:
-                Tween<Offset>(
-                  begin: const Offset(1, 0),
-                  end: Offset.zero,
-                ).animate(
-                  CurvedAnimation(parent: animation, curve: Curves.easeOut),
-                ),
-            child: child,
-          ),
-        ),
+        appPageRoute<void>(builder: (context) => const MultiviewScreen()),
       );
     } finally {
       widget.onExitFullScreenDetail?.call();
@@ -1002,7 +988,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     ref.listen<bool>(playerOverlayActiveProvider, _onPlayerOverlayChanged);
 
     if (isBootstrapping) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: AppLoadingIndicator()));
     }
 
     if (!isConfigured) {
@@ -1100,7 +1086,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
               // Only show the spinner when there is nothing to display yet.
               // During a background refresh the populated list stays visible.
               child: awaitingWindow || (isLoading && filtered.length == 0)
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(child: AppLoadingIndicator())
                   : filtered.length == 0
                   ? Center(
                       child: Text(
@@ -1442,41 +1428,13 @@ class _ContextMenuOption extends StatelessWidget {
   final bool autofocus;
 
   @override
-  Widget build(BuildContext context) {
-    final scale = FontSizeScope.scaleOf(context);
-    return DpadInkWell(
-      autofocus: autofocus,
-      onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          vertical: 10 * scale,
-          horizontal: 24 * scale,
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 20 * scale),
-            SizedBox(width: 12 * scale),
-            Expanded(
-              child: subtitle != null
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(label),
-                        Text(
-                          subtitle!,
-                          style: Theme.of(context).textTheme.bodySmall,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    )
-                  : Text(label),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => AppMenuOption(
+    icon: icon,
+    label: label,
+    subtitle: subtitle,
+    autofocus: autofocus,
+    onTap: onTap,
+  );
 }
 
 /// A list row whose channel is still loading, at a real row's geometry.

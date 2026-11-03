@@ -1,6 +1,7 @@
 import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/dialog_option_tiles.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
@@ -42,7 +43,7 @@ Future<ResumeModalResult?> showResumeModal(
   required int positionSeconds,
   bool showManageActions = false,
 }) {
-  return showDialog<ResumeModalResult>(
+  return showAppDialog<ResumeModalResult>(
     context: context,
     builder: (_) => _ResumeModal(
       title: title,

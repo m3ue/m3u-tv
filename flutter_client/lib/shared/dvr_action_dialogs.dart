@@ -1,7 +1,8 @@
-import 'package:dpad/dpad.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/app_alert_dialog.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:material_ui/material_ui.dart';
 
 enum StopRecordingChoice { keep, delete, back }
@@ -16,42 +17,30 @@ Future<StopRecordingChoice?> showStopRecordingDialog(
   required String title,
 }) {
   final l10n = AppLocalizations.of(context);
-  return showDialog<StopRecordingChoice>(
+  return showAppDialog<StopRecordingChoice>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: Text(l10n.dvrStopTitle(title)),
-      content: Text(l10n.dvrStopMessage),
+    builder: (dialogContext) => AppAlertDialog(
+      title: l10n.dvrStopTitle(title),
+      message: l10n.dvrStopMessage,
+      memoryKey: 'dvr/stop-dialog-actions',
       actions: [
-        DpadRegion(
-          memoryKey: 'dvr/stop-dialog-actions',
-          // OverflowBar (not Row) so three buttons on a narrow TV/mobile
-          // dialog stack vertically instead of overflowing horizontally.
-          child: OverflowBar(
-            alignment: MainAxisAlignment.end,
-            spacing: 8,
-            overflowSpacing: 8,
-            children: [
-              AppButton(
-                label: l10n.dvrStopBack,
-                onPressed: () =>
-                    Navigator.of(dialogContext).pop(StopRecordingChoice.back),
-              ),
-              AppButton(
-                label: l10n.dvrStopDelete,
-                variant: AppButtonVariant.destructive,
-                onPressed: () => Navigator.of(
-                  dialogContext,
-                ).pop(StopRecordingChoice.delete),
-              ),
-              AppButton(
-                label: l10n.dvrStopKeep,
-                variant: AppButtonVariant.primary,
-                autofocus: true,
-                onPressed: () =>
-                    Navigator.of(dialogContext).pop(StopRecordingChoice.keep),
-              ),
-            ],
-          ),
+        AppDialogAction(
+          label: l10n.dvrStopBack,
+          onPressed: () =>
+              Navigator.of(dialogContext).pop(StopRecordingChoice.back),
+        ),
+        AppDialogAction(
+          label: l10n.dvrStopDelete,
+          variant: AppButtonVariant.destructive,
+          onPressed: () =>
+              Navigator.of(dialogContext).pop(StopRecordingChoice.delete),
+        ),
+        AppDialogAction(
+          label: l10n.dvrStopKeep,
+          variant: AppButtonVariant.primary,
+          autofocus: true,
+          onPressed: () =>
+              Navigator.of(dialogContext).pop(StopRecordingChoice.keep),
         ),
       ],
     ),
@@ -60,33 +49,22 @@ Future<StopRecordingChoice?> showStopRecordingDialog(
 
 Future<bool?> showDeleteRecordingDialog(BuildContext context) {
   final l10n = AppLocalizations.of(context);
-  return showDialog<bool>(
+  return showAppDialog<bool>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: Text(l10n.dvrDeleteTitle),
-      content: Text(l10n.dvrDeleteMessage),
+    builder: (dialogContext) => AppAlertDialog(
+      title: l10n.dvrDeleteTitle,
+      message: l10n.dvrDeleteMessage,
+      memoryKey: 'dvr/delete-dialog-actions',
       actions: [
-        DpadRegion(
-          memoryKey: 'dvr/delete-dialog-actions',
-          // OverflowBar (not Row) so buttons on a narrow dialog stack
-          // vertically instead of overflowing horizontally.
-          child: OverflowBar(
-            alignment: MainAxisAlignment.end,
-            spacing: 8,
-            overflowSpacing: 8,
-            children: [
-              AppButton(
-                label: l10n.dvrDeleteDismiss,
-                autofocus: true,
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-              ),
-              AppButton(
-                label: l10n.dvrDeleteConfirm,
-                variant: AppButtonVariant.destructive,
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-              ),
-            ],
-          ),
+        AppDialogAction(
+          label: l10n.dvrDeleteDismiss,
+          autofocus: true,
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+        ),
+        AppDialogAction(
+          label: l10n.dvrDeleteConfirm,
+          variant: AppButtonVariant.destructive,
+          onPressed: () => Navigator.of(dialogContext).pop(true),
         ),
       ],
     ),
@@ -101,31 +79,22 @@ Future<bool?> showDeleteSeriesRuleDialog(
   required DvrSeriesRule rule,
 }) {
   final l10n = AppLocalizations.of(context);
-  return showDialog<bool>(
+  return showAppDialog<bool>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: Text(l10n.dvrDeleteSeriesRuleConfirm),
-      content: Text(l10n.showDeleteRuleConfirm(rule.seriesTitle)),
+    builder: (dialogContext) => AppAlertDialog(
+      title: l10n.dvrDeleteSeriesRuleConfirm,
+      message: l10n.showDeleteRuleConfirm(rule.seriesTitle),
+      memoryKey: 'dvr/delete-series-rule-dialog-actions',
       actions: [
-        DpadRegion(
-          memoryKey: 'dvr/delete-series-rule-dialog-actions',
-          child: OverflowBar(
-            alignment: MainAxisAlignment.end,
-            spacing: 8,
-            overflowSpacing: 8,
-            children: [
-              AppButton(
-                label: l10n.dvrDeleteDismiss,
-                autofocus: true,
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-              ),
-              AppButton(
-                label: l10n.showDeleteRule,
-                variant: AppButtonVariant.destructive,
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-              ),
-            ],
-          ),
+        AppDialogAction(
+          label: l10n.dvrDeleteDismiss,
+          autofocus: true,
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+        ),
+        AppDialogAction(
+          label: l10n.showDeleteRule,
+          variant: AppButtonVariant.destructive,
+          onPressed: () => Navigator.of(dialogContext).pop(true),
         ),
       ],
     ),

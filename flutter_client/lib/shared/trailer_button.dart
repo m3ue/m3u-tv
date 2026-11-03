@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/qr_link_dialog.dart';
 import 'package:material_ui/material_ui.dart';
@@ -28,7 +29,7 @@ const MethodChannel _tvosExternalUrlChannel = MethodChannel(
 Future<void> openTrailer(BuildContext context, String url) async {
   final opened = await _launchExternally(url);
   if (opened || !context.mounted) return;
-  await showDialog<void>(
+  await showAppDialog<void>(
     context: context,
     builder: (dialogContext) => QrLinkDialog(
       title: AppLocalizations.of(dialogContext).trailerWatch,

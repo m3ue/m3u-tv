@@ -1,4 +1,5 @@
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/shared/app_switch.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
@@ -103,7 +104,7 @@ class _FavoritesFirstSortRowState extends State<FavoritesFirstSortRow> {
             Expanded(
               child: Text(AppLocalizations.of(context).mediaSortFavoritesFirst),
             ),
-            Switch(value: _value, onChanged: _set),
+            AppSwitch(value: _value, onChanged: _set),
           ],
         ),
       ),

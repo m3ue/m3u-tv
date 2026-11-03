@@ -25,6 +25,7 @@ import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -102,7 +103,7 @@ class ConnectedView extends StatefulWidget {
 
 class _ConnectedViewState extends State<ConnectedView> {
   void _openViewerManagement(BuildContext context) {
-    showDialog<void>(
+    showAppDialog<void>(
       context: context,
       builder: (_) => ViewerManagementDialog(
         viewers: widget.viewers.isNotEmpty

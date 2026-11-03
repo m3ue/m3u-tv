@@ -1,5 +1,6 @@
 import 'package:dpad/dpad.dart';
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
+import 'package:m3u_tv/shared/app_icons.dart';
 import 'package:m3u_tv/shared/frosted_surface.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
@@ -119,7 +120,7 @@ class ItemDetailScaffold extends StatelessWidget {
                   ),
                 ],
                 child: IconButton(
-                  icon: Icon(Icons.arrow_back, size: 24 * scale),
+                  icon: Icon(AppIcons.back(context), size: 24 * scale),
                   onPressed: () => Navigator.of(context).maybePop(),
                 ),
               ),

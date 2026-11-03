@@ -4,6 +4,8 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_page_route.dart';
+import 'package:m3u_tv/shared/app_top_bar.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -92,32 +94,12 @@ Future<DvrSeriesRuleOptions?> openDvrSeriesRuleOptions(
   bool Function()? onBack,
 }) {
   return Navigator.of(context, rootNavigator: true).push<DvrSeriesRuleOptions>(
-    PageRouteBuilder<DvrSeriesRuleOptions>(
-      // Mirrors go_router_config.dart's `_slidePage`: an opaque backing
-      // color (the shared TV-layout gradient's dominant end tone) plus a
-      // pure slide, no fade. Without this, a raw MaterialPageRoute uses
-      // Material 3's default fade transition over a transparent Scaffold
-      // (scaffoldBackgroundColor is transparent app-wide, relying on
-      // AppShell's shared gradient to show through) and briefly renders
-      // see-through during the push.
-      pageBuilder: (context, animation, secondaryAnimation) => Stack(
-        fit: StackFit.expand,
-        children: [
-          const ColoredBox(color: Color(0xFF09090b)),
-          _topLevelSafeArea(
-            _withTopLevelBackHandling(
-              onBack,
-              DvrSeriesRuleOptionsScreen(show: show, initialRule: initialRule),
-            ),
-          ),
-        ],
-      ),
-      transitionsBuilder: (context, animation, _, child) => SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(1, 0),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
-        child: child,
+    appPageRoute<DvrSeriesRuleOptions>(
+      builder: (context) => _topLevelSafeArea(
+        _withTopLevelBackHandling(
+          onBack,
+          DvrSeriesRuleOptionsScreen(show: show, initialRule: initialRule),
+        ),
       ),
     ),
   );
@@ -283,26 +265,11 @@ class _DvrSeriesRuleOptionsScreenState
 
     return Scaffold(
       resizeToAvoidBottomInset: !_isRemoteDrivenEnvironment(context),
-      appBar: AppBar(
+      appBar: AppTopBar(
         title: Text(l10n.dvrSeriesOptionsFor(show.displayTitle)),
-        // AppBar's default toolbarHeight is fixed and unscaled - without
-        // scaling it too, AppIconButton's larger footprint gets squeezed
-        // into that fixed height (see item_detail_scaffold.dart).
-        toolbarHeight: kToolbarHeight * scale,
-        leadingWidth: (56 * scale) + macInset,
-        leading: Padding(
-          padding: EdgeInsets.fromLTRB(
-            8 * scale + macInset,
-            8 * scale,
-            8 * scale,
-            8 * scale,
-          ),
-          child: AppIconButton(
-            icon: Icons.arrow_back,
-            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ),
+        scale: scale,
+        leadingInset: macInset,
+        onBack: () => Navigator.of(context).pop(),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),

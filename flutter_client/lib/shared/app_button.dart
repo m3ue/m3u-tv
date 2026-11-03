@@ -1,4 +1,5 @@
 import 'package:dpad/dpad.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -297,7 +298,7 @@ class AppButton extends StatelessWidget {
       final child = SizedBox(
         width: 20 * scale,
         height: 20 * scale,
-        child: CircularProgressIndicator(
+        child: AppLoadingIndicator(
           strokeWidth: 2,
           color: switch (variant) {
             AppButtonVariant.destructive => colorScheme.error,

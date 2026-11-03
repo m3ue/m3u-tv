@@ -1,6 +1,8 @@
 import 'package:dpad/dpad.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
+import 'package:m3u_tv/shared/app_menu_dialog.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_sort.dart';
 import 'package:m3u_tv/shared/sort_option_row.dart';
@@ -44,11 +46,11 @@ Future<MediaSortOption?> showMediaSortDialog(
       recentOption,
     ),
   ];
-  return showDialog<MediaSortOption>(
+  return showAppDialog<MediaSortOption>(
     context: context,
     builder: (dialogContext) {
       final scale = FontSizeScope.scaleOf(dialogContext);
-      return SimpleDialog(
+      return AppMenuDialog(
         title: Row(
           children: [
             Icon(Icons.sort, size: 18 * scale),

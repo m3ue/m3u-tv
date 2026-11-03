@@ -15,7 +15,10 @@ import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
-import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/app_icons.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
+import 'package:m3u_tv/shared/app_menu_dialog.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
@@ -313,9 +316,9 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
   Future<void> _showTileMenu(int index) async {
     final l10n = AppLocalizations.of(context);
     final count = _tiles.length;
-    final action = await showDialog<_TileMenuAction>(
+    final action = await showAppDialog<_TileMenuAction>(
       context: context,
-      builder: (dialogContext) => SimpleDialog(
+      builder: (dialogContext) => AppMenuDialog(
         title: Text(_tiles[index].channel.name),
         children: [
           DpadRegion(
@@ -369,7 +372,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                       Navigator.of(dialogContext).pop(_TileMenuAction.remove),
                 ),
                 _MenuOption(
-                  icon: Icons.arrow_back,
+                  icon: AppIcons.back(context),
                   label: l10n.cancel,
                   onTap: () => Navigator.of(dialogContext).pop(),
                 ),
@@ -437,7 +440,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                       ],
                       child: Padding(
                         padding: EdgeInsets.all(8 * scale),
-                        child: Icon(Icons.arrow_back, size: 24 * scale),
+                        child: Icon(AppIcons.back(context), size: 24 * scale),
                       ),
                     ),
                     SizedBox(width: 16 * scale),
@@ -640,7 +643,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                 Center(
                   child: SizedBox.square(
                     dimension: 36 * scale,
-                    child: const CircularProgressIndicator(strokeWidth: 2),
+                    child: const AppLoadingIndicator(strokeWidth: 2),
                   ),
                 ),
               Positioned(
@@ -703,23 +706,16 @@ class _MenuOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = FontSizeScope.scaleOf(context);
-    return DpadInkWell(
-      onTap: onTap,
+    return AppMenuOption(
+      icon: icon,
+      label: label,
       autofocus: autofocus,
-      borderRadius: const BorderRadius.all(Radius.circular(8)),
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: 16 * scale,
-          vertical: 12 * scale,
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 20 * scale),
-            SizedBox(width: 12 * scale),
-            Text(label),
-          ],
-        ),
+      onTap: onTap,
+      padding: EdgeInsets.symmetric(
+        horizontal: 16 * scale,
+        vertical: 12 * scale,
       ),
+      borderRadius: const BorderRadius.all(Radius.circular(8)),
     );
   }
 }

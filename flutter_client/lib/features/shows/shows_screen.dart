@@ -8,6 +8,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:material_ui/material_ui.dart';
@@ -124,7 +125,7 @@ class _ShowsScreenState extends ConsumerState<ShowsScreen> {
     ref.watch(dvrSeriesRulesProvider);
 
     if (isBootstrapping) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: AppLoadingIndicator());
     }
 
     if (!isConfigured) {
@@ -161,7 +162,7 @@ class _ShowsScreenState extends ConsumerState<ShowsScreen> {
 
   Widget _buildBody(AppLocalizations l10n) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: AppLoadingIndicator());
     }
     if (_error != null) {
       return Center(
