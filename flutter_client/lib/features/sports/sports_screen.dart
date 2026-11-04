@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:m3u_tv/features/multiview/multiview_controller.dart';
 import 'package:m3u_tv/features/multiview/multiview_manage_dialog.dart';
 import 'package:m3u_tv/features/multiview/multiview_screen.dart';
@@ -13,7 +12,7 @@ import 'package:m3u_tv/features/sports/sports_teams_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
-import 'package:m3u_tv/services/sports_channel_resolver.dart';
+import 'package:m3u_tv/services/sports_channel_lookup.dart';
 import 'package:m3u_tv/services/sports_matcher.dart';
 import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/services/sports_settings.dart';
@@ -22,21 +21,19 @@ import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/app_menu_dialog.dart';
 import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/app_page_route.dart';
+import 'package:m3u_tv/shared/day_toolbar.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/media_category_nav.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// The days a Sports list covers.
-enum SportsRange { yesterday, today, upcoming }
-
-/// Games from the followed competitions (ESPN's schedule), each tied to the
-/// channels in the active playlist that carry it, so a game is one press
-/// from playing or from joining Multiview.
+/// One day's games from the followed competitions, each tied to the channels
+/// in the active playlist that carry it, so a game is one press from playing
+/// or from joining Multiview.
 ///
-/// Fixtures come from M3U Editor ([sportsServiceProvider]); channels from
-/// [SportsChannelResolver] over the locally stored guide and channel names.
+/// Games and channels both come from M3U Editor ([sportsServiceProvider]). The
+/// games show first; finding their channels can take longer on a big playlist.
 /// While a game is on, or about to start, the list refreshes every minute.
 class SportsScreen extends ConsumerStatefulWidget {
   const SportsScreen({
@@ -47,6 +44,7 @@ class SportsScreen extends ConsumerStatefulWidget {
     this.onEntryFocusScopeReady,
     this.onEnterFullScreenDetail,
     this.onExitFullScreenDetail,
+    this.onHandleTopLevelBack,
   });
 
   final ValueChanged<Channel> onChannelSelect;
@@ -62,26 +60,28 @@ class SportsScreen extends ConsumerStatefulWidget {
   final VoidCallback? onEnterFullScreenDetail;
   final VoidCallback? onExitFullScreenDetail;
 
+  /// `AppShellState.handleBackFromTopLevelRoute`, for pages this screen opens
+  /// on the root Navigator.
+  final bool Function()? onHandleTopLevelBack;
+
   @override
   ConsumerState<SportsScreen> createState() => _SportsScreenState();
 }
 
-class _SportsScreenState extends ConsumerState<SportsScreen>
-    with SingleTickerProviderStateMixin {
+class _SportsScreenState extends ConsumerState<SportsScreen> {
   static const String _scopeAll = '';
   static const String _scopeMyTeams = '__my_teams__';
   static const Duration _refreshInterval = Duration(minutes: 1);
-  static const Duration _guideChangeDebounce = Duration(seconds: 3);
 
-  late final TabController _tabController = TabController(
-    length: SportsRange.values.length,
-    initialIndex: SportsRange.today.index,
-    vsync: this,
-  );
+  /// Skipping through several days sends one request.
+  static const Duration _dayChangeDebounce = Duration(milliseconds: 300);
+  static const int _daysBack = 7;
+  static const int _daysAhead = 14;
+
   final FocusScopeNode _listFocusNode = FocusScopeNode();
   final GlobalKey<MediaCategoryNavState> _navKey =
       GlobalKey<MediaCategoryNavState>();
-  final GlobalKey<DpadTabBarState> _tabBarKey = GlobalKey<DpadTabBarState>();
+  final FocusNode _nowFocusNode = FocusNode(debugLabel: 'sports-now');
 
   late final SportsSettings _settings = ref.read(sportsSettingsProvider);
   late String _scope = _settings.followedTeams.isEmpty
@@ -89,6 +89,12 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
       : _scopeMyTeams;
   late String _leagueSignature = _leagueIdsSignature();
   String _query = '';
+  DateTime _selectedDay = _dateOnly(DateTime.now());
+
+  /// My Teams opens first when teams are followed, but falls back to All on
+  /// the first load if none of them play that day. Set once that's settled or
+  /// the viewer picks a tab, whose choice then stands.
+  bool _scopeSettled = false;
 
   List<SportsFixture> _fixtures = const [];
   bool _loading = true;
@@ -97,28 +103,31 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
   bool _loadFailed = false;
   int _loadGeneration = 0;
   Map<String, List<SportsChannelMatch>> _matches = const {};
-  bool _resolving = false;
-  Future<void>? _resolveInFlight;
-  int _resolveGeneration = 0;
+  bool _channelsLoading = false;
+  Future<void>? _channelsInFlight;
+  int _channelsGeneration = 0;
 
-  /// The watchable games [_matches] was resolved for. A score refresh that
-  /// brings the same games skips the resolve; a guide or playlist change
-  /// clears it.
-  String? _resolvedSignature;
+  /// The day and leagues [_matches] covers. A score refresh reuses it until
+  /// [kSportsChannelsMaxAge]; a playlist change clears it.
+  String? _channelsFor;
+  DateTime? _channelsFetchedAt;
   List<_SportsRow> _rows = const [];
 
   Timer? _refreshTimer;
-  Timer? _guideChangeTimer;
+  Timer? _dayChangeTimer;
   ValueListenable<TickerModeData>? _tickerModeNotifier;
 
-  SportsRange get _range => SportsRange.values[_tabController.index];
+  static DateTime _dateOnly(DateTime time) =>
+      DateTime(time.year, time.month, time.day);
+
+  static DateTime _offsetDay(DateTime day, int days) =>
+      DateTime(day.year, day.month, day.day + days);
 
   bool get _isVisible => _tickerModeNotifier?.value.enabled ?? true;
 
   @override
   void initState() {
     super.initState();
-    _tabController.addListener(_onRangeChanged);
     _settings.addListener(_onSettingsChanged);
     unawaited(_load());
   }
@@ -140,33 +149,43 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
     _tickerModeNotifier?.removeListener(_onVisibilityChanged);
     _settings.removeListener(_onSettingsChanged);
     _refreshTimer?.cancel();
-    _guideChangeTimer?.cancel();
-    _tabController.dispose();
+    _dayChangeTimer?.cancel();
+    _nowFocusNode.dispose();
     _listFocusNode.dispose();
     super.dispose();
   }
 
   void _onVisibilityChanged() {
     if (_isVisible) {
-      // Guide changes aren't followed while hidden.
-      _resolvedSignature = null;
       unawaited(_load());
     } else {
       _refreshTimer?.cancel();
-      _guideChangeTimer?.cancel();
+      _dayChangeTimer?.cancel();
     }
   }
 
-  void _onRangeChanged() {
-    if (_tabController.indexIsChanging) return;
+  /// Shows [day], loading it once the viewer stops pressing.
+  void _selectDay(DateTime day) {
+    if (day == _selectedDay) return;
+    _refreshTimer?.cancel();
+    _dayChangeTimer?.cancel();
+    _loadGeneration++;
+    _channelsGeneration++;
     setState(() {
+      _selectedDay = day;
       _fixtures = const [];
       _matches = const {};
-      _resolvedSignature = null;
+      _channelsFor = null;
+      _channelsFetchedAt = null;
+      _channelsInFlight = null;
+      _channelsLoading = false;
       _rows = const [];
       _loading = true;
+      _loadFailed = false;
     });
-    unawaited(_load());
+    _dayChangeTimer = Timer(_dayChangeDebounce, () {
+      if (mounted) unawaited(_load());
+    });
   }
 
   /// What the editor's Sports integration offers; null while it's off.
@@ -205,21 +224,10 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
   // Loading
   // ---------------------------------------------------------------------------
 
-  /// Local-day bounds of [range].
-  static (DateTime, DateTime) _bounds(SportsRange range, DateTime now) {
-    final midnight = DateTime(now.year, now.month, now.day);
-    DateTime day(int offset) =>
-        DateTime(midnight.year, midnight.month, midnight.day + offset);
-    return switch (range) {
-      SportsRange.yesterday => (day(-1), midnight),
-      SportsRange.today => (midnight, day(1)),
-      SportsRange.upcoming => (day(1), day(8)),
-    };
-  }
-
   Future<void> _load() async {
     final generation = ++_loadGeneration;
     _refreshTimer?.cancel();
+    _dayChangeTimer?.cancel();
     final capability = _capability;
     final leagues = _leagues;
     if (capability == null || leagues.isEmpty) {
@@ -232,7 +240,8 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
       });
       return;
     }
-    final (from, to) = _bounds(_range, DateTime.now());
+    final from = _selectedDay.toUtc();
+    final to = _offsetDay(_selectedDay, 1).toUtc();
     final List<SportsFixture> fixtures;
     try {
       fixtures = await ref
@@ -264,24 +273,24 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
       _fixtures = fixtures;
       _loading = false;
       _loadFailed = false;
+      if (!_scopeSettled) {
+        _scopeSettled = true;
+        final followed = _settings.followedTeamKeys;
+        if (_scope == _scopeMyTeams &&
+            !fixtures.any((fixture) => fixture.involves(followed))) {
+          _scope = _scopeAll;
+        }
+      }
       _rebuildRows();
     });
     _scheduleRefresh();
-    if (_watchableSignature(fixtures) != _resolvedSignature) {
-      unawaited(_resolveChannels());
-    }
+    _loadChannels(capability, leagues, from, to);
   }
-
-  String _watchableSignature(List<SportsFixture> fixtures) => [
-    for (final fixture in fixtures)
-      if (_isWatchable(fixture))
-        '${fixture.league.id}:${fixture.id}@${fixture.start.millisecondsSinceEpoch}',
-  ].join(',');
 
   /// Polls while a game is on or starts within the hour.
   void _scheduleRefresh() {
     _refreshTimer?.cancel();
-    if (!_isVisible || _range == SportsRange.yesterday) return;
+    if (!_isVisible) return;
     final soon = DateTime.now().toUtc().add(const Duration(hours: 1));
     final active = _fixtures.any(
       (fixture) =>
@@ -295,39 +304,50 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
     });
   }
 
-  /// Ties the loaded fixtures to channels. Runs again when the guide or the
-  /// playlist changes, since either can add or remove a match.
-  Future<void> _resolveChannels() {
-    final generation = ++_resolveGeneration;
-    final fixtures = _fixtures;
-    _resolvedSignature = _watchableSignature(fixtures);
-    final future = () async {
-      if (mounted) setState(() => _resolving = true);
+  /// Fetches the day's channels, unless [_matches] is recent enough or nothing
+  /// left on the day can be watched.
+  void _loadChannels(
+    SportsCapability capability,
+    List<SportsLeague> leagues,
+    DateTime from,
+    DateTime to,
+  ) {
+    final channelsFor = [
+      from.millisecondsSinceEpoch,
+      for (final league in leagues) league.id,
+    ].join(',');
+    final fetchedAt = _channelsFetchedAt;
+    final isFresh =
+        channelsFor == _channelsFor &&
+        fetchedAt != null &&
+        DateTime.now().difference(fetchedAt) < kSportsChannelsMaxAge;
+    if (isFresh || !_fixtures.any(_isWatchable)) return;
+    final generation = ++_channelsGeneration;
+    _channelsFor = channelsFor;
+    _channelsFetchedAt = DateTime.now();
+    _channelsInFlight = () async {
+      setState(() => _channelsLoading = true);
       try {
-        final matches = await SportsChannelResolver(
-          ref.read(catalogRepositoryProvider),
-        ).resolve(fixtures);
-        if (!mounted || generation != _resolveGeneration) return;
+        final matches = await loadSportsChannelMatches(
+          service: ref.read(sportsServiceProvider),
+          repository: ref.read(catalogRepositoryProvider),
+          capability: capability,
+          leagues: leagues,
+          from: from,
+          to: to,
+        );
+        if (!mounted || generation != _channelsGeneration) return;
         setState(() => _matches = matches);
       } on Object catch (error) {
-        debugPrint('[Sports] channel resolve failed: $error');
-        if (generation == _resolveGeneration) _resolvedSignature = null;
+        debugPrint('[Sports] channels load failed: $error');
+        // Try again on the next refresh
+        if (generation == _channelsGeneration) _channelsFor = null;
       } finally {
-        if (mounted && generation == _resolveGeneration) {
-          setState(() => _resolving = false);
+        if (mounted && generation == _channelsGeneration) {
+          setState(() => _channelsLoading = false);
         }
       }
     }();
-    _resolveInFlight = future;
-    return future;
-  }
-
-  void _onGuideChanged() {
-    if (!_isVisible || _fixtures.isEmpty) return;
-    _guideChangeTimer?.cancel();
-    _guideChangeTimer = Timer(_guideChangeDebounce, () {
-      if (mounted) unawaited(_resolveChannels());
-    });
   }
 
   // ---------------------------------------------------------------------------
@@ -342,11 +362,7 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
         if (_inScope(fixture, followed) && _matchesQuery(fixture, query))
           fixture,
     ];
-    _rows = switch (_range) {
-      SportsRange.upcoming => _groupByDay(visible),
-      SportsRange.today => _groupByLeague(visible, liveFirst: true),
-      SportsRange.yesterday => _groupByLeague(visible, liveFirst: false),
-    };
+    _rows = _groupByLeague(visible);
   }
 
   bool _inScope(SportsFixture fixture, Set<String> followed) =>
@@ -367,16 +383,11 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
     return false;
   }
 
-  List<_SportsRow> _groupByLeague(
-    List<SportsFixture> fixtures, {
-    required bool liveFirst,
-  }) {
+  List<_SportsRow> _groupByLeague(List<SportsFixture> fixtures) {
     final rows = <_SportsRow>[];
-    final live = liveFirst
-        ? fixtures
-              .where((fixture) => fixture.state == SportsFixtureState.live)
-              .toList()
-        : const <SportsFixture>[];
+    final live = fixtures
+        .where((fixture) => fixture.state == SportsFixtureState.live)
+        .toList();
     if (live.isNotEmpty) {
       rows
         ..add(const _LiveHeaderRow())
@@ -384,7 +395,7 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
     }
     final byLeague = <String, List<SportsFixture>>{};
     for (final fixture in fixtures) {
-      if (liveFirst && fixture.state == SportsFixtureState.live) continue;
+      if (fixture.state == SportsFixtureState.live) continue;
       byLeague.putIfAbsent(fixture.league.id, () => []).add(fixture);
     }
     for (final league in _leagues) {
@@ -397,32 +408,39 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
     return rows;
   }
 
-  static List<_SportsRow> _groupByDay(List<SportsFixture> fixtures) {
-    final rows = <_SportsRow>[];
-    DateTime? currentDay;
-    for (final fixture in fixtures) {
-      final local = fixture.start.toLocal();
-      final day = DateTime(local.year, local.month, local.day);
-      if (day != currentDay) {
-        currentDay = day;
-        rows.add(_DayHeaderRow(day));
-      }
-      rows.add(_FixtureRow(fixture, showLeague: true));
-    }
-    return rows;
-  }
-
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
 
   bool _isWatchable(SportsFixture fixture) => isSportsFixtureWatchable(fixture);
 
-  /// The fixture's channels, waiting out a resolve already under way so a
-  /// press right after the list loads doesn't report "no channel".
+  /// The fixture's channels, waiting out a load already under way so a press
+  /// right after the list loads doesn't report "no channel".
   Future<List<SportsChannelMatch>> _matchesFor(SportsFixture fixture) async {
-    if (_resolving) await _resolveInFlight;
-    return _matches[fixture.id] ?? const [];
+    if (_channelsLoading) await _channelsInFlight;
+    return _matches[fixture.key] ?? const [];
+  }
+
+  /// D-pad Up at the top of the list's focus scope: scrolls the rest of the
+  /// way up first, then moves to the date bar.
+  void _moveUpFromList() {
+    if (!scrollFocusedContentPageUp()) _nowFocusNode.requestFocus();
+  }
+
+  /// Moves into the games, when there are any on screen.
+  bool _enterList() {
+    if (_listFocusNode.context == null ||
+        _listFocusNode.traversalDescendants.isEmpty) {
+      return false;
+    }
+    _listFocusNode.requestFocus();
+    return true;
+  }
+
+  /// D-pad Right from the filter strip: the games, or the date bar on a day
+  /// with none, so another day is still within reach.
+  void _enterContent() {
+    if (!_enterList()) _nowFocusNode.requestFocus();
   }
 
   void _showMessage(String message) {
@@ -690,23 +708,14 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
     _ => Icons.sports,
   };
 
-  Future<void> _openTeams() async {
-    widget.onEnterFullScreenDetail?.call();
-    try {
-      await Navigator.of(context).push<void>(
-        appPageRoute<void>(
-          builder: (context) => SportsTeamsScreen(
-            useSidebarLayout: widget.useSidebarLayout,
-            initialLeagueId: _scope == _scopeAll || _scope == _scopeMyTeams
-                ? null
-                : _scope,
-          ),
-        ),
-      );
-    } finally {
-      widget.onExitFullScreenDetail?.call();
-    }
-  }
+  Future<void> _openTeams() => openSportsTeams(
+    context,
+    useSidebarLayout: widget.useSidebarLayout,
+    initialLeagueId: _scope == _scopeAll || _scope == _scopeMyTeams
+        ? null
+        : _scope,
+    onBack: widget.onHandleTopLevelBack,
+  );
 
   Future<void> _openMultiview() async {
     widget.onEnterFullScreenDetail?.call();
@@ -728,10 +737,11 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
     final l10n = AppLocalizations.of(context);
     final isBootstrapping = ref.watch(isBootstrappingProvider);
     final isConfigured = ref.watch(isConfiguredProvider);
-    ref.listen(epgServiceProvider, (_, _) => _onGuideChanged());
     ref.listen(sportsCapabilityProvider, (_, _) => _onLeaguesMaybeChanged());
     ref.listen(shownPlaylistKeyProvider, (_, _) {
-      if (_fixtures.isNotEmpty) unawaited(_resolveChannels());
+      _channelsFor = null;
+      _matches = const {};
+      if (_fixtures.isNotEmpty) unawaited(_load());
     });
 
     if (isBootstrapping) {
@@ -768,6 +778,7 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
       ],
       selectedId: _scope,
       onSelected: (id) => setState(() {
+        _scopeSettled = true;
         _scope = id;
         _rebuildRows();
       }),
@@ -791,9 +802,17 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
       gridFocusScopeNode: _listFocusNode,
       memoryKeyPrefix: 'sports',
       onEntryFocusScopeReady: widget.onEntryFocusScopeReady,
-      onTopEdge: () => _tabBarKey.currentState?.requestFocus(),
+      onGridEdgeEnter: _enterContent,
     );
-    final content = Expanded(child: _buildContent(l10n));
+    final content = Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildDayToolbar(l10n),
+          Expanded(child: _buildContent(l10n)),
+        ],
+      ),
+    );
 
     return Scaffold(
       body: DpadRegion(
@@ -804,25 +823,45 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
             widget.onSidebarActivate?.call();
           }
         },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            DpadTabBar(
-              key: _tabBarKey,
-              controller: _tabController,
-              tabs: [
-                l10n.sportsRangeYesterday,
-                l10n.sportsRangeToday,
-                l10n.sportsRangeUpcoming,
-              ],
-            ),
-            Expanded(
-              child: widget.useSidebarLayout
-                  ? Row(children: [nav, content])
-                  : Column(children: [nav, content]),
-            ),
-          ],
-        ),
+        child: widget.useSidebarLayout
+            ? Row(children: [nav, content])
+            : Column(children: [nav, content]),
+      ),
+    );
+  }
+
+  Widget _buildDayToolbar(AppLocalizations l10n) {
+    final today = _dateOnly(DateTime.now());
+    return DpadRegion(
+      memoryKey: 'sports/days',
+      horizontalEdge: DpadEdgeBehavior.stop,
+      verticalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.down) {
+          _enterList();
+        } else if (direction == TraversalDirection.left) {
+          if (widget.useSidebarLayout) {
+            _navKey.currentState?.requestFocus();
+          } else {
+            widget.onSidebarActivate?.call();
+          }
+        } else if (direction == TraversalDirection.up &&
+            !widget.useSidebarLayout) {
+          _navKey.currentState?.requestFocus();
+        }
+      },
+      child: DayToolbar(
+        keyPrefix: 'sports',
+        nowFocusNode: _nowFocusNode,
+        nowLabel: l10n.epgToday,
+        selectedDate: _selectedDay,
+        today: today,
+        compact: !widget.useSidebarLayout,
+        canGoPrevious: _selectedDay.isAfter(_offsetDay(today, -_daysBack)),
+        canGoNext: _selectedDay.isBefore(_offsetDay(today, _daysAhead)),
+        onPrevious: () => _selectDay(_offsetDay(_selectedDay, -1)),
+        onNow: () => _selectDay(today),
+        onNext: () => _selectDay(_offsetDay(_selectedDay, 1)),
       ),
     );
   }
@@ -878,11 +917,11 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
       child: DpadRegion(
         memoryKey: 'sports/list',
         horizontalEdge: DpadEdgeBehavior.stop,
-        // The tabs sit outside this scope, beyond plain traversal
+        // The date bar sits outside this scope, beyond plain traversal
         upEdge: DpadEdgeBehavior.stop,
         onEdge: (direction) {
           if (direction == TraversalDirection.up) {
-            _tabBarKey.currentState?.requestFocusFromContent();
+            _moveUpFromList();
             return;
           }
           if (direction != TraversalDirection.left) return;
@@ -899,11 +938,6 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
             _LiveHeaderRow() => _SectionHeader(title: l10n.sportsLiveNow),
             _LeagueHeaderRow(:final league) => _SectionHeader(
               title: league.name,
-            ),
-            _DayHeaderRow(:final day) => _SectionHeader(
-              title: DateFormat.MMMMEEEEd(
-                Localizations.localeOf(context).toLanguageTag(),
-              ).format(day),
             ),
             _FixtureRow(:final fixture, :final showLeague) => _buildCard(
               fixture,
@@ -922,12 +956,12 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
     required Set<int> multiviewIds,
   }) {
     final watchable = _isWatchable(fixture);
-    final matches = _matches[fixture.id] ?? const <SportsChannelMatch>[];
+    final matches = _matches[fixture.key] ?? const <SportsChannelMatch>[];
     return SportsFixtureCard(
       key: ValueKey('${fixture.league.id}:${fixture.id}'),
       fixture: fixture,
       channelCount: watchable ? matches.length : null,
-      isResolving: _resolving,
+      isResolving: _channelsLoading,
       showLeague: showLeague,
       inMultiview: matches.any(
         (match) => multiviewIds.contains(match.channel.id),
@@ -971,12 +1005,6 @@ class _LeagueHeaderRow extends _SportsRow {
   const _LeagueHeaderRow(this.league);
 
   final SportsLeague league;
-}
-
-class _DayHeaderRow extends _SportsRow {
-  const _DayHeaderRow(this.day);
-
-  final DateTime day;
 }
 
 class _FixtureRow extends _SportsRow {

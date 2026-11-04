@@ -2,7 +2,7 @@ import 'package:dpad/dpad.dart';
 import 'package:m3u_tv/features/sports/sports_fixture_card.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
-import 'package:m3u_tv/services/sports_channel_resolver.dart';
+import 'package:m3u_tv/services/sports_channel_lookup.dart';
 import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/shared/app_menu_dialog.dart';
 import 'package:m3u_tv/shared/app_modal.dart';
@@ -65,9 +65,7 @@ Future<SportsChannelMatch?> pickSportsChannel(
                 AppMenuOption(
                   icon: Icons.live_tv,
                   label: matches[i].channel.name,
-                  subtitle:
-                      matches[i].program?.displayTitle ??
-                      l10n.sportsEventChannel,
+                  subtitle: matches[i].programTitle ?? l10n.sportsEventChannel,
                   autofocus: i == 0,
                   onTap: () => Navigator.of(dialogContext).pop(matches[i]),
                 ),

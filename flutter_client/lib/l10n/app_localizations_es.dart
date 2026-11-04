@@ -2165,15 +2165,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get navSports => 'Deportes';
 
   @override
-  String get sportsRangeYesterday => 'Ayer';
-
-  @override
-  String get sportsRangeToday => 'Hoy';
-
-  @override
-  String get sportsRangeUpcoming => 'Próximos';
-
-  @override
   String get sportsScopeAll => 'Todas las ligas';
 
   @override
@@ -2209,7 +2200,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get sportsPostponed => 'Aplazado';
 
   @override
-  String get sportsNoGames => 'No hay partidos en este periodo';
+  String get sportsNoGames => 'No hay partidos este día';
 
   @override
   String get sportsNoLeagues =>
@@ -2220,8 +2211,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'Aún no sigues a ningún equipo. Usa Equipos para elegirlos, o mantén pulsado un partido.';
 
   @override
-  String get sportsMyTeamsNoGames =>
-      'Ninguno de tus equipos juega en este periodo';
+  String get sportsMyTeamsNoGames => 'Ninguno de tus equipos juega este día';
 
   @override
   String sportsChannelCount(int count) {

@@ -245,6 +245,15 @@ void main() {
                 },
               };
             }
+            if (request.action == 'get_sports_channels') {
+              return {
+                'channels': {
+                  'hockey/nhl:401': [
+                    {'stream_id': 5},
+                  ],
+                },
+              };
+            }
             return {
               'fixtures': [
                 {

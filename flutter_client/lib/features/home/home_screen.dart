@@ -15,7 +15,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
-import 'package:m3u_tv/services/sports_channel_resolver.dart';
+import 'package:m3u_tv/services/sports_channel_lookup.dart';
 import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
@@ -831,6 +831,8 @@ class _SportsRowState extends ConsumerState<_SportsRow> {
   /// Null until the first load.
   List<SportsFixture>? _fixtures;
   Map<String, List<SportsChannelMatch>> _matches = const {};
+  String? _matchesFor;
+  DateTime? _matchesFetchedAt;
   String? _loadedFor;
   int _generation = 0;
   Timer? _refreshTimer;
@@ -874,23 +876,44 @@ class _SportsRowState extends ConsumerState<_SportsRow> {
     _refreshTimer?.cancel();
     final now = DateTime.now();
     final midnight = DateTime(now.year, now.month, now.day);
+    final from = midnight.toUtc();
+    final to = DateTime(
+      midnight.year,
+      midnight.month,
+      midnight.day + 1,
+    ).toUtc();
     try {
-      final fixtures = await ref
-          .read(sportsServiceProvider)
-          .fixtures(
-            capability: capability,
-            leagues: leagues,
-            from: midnight.toUtc(),
-            to: DateTime(
-              midnight.year,
-              midnight.month,
-              midnight.day + 1,
-            ).toUtc(),
-          );
+      final service = ref.read(sportsServiceProvider);
+      final fixtures = await service.fixtures(
+        capability: capability,
+        leagues: leagues,
+        from: from,
+        to: to,
+      );
       final watchable = fixtures.where(isSportsFixtureWatchable).toList();
-      final matches = await SportsChannelResolver(
-        ref.read(catalogRepositoryProvider),
-      ).resolve(watchable);
+      // Score refreshes reuse the channels until they're due again
+      final matchesFor = [
+        from.millisecondsSinceEpoch,
+        for (final league in leagues) league.id,
+      ].join(',');
+      final fetchedAt = _matchesFetchedAt;
+      var matches = _matches;
+      if (watchable.isNotEmpty &&
+          (matchesFor != _matchesFor ||
+              fetchedAt == null ||
+              DateTime.now().difference(fetchedAt) >= kSportsChannelsMaxAge)) {
+        matches = await loadSportsChannelMatches(
+          service: service,
+          repository: ref.read(catalogRepositoryProvider),
+          capability: capability,
+          leagues: leagues,
+          from: from,
+          to: to,
+        );
+        if (!mounted || generation != _generation) return;
+        _matchesFor = matchesFor;
+        _matchesFetchedAt = DateTime.now();
+      }
       if (!mounted || generation != _generation) return;
       int rank(SportsFixture fixture) {
         final isFollowed = fixture.displayOrder.any(
@@ -902,7 +925,7 @@ class _SportsRowState extends ConsumerState<_SportsRow> {
 
       final shown =
           watchable
-              .where((fixture) => matches[fixture.id]?.isNotEmpty ?? false)
+              .where((fixture) => matches[fixture.key]?.isNotEmpty ?? false)
               .toList()
             ..sort((a, b) {
               final byRank = rank(a).compareTo(rank(b));
@@ -945,7 +968,7 @@ class _SportsRowState extends ConsumerState<_SportsRow> {
         fixture,
         channelNames: [
           for (final match
-              in _matches[fixture.id] ?? const <SportsChannelMatch>[])
+              in _matches[fixture.key] ?? const <SportsChannelMatch>[])
             match.channel.name,
         ],
       );
@@ -997,7 +1020,7 @@ class _SportsRowState extends ConsumerState<_SportsRow> {
       baseCardHeight: SportsFixtureTile.baseHeight,
       itemBuilder: (context, index, cardSize, {required autofocus}) {
         final fixture = rowFixtures[index];
-        final matches = _matches[fixture.id] ?? const <SportsChannelMatch>[];
+        final matches = _matches[fixture.key] ?? const <SportsChannelMatch>[];
         final tile = SizedBox.fromSize(
           size: cardSize,
           child: SportsFixtureTile(

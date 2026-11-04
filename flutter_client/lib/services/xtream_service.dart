@@ -1576,6 +1576,22 @@ class XtreamService {
     },
   );
 
+  /// The channels showing each game of a day
+  /// ([SportsCapability.channelsAction]), raw.
+  Future<Object?> getSportsChannels(
+    SportsCapability capability, {
+    required Iterable<String> leagueIds,
+    required DateTime from,
+    required DateTime to,
+  }) => _request(
+    capability.channelsAction,
+    params: {
+      'leagues': leagueIds.join(','),
+      'from': '${from.millisecondsSinceEpoch ~/ 1000}',
+      'to': '${to.millisecondsSinceEpoch ~/ 1000}',
+    },
+  );
+
   /// Every team of [leagueId] ([SportsCapability.teamsAction]), raw.
   Future<Object?> getSportsTeams(
     SportsCapability capability,

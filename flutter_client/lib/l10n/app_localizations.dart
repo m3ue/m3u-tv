@@ -3770,24 +3770,6 @@ abstract class AppLocalizations {
   /// **'Sports'**
   String get navSports;
 
-  /// No description provided for @sportsRangeYesterday.
-  ///
-  /// In en, this message translates to:
-  /// **'Yesterday'**
-  String get sportsRangeYesterday;
-
-  /// No description provided for @sportsRangeToday.
-  ///
-  /// In en, this message translates to:
-  /// **'Today'**
-  String get sportsRangeToday;
-
-  /// No description provided for @sportsRangeUpcoming.
-  ///
-  /// In en, this message translates to:
-  /// **'Upcoming'**
-  String get sportsRangeUpcoming;
-
   /// No description provided for @sportsScopeAll.
   ///
   /// In en, this message translates to:
@@ -3857,7 +3839,7 @@ abstract class AppLocalizations {
   /// No description provided for @sportsNoGames.
   ///
   /// In en, this message translates to:
-  /// **'No games in this range'**
+  /// **'No games on this day'**
   String get sportsNoGames;
 
   /// No description provided for @sportsNoLeagues.
@@ -3875,7 +3857,7 @@ abstract class AppLocalizations {
   /// No description provided for @sportsMyTeamsNoGames.
   ///
   /// In en, this message translates to:
-  /// **'None of your teams play in this range'**
+  /// **'None of your teams play on this day'**
   String get sportsMyTeamsNoGames;
 
   /// No description provided for @sportsChannelCount.

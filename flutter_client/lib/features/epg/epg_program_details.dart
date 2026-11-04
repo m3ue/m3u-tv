@@ -12,6 +12,7 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/auto_scroll_text.dart';
 import 'package:m3u_tv/shared/cached_media_thumbnail.dart';
+import 'package:m3u_tv/shared/day_toolbar.dart';
 import 'package:m3u_tv/shared/epg_icon_pill.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
@@ -119,27 +120,6 @@ String? epgEpisodeLabel(AppLocalizations l10n, EpgProgram program) {
   if (episode != null) return l10n.epgEpisodeNumber(episode);
   if (season != null) return l10n.epgSeasonNumber(season);
   return null;
-}
-
-/// "Today" / "Tomorrow" / "Yesterday", else the localized weekday name.
-String epgRelativeDayLabel(
-  BuildContext context,
-  DateTime day,
-  DateTime today,
-) {
-  final l10n = AppLocalizations.of(context);
-  final a = DateTime(day.year, day.month, day.day);
-  final b = DateTime(today.year, today.month, today.day);
-  // Calendar-day difference that ignores a DST hour either way.
-  final delta = (a.difference(b).inHours / 24).round();
-  return switch (delta) {
-    0 => l10n.epgToday,
-    1 => l10n.epgTomorrow,
-    -1 => l10n.epgYesterday,
-    _ => DateFormat.EEEE(
-      Localizations.localeOf(context).toLanguageTag(),
-    ).format(day),
-  };
 }
 
 /// The guide's top preview panel on TV/desktop: artwork beside the

@@ -2074,15 +2074,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get navSports => '体育';
 
   @override
-  String get sportsRangeYesterday => '昨天';
-
-  @override
-  String get sportsRangeToday => '今天';
-
-  @override
-  String get sportsRangeUpcoming => '即将开赛';
-
-  @override
   String get sportsScopeAll => '全部联赛';
 
   @override
@@ -2118,7 +2109,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sportsPostponed => '已延期';
 
   @override
-  String get sportsNoGames => '此时间段内没有比赛';
+  String get sportsNoGames => '这一天没有比赛';
 
   @override
   String get sportsNoLeagues => '未选择联赛。请在“联赛”中选择。';
@@ -2127,7 +2118,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sportsMyTeamsEmpty => '你还没有关注任何球队。使用“球队”来选择，或长按一场比赛。';
 
   @override
-  String get sportsMyTeamsNoGames => '你关注的球队在此时间段内没有比赛';
+  String get sportsMyTeamsNoGames => '你关注的球队这一天没有比赛';
 
   @override
   String sportsChannelCount(int count) {

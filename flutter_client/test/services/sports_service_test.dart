@@ -172,6 +172,46 @@ void main() {
     },
   );
 
+  test('asks for a day of channels and reads them by game', () async {
+    final (xtream, requests) = await _xtream(sports: _sportsPayload());
+    final capability = SportsCapability.fromJson(_sportsPayload());
+    final from = DateTime.utc(2026, 11, 3);
+    final to = DateTime.utc(2026, 11, 4);
+
+    await SportsService(xtream).channels(
+      capability: capability,
+      leagues: capability.leagues,
+      from: from,
+      to: to,
+    );
+
+    expect(requests.last.action, 'get_sports_channels');
+    expect(requests.last.params, {
+      'leagues': 'hockey/nhl,soccer/eng.1',
+      'from': '${from.millisecondsSinceEpoch ~/ 1000}',
+      'to': '${to.millisecondsSinceEpoch ~/ 1000}',
+    });
+
+    final channels = SportsService.parseChannels({
+      'channels': {
+        'hockey/nhl:401': [
+          {'stream_id': 5, 'program_title': 'NHL Hockey'},
+          {'stream_id': 6, 'program_title': null},
+          {'stream_id': 'junk'},
+          'junk',
+        ],
+        'hockey/nhl:402': 'junk',
+      },
+    });
+    expect(channels.keys, ['hockey/nhl:401']);
+    expect(channels['hockey/nhl:401']!.map((ref) => ref.streamId), [5, 6]);
+    expect(channels['hockey/nhl:401']!.first.programTitle, 'NHL Hockey');
+    expect(channels['hockey/nhl:401']!.last.programTitle, isNull);
+    // PHP sends an empty map as an object, but never mind a list
+    expect(SportsService.parseChannels({'channels': <Object>[]}), isEmpty);
+    expect(SportsService.parseChannels('junk'), isEmpty);
+  });
+
   test("caps a request at the editor's longest range", () async {
     final (xtream, requests) = await _xtream(sports: _sportsPayload());
     final capability = SportsCapability.fromJson({

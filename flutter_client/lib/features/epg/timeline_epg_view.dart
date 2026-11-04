@@ -5,7 +5,6 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/rendering.dart'
     show BoxParentData, PipelineOwner, RenderShiftedBox, ScrollCacheExtent;
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:m3u_tv/features/epg/epg_guide_navigation.dart';
 import 'package:m3u_tv/features/epg/epg_preview_player.dart';
 import 'package:m3u_tv/features/epg/epg_program_details.dart';
@@ -19,7 +18,7 @@ import 'package:m3u_tv/services/view_settings_service.dart'
 import 'package:m3u_tv/shared/cached_media_thumbnail.dart';
 import 'package:m3u_tv/shared/catchup_badge.dart';
 import 'package:m3u_tv/shared/channel_rows.dart';
-import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/day_toolbar.dart';
 import 'package:m3u_tv/shared/epg_icon_pill.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
@@ -1234,7 +1233,7 @@ class TimelineEpgViewState extends State<TimelineEpgView> {
                   },
                 ),
               ),
-            _DayToolbar(
+            DayToolbar(
               blockUp: showPreview,
               selectedDate: _selectedDate,
               today: _dateOnly(_now),
@@ -1423,166 +1422,6 @@ class _PinnedToViewport extends StatelessWidget {
         child: child,
       ),
       child: child,
-    );
-  }
-}
-
-class _DayToolbar extends StatelessWidget {
-  const _DayToolbar({
-    required this.blockUp,
-    required this.selectedDate,
-    required this.today,
-    required this.compact,
-    required this.canGoPrevious,
-    required this.canGoNext,
-    required this.onPrevious,
-    required this.onNow,
-    required this.onNext,
-  });
-
-  /// Swallow D-pad Up here. With the preview panel above there's nothing
-  /// focusable directly up, so traversal would otherwise jump sideways into
-  /// the middle of the category strip.
-  final bool blockUp;
-  final DateTime selectedDate;
-  final DateTime today;
-  final bool compact;
-  final bool canGoPrevious;
-  final bool canGoNext;
-  final VoidCallback onPrevious;
-  final VoidCallback onNow;
-  final VoidCallback onNext;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final l10n = AppLocalizations.of(context);
-    final scale = FontSizeScope.scaleOf(context);
-    final locale = Localizations.localeOf(context).toLanguageTag();
-
-    Widget chevron({
-      required Key key,
-      required IconData icon,
-      required bool enabled,
-      required VoidCallback onTap,
-      required String label,
-    }) {
-      return DpadInkWell(
-        key: key,
-        onTap: enabled ? onTap : null,
-        enabled: enabled,
-        autoScroll: false,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 6 * scale),
-          child: Center(
-            child: Icon(
-              icon,
-              size: 26 * scale,
-              color: enabled
-                  ? colorScheme.onSurface
-                  : colorScheme.onSurface.withValues(alpha: 0.3),
-              semanticLabel: label,
-            ),
-          ),
-        ),
-      );
-    }
-
-    final toolbar = Container(
-      height: (compact ? 50 : 58) * scale,
-      padding: EdgeInsets.symmetric(
-        horizontal: (compact ? 8 : 12) * scale,
-        vertical: 6 * scale,
-      ),
-      // crossAxisAlignment.stretch gives every focusable the same rect
-      // height, so D-pad Down from any of them reads as leaving the row
-      // (dpad's edge-based "is this candidate below me" check) instead of
-      // hopping to a taller neighbour.
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          chevron(
-            key: const ValueKey('timeline-previous-day'),
-            icon: Icons.chevron_left,
-            enabled: canGoPrevious,
-            onTap: onPrevious,
-            label: l10n.epgPreviousDay,
-          ),
-          SizedBox(
-            width: (compact ? 118 : 150) * scale,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  epgRelativeDayLabel(context, selectedDate, today),
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  DateFormat.yMMMd(locale).format(selectedDate),
-                  style: theme.textTheme.titleSmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          chevron(
-            key: const ValueKey('timeline-next-day'),
-            icon: Icons.chevron_right,
-            enabled: canGoNext,
-            onTap: onNext,
-            label: l10n.epgNextDay,
-          ),
-          SizedBox(width: 12 * scale),
-          DpadInkWell(
-            key: const ValueKey('timeline-now'),
-            onTap: onNow,
-            autoScroll: false,
-            borderRadius: BorderRadius.circular(50),
-            color: colorScheme.primaryContainer,
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16 * scale),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.today,
-                    size: 18 * scale,
-                    color: colorScheme.onPrimaryContainer,
-                  ),
-                  SizedBox(width: 6 * scale),
-                  Text(
-                    l10n.epgNow,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (!blockUp) return toolbar;
-    return Focus(
-      canRequestFocus: false,
-      skipTraversal: true,
-      onKeyEvent: (node, event) =>
-          event is! KeyUpEvent &&
-              Dpad.keySetOf(context).directionOf(event.logicalKey) ==
-                  TraversalDirection.up
-          ? KeyEventResult.handled
-          : KeyEventResult.ignored,
-      child: toolbar,
     );
   }
 }

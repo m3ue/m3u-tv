@@ -6,6 +6,31 @@ import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:material_ui/material_ui.dart';
 
+/// Scrolls the list holding the focused item up by most of a page, for D-pad
+/// Up at the top of a list's focus scope when the list is scrolled away from
+/// its start. False when it's already at the start, so the caller can move
+/// focus out of the list instead.
+bool scrollFocusedContentPageUp() {
+  final focused = FocusManager.instance.primaryFocus?.context;
+  final position = focused == null
+      ? null
+      : Scrollable.maybeOf(focused)?.position;
+  if (position == null || position.pixels <= position.minScrollExtent + 1) {
+    return false;
+  }
+  unawaited(
+    position.animateTo(
+      math.max(
+        position.minScrollExtent,
+        position.pixels - position.viewportDimension * 0.8,
+      ),
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+    ),
+  );
+  return true;
+}
+
 /// A [TabBar] replacement that integrates with the D-pad focus system.
 ///
 /// Unlike Material's [TabBar], each tab uses [DpadFocusable] so:
@@ -81,24 +106,7 @@ class DpadTabBarState extends State<DpadTabBar> {
   /// that list up a page instead, since a lazily built list can reach its
   /// edge with rows still above, not built yet.
   void requestFocusFromContent() {
-    final focused = FocusManager.instance.primaryFocus?.context;
-    final position = focused == null
-        ? null
-        : Scrollable.maybeOf(focused)?.position;
-    if (position != null && position.pixels > position.minScrollExtent + 1) {
-      unawaited(
-        position.animateTo(
-          math.max(
-            position.minScrollExtent,
-            position.pixels - position.viewportDimension * 0.8,
-          ),
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        ),
-      );
-      return;
-    }
-    requestFocus();
+    if (!scrollFocusedContentPageUp()) requestFocus();
   }
 
   @override

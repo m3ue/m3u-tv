@@ -11,6 +11,7 @@ class SportsCapability {
   const SportsCapability({
     required this.leagues,
     this.fixturesAction = 'get_sports_fixtures',
+    this.channelsAction = 'get_sports_channels',
     this.teamsAction,
     this.followsAction,
     this.toggleFollowAction,
@@ -40,6 +41,7 @@ class SportsCapability {
             if (league is Map) ?SportsLeague.fromJson(league, sportNames),
       ],
       fixturesAction: action('fixtures') ?? 'get_sports_fixtures',
+      channelsAction: action('channels') ?? 'get_sports_channels',
       teamsAction: action('teams'),
       followsAction: action('follows'),
       toggleFollowAction: action('toggle_follow'),
@@ -51,6 +53,7 @@ class SportsCapability {
   /// In the editor's display order.
   final List<SportsLeague> leagues;
   final String fixturesAction;
+  final String channelsAction;
 
   /// Null on editors predating the team browser or follow sync.
   final String? teamsAction;
@@ -181,6 +184,16 @@ class SportsCompetitor {
   final bool winner;
 }
 
+/// A channel the editor found showing a game. [streamId] is the playlist's
+/// stream id; [programTitle] is the guide listing that named the game, or null
+/// when the channel's own title did.
+class SportsChannelRef {
+  const SportsChannelRef({required this.streamId, this.programTitle});
+
+  final int streamId;
+  final String? programTitle;
+}
+
 class SportsFixture {
   const SportsFixture({
     required this.id,
@@ -217,6 +230,9 @@ class SportsFixture {
 
   /// Broadcaster names the provider lists ("ESPN+", "TNT").
   final List<String> broadcasts;
+
+  /// Unique across leagues, and how the editor keys a game's channels.
+  String get key => '${league.id}:$id';
 
   bool get hasTeams => home != null && away != null;
 

@@ -1208,9 +1208,6 @@
   "playerLoadTimedOut": "Stream loading timed out. The server may be unreachable or the stream URL is invalid.",
   "playerErrorTitle": "Playback error",
   "navSports": "Sports",
-  "sportsRangeYesterday": "Yesterday",
-  "sportsRangeToday": "Today",
-  "sportsRangeUpcoming": "Upcoming",
   "sportsScopeAll": "All Leagues",
   "sportsScopeMyTeams": "My Teams",
   "sportsSearchHint": "Search teams",
@@ -1233,10 +1230,10 @@
   "sportsLiveBadge": "LIVE",
   "sportsFinal": "Final",
   "sportsPostponed": "Postponed",
-  "sportsNoGames": "No games in this range",
+  "sportsNoGames": "No games on this day",
   "sportsNoLeagues": "No leagues selected. Choose some with Leagues.",
   "sportsMyTeamsEmpty": "You aren't following any teams yet. Use Teams to pick yours, or long-press a game.",
-  "sportsMyTeamsNoGames": "None of your teams play in this range",
+  "sportsMyTeamsNoGames": "None of your teams play on this day",
   "sportsChannelCount": "{count, plural, =1{1 channel} other{{count} channels}}",
   "@sportsChannelCount": {
     "placeholders": {

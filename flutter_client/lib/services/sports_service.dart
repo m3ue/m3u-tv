@@ -3,9 +3,9 @@ import 'package:m3u_tv/services/xtream_service.dart';
 
 /// Games for the Sports screen, from M3U Editor's Sports integration.
 ///
-/// The editor reads ESPN's scoreboards, caches them for every client, and
-/// proxies the team crests, so the app never contacts ESPN itself. Only
-/// available while the editor advertises the `sports` feature (see
+/// The editor reads its sports providers, caches them for every client, finds
+/// the channels showing each game, and proxies the team crests, so the app
+/// never contacts a provider itself. Only available while the editor advertises the `sports` feature (see
 /// [XtreamAuthResponse.hasSports]).
 class SportsService {
   SportsService(this._xtream);
@@ -32,6 +32,46 @@ class SportsService {
     );
     return parseFixtures(json, capability)
       ..sort((a, b) => a.start.compareTo(b.start));
+  }
+
+  /// The channels showing each game of [leagues] starting in [from, to], by
+  /// [SportsFixture.key], strongest match first. The editor matches these on
+  /// request against the guide, so ask for one day, after showing its games.
+  /// Throws when the editor can't be reached or refuses the request.
+  Future<Map<String, List<SportsChannelRef>>> channels({
+    required SportsCapability capability,
+    required List<SportsLeague> leagues,
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    if (leagues.isEmpty) return const {};
+    return parseChannels(
+      await _xtream.getSportsChannels(
+        capability,
+        leagueIds: leagues.map((league) => league.id),
+        from: from,
+        to: to,
+      ),
+    );
+  }
+
+  /// Maps the editor's `get_sports_channels` response, dropping entries
+  /// without a usable stream id. Exposed for tests.
+  static Map<String, List<SportsChannelRef>> parseChannels(Object? json) {
+    final raw = json is Map ? json['channels'] : null;
+    if (raw is! Map) return const {};
+    return {
+      for (final MapEntry(:key, :value) in raw.entries)
+        if (key is String && value is List)
+          key: [
+            for (final channel in value)
+              if (channel is Map && channel['stream_id'] is int)
+                SportsChannelRef(
+                  streamId: channel['stream_id'] as int,
+                  programTitle: _string(channel['program_title']),
+                ),
+          ],
+    };
   }
 
   /// Maps the editor's `get_sports_fixtures` response, dropping fixtures of

@@ -1613,6 +1613,7 @@ class AppShellState extends ConsumerState<AppShell>
             _registerContentEntryFocus(RouteNames.sports, node),
         onEnterFullScreenDetail: _enterFullScreenDetail,
         onExitFullScreenDetail: _exitFullScreenDetail,
+        onHandleTopLevelBack: handleBackFromTopLevelRoute,
       ),
       RouteNames.vod => VodScreen(
         onVodSelect: _openVod,
