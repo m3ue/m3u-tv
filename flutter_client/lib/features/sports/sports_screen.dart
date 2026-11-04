@@ -685,6 +685,8 @@ class _SportsScreenState extends ConsumerState<SportsScreen>
     'soccer' => Icons.sports_soccer,
     'rugby' || 'rugby-league' || 'australian-football' => Icons.sports_rugby,
     'volleyball' => Icons.sports_volleyball,
+    'cricket' => Icons.sports_cricket,
+    'handball' => Icons.sports_handball,
     _ => Icons.sports,
   };
 
