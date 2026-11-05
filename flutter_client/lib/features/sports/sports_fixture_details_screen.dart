@@ -315,6 +315,10 @@ class _SportsFixtureDetailsScreenState
                           DpadFocusable(
                             key: _readingKey,
                             autofocus: !canWatch,
+                            // Only here for D-pad scrolling; the scrollbar shows
+                            // focus, as a border around the whole page would look
+                            // selected on touch.
+                            effects: const [],
                             // It can be taller than the page; revealing it would
                             // jump past the top.
                             autoScroll: false,

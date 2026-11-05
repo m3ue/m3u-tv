@@ -85,17 +85,10 @@ class _SportsScreenState extends ConsumerState<SportsScreen> {
   final FocusNode _nowFocusNode = FocusNode(debugLabel: 'sports-now');
 
   late final SportsSettings _settings = ref.read(sportsSettingsProvider);
-  late String _scope = _settings.followedTeams.isEmpty
-      ? _scopeAll
-      : _scopeMyTeams;
+  String _scope = _scopeAll;
   late String _leagueSignature = _leagueIdsSignature();
   String _query = '';
   DateTime _selectedDay = _dateOnly(DateTime.now());
-
-  /// My Teams opens first when teams are followed, but falls back to All on
-  /// the first load if none of them play that day. Set once that's settled or
-  /// the viewer picks a tab, whose choice then stands.
-  bool _scopeSettled = false;
 
   List<SportsFixture> _fixtures = const [];
   bool _loading = true;
@@ -274,14 +267,6 @@ class _SportsScreenState extends ConsumerState<SportsScreen> {
       _fixtures = fixtures;
       _loading = false;
       _loadFailed = false;
-      if (!_scopeSettled) {
-        _scopeSettled = true;
-        final followed = _settings.followedTeamKeys;
-        if (_scope == _scopeMyTeams &&
-            !fixtures.any((fixture) => fixture.involves(followed))) {
-          _scope = _scopeAll;
-        }
-      }
       _rebuildRows();
     });
     _scheduleRefresh();
@@ -786,14 +771,13 @@ class _SportsScreenState extends ConsumerState<SportsScreen> {
       },
       searchHint: l10n.sportsSearchHint,
       tabs: [
-        CategoryTabData(id: _scopeMyTeams, name: l10n.sportsScopeMyTeams),
         CategoryTabData(id: _scopeAll, name: l10n.sportsScopeAll),
+        CategoryTabData(id: _scopeMyTeams, name: l10n.sportsScopeMyTeams),
         for (final league in _leagues)
           CategoryTabData(id: league.id, name: league.name),
       ],
       selectedId: _scope,
       onSelected: (id) => setState(() {
-        _scopeSettled = true;
         _scope = id;
         _rebuildRows();
       }),

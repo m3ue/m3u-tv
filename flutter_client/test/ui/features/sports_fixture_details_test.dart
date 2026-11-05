@@ -452,6 +452,26 @@ void main() {
     ]);
   });
 
+  testWidgets('the sections take focus without drawing a border', (
+    tester,
+  ) async {
+    responses = [
+      {'details': _details()},
+    ];
+    await pumpHost(tester, fixture: _game(SportsFixtureState.finished));
+
+    final sections = find.ancestor(
+      of: find.text('Team stats'),
+      matching: find.byType(DpadFocusable),
+    );
+    expect(tester.widget<DpadFocusable>(sections).effects, isEmpty);
+    // The scrollbar is what shows focus there instead.
+    expect(
+      tester.widget<Scrollbar>(find.byType(Scrollbar).first).thumbVisibility,
+      isTrue,
+    );
+  });
+
   testWidgets('D-pad Down scrolls the page', (tester) async {
     responses = [
       {'details': _details()},

@@ -19,6 +19,7 @@ import 'package:m3u_tv/services/sports_service.dart';
 import 'package:m3u_tv/services/sports_settings.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/day_toolbar.dart';
+import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/media_category_nav.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -511,7 +512,46 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('opens on All when no followed team plays that day', (
+  testWidgets('opens on All Leagues, listed first, even if a followed team '
+      'plays', (tester) async {
+    final repo = await _buildRepo(tester);
+    final editor = (await tester.runAsync(_editor))!;
+    final settings = SportsSettings();
+    await tester.runAsync(
+      () => settings.toggleFollow(
+        const SportsTeam(
+          leagueId: 'hockey/nhl',
+          id: 'uta',
+          displayName: 'Utah Mammoth',
+          shortName: 'Mammoth',
+          nickname: 'Mammoth',
+          abbreviation: 'UTA',
+        ),
+      ),
+    );
+
+    await _pumpScreen(
+      tester,
+      repo: repo,
+      settings: settings,
+      capability: _capability,
+      editor: editor,
+    );
+
+    final chips = tester
+        .widgetList<CategoryFilterChip>(find.byType(CategoryFilterChip))
+        .toList();
+    expect(chips.take(2).map((chip) => chip.label), [
+      'All Leagues',
+      'My Teams',
+    ]);
+    expect(chips.first.isSelected, isTrue);
+    expect(chips[1].isSelected, isFalse);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('My Teams says so when no followed team plays that day', (
     tester,
   ) async {
     final repo = await _buildRepo(tester);
@@ -539,7 +579,6 @@ void main() {
     );
     expect(find.text('Toronto Maple Leafs'), findsOneWidget);
 
-    // A tab the viewer picks stands, even with nothing to show.
     await tester.tap(find.text('My Teams'));
     await _settle(tester);
     expect(find.text('Toronto Maple Leafs'), findsNothing);
