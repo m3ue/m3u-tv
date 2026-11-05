@@ -51,6 +51,44 @@ class SportsTeamLogo extends StatelessWidget {
   }
 }
 
+/// A league in a tight spot: its logo, or its abbreviation when there is no
+/// logo or it won't load.
+class SportsLeagueMark extends StatelessWidget {
+  const SportsLeagueMark({
+    super.key,
+    required this.league,
+    required this.logoUrl,
+    required this.size,
+    this.style,
+  });
+
+  final SportsLeague league;
+  final String? logoUrl;
+  final double size;
+
+  /// The abbreviation's style.
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final abbreviation = Text(league.abbreviation, style: style);
+    final url = logoUrl;
+    if (url == null) return abbreviation;
+    return Semantics(
+      label: league.name,
+      image: true,
+      child: CachedMediaThumbnail(
+        url: url,
+        fallback: abbreviation,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        oversample: 2,
+      ),
+    );
+  }
+}
+
 /// One game in the Sports list: kickoff or live status, both teams with
 /// their crests and scores, and how many channels carry it, over a wash of
 /// the two teams' colours.
@@ -73,7 +111,7 @@ class SportsFixtureCard extends StatelessWidget {
   final int? channelCount;
   final bool isResolving;
 
-  /// Names the league under the time, for lists not already grouped by it.
+  /// Marks the league under the time, for lists not already grouped by it.
   final bool showLeague;
   final bool inMultiview;
   final VoidCallback onTap;
@@ -252,7 +290,12 @@ class SportsFixtureTile extends StatelessWidget {
                     showLeague: false,
                   ),
                 ),
-                Text(fixture.league.abbreviation, style: muted),
+                SportsLeagueMark(
+                  league: fixture.league,
+                  logoUrl: fixture.leagueLogoUrl,
+                  size: 28 * scale,
+                  style: muted,
+                ),
               ],
             ),
             const Spacer(),
@@ -346,7 +389,12 @@ class SportsFixtureStatus extends StatelessWidget {
         ],
         if (showLeague) ...[
           SizedBox(height: 4 * scale),
-          Text(fixture.league.abbreviation, style: muted),
+          SportsLeagueMark(
+            league: fixture.league,
+            logoUrl: fixture.leagueLogoUrl,
+            size: 24 * scale,
+            style: muted,
+          ),
         ],
       ],
     );

@@ -388,7 +388,7 @@ class _SportsScreenState extends ConsumerState<SportsScreen> {
       final games = byLeague[league.id];
       if (games == null) continue;
       rows
-        ..add(_LeagueHeaderRow(league))
+        ..add(_LeagueHeaderRow(league, logoUrl: games.first.leagueLogoUrl))
         ..addAll(games.map(_FixtureRow.new));
     }
     return rows;
@@ -935,8 +935,9 @@ class _SportsScreenState extends ConsumerState<SportsScreen> {
           itemCount: _rows.length,
           itemBuilder: (context, index) => switch (_rows[index]) {
             _LiveHeaderRow() => _SectionHeader(title: l10n.sportsLiveNow),
-            _LeagueHeaderRow(:final league) => _SectionHeader(
+            _LeagueHeaderRow(:final league, :final logoUrl) => _SectionHeader(
               title: league.name,
+              logoUrl: logoUrl,
             ),
             _FixtureRow(:final fixture, :final showLeague) => _buildCard(
               fixture,
@@ -972,21 +973,33 @@ class _SportsScreenState extends ConsumerState<SportsScreen> {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title});
+  const _SectionHeader({required this.title, this.logoUrl});
 
   final String title;
+  final String? logoUrl;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scale = FontSizeScope.scaleOf(context);
+    final logoUrl = this.logoUrl;
     return Padding(
       padding: EdgeInsets.only(top: 12 * scale, bottom: 10 * scale),
-      child: Text(
-        title,
-        style: theme.textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w700,
-        ),
+      child: Row(
+        children: [
+          if (logoUrl != null) ...[
+            SportsTeamLogo(url: logoUrl, size: 28 * scale),
+            SizedBox(width: 10 * scale),
+          ],
+          Expanded(
+            child: Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1001,9 +1014,10 @@ class _LiveHeaderRow extends _SportsRow {
 }
 
 class _LeagueHeaderRow extends _SportsRow {
-  const _LeagueHeaderRow(this.league);
+  const _LeagueHeaderRow(this.league, {this.logoUrl});
 
   final SportsLeague league;
+  final String? logoUrl;
 }
 
 class _FixtureRow extends _SportsRow {
