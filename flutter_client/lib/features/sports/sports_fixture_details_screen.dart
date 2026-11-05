@@ -740,6 +740,9 @@ class _ChannelRow extends StatelessWidget {
       match.programTitle,
       channel.groupTitle,
     ].whereType<String>().where((text) => text.isNotEmpty).join(' · ');
+    final detailStyle = theme.textTheme.labelSmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
     return DpadInkWell(
       onTap: onTap,
       autofocus: autofocus,
@@ -772,14 +775,16 @@ class _ChannelRow extends StatelessWidget {
                   ),
                   if (detail.isNotEmpty) ...[
                     SizedBox(height: 4 * scale),
-                    Text(
-                      detail,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                    // A remote can't drag, so wider screens keep the ellipsis
+                    if (MediaQuery.sizeOf(context).width < 600)
+                      DraggableText(detail, style: detailStyle)
+                    else
+                      Text(
+                        detail,
+                        style: detailStyle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
                   ],
                 ],
               ),

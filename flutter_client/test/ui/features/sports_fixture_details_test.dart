@@ -335,6 +335,77 @@ void main() {
     expect(find.byType(SportsFixtureDetailsScreen), findsNothing);
   });
 
+  for (final (width, draggable) in const [(390.0, true), (1000.0, false)]) {
+    testWidgets('a channel row programme at width $width: '
+        '${draggable ? 'drags' : 'keeps its ellipsis'}', (tester) async {
+      const programme =
+          'NFL Football : Jacksonville Jaguars at Baltimore Ravens';
+      responses = [
+        {'details': null},
+      ];
+      tester.view
+        ..physicalSize = Size(width, 2400)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final xtream = await editor();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sportsCapabilityProvider.overrideWith((_) => _capability),
+            sportsServiceProvider.overrideWith((_) => SportsService(xtream)),
+            sportsSettingsProvider.overrideWith((_) => settings),
+          ],
+          child: Dpad(
+            child: MaterialApp(
+              theme: ThemeData.dark(useMaterial3: true),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Builder(
+                builder: (context) => Scaffold(
+                  body: TextButton(
+                    onPressed: () => openSportsFixtureDetails(
+                      context,
+                      fixture: _game(SportsFixtureState.live),
+                      matches: const [
+                        SportsChannelMatch(
+                          channel: _channel,
+                          programTitle: programme,
+                        ),
+                      ],
+                      onChannelSelect: (_) {},
+                    ),
+                    child: const Text('Open game'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open game'));
+      await tester.pumpAndSettle();
+
+      final inDraggable = find.ancestor(
+        of: find.text(programme),
+        matching: find.byType(DraggableText),
+      );
+      if (!draggable) {
+        expect(inDraggable, findsNothing);
+        expect(
+          tester.widget<Text>(find.text(programme)).overflow,
+          TextOverflow.ellipsis,
+        );
+        return;
+      }
+      final scrollable = tester.state<ScrollableState>(
+        find.descendant(of: inDraggable, matching: find.byType(Scrollable)),
+      );
+      await tester.drag(inDraggable, const Offset(-60, 0));
+      await tester.pump();
+      expect(scrollable.position.pixels, greaterThan(0));
+    });
+  }
+
   testWidgets('says so when there are no details, keeping the scoreboard', (
     tester,
   ) async {

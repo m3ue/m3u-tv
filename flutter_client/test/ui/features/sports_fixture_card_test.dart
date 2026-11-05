@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/sports/sports_fixture_card.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/sports_models.dart';
+import 'package:m3u_tv/shared/draggable_text.dart';
 import 'package:material_ui/material_ui.dart';
 
 const _league = SportsLeague(
@@ -99,6 +100,125 @@ void main() {
       tester.getTopLeft(find.text('1 channel')).dy,
       lessThan(tester.getTopLeft(find.text('Atletico Madrid')).dy),
     );
+  });
+
+  group('team names', () {
+    const longName = 'Southern Mississippi Golden Eagles of Hattiesburg';
+
+    Future<void> pumpAt(WidgetTester tester, Size size) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: _card(_game('1', longName, '3', 'Howard Bison'), 1),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('a phone drags a long name sideways, without scrolling a fit', (
+      tester,
+    ) async {
+      await pumpAt(tester, const Size(380, 800));
+
+      final name = find.ancestor(
+        of: find.text(longName),
+        matching: find.byType(DraggableText),
+      );
+      final scrollable = tester.state<ScrollableState>(
+        find.descendant(of: name, matching: find.byType(Scrollable)),
+      );
+      await tester.drag(name, const Offset(-60, 0));
+      await tester.pump();
+      expect(scrollable.position.pixels, greaterThan(0));
+
+      final fits = tester.state<ScrollableState>(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('Howard Bison'),
+            matching: find.byType(DraggableText),
+          ),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(fits.position.maxScrollExtent, 0);
+    });
+
+    testWidgets('tapping a draggable name still opens the game', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(380, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      var tapped = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SportsFixtureCard(
+              fixture: _game('1', longName, '3', 'Howard Bison'),
+              channelCount: 1,
+              isResolving: false,
+              showLeague: false,
+              inMultiview: false,
+              onTap: () => tapped++,
+              onLongTap: () {},
+            ),
+          ),
+        ),
+      );
+
+      // Its start: the centre of a name this long is off screen
+      await tester.tapAt(
+        tester.getTopLeft(find.text(longName)) + const Offset(10, 10),
+      );
+      await tester.pumpAndSettle();
+      expect(tapped, 1);
+    });
+
+    testWidgets('a wide card keeps the ellipsis', (tester) async {
+      await pumpAt(tester, const Size(1600, 900));
+
+      expect(find.byType(DraggableText), findsNothing);
+      expect(
+        tester.widget<Text>(find.text(longName)).overflow,
+        TextOverflow.ellipsis,
+      );
+    });
+
+    testWidgets('a Home tile keeps the ellipsis, even on a phone', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(380, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: SportsFixtureTile.baseWidth,
+                height: SportsFixtureTile.baseHeight,
+                child: SportsFixtureTile(
+                  fixture: _game('1', longName, '3', 'Howard Bison'),
+                  channelCount: 1,
+                  onTap: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(DraggableText), findsNothing);
+    });
   });
 
   group('league mark', () {

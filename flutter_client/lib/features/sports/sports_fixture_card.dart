@@ -5,6 +5,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/shared/cached_media_thumbnail.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
+import 'package:m3u_tv/shared/draggable_text.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:material_ui/material_ui.dart';
@@ -157,7 +158,12 @@ class SportsFixtureCard extends StatelessWidget {
                 fixture: fixture,
                 showLeague: showLeague,
               );
-              final teams = _Matchup(fixture: fixture, sides: sides);
+              final compact = constraints.maxWidth < _compactBelowWidth * scale;
+              final teams = _Matchup(
+                fixture: fixture,
+                sides: sides,
+                draggableNames: compact,
+              );
               final channels = _ChannelIndicator(
                 count: channelCount,
                 isResolving: isResolving,
@@ -168,7 +174,7 @@ class SportsFixtureCard extends StatelessWidget {
                 size: 20 * scale,
                 color: theme.colorScheme.onSurfaceVariant,
               );
-              if (constraints.maxWidth < _compactBelowWidth * scale) {
+              if (compact) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
@@ -404,10 +410,18 @@ class SportsFixtureStatus extends StatelessWidget {
 /// Both teams, one per row: crest, name, and the score in a fixed-width
 /// column, so scores line up with each other and with other cards.
 class _Matchup extends StatelessWidget {
-  const _Matchup({required this.fixture, required this.sides});
+  const _Matchup({
+    required this.fixture,
+    required this.sides,
+    this.draggableNames = false,
+  });
 
   final SportsFixture fixture;
   final List<SportsCompetitor> sides;
+
+  /// Long names drag sideways to read instead of truncating: for phones,
+  /// and only where nothing behind the card scrolls sideways too.
+  final bool draggableNames;
 
   @override
   Widget build(BuildContext context) {
@@ -432,6 +446,7 @@ class _Matchup extends StatelessWidget {
             fixture: fixture,
             competitor: sides[i],
             showScore: scored,
+            draggableName: draggableNames,
             // Finished games mark ESPN's winner; live ones the side ahead
             leads: fixture.state == SportsFixtureState.finished
                 ? sides[i].winner
@@ -451,6 +466,7 @@ class _TeamRow extends StatelessWidget {
     required this.fixture,
     required this.competitor,
     required this.showScore,
+    required this.draggableName,
     required this.leads,
     required this.trails,
   });
@@ -458,6 +474,7 @@ class _TeamRow extends StatelessWidget {
   final SportsFixture fixture;
   final SportsCompetitor competitor;
   final bool showScore;
+  final bool draggableName;
   final bool leads;
   final bool trails;
 
@@ -471,12 +488,14 @@ class _TeamRow extends StatelessWidget {
       color: color,
     );
     final score = showScore ? competitor.score : null;
-    final name = Text(
-      competitor.team.displayName,
-      style: nameStyle,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-    );
+    final name = draggableName
+        ? DraggableText(competitor.team.displayName, style: nameStyle)
+        : Text(
+            competitor.team.displayName,
+            style: nameStyle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          );
     return Row(
       children: [
         SportsTeamLogo(url: competitor.team.logoUrl, size: 36 * scale),
