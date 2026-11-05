@@ -3,7 +3,7 @@
 #
 # We pin exact mpv-build commits/asset hashes in 3 places:
 #   - ios/macos/tvos Runner.xcodeproj/project.pbxproj (XCRemoteSwiftPackageReference
-#     "mpv-build" -> requirement.revision)
+#     "mpv-build" -> requirement.revision) + their two Package.resolved files
 #   - mpv-build.lock.json (android + windows tarball asset names + checksums)
 #   - windows/CMakeLists.txt (a hand-kept mirror of the lock's windows entry)
 #
@@ -139,6 +139,7 @@ import re
 import sys
 
 lock_path, artifacts_path, cmake_path = sys.argv[1:]
+lock_commit = json.load(open(lock_path))["commit"]
 lock = json.load(open(lock_path))["artifacts"]
 platforms = json.load(open(artifacts_path))["platforms"]
 failures = 0
@@ -168,6 +169,17 @@ for platform, entry in lock.items():
         expected_base = expected.get("assetBase", platforms[platform].get("assetBase"))
         check(entry["assetBase"] == expected_base,
               f"{platform}/{arch}: lock assetBase {entry['assetBase']} vs artifacts.json {expected_base}")
+
+for platform in ("ios", "macos", "tvos"):
+    for parent in ("Runner.xcodeproj/project.xcworkspace", "Runner.xcworkspace"):
+        path = f"{platform}/{parent}/xcshareddata/swiftpm/Package.resolved"
+        try:
+            pins = json.load(open(path))["pins"]
+        except OSError:
+            check(False, f"{path}: not found")
+            continue
+        revisions = [pin["state"].get("revision") for pin in pins if pin["identity"] == "mpv-build"]
+        check(revisions == [lock_commit], f"{path}: mpv-build {revisions} vs lock {lock_commit}")
 
 cmake = open(cmake_path).read()
 windows = lock.get("windows")

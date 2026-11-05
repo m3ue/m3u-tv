@@ -12,8 +12,9 @@ internal enum class FlutterRenderer(
  * Picks the Flutter UI renderer before the engine starts, from device
  * signals [MainActivity] reads in `getFlutterShellArgs`.
  *
- * Matches Plezy's device list (Skia on NVIDIA, Huawei/HONOR, and weaker
- * Android TVs), where Impeller has a history of rendering regressions. Note
+ * Matches Plezy's device list (Skia on NVIDIA, Huawei/HONOR, weaker Android
+ * TVs, and any device without Vulkan 1.1), where Impeller has a history of
+ * rendering regressions. Note
  * the SHIELD low-memory kills that prompted adding this were ultimately
  * unsized full-resolution poster decodes (see ResilientMediaImage), not the
  * renderer.
