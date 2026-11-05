@@ -43,6 +43,7 @@ final class MpvPlayerCore {
 
   // Set once from `attach(to:)` so `updateEDRMode` can toggle EDR on it.
   private weak var videoLayer: AVSampleBufferDisplayLayer?
+  private var videoOutputWasConfigured = false
 
   init(viewId: Int) {
     self.viewId = viewId
@@ -72,6 +73,11 @@ final class MpvPlayerCore {
       // shares the same avfoundation VO so it shares the same requirement.
       mpv_set_option_string(handle, "avfoundation-composite-osd", "yes")
       mpv_set_option_string(handle, "vo", "avfoundation")
+      // Host-clock presentation, as on tvOS: samples carry mpv's scheduled
+      // display time against a clock that only moves forward, so seeks and
+      // audio-clock drift never reach the display layer's timebase. iOS
+      // defaults to media time (Plezy 5f644f17f).
+      mpv_set_option_string(handle, "avfoundation-presentation", "host")
       mpv_set_option_string(handle, "hwdec", "videotoolbox")
       mpv_set_option_string(handle, "hwdec-codecs", "all")
       mpv_set_option_string(handle, "hwdec-software-fallback", "yes")
@@ -111,6 +117,7 @@ final class MpvPlayerCore {
         // EDR input -- appended rather than interleaved so the indices
         // above (relied on by trackRelatedPropertyIndices) don't shift.
         ("video-params/sig-peak", MPV_FORMAT_DOUBLE),
+        ("vo-configured", MPV_FORMAT_FLAG),
       ]
       for (index, entry) in observed.enumerated() {
         mpv_observe_property(handle, UInt64(index), entry.0, entry.1)
@@ -329,6 +336,12 @@ final class MpvPlayerCore {
     case MPV_EVENT_PLAYBACK_RESTART:
       emit(kind: "PLAYBACK_RESTART", extra: snapshot(includeTracks: true))
     case MPV_EVENT_PROPERTY_CHANGE:
+      if event.reply_userdata == Self.voConfiguredPropertyIndex {
+        var configured: Int32 = 0
+        if let handle = mpv { _ = mpv_get_property(handle, "vo-configured", MPV_FORMAT_FLAG, &configured) }
+        let voConfigured = configured != 0
+        DispatchQueue.main.async { [weak self] in self?.updateVideoLayerVisibility(voConfigured: voConfigured) }
+      }
       if event.reply_userdata == Self.sigPeakPropertyIndex {
         var sigPeak: Double = 0
         if let handle = mpv, mpv_get_property(handle, "video-params/sig-peak", MPV_FORMAT_DOUBLE, &sigPeak) >= 0
@@ -380,6 +393,23 @@ final class MpvPlayerCore {
 
   /// Index of `video-params/sig-peak` in the `observed` array in `attach(to:)`.
   private static let sigPeakPropertyIndex: UInt64 = 10
+
+  /// Index of `vo-configured` in the `observed` array in `attach(to:)`.
+  private static let voConfiguredPropertyIndex: UInt64 = 11
+
+  /// mpv keeps the last image on the layer when it closes its video output
+  /// (mpv-build 0502a36: removing a displayed image can freeze the display)
+  /// and leaves hiding it to us. Without this, an audio-only file after a
+  /// video one keeps showing the old picture. Hidden only after a first video
+  /// output, so the view stays black until then. Must run on main.
+  private func updateVideoLayerVisibility(voConfigured: Bool) {
+    if voConfigured { videoOutputWasConfigured = true }
+    guard let videoLayer, videoOutputWasConfigured else { return }
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    videoLayer.isHidden = !voConfigured
+    CATransaction.commit()
+  }
 
   /// Toggles EDR rendering on the display layer based on the source's HDR
   /// peak signal. Must run on main (layer property mutation). Ported from

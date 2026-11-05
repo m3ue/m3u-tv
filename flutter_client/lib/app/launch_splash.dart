@@ -429,7 +429,7 @@ class LaunchSplashPainter extends CustomPainter {
 
     // Painted even at zero strength (floored to [_primeAlpha]) so the very
     // first frame, still identical to the native splash, already uses the
-    // glow and arc gradients: on Skia (Android < 12, Fire TV) compiling those
+    // glow and arc gradients: on Skia (see FlutterRendererPolicy) compiling those
     // shaders took 80-150ms per effect on a SHIELD, a visible hitch when they
     // first faded in mid-animation. Paid on frame one instead, it only keeps
     // the native splash up a moment longer.

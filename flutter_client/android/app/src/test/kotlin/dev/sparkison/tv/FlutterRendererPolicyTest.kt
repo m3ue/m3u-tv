@@ -38,7 +38,15 @@ class FlutterRendererPolicyTest {
     fun ordinaryPhonesKeepImpeller() {
         assertEquals(
             FlutterRenderer.IMPELLER,
-            select(manufacturer = "Samsung", isAndroidTv = false, sdkInt = 28, supportsVulkan11 = false, is64Bit = false),
+            select(manufacturer = "Samsung", isAndroidTv = false, sdkInt = 28, is64Bit = false),
+        )
+    }
+
+    @Test
+    fun phonesWithoutVulkan11UseSkia() {
+        assertEquals(
+            FlutterRenderer.SKIA,
+            select(manufacturer = "asus", isAndroidTv = false, sdkInt = 34, supportsVulkan11 = false, is64Bit = false),
         )
     }
 

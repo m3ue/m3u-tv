@@ -4,10 +4,11 @@ name: Dependency Canary
 # revisions + mpv-build.lock.json for Android/Windows) are still servable from
 # GitHub, on a schedule independent of any release.
 #
-# Why this exists: mpv-build publishes every build to one perpetually-growing
-# GitHub Release per platform (200+ assets and counting) instead of pruning
-# old ones, and that release has been observed to intermittently 5xx on
-# essentially random assets - old and new alike. A pin that resolved fine
+# Why this exists: mpv-build's GitHub Releases (one perpetually-growing release
+# per platform before mpv-build f4d61bc, one release per publish run since, as
+# named by the lock's assetBase) never prune old assets, and they have been
+# observed to intermittently 5xx on essentially random assets - old and new
+# alike. A pin that resolved fine
 # yesterday can 504/500 mid-release with no warning, which is exactly what
 # happened on 2026-09-21 (see flutter_client/scripts/check-mpv-build-pins.sh
 # for the full incident writeup) and cost hours to diagnose because it was

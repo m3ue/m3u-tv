@@ -74,6 +74,8 @@ final class MpvPlayerCore {
   // resolve `.window` later -- the view isn't in the hierarchy yet (and has
   // no window) at attach time, so this can't be resolved up front.
   private weak var hostView: UIView?
+  private weak var videoLayer: AVSampleBufferDisplayLayer?
+  private var videoOutputWasConfigured = false
   private var activeDisplayCriteriaKey: String?
 
   // Display-criteria inputs and hold, both owned by `queue`. Held from a
@@ -147,6 +149,7 @@ final class MpvPlayerCore {
   /// weakly so HDR display-criteria updates can resolve its `.window` once
   /// it's actually in the view hierarchy. Must be called once, before `load`.
   func attach(to displayLayer: AVSampleBufferDisplayLayer, hostView: UIView) {
+    self.videoLayer = displayLayer
     self.hostView = hostView
     queue.async { [weak self] in
       guard let self, self.mpv == nil else { return }
@@ -208,6 +211,7 @@ final class MpvPlayerCore {
         ("video-params/primaries", MPV_FORMAT_STRING),
         ("video-params/colormatrix", MPV_FORMAT_STRING),
         ("deinterlace-active", MPV_FORMAT_FLAG),
+        ("vo-configured", MPV_FORMAT_FLAG),
       ]
       for (index, entry) in observed.enumerated() {
         mpv_observe_property(handle, UInt64(index), entry.0, entry.1)
@@ -466,6 +470,12 @@ final class MpvPlayerCore {
       }
       emit(kind: "PLAYBACK_RESTART", extra: snapshot(includeTracks: true))
     case MPV_EVENT_PROPERTY_CHANGE:
+      if event.reply_userdata == Self.voConfiguredPropertyIndex {
+        var configured: Int32 = 0
+        if let handle = mpv { _ = mpv_get_property(handle, "vo-configured", MPV_FORMAT_FLAG, &configured) }
+        let voConfigured = configured != 0
+        DispatchQueue.main.async { [weak self] in self?.updateVideoLayerVisibility(voConfigured: voConfigured) }
+      }
       if Self.displayCriteriaPropertyIndices.contains(event.reply_userdata), !displayCriteriaHeld,
         let data = event.data,
         refineDisplayCriteria(with: data.assumingMemoryBound(to: mpv_event_property.self).pointee)
@@ -522,6 +532,23 @@ final class MpvPlayerCore {
   /// profile/level, container-fps, gamma, primaries, colormatrix,
   /// deinterlace-active).
   private static let displayCriteriaPropertyIndices: Set<UInt64> = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+
+  /// Index of `vo-configured` in the `observed` array in `attach(to:hostView:)`.
+  private static let voConfiguredPropertyIndex: UInt64 = 20
+
+  /// mpv keeps the last image on the layer when it closes its video output
+  /// (mpv-build 0502a36: removing a displayed image can freeze the display)
+  /// and leaves hiding it to us. Without this, an audio-only file after a
+  /// video one keeps showing the old picture. Hidden only after a first video
+  /// output, so the view stays black until then. Must run on main.
+  private func updateVideoLayerVisibility(voConfigured: Bool) {
+    if voConfigured { videoOutputWasConfigured = true }
+    guard let videoLayer, videoOutputWasConfigured else { return }
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
+    videoLayer.isHidden = !voConfigured
+    CATransaction.commit()
+  }
 
   private func snapshot(includeTracks: Bool) -> [String: Any] {
     guard let handle = mpv else { return [:] }

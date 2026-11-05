@@ -12,8 +12,9 @@ internal enum class FlutterRenderer(
  * Picks the Flutter UI renderer before the engine starts, from device
  * signals [MainActivity] reads in `getFlutterShellArgs`.
  *
- * Matches Plezy's device list (Skia on NVIDIA, Huawei/HONOR, and weaker
- * Android TVs), where Impeller has a history of rendering regressions. Note
+ * Matches Plezy's device list (Skia on NVIDIA, Huawei/HONOR, weaker Android
+ * TVs, and any device without Vulkan 1.1), where Impeller has a history of
+ * rendering regressions. Note
  * the SHIELD low-memory kills that prompted adding this were ultimately
  * unsized full-resolution poster decodes (see ResilientMediaImage), not the
  * renderer.
@@ -38,8 +39,13 @@ internal object FlutterRendererPolicy {
         ) {
             return FlutterRenderer.SKIA
         }
+        // Without Vulkan 1.1, Impeller can only fall back to its GLES backend.
+        // The engine's own guard keys on API level, which custom ROMs defeat:
+        // old Adreno 3xx drivers crash the raster thread on Impeller's GLES
+        // shaders at launch (flutter/flutter#164906, Plezy d24240182).
+        if (!supportsVulkan11) return FlutterRenderer.SKIA
         if (!isAndroidTv) return FlutterRenderer.IMPELLER
-        if (sdkInt < ANDROID_12_API || manufacturer.equals("Amazon", ignoreCase = true) || !supportsVulkan11) {
+        if (sdkInt < ANDROID_12_API || manufacturer.equals("Amazon", ignoreCase = true)) {
             return FlutterRenderer.SKIA
         }
         // 32-bit Android TV SoCs are the low-memory / low-throughput class.
