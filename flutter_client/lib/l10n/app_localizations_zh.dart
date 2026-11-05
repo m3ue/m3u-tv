@@ -1016,7 +1016,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeBrowseSeries => '浏览所有剧集';
 
   @override
-  String get homeNothingToShow => '此播放列表暂无内容';
+  String get homeNothingToShow => '暂无内容';
 
   @override
   String get notificationsTitle => '通知';
@@ -2255,4 +2255,38 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get sportsNoTeams => '未找到球队';
+
+  @override
+  String get homeAioStreamsBrowse => '浏览你的 AIOStreams 目录';
+
+  @override
+  String get homeRequestsBrowse => '搜索并请求电影和剧集';
+
+  @override
+  String get settingsNavLayout => '导航和主页';
+
+  @override
+  String get settingsNavLayoutSubtitle => '重新排序或隐藏导航和主页中的栏目';
+
+  @override
+  String get settingsNavLayoutHintRemote =>
+      '在某一行按确定键将其选中,用上下键移动,再按确定键放下。按返回键取消。';
+
+  @override
+  String get settingsNavLayoutHintTouch => '拖动行的手柄即可移动。';
+
+  @override
+  String get settingsNavLayoutPinned => '主页和搜索固定在顶部,通知和设置固定在底部,继续观看始终位于主页首位。';
+
+  @override
+  String get settingsNavLayoutColumnNav => '导航';
+
+  @override
+  String get settingsNavLayoutReset => '恢复默认';
+
+  @override
+  String get settingsNavLayoutResetMessage => '这将恢复这些栏目的原始顺序和显示状态。';
+
+  @override
+  String get settingsNavLayoutResetConfirm => '恢复';
 }

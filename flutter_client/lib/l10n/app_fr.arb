@@ -450,7 +450,7 @@
   "homeSportsOnChannels": "Sur {channels}",
   "homeBrowseMovies": "Parcourir tous les films",
   "homeBrowseSeries": "Parcourir toutes les séries",
-  "homeNothingToShow": "Cette playlist n'a encore aucun contenu",
+  "homeNothingToShow": "Rien à afficher pour le moment",
   "notificationsTitle": "Notifications",
   "notificationsTabNotifications": "Notifications",
   "notificationsTabChannelSettings": "Paramètres des chaînes",
@@ -1086,5 +1086,16 @@
   "sportsTeamsButton": "Équipes",
   "sportsTeamsTitle": "Choisissez vos équipes",
   "sportsTeamsLoadFailed": "Impossible de charger les équipes. Choisissez à nouveau la ligue pour réessayer.",
-  "sportsNoTeams": "Aucune équipe trouvée"
+  "sportsNoTeams": "Aucune équipe trouvée",
+  "homeAioStreamsBrowse": "Parcourir vos catalogues AIOStreams",
+  "homeRequestsBrowse": "Rechercher et demander des films et des séries",
+  "settingsNavLayout": "Navigation et Accueil",
+  "settingsNavLayoutSubtitle": "Réorganiser ou masquer des sections dans la navigation et sur l'Accueil",
+  "settingsNavLayoutHintRemote": "Appuyez sur OK sur une ligne pour la saisir, déplacez-la avec Haut et Bas, puis appuyez sur OK pour la déposer. Retour annule.",
+  "settingsNavLayoutHintTouch": "Faites glisser une ligne par sa poignée pour la déplacer.",
+  "settingsNavLayoutPinned": "Accueil et Rechercher restent en haut, Notifications et Paramètres restent en bas, et Reprendre reste en premier sur l'Accueil.",
+  "settingsNavLayoutColumnNav": "Nav",
+  "settingsNavLayoutReset": "Rétablir les valeurs par défaut",
+  "settingsNavLayoutResetMessage": "Cela rétablit l'ordre et la visibilité d'origine de ces sections.",
+  "settingsNavLayoutResetConfirm": "Rétablir"
 }

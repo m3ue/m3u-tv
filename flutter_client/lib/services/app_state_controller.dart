@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/widgets.dart' show Locale;
+import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/app_log_buffer.dart';
@@ -609,6 +610,21 @@ class AppStateController extends ChangeNotifier {
     credentials: authNotifier.credentials,
   );
   bool get hasAioStreams => authNotifier.authResponse?.hasAioStreams ?? false;
+
+  /// The main destinations this playlist offers, whether or not the user's
+  /// nav layout lists them: one hidden from the nav still opens from its Home
+  /// row or a notification.
+  List<String> get availableMainRoutes => RouteNames.mainRoutes
+      .where(
+        (route) => switch (route) {
+          RouteNames.aiostreams => hasAioStreams,
+          RouteNames.dvr => hasDvrFeature,
+          RouteNames.requests => hasRequestsFeature,
+          RouteNames.sports => hasSportsFeature,
+          _ => true,
+        },
+      )
+      .toList(growable: false);
   List<AIOStreamsIntegration> get aiostreamsIntegrations =>
       authNotifier.authResponse?.aiostreamsIntegrations ?? const [];
   late final AIOStreamsApiService aiostreamsApiService = AIOStreamsApiService(

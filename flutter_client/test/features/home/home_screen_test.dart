@@ -1,10 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/home/home_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/navigation/nav_layout.dart';
+import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
@@ -139,6 +142,11 @@ void main() {
     XtreamService? sportsEditor,
     ValueChanged<Channel>? onChannelSelect,
     VoidCallback? onSportsMore,
+    ViewSettingsService? viewSettings,
+    bool hasDvr = false,
+    bool hasAioStreams = false,
+    bool hasRequests = false,
+    VoidCallback? onSidebarActivate,
   }) async {
     // A TV screen: every row is on it.
     await tester.binding.setSurfaceSize(const Size(1920, 1080));
@@ -169,7 +177,10 @@ void main() {
           }),
           catalogRepositoryProvider.overrideWith((_) => repo),
           progressListProvider.overrideWith((_) => const <Progress>[]),
-          hasDvrFeatureProvider.overrideWith((_) => false),
+          hasDvrFeatureProvider.overrideWith((_) => hasDvr),
+          dvrRecordingsProvider.overrideWith((_) => const <DvrRecording>[]),
+          hasAioStreamsProvider.overrideWith((_) => hasAioStreams),
+          hasRequestsFeatureProvider.overrideWith((_) => hasRequests),
           // Sports is off unless a test turns it on
           sportsCapabilityProvider.overrideWith((_) => sports),
           if (sportsEditor != null) ...[
@@ -181,7 +192,7 @@ void main() {
           epgServiceProvider.overrideWith((_) => EpgService()),
           recordingChannelIdsProvider.overrideWith((_) => const <int>{}),
           viewSettingsServiceProvider.overrideWith(
-            (_) => ViewSettingsService(),
+            (_) => viewSettings ?? ViewSettingsService(),
           ),
           liveFavoritesServiceProvider.overrideWith(
             (_) => liveFavorites ?? FavoritesService(memory: memory),
@@ -208,8 +219,11 @@ void main() {
             onMoviesMore: onMoviesMore ?? () {},
             onSeriesMore: () {},
             onRecordingsSelect: () {},
+            onAioStreamsSelect: () {},
+            onRequestsSelect: () {},
             onAioStreamsItemSelect: (_, _) {},
             useSidebarLayout: true,
+            onSidebarActivate: onSidebarActivate,
           ),
         ),
       ),
@@ -366,7 +380,7 @@ void main() {
     expect(find.text('Movies'), findsOneWidget);
     expect(find.text('Series'), findsNothing);
     expect(find.text('No Series available'), findsNothing);
-    expect(find.text('This playlist has nothing to show yet'), findsNothing);
+    expect(find.text('Nothing to show yet'), findsNothing);
   });
 
   testWidgets('rows that cannot be read are hidden, not left loading', (
@@ -387,7 +401,275 @@ void main() {
     await _settle(tester);
 
     expect(find.byType(MediaPreviewSection), findsNothing);
-    expect(find.text('This playlist has nothing to show yet'), findsOneWidget);
+    expect(find.text('Nothing to show yet'), findsOneWidget);
+  });
+
+  group('nav layout', () {
+    const full = _Catalog(
+      channels: _channels,
+      movies: _movies,
+      series: _series,
+    );
+
+    Future<ViewSettingsService> serviceWith(
+      NavLayout Function(NavLayout) change,
+    ) async {
+      final service = ViewSettingsService();
+      await service.setNavLayout(change(NavLayout.defaults));
+      return service;
+    }
+
+    double rowTop(WidgetTester tester, String title) =>
+        tester.getTopLeft(find.text(title).first).dy;
+
+    testWidgets('rows follow the saved order', (tester) async {
+      final all = NavLayout.customizableRoutes;
+      await pumpHome(
+        tester,
+        full,
+        viewSettings: await serviceWith(
+          (layout) => layout.moved(RouteNames.series, -10, all),
+        ),
+      );
+      await _settle(tester);
+
+      expect(rowTop(tester, 'Live TV'), lessThan(rowTop(tester, 'Movies')));
+      expect(rowTop(tester, 'Series'), lessThan(rowTop(tester, 'Live TV')));
+    });
+
+    testWidgets('a row turned off is gone, and its siblings stay', (
+      tester,
+    ) async {
+      await pumpHome(
+        tester,
+        full,
+        viewSettings: await serviceWith(
+          (layout) => layout.withHomeRow(RouteNames.vod, shown: false),
+        ),
+      );
+      await _settle(tester);
+
+      expect(find.text('Big Buck Bunny'), findsNothing);
+      expect(find.text('Sintel Saga'), findsWidgets);
+    });
+
+    testWidgets('AIOStreams and Requests rows are opt-in', (tester) async {
+      await pumpHome(
+        tester,
+        full,
+        hasAioStreams: true,
+        hasRequests: true,
+      );
+      await _settle(tester);
+
+      expect(find.text('Browse your AIOStreams catalogs'), findsNothing);
+      expect(
+        find.text('Search for and request movies and shows'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('AIOStreams and Requests rows show once turned on', (
+      tester,
+    ) async {
+      await pumpHome(
+        tester,
+        full,
+        hasAioStreams: true,
+        hasRequests: true,
+        viewSettings: await serviceWith(
+          (layout) => layout
+              .withHomeRow(RouteNames.aiostreams, shown: true)
+              .withHomeRow(RouteNames.requests, shown: true),
+        ),
+      );
+      await _settle(tester);
+
+      expect(
+        find.text('Browse your AIOStreams catalogs'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Search for and request movies and shows'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a turned-on row without its feature stays hidden', (
+      tester,
+    ) async {
+      await pumpHome(
+        tester,
+        full,
+        viewSettings: await serviceWith(
+          (layout) => layout.withHomeRow(RouteNames.aiostreams, shown: true),
+        ),
+      );
+      await _settle(tester);
+
+      expect(find.text('Browse your AIOStreams catalogs'), findsNothing);
+    });
+
+    testWidgets('says so when the user hid every row with content', (
+      tester,
+    ) async {
+      await pumpHome(
+        tester,
+        full,
+        viewSettings: await serviceWith((layout) {
+          var next = layout;
+          for (final route in NavLayout.customizableRoutes) {
+            next = next.withHomeRow(route, shown: false);
+          }
+          return next;
+        }),
+      );
+      await _settle(tester);
+
+      expect(find.byType(MediaPreviewSection), findsNothing);
+      expect(find.text('Nothing to show yet'), findsOneWidget);
+    });
+
+    testWidgets('a visible DVR entry row counts as something to show', (
+      tester,
+    ) async {
+      await pumpHome(tester, const _Catalog(), hasDvr: true);
+      await _settle(tester);
+
+      expect(find.text('DVR Recordings'), findsOneWidget);
+      expect(find.text('Nothing to show yet'), findsNothing);
+    });
+
+    testWidgets('DVR hidden from Home no longer blocks the empty message', (
+      tester,
+    ) async {
+      await pumpHome(
+        tester,
+        const _Catalog(),
+        hasDvr: true,
+        viewSettings: await serviceWith(
+          (layout) => layout.withHomeRow(RouteNames.dvr, shown: false),
+        ),
+      );
+      await _settle(tester);
+
+      expect(find.text('Nothing to show yet'), findsOneWidget);
+    });
+
+    group('Sports on a day with no games', () {
+      const capability = SportsCapability(
+        leagues: [
+          SportsLeague(
+            id: 'hockey/nhl',
+            name: 'NHL',
+            abbreviation: 'NHL',
+            isDefault: true,
+          ),
+        ],
+      );
+
+      Future<XtreamService> gameless(WidgetTester tester) async =>
+          (await tester.runAsync(() async {
+            final service = XtreamService(
+              transport: (request) async {
+                if (request.action == null) {
+                  return {
+                    'user_info': {'auth': 1, 'status': 'Active'},
+                    'm3u_editor': {
+                      'version': '0.14.0',
+                      'features': ['sports'],
+                    },
+                  };
+                }
+                return {'fixtures': <Object?>[]};
+              },
+            );
+            await service.authenticate(
+              const UserCredentials(
+                server: 'https://editor.example',
+                username: 'user',
+                password: 'pass',
+              ),
+            );
+            return service;
+          }))!;
+
+      // Only Sports left on Home, as someone who only wants games would set up.
+      NavLayout onlySports(NavLayout layout) {
+        var next = layout;
+        for (final route in NavLayout.customizableRoutes) {
+          if (route != RouteNames.sports) {
+            next = next.withHomeRow(route, shown: false);
+          }
+        }
+        return next;
+      }
+
+      testWidgets('shows the empty message when Sports is in the nav', (
+        tester,
+      ) async {
+        await pumpHome(
+          tester,
+          full,
+          sports: capability,
+          sportsEditor: await gameless(tester),
+          onSportsMore: () {},
+          viewSettings: await serviceWith(onlySports),
+        );
+        await _settle(tester);
+
+        expect(find.byType(MediaPreviewSection), findsNothing);
+        expect(find.text('Nothing to show yet'), findsOneWidget);
+      });
+
+      testWidgets('keeps a way in when Sports is off the nav', (tester) async {
+        var opened = 0;
+        await pumpHome(
+          tester,
+          full,
+          sports: capability,
+          sportsEditor: await gameless(tester),
+          onSportsMore: () => opened += 1,
+          viewSettings: await serviceWith(
+            (layout) =>
+                onlySports(layout).withNav(RouteNames.sports, shown: false),
+          ),
+        );
+        await _settle(tester);
+
+        expect(find.text('Nothing to show yet'), findsNothing);
+        await tester.tap(find.text('No games on this day').first);
+        await tester.pump();
+        expect(opened, 1);
+      });
+    });
+
+    testWidgets('the rich layout shows the empty message too', (tester) async {
+      final service = ViewSettingsService();
+      await service.setHomeScreenStyle(HomeScreenStyle.rich);
+      await pumpHome(tester, const _Catalog(), viewSettings: service);
+      await _settle(tester);
+
+      expect(find.text('Nothing to show yet'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('left from the empty message opens the sidebar', (
+      tester,
+    ) async {
+      var activations = 0;
+      await pumpHome(
+        tester,
+        const _Catalog(),
+        onSidebarActivate: () => activations += 1,
+      );
+      await _settle(tester);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+
+      expect(activations, 1);
+    });
   });
 
   testWidgets('View All at the end of a row opens its full list', (

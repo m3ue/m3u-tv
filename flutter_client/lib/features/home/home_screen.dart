@@ -9,6 +9,8 @@ import 'package:m3u_tv/features/sports/sports_fixture_actions.dart';
 import 'package:m3u_tv/features/sports/sports_fixture_card.dart';
 import 'package:m3u_tv/features/sports/sports_fixture_details_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/navigation/nav_layout.dart';
+import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
@@ -53,6 +55,8 @@ class HomeScreen extends ConsumerStatefulWidget {
     required this.onMoviesMore,
     required this.onSeriesMore,
     required this.onRecordingsSelect,
+    this.onAioStreamsSelect,
+    this.onRequestsSelect,
     required this.onAioStreamsItemSelect,
     this.useSidebarLayout = false,
     this.onSidebarActivate,
@@ -76,6 +80,10 @@ class HomeScreen extends ConsumerStatefulWidget {
   final VoidCallback onMoviesMore;
   final VoidCallback onSeriesMore;
   final VoidCallback onRecordingsSelect;
+
+  /// Open the AIOStreams and Requests screens from their opt-in Home rows.
+  final VoidCallback? onAioStreamsSelect;
+  final VoidCallback? onRequestsSelect;
   final void Function(AIOStreamsItem, int integrationId) onAioStreamsItemSelect;
   final bool useSidebarLayout;
   final VoidCallback? onSidebarActivate;
@@ -115,6 +123,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// right layout builds immediately (a Simplified-then-Rich swap flashed and
   /// remounted every row). Falls back to Simplified if nothing was cached.
   late HomeScreenStyle _style;
+  late NavLayout _navLayout;
   final HomeSpotlightController _spotlight = HomeSpotlightController();
   late final HomeSpotlightEnricher _enricher = HomeSpotlightEnricher(
     fetchVodInfo: widget.fetchVodInfo,
@@ -157,6 +166,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _viewSettings = ref.read(viewSettingsServiceProvider);
     _shownPlaylistKey = ref.read(shownPlaylistKeyProvider);
     _style = _viewSettings.homeScreenStyleCached ?? HomeScreenStyle.simplified;
+    _navLayout = _viewSettings.navLayoutSync;
     _viewSettings.addListener(_onViewSettingsChanged);
     unawaited(_loadStyle());
     _liveFavoritesService = ref.read(liveFavoritesServiceProvider);
@@ -182,7 +192,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
-  void _onViewSettingsChanged() => unawaited(_loadStyle());
+  void _onViewSettingsChanged() {
+    unawaited(_loadStyle());
+    final layout = _viewSettings.navLayoutSync;
+    if (layout != _navLayout) setState(() => _navLayout = layout);
+  }
 
   /// Continue Watching re-syncs with the server after launch and can drop
   /// entries. A focused card that is rebuilt in place with another entry
@@ -325,6 +339,97 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() => _catalogRowHasItems[row] = hasItems);
   }
 
+  /// Whether a turned-on row has come up with nothing to show. The entry-point
+  /// rows always show their card when their feature is there.
+  bool _rowHasNothing(String route) => switch (route) {
+    RouteNames.liveTv => _catalogRowHasItems[_CatalogRow.live] == false,
+    RouteNames.sports => _catalogRowHasItems[_CatalogRow.sports] == false,
+    RouteNames.vod => _catalogRowHasItems[_CatalogRow.movies] == false,
+    RouteNames.series => _catalogRowHasItems[_CatalogRow.series] == false,
+    RouteNames.dvr => !ref.watch(hasDvrFeatureProvider),
+    RouteNames.aiostreams => !ref.watch(hasAioStreamsProvider),
+    RouteNames.requests => !ref.watch(hasRequestsFeatureProvider),
+    _ => true,
+  };
+
+  Widget _buildRow(
+    String route,
+    String? playlistKey,
+    HomeSpotlightController? spotlight,
+  ) => switch (route) {
+    RouteNames.liveTv => _LiveRow(
+      key: ValueKey(('live', playlistKey)),
+      favoriteChannelIds: _favoriteChannelIds,
+      onChannelSelect: widget.onChannelSelect,
+      onChannelContextChanged: widget.onChannelContextChanged,
+      onToggleFavorite: (channel) => _liveFavoritesService.toggle(channel.id),
+      rowItemLimit: _rowItemLimit,
+      onViewAll: widget.onLiveTvMore,
+      onLoaded: (hasItems) => _onCatalogRowLoaded(_CatalogRow.live, hasItems),
+      useSidebarLayout: widget.useSidebarLayout,
+      onSidebarActivate: widget.onSidebarActivate,
+      spotlight: spotlight,
+    ),
+    RouteNames.sports => _SportsRow(
+      key: ValueKey(('sports', playlistKey)),
+      onChannelSelect: widget.onChannelSelect,
+      onViewAll: widget.onSportsMore,
+      onBack: widget.onHandleTopLevelBack,
+      rowItemLimit: _rowItemLimit,
+      hiddenFromNav: !_navLayout.showsInNav(RouteNames.sports),
+      onLoaded: (hasItems) => _onCatalogRowLoaded(_CatalogRow.sports, hasItems),
+      useSidebarLayout: widget.useSidebarLayout,
+      onSidebarActivate: widget.onSidebarActivate,
+      spotlight: spotlight,
+    ),
+    RouteNames.vod => _MoviesRow(
+      key: ValueKey(('movies', playlistKey)),
+      favoriteVodIds: _favoriteVodIds,
+      onVodSelect: widget.onVodSelect,
+      onToggleFavorite: (item) => _vodFavoritesService.toggle(item.id),
+      rowItemLimit: _rowItemLimit,
+      onViewAll: widget.onMoviesMore,
+      onLoaded: (hasItems) => _onCatalogRowLoaded(_CatalogRow.movies, hasItems),
+      useSidebarLayout: widget.useSidebarLayout,
+      onSidebarActivate: widget.onSidebarActivate,
+      spotlight: spotlight,
+    ),
+    RouteNames.series => _SeriesRow(
+      key: ValueKey(('series', playlistKey)),
+      favoriteSeriesIds: _favoriteSeriesIds,
+      onSeriesSelect: widget.onSeriesSelect,
+      onToggleFavorite: (series) => _seriesFavoritesService.toggle(series.id),
+      rowItemLimit: _rowItemLimit,
+      onViewAll: widget.onSeriesMore,
+      onLoaded: (hasItems) => _onCatalogRowLoaded(_CatalogRow.series, hasItems),
+      useSidebarLayout: widget.useSidebarLayout,
+      onSidebarActivate: widget.onSidebarActivate,
+      spotlight: spotlight,
+    ),
+    RouteNames.dvr => _RecordingsRow(
+      key: const ValueKey('dvr'),
+      onRecordingsSelect: widget.onRecordingsSelect,
+      useSidebarLayout: widget.useSidebarLayout,
+      onSidebarActivate: widget.onSidebarActivate,
+      spotlight: spotlight,
+    ),
+    RouteNames.aiostreams => _AioStreamsRow(
+      key: const ValueKey('aiostreams'),
+      onSelect: widget.onAioStreamsSelect,
+      useSidebarLayout: widget.useSidebarLayout,
+      onSidebarActivate: widget.onSidebarActivate,
+      spotlight: spotlight,
+    ),
+    RouteNames.requests => _RequestsRow(
+      key: const ValueKey('requests'),
+      onSelect: widget.onRequestsSelect,
+      useSidebarLayout: widget.useSidebarLayout,
+      onSidebarActivate: widget.onSidebarActivate,
+      spotlight: spotlight,
+    ),
+    _ => const SizedBox.shrink(),
+  };
+
   @override
   Widget build(BuildContext context) {
     final isBootstrapping = ref.watch(isBootstrappingProvider);
@@ -369,11 +474,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final hasNoProgress = ref.watch(
       progressListProvider.select((progress) => progress.isEmpty),
     );
-    final hasDvrFeature = ref.watch(hasDvrFeatureProvider);
-    final nothingToShow =
-        hasNoProgress &&
-        !hasDvrFeature &&
-        _CatalogRow.values.every((row) => _catalogRowHasItems[row] == false);
+    final homeRowRoutes = _navLayout.homeRowRoutes;
+    final nothingToShow = hasNoProgress && homeRowRoutes.every(_rowHasNothing);
     final rows = <Widget>[
       Focus(
         focusNode: _continueWatchingNode,
@@ -388,70 +490,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           onItemsChanged: _onContinueWatchingChanged,
         ),
       ),
-      _LiveRow(
-        key: ValueKey(('live', playlistKey)),
-        favoriteChannelIds: _favoriteChannelIds,
-        onChannelSelect: widget.onChannelSelect,
-        onChannelContextChanged: widget.onChannelContextChanged,
-        onToggleFavorite: (channel) => _liveFavoritesService.toggle(channel.id),
-        rowItemLimit: _rowItemLimit,
-        onViewAll: widget.onLiveTvMore,
-        onLoaded: (hasItems) => _onCatalogRowLoaded(_CatalogRow.live, hasItems),
-        useSidebarLayout: widget.useSidebarLayout,
-        onSidebarActivate: widget.onSidebarActivate,
-        spotlight: spotlight,
-      ),
-      _SportsRow(
-        key: ValueKey(('sports', playlistKey)),
-        onChannelSelect: widget.onChannelSelect,
-        onViewAll: widget.onSportsMore,
-        onBack: widget.onHandleTopLevelBack,
-        rowItemLimit: _rowItemLimit,
-        useSidebarLayout: widget.useSidebarLayout,
-        onSidebarActivate: widget.onSidebarActivate,
-        spotlight: spotlight,
-      ),
-      _MoviesRow(
-        key: ValueKey(('movies', playlistKey)),
-        favoriteVodIds: _favoriteVodIds,
-        onVodSelect: widget.onVodSelect,
-        onToggleFavorite: (item) => _vodFavoritesService.toggle(item.id),
-        rowItemLimit: _rowItemLimit,
-        onViewAll: widget.onMoviesMore,
-        onLoaded: (hasItems) =>
-            _onCatalogRowLoaded(_CatalogRow.movies, hasItems),
-        useSidebarLayout: widget.useSidebarLayout,
-        onSidebarActivate: widget.onSidebarActivate,
-        spotlight: spotlight,
-      ),
-      _SeriesRow(
-        key: ValueKey(('series', playlistKey)),
-        favoriteSeriesIds: _favoriteSeriesIds,
-        onSeriesSelect: widget.onSeriesSelect,
-        onToggleFavorite: (series) => _seriesFavoritesService.toggle(series.id),
-        rowItemLimit: _rowItemLimit,
-        onViewAll: widget.onSeriesMore,
-        onLoaded: (hasItems) =>
-            _onCatalogRowLoaded(_CatalogRow.series, hasItems),
-        useSidebarLayout: widget.useSidebarLayout,
-        onSidebarActivate: widget.onSidebarActivate,
-        spotlight: spotlight,
-      ),
-      _RecordingsRow(
-        onRecordingsSelect: widget.onRecordingsSelect,
-        useSidebarLayout: widget.useSidebarLayout,
-        onSidebarActivate: widget.onSidebarActivate,
-        spotlight: spotlight,
-      ),
+      for (final route in homeRowRoutes)
+        _buildRow(route, playlistKey, spotlight),
       if (nothingToShow)
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            vertical: MediaBrowsingMetrics.pagePadding * 2,
-          ),
-          child: Center(
-            child: Text(
-              AppLocalizations.of(context).homeNothingToShow,
-              style: Theme.of(context).textTheme.titleMedium,
+        // Nothing else here can take focus. Without this a remote has no way
+        // to reach the sidebar on some platforms, as key events only travel up
+        // from whatever holds focus.
+        Focus(
+          autofocus: widget.useSidebarLayout,
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent &&
+                event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+              widget.onSidebarActivate?.call();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              vertical: MediaBrowsingMetrics.pagePadding * 2,
+            ),
+            child: Center(
+              child: Text(
+                AppLocalizations.of(context).homeNothingToShow,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
             ),
           ),
         ),
@@ -506,7 +569,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 // provider tick only rebuilds the row(s) that actually watch it - e.g. an
 // EPG update no longer touches the Movies/Series rows.
 
-enum _CatalogRow { live, movies, series }
+enum _CatalogRow { live, sports, movies, series }
 
 /// A row's [MediaPreviewSection.viewAll] card. In the rich layout the hero
 /// describes [target], where it leads.
@@ -815,6 +878,8 @@ class _SportsRow extends ConsumerStatefulWidget {
     required this.onViewAll,
     required this.onBack,
     required this.rowItemLimit,
+    required this.hiddenFromNav,
+    required this.onLoaded,
     required this.useSidebarLayout,
     required this.onSidebarActivate,
     required this.spotlight,
@@ -824,6 +889,8 @@ class _SportsRow extends ConsumerStatefulWidget {
   final VoidCallback? onViewAll;
   final bool Function()? onBack;
   final int rowItemLimit;
+  final bool hiddenFromNav;
+  final ValueChanged<bool> onLoaded;
   final bool useSidebarLayout;
   final VoidCallback? onSidebarActivate;
   final HomeSpotlightController? spotlight;
@@ -838,6 +905,7 @@ class _SportsRowState extends ConsumerState<_SportsRow> {
 
   /// Null until the first load.
   List<SportsFixture>? _fixtures;
+  bool? _reportedHasItems;
   Map<String, List<SportsChannelMatch>> _matches = const {};
   String? _matchesFor;
   DateTime? _matchesFetchedAt;
@@ -864,6 +932,15 @@ class _SportsRowState extends ConsumerState<_SportsRow> {
     _tickerMode?.removeListener(_onVisibilityChanged);
     _refreshTimer?.cancel();
     super.dispose();
+  }
+
+  void _reportLoaded(bool hasItems) {
+    if (_reportedHasItems == hasItems) return;
+    _reportedHasItems = hasItems;
+    // Reported from build, where the parent can't be rebuilt yet.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onLoaded(hasItems);
+    });
   }
 
   void _onVisibilityChanged() {
@@ -984,10 +1061,35 @@ class _SportsRowState extends ConsumerState<_SportsRow> {
   @override
   Widget build(BuildContext context) {
     final capability = ref.watch(sportsCapabilityProvider);
-    if (capability == null) return const SizedBox.shrink();
+    if (capability == null) {
+      _reportLoaded(false);
+      return const SizedBox.shrink();
+    }
+    final l = AppLocalizations.of(context);
+    final spotlight = widget.spotlight;
+    final onViewAll = widget.onViewAll;
+    // With Sports off the nav this row is the only way in, so it stays as a
+    // plain entry card on days it has no games to list.
+    Widget entryCardOrNothing(String subtitle) {
+      final keepsEntry = widget.hiddenFromNav && onViewAll != null;
+      _reportLoaded(keepsEntry);
+      if (!keepsEntry) return const SizedBox.shrink();
+      return _EntryPointRow(
+        targetId: 'sports-entry',
+        title: l.navSports,
+        icon: Icons.stadium_rounded,
+        cardTitle: l.navSports,
+        subtitle: subtitle,
+        onTap: onViewAll,
+        useSidebarLayout: widget.useSidebarLayout,
+        onSidebarActivate: widget.onSidebarActivate,
+        spotlight: spotlight,
+      );
+    }
+
     final settings = ref.watch(sportsSettingsProvider);
     final leagues = settings.enabledLeagues(capability.leagues);
-    if (leagues.isEmpty) return const SizedBox.shrink();
+    if (leagues.isEmpty) return entryCardOrNothing(l.homeBrowseSports);
     final followed = settings.followedTeamKeys;
     final signature = [
       for (final league in leagues) league.id,
@@ -1001,10 +1103,10 @@ class _SportsRowState extends ConsumerState<_SportsRow> {
 
     final fixtures = _fixtures;
     final isLoading = fixtures == null;
-    if (fixtures != null && fixtures.isEmpty) return const SizedBox.shrink();
-    final l = AppLocalizations.of(context);
-    final spotlight = widget.spotlight;
-    final onViewAll = widget.onViewAll;
+    if (fixtures != null) {
+      if (fixtures.isEmpty) return entryCardOrNothing(l.sportsNoGames);
+      _reportLoaded(true);
+    }
     final rowFixtures = fixtures ?? const <SportsFixture>[];
     return MediaPreviewSection.builder(
       title: l.navSports,
@@ -1296,8 +1398,64 @@ class _SeriesRowState extends ConsumerState<_SeriesRow> {
   }
 }
 
+/// A one-card row that opens a whole section: DVR, the opt-in AIOStreams and
+/// Requests rows, and Sports when it's hidden from the nav with no games to
+/// list.
+class _EntryPointRow extends StatelessWidget {
+  const _EntryPointRow({
+    required this.targetId,
+    required this.title,
+    required this.icon,
+    required this.cardTitle,
+    required this.subtitle,
+    required this.onTap,
+    required this.useSidebarLayout,
+    required this.onSidebarActivate,
+    required this.spotlight,
+  });
+
+  final String targetId;
+  final String title;
+  final IconData icon;
+  final String cardTitle;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool useSidebarLayout;
+  final VoidCallback? onSidebarActivate;
+  final HomeSpotlightController? spotlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final spotlight = this.spotlight;
+    final target = StaticSpotlightTarget(
+      id: targetId,
+      title: cardTitle,
+      description: subtitle,
+    );
+    return MediaPreviewSection(
+      title: title,
+      titleIcon: icon,
+      // Never shown: the row always has its one card.
+      emptyLabel: subtitle,
+      items: [
+        MediaPreviewItem(
+          title: cardTitle,
+          subtitle: subtitle,
+          fallbackIcon: icon,
+          onTap: onTap,
+          onFocused: spotlight == null ? null : () => spotlight.select(target),
+          onHoverChanged: spotlight?.hoverHandler(target),
+        ),
+      ],
+      useSidebarLayout: useSidebarLayout,
+      onSidebarActivate: onSidebarActivate,
+    );
+  }
+}
+
 class _RecordingsRow extends ConsumerWidget {
   const _RecordingsRow({
+    super.key,
     required this.onRecordingsSelect,
     required this.useSidebarLayout,
     required this.onSidebarActivate,
@@ -1314,34 +1472,89 @@ class _RecordingsRow extends ConsumerWidget {
     final hasDvrFeature = ref.watch(hasDvrFeatureProvider);
     if (!hasDvrFeature) return const SizedBox.shrink();
     final dvrRecordings = ref.watch(dvrRecordingsProvider);
-    final spotlight = this.spotlight;
     final l = AppLocalizations.of(context);
-    final subtitle = dvrRecordings.isEmpty
-        ? l.homeDvrRecordingsBrowse
-        : l.dvrStorageRecordingCount(dvrRecordings.length);
-    final dvrTarget = StaticSpotlightTarget(
-      id: 'dvr',
-      title: l.homeDvrRecordings,
-      description: subtitle,
-    );
-    return MediaPreviewSection(
+    return _EntryPointRow(
+      targetId: 'dvr',
       title: l.navDvr,
-      titleIcon: Icons.video_library,
-      emptyLabel: l.dvrNoRecordings,
-      items: [
-        MediaPreviewItem(
-          title: l.homeDvrRecordings,
-          subtitle: subtitle,
-          fallbackIcon: Icons.video_library,
-          onTap: onRecordingsSelect,
-          onFocused: spotlight == null
-              ? null
-              : () => spotlight.select(dvrTarget),
-          onHoverChanged: spotlight?.hoverHandler(dvrTarget),
-        ),
-      ],
+      icon: Icons.video_library,
+      cardTitle: l.homeDvrRecordings,
+      subtitle: dvrRecordings.isEmpty
+          ? l.homeDvrRecordingsBrowse
+          : l.dvrStorageRecordingCount(dvrRecordings.length),
+      onTap: onRecordingsSelect,
       useSidebarLayout: useSidebarLayout,
       onSidebarActivate: onSidebarActivate,
+      spotlight: spotlight,
+    );
+  }
+}
+
+class _AioStreamsRow extends ConsumerWidget {
+  const _AioStreamsRow({
+    super.key,
+    required this.onSelect,
+    required this.useSidebarLayout,
+    required this.onSidebarActivate,
+    required this.spotlight,
+  });
+
+  final VoidCallback? onSelect;
+  final bool useSidebarLayout;
+  final VoidCallback? onSidebarActivate;
+  final HomeSpotlightController? spotlight;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final onSelect = this.onSelect;
+    if (onSelect == null || !ref.watch(hasAioStreamsProvider)) {
+      return const SizedBox.shrink();
+    }
+    final l = AppLocalizations.of(context);
+    return _EntryPointRow(
+      targetId: 'aiostreams',
+      title: l.navAioStreams,
+      icon: Icons.subscriptions_rounded,
+      cardTitle: l.navAioStreams,
+      subtitle: l.homeAioStreamsBrowse,
+      onTap: onSelect,
+      useSidebarLayout: useSidebarLayout,
+      onSidebarActivate: onSidebarActivate,
+      spotlight: spotlight,
+    );
+  }
+}
+
+class _RequestsRow extends ConsumerWidget {
+  const _RequestsRow({
+    super.key,
+    required this.onSelect,
+    required this.useSidebarLayout,
+    required this.onSidebarActivate,
+    required this.spotlight,
+  });
+
+  final VoidCallback? onSelect;
+  final bool useSidebarLayout;
+  final VoidCallback? onSidebarActivate;
+  final HomeSpotlightController? spotlight;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final onSelect = this.onSelect;
+    if (onSelect == null || !ref.watch(hasRequestsFeatureProvider)) {
+      return const SizedBox.shrink();
+    }
+    final l = AppLocalizations.of(context);
+    return _EntryPointRow(
+      targetId: 'requests',
+      title: l.navRequests,
+      icon: Icons.playlist_add_rounded,
+      cardTitle: l.navRequests,
+      subtitle: l.homeRequestsBrowse,
+      onTap: onSelect,
+      useSidebarLayout: useSidebarLayout,
+      onSidebarActivate: onSidebarActivate,
+      spotlight: spotlight,
     );
   }
 }

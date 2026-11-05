@@ -1919,7 +1919,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeNothingToShow.
   ///
   /// In en, this message translates to:
-  /// **'This playlist has nothing to show yet'**
+  /// **'Nothing to show yet'**
   String get homeNothingToShow;
 
   /// No description provided for @notificationsTitle.
@@ -4087,6 +4087,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No teams found'**
   String get sportsNoTeams;
+
+  /// No description provided for @homeAioStreamsBrowse.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse your AIOStreams catalogs'**
+  String get homeAioStreamsBrowse;
+
+  /// No description provided for @homeRequestsBrowse.
+  ///
+  /// In en, this message translates to:
+  /// **'Search for and request movies and shows'**
+  String get homeRequestsBrowse;
+
+  /// No description provided for @settingsNavLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigation & Home'**
+  String get settingsNavLayout;
+
+  /// No description provided for @settingsNavLayoutSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reorder or hide sections in the nav and on Home'**
+  String get settingsNavLayoutSubtitle;
+
+  /// No description provided for @settingsNavLayoutHintRemote.
+  ///
+  /// In en, this message translates to:
+  /// **'Press OK on a row to pick it up, move it with Up and Down, then press OK to drop it. Back cancels.'**
+  String get settingsNavLayoutHintRemote;
+
+  /// No description provided for @settingsNavLayoutHintTouch.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag a row by its handle to move it.'**
+  String get settingsNavLayoutHintTouch;
+
+  /// No description provided for @settingsNavLayoutPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Home and Search stay at the top, Notifications and Settings stay at the bottom, and Continue Watching stays first on Home.'**
+  String get settingsNavLayoutPinned;
+
+  /// No description provided for @settingsNavLayoutColumnNav.
+  ///
+  /// In en, this message translates to:
+  /// **'Nav'**
+  String get settingsNavLayoutColumnNav;
+
+  /// No description provided for @settingsNavLayoutReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default'**
+  String get settingsNavLayoutReset;
+
+  /// No description provided for @settingsNavLayoutResetMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This restores the original order and visibility of these sections.'**
+  String get settingsNavLayoutResetMessage;
+
+  /// No description provided for @settingsNavLayoutResetConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get settingsNavLayoutResetConfirm;
 }
 
 class _AppLocalizationsDelegate

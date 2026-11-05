@@ -1059,7 +1059,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeBrowseSeries => 'Browse every series';
 
   @override
-  String get homeNothingToShow => 'This playlist has nothing to show yet';
+  String get homeNothingToShow => 'Nothing to show yet';
 
   @override
   String get notificationsTitle => 'Notifications';
@@ -2332,4 +2332,42 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sportsNoTeams => 'No teams found';
+
+  @override
+  String get homeAioStreamsBrowse => 'Browse your AIOStreams catalogs';
+
+  @override
+  String get homeRequestsBrowse => 'Search for and request movies and shows';
+
+  @override
+  String get settingsNavLayout => 'Navigation & Home';
+
+  @override
+  String get settingsNavLayoutSubtitle =>
+      'Reorder or hide sections in the nav and on Home';
+
+  @override
+  String get settingsNavLayoutHintRemote =>
+      'Press OK on a row to pick it up, move it with Up and Down, then press OK to drop it. Back cancels.';
+
+  @override
+  String get settingsNavLayoutHintTouch =>
+      'Drag a row by its handle to move it.';
+
+  @override
+  String get settingsNavLayoutPinned =>
+      'Home and Search stay at the top, Notifications and Settings stay at the bottom, and Continue Watching stays first on Home.';
+
+  @override
+  String get settingsNavLayoutColumnNav => 'Nav';
+
+  @override
+  String get settingsNavLayoutReset => 'Reset to default';
+
+  @override
+  String get settingsNavLayoutResetMessage =>
+      'This restores the original order and visibility of these sections.';
+
+  @override
+  String get settingsNavLayoutResetConfirm => 'Reset';
 }

@@ -178,7 +178,7 @@ class AppShellState extends ConsumerState<AppShell>
   // return re-checks the guide (see didChangeAppLifecycleState).
   bool _awayFromForeground = false;
   int _lastNavMs = 0;
-  int _lastNavIndex = -1;
+  String? _lastNavRoute;
   StreamSubscription<TvNotificationItem>? _tvNotificationSub;
   StreamSubscription<TvNotificationDestination>? _notificationActivationSub;
   StreamSubscription<EpgSweepProgress?>? _epgSweepProgressSub;
@@ -235,18 +235,12 @@ class AppShellState extends ConsumerState<AppShell>
   final FocusScopeNode _contentFocusNode = FocusScopeNode();
   final FocusScopeNode _sidebarScopeNode = FocusScopeNode();
 
-  List<String> get _mainRoutes => RouteNames.mainRoutes
-      .where(
-        (route) => route != RouteNames.aiostreams || _appState.hasAioStreams,
-      )
-      .where((route) => route != RouteNames.dvr || _appState.hasDvrFeature)
-      .where(
-        (route) => route != RouteNames.requests || _appState.hasRequestsFeature,
-      )
-      .where(
-        (route) => route != RouteNames.sports || _appState.hasSportsFeature,
-      )
-      .toList(growable: false);
+  /// The destinations the sidebar and bottom bar list. A route outside this
+  /// but in [AppStateController.availableMainRoutes] is hidden from the nav,
+  /// not gone: it still opens from its Home row or a notification, so anything
+  /// asking whether a route can be opened checks the available list instead.
+  List<String> get _mainRoutes => _appState.viewSettingsService.navLayoutSync
+      .navRoutes(_appState.availableMainRoutes);
 
   int get _currentIndex {
     final route = RouteNames.mainRoutes[widget.navigationShell.currentIndex];
@@ -270,6 +264,7 @@ class AppShellState extends ConsumerState<AppShell>
     );
     _unreadCount = _appState.unreadNotificationCount;
     _appState.addListener(_onAppStateChanged);
+    _appState.viewSettingsService.addListener(_onAppStateChanged);
     _tvNotificationSub = _appState.tvNotifications.listen(_onTvNotification);
     _epgSweepProgressSub = _appState.epgSweepProgress.listen(
       _onEpgSweepProgress,
@@ -371,7 +366,8 @@ class AppShellState extends ConsumerState<AppShell>
     final startRoute = _appState.viewSettingsService.defaultStartPageSync.route;
     final currentRoute =
         RouteNames.mainRoutes[widget.navigationShell.currentIndex];
-    if (currentRoute != startRoute && _mainRoutes.contains(startRoute)) {
+    if (currentRoute != startRoute &&
+        _appState.availableMainRoutes.contains(startRoute)) {
       _backExitTimer?.cancel();
       _lastBackPress = null;
       _goToStartPage(startRoute);
@@ -437,7 +433,7 @@ class AppShellState extends ConsumerState<AppShell>
     final newRoutes = _mainRoutes;
     _syncSidebarFocusNodes(newRoutes);
     final route = RouteNames.mainRoutes[widget.navigationShell.currentIndex];
-    if (!newRoutes.contains(route)) {
+    if (!_appState.availableMainRoutes.contains(route)) {
       widget.navigationShell.goBranch(0, initialLocation: true);
     }
     final newCount = _appState.unreadNotificationCount;
@@ -568,6 +564,7 @@ class AppShellState extends ConsumerState<AppShell>
     _contentFocusNode.dispose();
     _sidebarScopeNode.dispose();
     _appState.removeListener(_onAppStateChanged);
+    _appState.viewSettingsService.removeListener(_onAppStateChanged);
     if (_ownsAppState) _appState.dispose();
     super.dispose();
   }
@@ -654,13 +651,22 @@ class AppShellState extends ConsumerState<AppShell>
 
   void _navigateTo(int index) {
     final routes = _mainRoutes;
-    if (index < 0 || index >= routes.length || index == _currentIndex) return;
-    final branchIndex = RouteNames.mainRoutes.indexOf(routes[index]);
-    if (branchIndex < 0) return;
+    if (index < 0 || index >= routes.length) return;
+    _navigateToRoute(routes[index]);
+  }
+
+  void _navigateToRoute(String route) {
+    if (!_appState.availableMainRoutes.contains(route)) return;
+    final branchIndex = RouteNames.mainRoutes.indexOf(route);
+    // Compared by route, not nav index: on a route hidden from the nav, Home
+    // shows as current, and tapping it has to leave.
+    if (branchIndex < 0 || branchIndex == widget.navigationShell.currentIndex) {
+      return;
+    }
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (index == _lastNavIndex && now - _lastNavMs < 350) return;
+    if (route == _lastNavRoute && now - _lastNavMs < 350) return;
     _lastNavMs = now;
-    _lastNavIndex = index;
+    _lastNavRoute = route;
     widget.navigationShell.goBranch(
       branchIndex,
       initialLocation: branchIndex == widget.navigationShell.currentIndex,
@@ -673,11 +679,6 @@ class AppShellState extends ConsumerState<AppShell>
         }),
       );
     }
-  }
-
-  void _navigateToRoute(String routeName) {
-    final index = _mainRoutes.indexOf(routeName);
-    if (index >= 0) _navigateTo(index);
   }
 
   void _activateSidebar() {
@@ -1565,6 +1566,8 @@ class AppShellState extends ConsumerState<AppShell>
         onMoviesMore: () => _navigateToRoute(RouteNames.vod),
         onSeriesMore: () => _navigateToRoute(RouteNames.series),
         onRecordingsSelect: () => _navigateToRoute(RouteNames.dvr),
+        onAioStreamsSelect: () => _navigateToRoute(RouteNames.aiostreams),
+        onRequestsSelect: () => _navigateToRoute(RouteNames.requests),
         onAioStreamsItemSelect: _openAioStreamsItem,
         useSidebarLayout: shouldUseSidebar(widget.deviceType),
         onSidebarActivate: _activateSidebar,

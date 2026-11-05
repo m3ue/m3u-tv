@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:m3u_tv/navigation/nav_layout.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
@@ -247,6 +248,7 @@ class ViewSettingsService extends ChangeNotifier {
   static const prebufferLiveKey = 'm3ue_tv_prebuffer_live';
   static const defaultStartPageKey = 'm3ue_tv_default_start_page';
   static const homeScreenStyleKey = 'm3ue_tv_home_screen_style';
+  static const navLayoutKey = 'm3ue_tv_nav_layout';
   static const windowBoundsKey = 'm3ue_tv_window_bounds';
   static const optimizeForKey = 'm3ue_tv_optimize_for';
   static const fontSizeKey = 'm3ue_tv_font_size';
@@ -285,6 +287,18 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<void> setHomeScreenStyle(HomeScreenStyle style) async {
     await _write(homeScreenStyleKey, style.value);
+    notifyListeners();
+  }
+
+  Future<NavLayout> navLayout() async =>
+      NavLayout.fromJson(await _read(navLayoutKey));
+
+  /// The layout from the in-memory cache. `main()` reads [navLayout] before
+  /// the first frame, so the nav and Home never paint the default order first.
+  NavLayout get navLayoutSync => NavLayout.fromJson(_memory[navLayoutKey]);
+
+  Future<void> setNavLayout(NavLayout layout) async {
+    await _write(navLayoutKey, layout.toJson());
     notifyListeners();
   }
 

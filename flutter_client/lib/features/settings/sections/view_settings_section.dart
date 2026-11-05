@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
+import 'package:m3u_tv/features/settings/sections/nav_layout_page.dart';
 import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
@@ -189,6 +190,24 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
                   ),
                 ),
               ),
+            SettingsRow(
+              title: l.settingsNavLayout,
+              subtitle: l.settingsNavLayoutSubtitle,
+              icon: Icons.low_priority,
+              trailing: const SettingsChevron(),
+              onTap: () => unawaited(
+                pushSettingsSubpageFullHeight<void>(
+                  context,
+                  title: (context) =>
+                      AppLocalizations.of(context).settingsNavLayout,
+                  onBack: widget.onHandleTopLevelBack,
+                  builder: (_) => NavLayoutPage(
+                    service: widget.service,
+                    usesRemote: _showNavigationSoundToggle,
+                  ),
+                ),
+              ),
+            ),
             SettingsRow(
               title: l.settingsLiveTvLayout,
               subtitle: _liveTvLayoutLabel(l, _liveTvLayout),

@@ -450,7 +450,7 @@
   "homeSportsOnChannels": "在 {channels} 播出",
   "homeBrowseMovies": "浏览所有电影",
   "homeBrowseSeries": "浏览所有剧集",
-  "homeNothingToShow": "此播放列表暂无内容",
+  "homeNothingToShow": "暂无内容",
   "notificationsTitle": "通知",
   "notificationsTabNotifications": "通知",
   "notificationsTabChannelSettings": "频道设置",
@@ -1086,5 +1086,16 @@
   "sportsTeamsButton": "球队",
   "sportsTeamsTitle": "选择你的球队",
   "sportsTeamsLoadFailed": "无法加载球队。请重新选择该联赛以重试。",
-  "sportsNoTeams": "未找到球队"
+  "sportsNoTeams": "未找到球队",
+  "homeAioStreamsBrowse": "浏览你的 AIOStreams 目录",
+  "homeRequestsBrowse": "搜索并请求电影和剧集",
+  "settingsNavLayout": "导航和主页",
+  "settingsNavLayoutSubtitle": "重新排序或隐藏导航和主页中的栏目",
+  "settingsNavLayoutHintRemote": "在某一行按确定键将其选中,用上下键移动,再按确定键放下。按返回键取消。",
+  "settingsNavLayoutHintTouch": "拖动行的手柄即可移动。",
+  "settingsNavLayoutPinned": "主页和搜索固定在顶部,通知和设置固定在底部,继续观看始终位于主页首位。",
+  "settingsNavLayoutColumnNav": "导航",
+  "settingsNavLayoutReset": "恢复默认",
+  "settingsNavLayoutResetMessage": "这将恢复这些栏目的原始顺序和显示状态。",
+  "settingsNavLayoutResetConfirm": "恢复"
 }

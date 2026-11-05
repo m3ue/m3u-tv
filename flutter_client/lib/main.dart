@@ -123,6 +123,8 @@ Future<void> main() async {
     // later swapped Simplified for Rich a frame in (a flash, and a full row
     // remount that lost the initial focus).
     appState.viewSettingsService.homeScreenStyle(),
+    // Same for the nav and Home row order, read synchronously from here on.
+    appState.viewSettingsService.navLayout(),
   ]);
   // Resolve the user's preferred start page before the router is built so a
   // cold launch opens there instead of always on Home.

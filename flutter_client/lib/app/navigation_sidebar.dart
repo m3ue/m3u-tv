@@ -185,7 +185,7 @@ class NavigationSidebar extends StatelessWidget {
         // destination.
         key: ValueKey(route),
         label: navigationRouteLabel(context, route),
-        icon: _routeIcon(route),
+        icon: navigationRouteIcon(route),
         selected: index == currentIndex,
         expanded: expanded,
         focusNode: focusNodes[index],
@@ -196,21 +196,6 @@ class NavigationSidebar extends StatelessWidget {
       ),
     );
   }
-
-  IconData _routeIcon(String route) => switch (route) {
-    RouteNames.home => Icons.home_rounded,
-    RouteNames.search => Icons.search_rounded,
-    RouteNames.liveTv => Icons.live_tv_rounded,
-    RouteNames.sports => Icons.stadium_rounded,
-    RouteNames.vod => Icons.movie_rounded,
-    RouteNames.series => Icons.tv_rounded,
-    RouteNames.aiostreams => Icons.subscriptions_rounded,
-    RouteNames.dvr => Icons.video_library_rounded,
-    RouteNames.requests => Icons.playlist_add_rounded,
-    RouteNames.notifications => Icons.notifications_rounded,
-    RouteNames.settings => Icons.settings_rounded,
-    _ => Icons.circle,
-  };
 }
 
 /// A single sidebar destination item with focus highlight.
@@ -441,6 +426,21 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
     );
   }
 }
+
+IconData navigationRouteIcon(String route) => switch (route) {
+  RouteNames.home => Icons.home_rounded,
+  RouteNames.search => Icons.search_rounded,
+  RouteNames.liveTv => Icons.live_tv_rounded,
+  RouteNames.sports => Icons.stadium_rounded,
+  RouteNames.vod => Icons.movie_rounded,
+  RouteNames.series => Icons.tv_rounded,
+  RouteNames.aiostreams => Icons.subscriptions_rounded,
+  RouteNames.dvr => Icons.video_library_rounded,
+  RouteNames.requests => Icons.playlist_add_rounded,
+  RouteNames.notifications => Icons.notifications_rounded,
+  RouteNames.settings => Icons.settings_rounded,
+  _ => Icons.circle,
+};
 
 String navigationRouteLabel(BuildContext context, String route) {
   final l = AppLocalizations.of(context);

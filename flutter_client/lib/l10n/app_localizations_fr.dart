@@ -1073,7 +1073,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get homeBrowseSeries => 'Parcourir toutes les séries';
 
   @override
-  String get homeNothingToShow => 'Cette playlist n\'a encore aucun contenu';
+  String get homeNothingToShow => 'Rien à afficher pour le moment';
 
   @override
   String get notificationsTitle => 'Notifications';
@@ -2358,4 +2358,43 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get sportsNoTeams => 'Aucune équipe trouvée';
+
+  @override
+  String get homeAioStreamsBrowse => 'Parcourir vos catalogues AIOStreams';
+
+  @override
+  String get homeRequestsBrowse =>
+      'Rechercher et demander des films et des séries';
+
+  @override
+  String get settingsNavLayout => 'Navigation et Accueil';
+
+  @override
+  String get settingsNavLayoutSubtitle =>
+      'Réorganiser ou masquer des sections dans la navigation et sur l\'Accueil';
+
+  @override
+  String get settingsNavLayoutHintRemote =>
+      'Appuyez sur OK sur une ligne pour la saisir, déplacez-la avec Haut et Bas, puis appuyez sur OK pour la déposer. Retour annule.';
+
+  @override
+  String get settingsNavLayoutHintTouch =>
+      'Faites glisser une ligne par sa poignée pour la déplacer.';
+
+  @override
+  String get settingsNavLayoutPinned =>
+      'Accueil et Rechercher restent en haut, Notifications et Paramètres restent en bas, et Reprendre reste en premier sur l\'Accueil.';
+
+  @override
+  String get settingsNavLayoutColumnNav => 'Nav';
+
+  @override
+  String get settingsNavLayoutReset => 'Rétablir les valeurs par défaut';
+
+  @override
+  String get settingsNavLayoutResetMessage =>
+      'Cela rétablit l\'ordre et la visibilité d\'origine de ces sections.';
+
+  @override
+  String get settingsNavLayoutResetConfirm => 'Rétablir';
 }

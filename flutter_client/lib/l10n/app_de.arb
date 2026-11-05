@@ -450,7 +450,7 @@
   "homeSportsOnChannels": "Auf {channels}",
   "homeBrowseMovies": "Alle Filme durchsuchen",
   "homeBrowseSeries": "Alle Serien durchsuchen",
-  "homeNothingToShow": "Diese Playlist hat noch keine Inhalte",
+  "homeNothingToShow": "Noch nichts anzuzeigen",
   "notificationsTitle": "Mitteilungen",
   "notificationsTabNotifications": "Mitteilungen",
   "notificationsTabChannelSettings": "Kanaleinstellungen",
@@ -1086,5 +1086,16 @@
   "sportsTeamsButton": "Teams",
   "sportsTeamsTitle": "Wähle deine Teams",
   "sportsTeamsLoadFailed": "Teams konnten nicht geladen werden. Wähle die Liga erneut, um es noch einmal zu versuchen.",
-  "sportsNoTeams": "Keine Teams gefunden"
+  "sportsNoTeams": "Keine Teams gefunden",
+  "homeAioStreamsBrowse": "Deine AIOStreams-Kataloge durchsuchen",
+  "homeRequestsBrowse": "Filme und Serien suchen und anfragen",
+  "settingsNavLayout": "Navigation & Startseite",
+  "settingsNavLayoutSubtitle": "Bereiche in der Navigation und auf der Startseite anordnen oder ausblenden",
+  "settingsNavLayoutHintRemote": "Drücke OK auf einer Zeile, um sie aufzunehmen, verschiebe sie mit Hoch und Runter und drücke zum Ablegen erneut OK. Zurück bricht ab.",
+  "settingsNavLayoutHintTouch": "Ziehe eine Zeile am Griff, um sie zu verschieben.",
+  "settingsNavLayoutPinned": "Startseite und Suche bleiben oben, Mitteilungen und Einstellungen bleiben unten, und Weiterschauen bleibt auf der Startseite an erster Stelle.",
+  "settingsNavLayoutColumnNav": "Nav",
+  "settingsNavLayoutReset": "Auf Standard zurücksetzen",
+  "settingsNavLayoutResetMessage": "Dadurch werden die ursprüngliche Reihenfolge und Sichtbarkeit dieser Bereiche wiederhergestellt.",
+  "settingsNavLayoutResetConfirm": "Zurücksetzen"
 }

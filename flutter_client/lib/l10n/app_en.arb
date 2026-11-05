@@ -582,7 +582,7 @@
   },
   "homeBrowseMovies": "Browse every movie",
   "homeBrowseSeries": "Browse every series",
-  "homeNothingToShow": "This playlist has nothing to show yet",
+  "homeNothingToShow": "Nothing to show yet",
   "notificationsTitle": "Notifications",
   "notificationsTabNotifications": "Notifications",
   "notificationsTabChannelSettings": "Channel Settings",
@@ -1333,5 +1333,16 @@
   "sportsTeamsButton": "Teams",
   "sportsTeamsTitle": "Pick your teams",
   "sportsTeamsLoadFailed": "Couldn't load teams. Choose the league again to retry.",
-  "sportsNoTeams": "No teams found"
+  "sportsNoTeams": "No teams found",
+  "homeAioStreamsBrowse": "Browse your AIOStreams catalogs",
+  "homeRequestsBrowse": "Search for and request movies and shows",
+  "settingsNavLayout": "Navigation & Home",
+  "settingsNavLayoutSubtitle": "Reorder or hide sections in the nav and on Home",
+  "settingsNavLayoutHintRemote": "Press OK on a row to pick it up, move it with Up and Down, then press OK to drop it. Back cancels.",
+  "settingsNavLayoutHintTouch": "Drag a row by its handle to move it.",
+  "settingsNavLayoutPinned": "Home and Search stay at the top, Notifications and Settings stay at the bottom, and Continue Watching stays first on Home.",
+  "settingsNavLayoutColumnNav": "Nav",
+  "settingsNavLayoutReset": "Reset to default",
+  "settingsNavLayoutResetMessage": "This restores the original order and visibility of these sections.",
+  "settingsNavLayoutResetConfirm": "Reset"
 }

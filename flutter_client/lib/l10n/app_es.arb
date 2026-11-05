@@ -450,7 +450,7 @@
   "homeSportsOnChannels": "En {channels}",
   "homeBrowseMovies": "Explorar todas las películas",
   "homeBrowseSeries": "Explorar todas las series",
-  "homeNothingToShow": "Esta lista de reproducción aún no tiene contenido",
+  "homeNothingToShow": "Aún no hay nada que mostrar",
   "notificationsTitle": "Notificaciones",
   "notificationsTabNotifications": "Notificaciones",
   "notificationsTabChannelSettings": "Ajustes de canales",
@@ -1086,5 +1086,16 @@
   "sportsTeamsButton": "Equipos",
   "sportsTeamsTitle": "Elige tus equipos",
   "sportsTeamsLoadFailed": "No se pudieron cargar los equipos. Vuelve a elegir la liga para reintentarlo.",
-  "sportsNoTeams": "No se encontraron equipos"
+  "sportsNoTeams": "No se encontraron equipos",
+  "homeAioStreamsBrowse": "Explora tus catálogos de AIOStreams",
+  "homeRequestsBrowse": "Busca y solicita películas y series",
+  "settingsNavLayout": "Navegación e Inicio",
+  "settingsNavLayoutSubtitle": "Reordena u oculta secciones en la navegación y en Inicio",
+  "settingsNavLayoutHintRemote": "Pulsa OK en una fila para seleccionarla, muévela con Arriba y Abajo, y pulsa OK para soltarla. Atrás cancela.",
+  "settingsNavLayoutHintTouch": "Arrastra una fila por su asa para moverla.",
+  "settingsNavLayoutPinned": "Inicio y Buscar permanecen arriba, Notificaciones y Ajustes permanecen abajo, y Continuar viendo permanece primero en Inicio.",
+  "settingsNavLayoutColumnNav": "Nav",
+  "settingsNavLayoutReset": "Restablecer valores",
+  "settingsNavLayoutResetMessage": "Esto restaura el orden y la visibilidad originales de estas secciones.",
+  "settingsNavLayoutResetConfirm": "Restablecer"
 }

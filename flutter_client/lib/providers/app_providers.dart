@@ -153,6 +153,15 @@ final hasRequestsFeatureProvider = Provider<bool>((ref) {
   return ref.watch(appStateControllerProvider).appState.hasRequestsFeature;
 });
 
+final hasAioStreamsProvider = Provider<bool>((ref) {
+  return ref.watch(appStateControllerProvider).appState.hasAioStreams;
+});
+
+/// See [AppStateController.availableMainRoutes].
+final availableMainRoutesProvider = Provider<List<String>>((ref) {
+  return ref.watch(appStateControllerProvider).appState.availableMainRoutes;
+});
+
 final requestsCapabilityProvider = Provider<RequestsCapability?>((ref) {
   return ref.watch(appStateControllerProvider).appState.requestsCapability;
 });
