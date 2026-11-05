@@ -13,6 +13,7 @@ import android.os.Process
 import android.util.DisplayMetrics
 import android.util.Log
 import android.util.Rational
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -90,6 +91,9 @@ class MainActivity : FlutterActivity() {
         applySystemUiPolicy("browsing")
         if (isTelevisionDevice()) installTextEditorProxy()
     }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+        super.dispatchKeyEvent(event.withoutModifierScanCode())
 
     // Google TV Streamer, Chromecast with Google TV and other Android TV builds
     // enable config_preventImeStartupUnlessTextEditor (#309): the system answers
