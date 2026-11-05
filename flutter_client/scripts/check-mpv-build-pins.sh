@@ -7,8 +7,10 @@
 #   - mpv-build.lock.json (android + windows tarball asset names + checksums)
 #   - windows/CMakeLists.txt (a hand-kept mirror of the lock's windows entry)
 #
-# mpv-build publishes every build to one perpetually-growing GitHub Release per
-# platform (200+ assets and counting) instead of pruning old ones, and GitHub's
+# mpv-build published every build before f4d61bc to one perpetually-growing
+# GitHub Release per platform, and since then to a release per publish run,
+# recorded as an `assetBase` beside each asset in artifacts.json (the group's
+# own `assetBase` is the legacy release and 404s for anything newer). GitHub's
 # release-asset CDN has been observed to start 504ing specific old assets over
 # time (see the 2026-09-21 incident: a Sept-1 pin died in CI ~3 weeks later,
 # while local machines with those assets already cached never noticed).
@@ -163,6 +165,9 @@ for platform, entry in lock.items():
         expected = published.get("prebuilt", {}).get(arch, {})
         check(asset == {"asset": expected.get("asset"), "checksum": expected.get("checksum")},
               f"{platform}/{arch}: lock asset + checksum match artifacts.json")
+        expected_base = expected.get("assetBase", platforms[platform].get("assetBase"))
+        check(entry["assetBase"] == expected_base,
+              f"{platform}/{arch}: lock assetBase {entry['assetBase']} vs artifacts.json {expected_base}")
 
 cmake = open(cmake_path).read()
 windows = lock.get("windows")
@@ -170,6 +175,9 @@ if windows is not None:
     key = re.search(r'set\(MPV_KEY "([0-9a-f]+)"\)', cmake)
     check(key is not None and key.group(1) == windows["key"],
           f"windows/CMakeLists.txt MPV_KEY {key.group(1) if key else '(missing)'} vs lock {windows['key']}")
+    base = re.search(r'set\(MPV_ASSET_BASE "([^"]+)"\)', cmake)
+    check(base is not None and base.group(1) == windows["assetBase"],
+          f"windows/CMakeLists.txt MPV_ASSET_BASE {base.group(1) if base else '(missing)'} vs lock {windows['assetBase']}")
     for arch in ("aarch64", "x86_64"):
         sha = re.search(r'set\(MPV_ARCH "' + arch + r'"\)\s*set\(MPV_SHA256 "([0-9a-f]+)"\)', cmake)
         check(sha is not None and sha.group(1) == windows["assets"][arch]["checksum"],
@@ -215,7 +223,7 @@ if [[ "$FAILED" -gt 0 ]]; then
   echo "GitHub, or the pins disagree with each other. Bump every pin together"
   echo "(XCRemoteSwiftPackageReference \"mpv-build\" in each project.pbxproj +"
   echo "matching Package.resolved files, mpv-build.lock.json, and the MPV_KEY +"
-  echo "MPV_SHA256 values in windows/CMakeLists.txt) to one edde746/mpv-build"
+  echo "MPV_ASSET_BASE + MPV_SHA256 values in windows/CMakeLists.txt) to one edde746/mpv-build"
   echo "commit before this reaches a release build."
   exit 1
 fi
