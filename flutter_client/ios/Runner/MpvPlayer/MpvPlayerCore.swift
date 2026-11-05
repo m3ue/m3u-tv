@@ -72,6 +72,11 @@ final class MpvPlayerCore {
       // shares the same avfoundation VO so it shares the same requirement.
       mpv_set_option_string(handle, "avfoundation-composite-osd", "yes")
       mpv_set_option_string(handle, "vo", "avfoundation")
+      // Host-clock presentation, as on tvOS: samples carry mpv's scheduled
+      // display time against a clock that only moves forward, so seeks and
+      // audio-clock drift never reach the display layer's timebase. iOS
+      // defaults to media time (Plezy 5f644f17f).
+      mpv_set_option_string(handle, "avfoundation-presentation", "host")
       mpv_set_option_string(handle, "hwdec", "videotoolbox")
       mpv_set_option_string(handle, "hwdec-codecs", "all")
       mpv_set_option_string(handle, "hwdec-software-fallback", "yes")
