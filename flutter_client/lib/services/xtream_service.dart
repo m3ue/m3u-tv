@@ -1592,6 +1592,16 @@ class XtreamService {
     },
   );
 
+  /// One game's details ([SportsCapability.detailsAction]), raw.
+  Future<Object?> getSportsFixtureDetails(
+    SportsCapability capability, {
+    required String leagueId,
+    required String fixtureId,
+  }) => _request(
+    capability.detailsAction,
+    params: {'league': leagueId, 'fixture': fixtureId},
+  );
+
   /// Every team of [leagueId] ([SportsCapability.teamsAction]), raw.
   Future<Object?> getSportsTeams(
     SportsCapability capability,

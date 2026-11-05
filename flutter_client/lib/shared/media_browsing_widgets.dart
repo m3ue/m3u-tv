@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart'
     show CachedNetworkImageProvider;
@@ -1335,6 +1336,12 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
     // card's Column (bigger image + taller scaled-up text in a row height
     // that never grew to match).
     final cardHeight = baseHeight * scale * fontScale;
+    // A custom card wider than the row is centred on focus and cut off on
+    // both sides (phones); leave room to show the next one is there.
+    final customCardWidth = math.min(
+      cardWidth * fontScale,
+      availableWidth * 0.9,
+    );
     final viewAll = widget.viewAll;
     final cardCount = visibleCount + (viewAll == null ? 0 : 1);
 
@@ -1375,7 +1382,9 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
                   separatorBuilder: (_, _) =>
                       const SizedBox(width: MediaBrowsingMetrics.itemGap),
                   itemBuilder: (_, _) => _PreviewCardSkeleton(
-                    width: cardWidth * fontScale,
+                    width: widget.itemBuilder != null
+                        ? customCardWidth
+                        : cardWidth * fontScale,
                     shape: widget.itemBuilder != null
                         ? _PreviewSkeletonShape.tile
                         : widget.landscapeStyle
@@ -1420,7 +1429,9 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
                         if (index == visibleCount) {
                           return _PreviewViewAllCard(
                             item: viewAll!,
-                            width: cardWidth * fontScale,
+                            width: widget.itemBuilder != null
+                                ? customCardWidth
+                                : cardWidth * fontScale,
                           );
                         }
                         final cardBuilder = widget.itemBuilder;
@@ -1428,7 +1439,7 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
                           return cardBuilder(
                             context,
                             index,
-                            Size(cardWidth * fontScale, cardHeight),
+                            Size(customCardWidth, cardHeight),
                             autofocus: index == 0,
                           );
                         }

@@ -45,6 +45,7 @@ import 'package:m3u_tv/shared/app_background.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
+import 'package:m3u_tv/shared/desktop_back_key.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/dvr_schedule_feedback.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
@@ -1551,6 +1552,7 @@ class AppShellState extends ConsumerState<AppShell>
     return switch (routeName) {
       RouteNames.home => HomeScreen(
         onChannelSelect: _openChannel,
+        onHandleTopLevelBack: handleBackFromTopLevelRoute,
         onChannelContextChanged: _setChannelContext,
         onVodSelect: _openVod,
         onSeriesSelect: _openSeries,
@@ -1798,8 +1800,9 @@ class AppShellState extends ConsumerState<AppShell>
     );
 
     final shell = Shortcuts(
-      shortcuts: <LogicalKeySet, Intent>{
+      shortcuts: <ShortcutActivator, Intent>{
         LogicalKeySet(LogicalKeyboardKey.escape): const _BackIntent(),
+        const DesktopBackspaceActivator(): const _BackIntent(),
         LogicalKeySet(LogicalKeyboardKey.goBack): const _BackIntent(),
         LogicalKeySet(LogicalKeyboardKey.contextMenu): const _MenuIntent(),
         LogicalKeySet(LogicalKeyboardKey.f1): const _MenuIntent(),

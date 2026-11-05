@@ -12,6 +12,7 @@ class SportsCapability {
     required this.leagues,
     this.fixturesAction = 'get_sports_fixtures',
     this.channelsAction = 'get_sports_channels',
+    this.detailsAction = 'get_sports_fixture_details',
     this.teamsAction,
     this.followsAction,
     this.toggleFollowAction,
@@ -42,6 +43,7 @@ class SportsCapability {
       ],
       fixturesAction: action('fixtures') ?? 'get_sports_fixtures',
       channelsAction: action('channels') ?? 'get_sports_channels',
+      detailsAction: action('details') ?? 'get_sports_fixture_details',
       teamsAction: action('teams'),
       followsAction: action('follows'),
       toggleFollowAction: action('toggle_follow'),
@@ -54,6 +56,7 @@ class SportsCapability {
   final List<SportsLeague> leagues;
   final String fixturesAction;
   final String channelsAction;
+  final String detailsAction;
 
   /// Null on editors predating the team browser or follow sync.
   final String? teamsAction;
@@ -248,6 +251,110 @@ class SportsFixture {
 
   bool involves(Set<String> teamKeys) =>
       teamKeys.contains(home?.team.key) || teamKeys.contains(away?.team.key);
+}
+
+enum SportsEventKind { score, yellowCard, redCard, substitution, penalty }
+
+/// One side of [SportsFixture], by where the game is played.
+enum SportsSide { home, away }
+
+/// A moment worth listing in a game's details: a score, card or substitution.
+class SportsFixtureEvent {
+  const SportsFixtureEvent({
+    required this.kind,
+    required this.text,
+    this.time,
+    this.side,
+    this.homeScore,
+    this.awayScore,
+  });
+
+  final SportsEventKind kind;
+  final String text;
+
+  /// The provider's game clock: "12'", "1st 19:47", "Q2 1:08".
+  final String? time;
+  final SportsSide? side;
+  final String? homeScore;
+  final String? awayScore;
+}
+
+/// A statistic both teams report, as the provider words it.
+class SportsTeamStat {
+  const SportsTeamStat({
+    required this.label,
+    required this.home,
+    required this.away,
+  });
+
+  final String label;
+  final String home;
+  final String away;
+}
+
+class SportsLeader {
+  const SportsLeader({required this.name, this.value, this.photoUrl});
+
+  final String name;
+  final String? value;
+  final String? photoUrl;
+}
+
+/// Each team's top player in one category; a team may have none.
+class SportsLeaderCategory {
+  const SportsLeaderCategory({required this.label, this.home, this.away});
+
+  final String label;
+  final SportsLeader? home;
+  final SportsLeader? away;
+}
+
+/// Points per period; both lists are as long as [periods].
+class SportsLineScore {
+  const SportsLineScore({
+    required this.periods,
+    required this.home,
+    required this.away,
+  });
+
+  final List<String> periods;
+  final List<String> home;
+  final List<String> away;
+}
+
+/// What M3U Editor knows about one game beyond its fixture. Any section may be
+/// empty: it depends on the provider, the sport and how far along the game is.
+class SportsFixtureDetails {
+  const SportsFixtureDetails({
+    this.fixture,
+    this.lineScore,
+    this.events = const [],
+    this.stats = const [],
+    this.leaders = const [],
+    this.venue,
+    this.location,
+    this.attendance,
+    this.officials = const [],
+    this.series,
+    this.homeRecord,
+    this.awayRecord,
+  });
+
+  /// The game as it stands now, to replace the one the list was showing.
+  final SportsFixture? fixture;
+  final SportsLineScore? lineScore;
+  final List<SportsFixtureEvent> events;
+  final List<SportsTeamStat> stats;
+  final List<SportsLeaderCategory> leaders;
+  final String? venue;
+  final String? location;
+  final int? attendance;
+  final List<String> officials;
+
+  /// "UTA wins series 2-0"
+  final String? series;
+  final String? homeRecord;
+  final String? awayRecord;
 }
 
 /// A followed team as "My Teams" lists it, kept with enough to render the

@@ -1,5 +1,6 @@
 import 'package:dpad/dpad.dart';
 import 'package:m3u_tv/features/sports/sports_fixture_card.dart';
+import 'package:m3u_tv/features/sports/sports_fixture_details_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/sports_channel_lookup.dart';
@@ -13,24 +14,41 @@ bool isSportsFixtureWatchable(SportsFixture fixture) =>
     fixture.state == SportsFixtureState.live ||
     fixture.state == SportsFixtureState.scheduled;
 
+/// What pressing a game does: play it when it can be watched, else show its
+/// details, the next best thing for a finished game or one no channel carries.
+/// Shared by the Sports screen and Home's Sports row.
+Future<void> openSportsFixture(
+  BuildContext context, {
+  required SportsFixture fixture,
+  required List<SportsChannelMatch> matches,
+  required ValueChanged<Channel> onChannelSelect,
+  bool Function()? onBack,
+}) {
+  if (isSportsFixtureWatchable(fixture) && matches.isNotEmpty) {
+    return playSportsFixture(
+      context,
+      fixture: fixture,
+      matches: matches,
+      onChannelSelect: onChannelSelect,
+    );
+  }
+  return openSportsFixtureDetails(
+    context,
+    fixture: fixture,
+    matches: matches,
+    onChannelSelect: onChannelSelect,
+    onBack: onBack,
+  );
+}
+
 /// Plays [fixture]: straight away on its only channel, else on the one the
-/// viewer picks from [matches]. Says why when it can't (over, or nothing
-/// carries it). Shared by the Sports screen and Home's Sports row.
+/// viewer picks from [matches].
 Future<void> playSportsFixture(
   BuildContext context, {
   required SportsFixture fixture,
   required List<SportsChannelMatch> matches,
   required ValueChanged<Channel> onChannelSelect,
 }) async {
-  final l10n = AppLocalizations.of(context);
-  if (!isSportsFixtureWatchable(fixture)) {
-    _showSportsMessage(context, l10n.sportsGameOver);
-    return;
-  }
-  if (matches.isEmpty) {
-    _showSportsMessage(context, l10n.sportsNoChannelFound);
-    return;
-  }
   final match = matches.length == 1
       ? matches.single
       : await pickSportsChannel(context, fixture, matches);
@@ -80,8 +98,4 @@ Future<SportsChannelMatch?> pickSportsChannel(
       ],
     ),
   );
-}
-
-void _showSportsMessage(BuildContext context, String message) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }

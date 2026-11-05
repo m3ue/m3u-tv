@@ -55,6 +55,134 @@ class SportsService {
     );
   }
 
+  /// One game's details as they stand now; null when the editor's provider
+  /// has none. Throws when the editor can't be reached or refuses the request.
+  Future<SportsFixtureDetails?> details({
+    required SportsCapability capability,
+    required SportsFixture fixture,
+  }) async {
+    return parseDetails(
+      await _xtream.getSportsFixtureDetails(
+        capability,
+        leagueId: fixture.league.id,
+        fixtureId: fixture.id,
+      ),
+      capability,
+    );
+  }
+
+  /// Maps the editor's `get_sports_fixture_details` response. Exposed for
+  /// tests.
+  static SportsFixtureDetails? parseDetails(
+    Object? json,
+    SportsCapability capability,
+  ) {
+    final raw = json is Map ? json['details'] : null;
+    if (raw is! Map) return null;
+    final fixture = raw['fixture'];
+    final info = raw['info'];
+    return SportsFixtureDetails(
+      fixture: fixture is Map ? _parseFixture(fixture, capability) : null,
+      lineScore: _parseLineScore(raw['line_score']),
+      events: [
+        if (raw['events'] case final List<dynamic> events)
+          for (final event in events) ?_parseEvent(event),
+      ],
+      stats: [
+        if (raw['stats'] case final List<dynamic> stats)
+          for (final stat in stats) ?_parseStat(stat),
+      ],
+      leaders: [
+        if (raw['leaders'] case final List<dynamic> leaders)
+          for (final category in leaders) ?_parseLeaders(category),
+      ],
+      venue: info is Map ? _string(info['venue']) : null,
+      location: info is Map ? _string(info['location']) : null,
+      attendance: info is Map && info['attendance'] is int
+          ? info['attendance'] as int
+          : null,
+      officials: [
+        if (info is Map && info['officials'] is List)
+          for (final official in info['officials'] as List) ?_string(official),
+      ],
+      series: info is Map ? _string(info['series']) : null,
+      homeRecord: info is Map ? _string(info['home_record']) : null,
+      awayRecord: info is Map ? _string(info['away_record']) : null,
+    );
+  }
+
+  static SportsLineScore? _parseLineScore(Object? json) {
+    if (json is! Map) return null;
+    List<String> column(String key) => [
+      if (json[key] case final List<dynamic> values)
+        for (final value in values) _string(value) ?? '-',
+    ];
+    final periods = column('periods');
+    final home = column('home');
+    final away = column('away');
+    if (periods.isEmpty ||
+        home.length != periods.length ||
+        away.length != periods.length) {
+      return null;
+    }
+    return SportsLineScore(periods: periods, home: home, away: away);
+  }
+
+  static SportsFixtureEvent? _parseEvent(Object? json) {
+    if (json is! Map) return null;
+    final text = _string(json['text']);
+    if (text == null) return null;
+    return SportsFixtureEvent(
+      kind: switch (json['kind']) {
+        'yellow_card' => SportsEventKind.yellowCard,
+        'red_card' => SportsEventKind.redCard,
+        'substitution' => SportsEventKind.substitution,
+        'penalty' => SportsEventKind.penalty,
+        _ => SportsEventKind.score,
+      },
+      text: text,
+      time: _string(json['time']),
+      side: switch (json['side']) {
+        'home' => SportsSide.home,
+        'away' => SportsSide.away,
+        _ => null,
+      },
+      homeScore: _string(json['home_score']),
+      awayScore: _string(json['away_score']),
+    );
+  }
+
+  static SportsTeamStat? _parseStat(Object? json) {
+    if (json is! Map) return null;
+    final label = _string(json['label']);
+    final home = _string(json['home']);
+    final away = _string(json['away']);
+    if (label == null || home == null || away == null) return null;
+    return SportsTeamStat(label: label, home: home, away: away);
+  }
+
+  static SportsLeaderCategory? _parseLeaders(Object? json) {
+    if (json is! Map) return null;
+    final label = _string(json['label']);
+    if (label == null) return null;
+    SportsLeader? leader(Object? raw) {
+      if (raw is! Map) return null;
+      final name = _string(raw['name']);
+      if (name == null) return null;
+      return SportsLeader(
+        name: name,
+        value: _string(raw['value']),
+        photoUrl: _string(raw['photo']),
+      );
+    }
+
+    return SportsLeaderCategory(
+      label: label,
+      home: leader(json['home']),
+      away: leader(json['away']),
+    );
+  }
+
   /// Maps the editor's `get_sports_channels` response, dropping entries
   /// without a usable stream id. Exposed for tests.
   static Map<String, List<SportsChannelRef>> parseChannels(Object? json) {

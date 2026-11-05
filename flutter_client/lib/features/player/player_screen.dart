@@ -37,6 +37,7 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_icons.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/cached_backdrop_image.dart';
+import 'package:m3u_tv/shared/desktop_back_key.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -1764,8 +1765,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ? Colors.transparent
           : Colors.black,
       body: Shortcuts(
-        shortcuts: <LogicalKeySet, Intent>{
+        shortcuts: <ShortcutActivator, Intent>{
           LogicalKeySet(LogicalKeyboardKey.escape): const PlayerBackIntent(),
+          const DesktopBackspaceActivator(): const PlayerBackIntent(),
           LogicalKeySet(LogicalKeyboardKey.goBack): const PlayerBackIntent(),
           LogicalKeySet(LogicalKeyboardKey.mediaPlayPause):
               const PlayerPlayPauseIntent(),
@@ -1826,7 +1828,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 final key = event.logicalKey;
                 final isBack =
                     key == LogicalKeyboardKey.escape ||
-                    key == LogicalKeyboardKey.goBack;
+                    key == LogicalKeyboardKey.goBack ||
+                    isDesktopBackspaceBack(event, HardwareKeyboard.instance);
                 if (!isBack) _showOverlay();
               }
               return KeyEventResult.ignored;

@@ -91,6 +91,97 @@ Future<(XtreamService, List<XtreamRequest>)> _xtream({
 }
 
 void main() {
+  group('parseDetails', () {
+    const capability = SportsCapability(
+      leagues: [
+        SportsLeague(id: 'hockey/nhl', name: 'NHL', abbreviation: 'NHL'),
+      ],
+    );
+
+    test('maps every section', () {
+      final details = SportsService.parseDetails({
+        'details': {
+          'fixture': {
+            'id': '401',
+            'league_id': 'hockey/nhl',
+            'start': '2026-11-03T17:00:00Z',
+            'state': 'live',
+            'status_detail': '3rd - 10:00',
+          },
+          'line_score': {
+            'periods': ['1', 'OT'],
+            'home': ['0', '1'],
+            'away': ['1', '-'],
+          },
+          'events': [
+            {
+              'kind': 'yellow_card',
+              'time': "34'",
+              'side': 'away',
+              'text': 'Booked',
+            },
+            {'kind': 'score', 'text': 'Goal', 'home_score': 1, 'away_score': 0},
+            {'kind': 'score'},
+          ],
+          'stats': [
+            {'label': 'Shots', 'home': '29', 'away': '36'},
+            {'label': 'One-sided', 'home': '1'},
+          ],
+          'leaders': [
+            {
+              'label': 'Goals',
+              'home': {'name': 'Jack', 'value': '2', 'photo': 'http://x/j.png'},
+              'away': null,
+            },
+          ],
+          'info': {
+            'venue': 'Arena',
+            'location': 'Toronto, Canada',
+            'attendance': 18889,
+            'officials': ['Ref'],
+            'series': 'Tied 1-1',
+            'home_record': '8-7-2',
+            'away_record': '10-6-0',
+          },
+        },
+      }, capability)!;
+
+      expect(details.fixture?.state, SportsFixtureState.live);
+      expect(details.lineScore?.periods, ['1', 'OT']);
+      expect(details.lineScore?.away, ['1', '-']);
+      expect(details.events, hasLength(2));
+      expect(details.events.first.kind, SportsEventKind.yellowCard);
+      expect(details.events.first.side, SportsSide.away);
+      expect(details.events.last.homeScore, '1');
+      expect(details.stats.single.label, 'Shots');
+      expect(details.leaders.single.home?.photoUrl, 'http://x/j.png');
+      expect(details.leaders.single.away, isNull);
+      expect(details.venue, 'Arena');
+      expect(details.attendance, 18889);
+      expect(details.officials, ['Ref']);
+      expect(details.series, 'Tied 1-1');
+      expect(details.awayRecord, '10-6-0');
+    });
+
+    test('reads null and missing sections as nothing', () {
+      expect(SportsService.parseDetails({'details': null}, capability), isNull);
+      expect(SportsService.parseDetails('nope', capability), isNull);
+
+      final details = SportsService.parseDetails({
+        'details': {
+          'line_score': {
+            'periods': ['1'],
+            'home': <String>[],
+            'away': ['1'],
+          },
+        },
+      }, capability)!;
+      expect(details.fixture, isNull);
+      expect(details.lineScore, isNull);
+      expect(details.events, isEmpty);
+    });
+  });
+
   test('reads the sports capability from the auth payload', () async {
     final service = XtreamService(
       transport: (_) async => {

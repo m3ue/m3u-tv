@@ -13,6 +13,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/channel_rows.dart';
+import 'package:m3u_tv/shared/draggable_text.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -63,6 +64,7 @@ void main() {
     EpgPreviewPlayerController? previewPlayer,
     EpgPreviewPlayback previewPlayback = EpgPreviewPlayback.off,
     Duration previewDelay = const Duration(seconds: 5),
+    ChannelColumnLayout channelColumnLayout = ChannelColumnLayout.logoOnly,
   }) async {
     Widget guide = SizedBox(
       width: width,
@@ -85,6 +87,7 @@ void main() {
         previewPlayer: previewPlayer,
         previewPlayback: previewPlayback,
         previewDelay: previewDelay,
+        channelColumnLayout: channelColumnLayout,
       ),
     );
     if (inRegion) {
@@ -156,6 +159,64 @@ void main() {
   }
 
   group('TimelineEpgView', () {
+    group('channel column on a phone', () {
+      const longName = Channel(
+        id: 7,
+        channelNumber: 1234,
+        name: 'A Very Long Regional Sports Network Name HD',
+        streamUrl: 'https://streams.example/live/7.m3u8',
+      );
+
+      for (final layout in [
+        ChannelColumnLayout.logoAndTitle,
+        ChannelColumnLayout.titleOnly,
+      ]) {
+        testWidgets('$layout gives the title the full width and a drag', (
+          tester,
+        ) async {
+          await pumpGuide(
+            tester,
+            channels: const [longName],
+            epgService: EpgService(),
+            width: 400,
+            channelColumnLayout: layout,
+          );
+
+          final title = find.ancestor(
+            of: find.text(longName.name),
+            matching: find.byType(DraggableText),
+          );
+          expect(title, findsOneWidget);
+          // Beside the number it had about half the column
+          expect(tester.getSize(title).width, greaterThan(70));
+          expect(find.text('1234'), findsOneWidget);
+          expect(
+            tester.getTopLeft(find.text('1234')).dy,
+            lessThan(tester.getTopLeft(find.text(longName.name)).dy),
+          );
+
+          final scrollable = tester.state<ScrollableState>(
+            find.descendant(of: title, matching: find.byType(Scrollable)),
+          );
+          expect(scrollable.position.pixels, 0);
+          await tester.drag(title, const Offset(-60, 0));
+          await tester.pump();
+          expect(scrollable.position.pixels, greaterThan(0));
+        });
+      }
+
+      testWidgets('a wide layout is unchanged', (tester) async {
+        await pumpGuide(
+          tester,
+          channels: const [longName],
+          epgService: EpgService(),
+          channelColumnLayout: ChannelColumnLayout.logoAndTitle,
+        );
+
+        expect(find.byType(DraggableText), findsNothing);
+      });
+    });
+
     testWidgets('a row still loading renders a placeholder and asks for it', (
       tester,
     ) async {

@@ -12,6 +12,7 @@ import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/app_page_route.dart';
 import 'package:m3u_tv/shared/app_top_bar.dart';
+import 'package:m3u_tv/shared/desktop_back_key.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -45,9 +46,10 @@ Future<void> openSportsTeams(
     appPageRoute<void>(
       builder: (context) {
         final screen = Shortcuts(
-          shortcuts: <LogicalKeySet, Intent>{
+          shortcuts: <ShortcutActivator, Intent>{
             LogicalKeySet(LogicalKeyboardKey.escape):
                 const _SportsTeamsPopIntent(),
+            const DesktopBackspaceActivator(): const _SportsTeamsPopIntent(),
             LogicalKeySet(LogicalKeyboardKey.goBack):
                 const _SportsTeamsPopIntent(),
           },

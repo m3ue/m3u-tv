@@ -6,6 +6,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_page_route.dart';
 import 'package:m3u_tv/shared/app_top_bar.dart';
+import 'package:m3u_tv/shared/desktop_back_key.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -125,8 +126,9 @@ class _RuleOptionsPopIntent extends Intent {
 
 Widget _withTopLevelBackHandling(bool Function()? onBack, Widget child) {
   return Shortcuts(
-    shortcuts: <LogicalKeySet, Intent>{
+    shortcuts: <ShortcutActivator, Intent>{
       LogicalKeySet(LogicalKeyboardKey.escape): const _RuleOptionsPopIntent(),
+      const DesktopBackspaceActivator(): const _RuleOptionsPopIntent(),
       LogicalKeySet(LogicalKeyboardKey.goBack): const _RuleOptionsPopIntent(),
     },
     child: Builder(

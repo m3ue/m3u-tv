@@ -7,6 +7,7 @@ import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/app_page_route.dart';
 import 'package:m3u_tv/shared/app_switch.dart';
 import 'package:m3u_tv/shared/app_top_bar.dart';
+import 'package:m3u_tv/shared/desktop_back_key.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -54,9 +55,10 @@ class _SettingsSubpagePopIntent extends Intent {
 /// and `dvr_series_rule_options_screen.dart`'s function of the same name.
 Widget _withTopLevelBackHandling(bool Function()? onBack, Widget child) {
   return Shortcuts(
-    shortcuts: <LogicalKeySet, Intent>{
+    shortcuts: <ShortcutActivator, Intent>{
       LogicalKeySet(LogicalKeyboardKey.escape):
           const _SettingsSubpagePopIntent(),
+      const DesktopBackspaceActivator(): const _SettingsSubpagePopIntent(),
       LogicalKeySet(LogicalKeyboardKey.goBack):
           const _SettingsSubpagePopIntent(),
     },

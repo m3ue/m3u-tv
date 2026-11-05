@@ -27,6 +27,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_background.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/app_page_route.dart';
+import 'package:m3u_tv/shared/desktop_back_key.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -99,8 +100,9 @@ Widget _withTopLevelBackHandling(
   Widget child,
 ) {
   return Shortcuts(
-    shortcuts: <LogicalKeySet, Intent>{
+    shortcuts: <ShortcutActivator, Intent>{
       LogicalKeySet(LogicalKeyboardKey.escape): const _TopLevelPopIntent(),
+      const DesktopBackspaceActivator(): const _TopLevelPopIntent(),
       LogicalKeySet(LogicalKeyboardKey.goBack): const _TopLevelPopIntent(),
     },
     child: Actions(

@@ -2228,17 +2228,75 @@ class AppLocalizationsEs extends AppLocalizations {
   String get sportsNoChannel => 'Sin canal';
 
   @override
-  String get sportsNoChannelFound =>
-      'Ningún canal de tu lista muestra este partido todavía';
-
-  @override
-  String get sportsGameOver => 'Este partido ha terminado';
-
-  @override
   String get sportsEventChannel => 'Canal del evento';
 
   @override
   String get sportsWatch => 'Ver';
+
+  @override
+  String get sportsViewDetails => 'Detalles del partido';
+
+  @override
+  String get sportsDetailsTitle => 'Partido';
+
+  @override
+  String get sportsFollow => 'Seguir';
+
+  @override
+  String get sportsFollowing => 'Siguiendo';
+
+  @override
+  String get sportsDetailsOnYourChannels => 'En tus canales';
+
+  @override
+  String get sportsDetailsLoadFailed =>
+      'No se pudieron cargar los detalles del partido. Se reintentará en breve.';
+
+  @override
+  String get sportsDetailsUnavailable =>
+      'Todavía no hay más detalles de este partido.';
+
+  @override
+  String get sportsDetailsLineScore => 'Marcador por periodo';
+
+  @override
+  String get sportsDetailsTotalShort => 'T';
+
+  @override
+  String get sportsDetailsEvents => 'Momentos clave';
+
+  @override
+  String get sportsDetailsStats => 'Estadísticas de equipo';
+
+  @override
+  String get sportsDetailsSeasonStats => 'Estadísticas de la temporada';
+
+  @override
+  String get sportsDetailsLeaders => 'Mejores jugadores';
+
+  @override
+  String get sportsDetailsSeasonLeaders => 'Líderes de la temporada';
+
+  @override
+  String get sportsDetailsInfo => 'Información del partido';
+
+  @override
+  String get sportsDetailsStart => 'Hora de inicio';
+
+  @override
+  String get sportsDetailsVenue => 'Estadio';
+
+  @override
+  String get sportsDetailsAttendance => 'Asistencia';
+
+  @override
+  String get sportsDetailsOfficials => 'Árbitros';
+
+  @override
+  String get sportsDetailsSeries => 'Serie';
+
+  @override
+  String get sportsDetailsBroadcast => 'Emisión';
 
   @override
   String sportsFollowTeam(String team) {

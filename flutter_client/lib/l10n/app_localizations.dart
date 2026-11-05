@@ -3872,18 +3872,6 @@ abstract class AppLocalizations {
   /// **'No channel'**
   String get sportsNoChannel;
 
-  /// No description provided for @sportsNoChannelFound.
-  ///
-  /// In en, this message translates to:
-  /// **'No channel in your playlist is showing this game yet'**
-  String get sportsNoChannelFound;
-
-  /// No description provided for @sportsGameOver.
-  ///
-  /// In en, this message translates to:
-  /// **'This game has ended'**
-  String get sportsGameOver;
-
   /// No description provided for @sportsEventChannel.
   ///
   /// In en, this message translates to:
@@ -3895,6 +3883,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Watch'**
   String get sportsWatch;
+
+  /// No description provided for @sportsViewDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Game details'**
+  String get sportsViewDetails;
+
+  /// No description provided for @sportsDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Game'**
+  String get sportsDetailsTitle;
+
+  /// No description provided for @sportsFollow.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow'**
+  String get sportsFollow;
+
+  /// No description provided for @sportsFollowing.
+  ///
+  /// In en, this message translates to:
+  /// **'Following'**
+  String get sportsFollowing;
+
+  /// No description provided for @sportsDetailsOnYourChannels.
+  ///
+  /// In en, this message translates to:
+  /// **'On Your Channels'**
+  String get sportsDetailsOnYourChannels;
+
+  /// No description provided for @sportsDetailsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load game details. Retrying shortly.'**
+  String get sportsDetailsLoadFailed;
+
+  /// No description provided for @sportsDetailsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No more details are available for this game yet.'**
+  String get sportsDetailsUnavailable;
+
+  /// No description provided for @sportsDetailsLineScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Score by period'**
+  String get sportsDetailsLineScore;
+
+  /// No description provided for @sportsDetailsTotalShort.
+  ///
+  /// In en, this message translates to:
+  /// **'T'**
+  String get sportsDetailsTotalShort;
+
+  /// No description provided for @sportsDetailsEvents.
+  ///
+  /// In en, this message translates to:
+  /// **'Key moments'**
+  String get sportsDetailsEvents;
+
+  /// No description provided for @sportsDetailsStats.
+  ///
+  /// In en, this message translates to:
+  /// **'Team stats'**
+  String get sportsDetailsStats;
+
+  /// No description provided for @sportsDetailsSeasonStats.
+  ///
+  /// In en, this message translates to:
+  /// **'Season stats'**
+  String get sportsDetailsSeasonStats;
+
+  /// No description provided for @sportsDetailsLeaders.
+  ///
+  /// In en, this message translates to:
+  /// **'Top performers'**
+  String get sportsDetailsLeaders;
+
+  /// No description provided for @sportsDetailsSeasonLeaders.
+  ///
+  /// In en, this message translates to:
+  /// **'Season leaders'**
+  String get sportsDetailsSeasonLeaders;
+
+  /// No description provided for @sportsDetailsInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Game info'**
+  String get sportsDetailsInfo;
+
+  /// No description provided for @sportsDetailsStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start time'**
+  String get sportsDetailsStart;
+
+  /// No description provided for @sportsDetailsVenue.
+  ///
+  /// In en, this message translates to:
+  /// **'Venue'**
+  String get sportsDetailsVenue;
+
+  /// No description provided for @sportsDetailsAttendance.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance'**
+  String get sportsDetailsAttendance;
+
+  /// No description provided for @sportsDetailsOfficials.
+  ///
+  /// In en, this message translates to:
+  /// **'Officials'**
+  String get sportsDetailsOfficials;
+
+  /// No description provided for @sportsDetailsSeries.
+  ///
+  /// In en, this message translates to:
+  /// **'Series'**
+  String get sportsDetailsSeries;
+
+  /// No description provided for @sportsDetailsBroadcast.
+  ///
+  /// In en, this message translates to:
+  /// **'Broadcast'**
+  String get sportsDetailsBroadcast;
 
   /// No description provided for @sportsFollowTeam.
   ///

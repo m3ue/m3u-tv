@@ -8,6 +8,7 @@ import 'package:m3u_tv/features/multiview/multiview_manage_dialog.dart';
 import 'package:m3u_tv/features/multiview/multiview_screen.dart';
 import 'package:m3u_tv/features/sports/sports_fixture_actions.dart';
 import 'package:m3u_tv/features/sports/sports_fixture_card.dart';
+import 'package:m3u_tv/features/sports/sports_fixture_details_screen.dart';
 import 'package:m3u_tv/features/sports/sports_teams_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
@@ -454,11 +455,12 @@ class _SportsScreenState extends ConsumerState<SportsScreen> {
         ? await _matchesFor(fixture)
         : const <SportsChannelMatch>[];
     if (!mounted) return;
-    await playSportsFixture(
+    await openSportsFixture(
       context,
       fixture: fixture,
       matches: matches,
       onChannelSelect: widget.onChannelSelect,
+      onBack: widget.onHandleTopLevelBack,
     );
   }
 
@@ -481,6 +483,7 @@ class _SportsScreenState extends ConsumerState<SportsScreen> {
         final options = <(IconData, String, _FixtureAction?)>[
           if (matches.isNotEmpty)
             (Icons.play_arrow, l10n.sportsWatch, const _WatchAction()),
+          (Icons.info_outline, l10n.sportsViewDetails, const _DetailsAction()),
           if (multiviewSupported && matches.isNotEmpty && !inMultiviewAlready)
             (
               Icons.grid_view_outlined,
@@ -537,6 +540,14 @@ class _SportsScreenState extends ConsumerState<SportsScreen> {
     switch (action) {
       case _WatchAction():
         await _openFixture(fixture);
+      case _DetailsAction():
+        await openSportsFixtureDetails(
+          context,
+          fixture: fixture,
+          matches: matches,
+          onChannelSelect: widget.onChannelSelect,
+          onBack: widget.onHandleTopLevelBack,
+        );
       case _AddToMultiviewAction():
         final match = matches.length == 1
             ? matches.single
@@ -679,20 +690,24 @@ class _SportsScreenState extends ConsumerState<SportsScreen> {
   static const double _pickerWidth = 640;
 
   /// [options] two to a row, so long pickers (220 soccer leagues) scroll
-  /// half as far. Rows stay aligned for D-pad up/down.
-  static List<Widget> _inColumns(List<Widget> options) => [
-    for (var i = 0; i < options.length; i += 2)
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: options[i]),
-          Expanded(
-            child: i + 1 < options.length
-                ? options[i + 1]
-                : const SizedBox.shrink(),
-          ),
-        ],
-      ),
+  /// half as far. Rows stay aligned for D-pad up/down. One to a row where
+  /// the dialog is too narrow for two to fit their labels (phones).
+  List<Widget> _inColumns(List<Widget> options) => [
+    if (MediaQuery.sizeOf(context).width < _pickerWidth)
+      ...options
+    else
+      for (var i = 0; i < options.length; i += 2)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: options[i]),
+            Expanded(
+              child: i + 1 < options.length
+                  ? options[i + 1]
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        ),
   ];
 
   static IconData _sportIcon(String sport) => switch (sport) {
@@ -1020,6 +1035,10 @@ sealed class _FixtureAction {
 
 class _WatchAction extends _FixtureAction {
   const _WatchAction();
+}
+
+class _DetailsAction extends _FixtureAction {
+  const _DetailsAction();
 }
 
 class _AddToMultiviewAction extends _FixtureAction {

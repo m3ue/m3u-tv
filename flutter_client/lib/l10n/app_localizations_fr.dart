@@ -2233,17 +2233,75 @@ class AppLocalizationsFr extends AppLocalizations {
   String get sportsNoChannel => 'Aucune chaîne';
 
   @override
-  String get sportsNoChannelFound =>
-      'Aucune chaîne de votre playlist ne diffuse encore ce match';
-
-  @override
-  String get sportsGameOver => 'Ce match est terminé';
-
-  @override
   String get sportsEventChannel => 'Chaîne de l\'événement';
 
   @override
   String get sportsWatch => 'Regarder';
+
+  @override
+  String get sportsViewDetails => 'Détails du match';
+
+  @override
+  String get sportsDetailsTitle => 'Match';
+
+  @override
+  String get sportsFollow => 'Suivre';
+
+  @override
+  String get sportsFollowing => 'Suivi';
+
+  @override
+  String get sportsDetailsOnYourChannels => 'Sur vos chaînes';
+
+  @override
+  String get sportsDetailsLoadFailed =>
+      'Impossible de charger les détails du match. Nouvel essai sous peu.';
+
+  @override
+  String get sportsDetailsUnavailable =>
+      'Aucun autre détail n\'est encore disponible pour ce match.';
+
+  @override
+  String get sportsDetailsLineScore => 'Score par période';
+
+  @override
+  String get sportsDetailsTotalShort => 'T';
+
+  @override
+  String get sportsDetailsEvents => 'Moments clés';
+
+  @override
+  String get sportsDetailsStats => 'Statistiques d\'équipe';
+
+  @override
+  String get sportsDetailsSeasonStats => 'Statistiques de la saison';
+
+  @override
+  String get sportsDetailsLeaders => 'Meilleurs joueurs';
+
+  @override
+  String get sportsDetailsSeasonLeaders => 'Meneurs de la saison';
+
+  @override
+  String get sportsDetailsInfo => 'Infos du match';
+
+  @override
+  String get sportsDetailsStart => 'Heure de début';
+
+  @override
+  String get sportsDetailsVenue => 'Lieu';
+
+  @override
+  String get sportsDetailsAttendance => 'Affluence';
+
+  @override
+  String get sportsDetailsOfficials => 'Arbitres';
+
+  @override
+  String get sportsDetailsSeries => 'Série';
+
+  @override
+  String get sportsDetailsBroadcast => 'Diffusion';
 
   @override
   String sportsFollowTeam(String team) {

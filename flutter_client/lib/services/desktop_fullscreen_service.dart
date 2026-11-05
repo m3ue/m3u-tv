@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:m3u_tv/shared/desktop_back_key.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -151,7 +152,8 @@ class DesktopFullscreenService extends ChangeNotifier with WindowListener {
         HardwareKeyboard.instance.isAltPressed) {
       unawaited(toggle());
       consume = true;
-    } else if (logical == LogicalKeyboardKey.escape &&
+    } else if ((logical == LogicalKeyboardKey.escape ||
+            isDesktopBackspaceBack(event, HardwareKeyboard.instance)) &&
         (_isFullscreen || _transitioning) &&
         !_dialogHasFocus() &&
         !(deferEscape?.call() ?? false)) {

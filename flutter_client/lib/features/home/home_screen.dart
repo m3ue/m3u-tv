@@ -7,6 +7,7 @@ import 'package:m3u_tv/features/home/home_spotlight.dart';
 import 'package:m3u_tv/features/home/home_spotlight_hero.dart';
 import 'package:m3u_tv/features/sports/sports_fixture_actions.dart';
 import 'package:m3u_tv/features/sports/sports_fixture_card.dart';
+import 'package:m3u_tv/features/sports/sports_fixture_details_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
@@ -55,6 +56,7 @@ class HomeScreen extends ConsumerStatefulWidget {
     required this.onAioStreamsItemSelect,
     this.useSidebarLayout = false,
     this.onSidebarActivate,
+    this.onHandleTopLevelBack,
     this.fetchVodInfo,
   });
 
@@ -68,6 +70,9 @@ class HomeScreen extends ConsumerStatefulWidget {
 
   /// Opens the Sports screen from the Sports row's View All card.
   final VoidCallback? onSportsMore;
+
+  /// Hardware Back on a page the Sports row opens over the shell.
+  final bool Function()? onHandleTopLevelBack;
   final VoidCallback onMoviesMore;
   final VoidCallback onSeriesMore;
   final VoidCallback onRecordingsSelect;
@@ -400,6 +405,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         key: ValueKey(('sports', playlistKey)),
         onChannelSelect: widget.onChannelSelect,
         onViewAll: widget.onSportsMore,
+        onBack: widget.onHandleTopLevelBack,
         rowItemLimit: _rowItemLimit,
         useSidebarLayout: widget.useSidebarLayout,
         onSidebarActivate: widget.onSidebarActivate,
@@ -807,6 +813,7 @@ class _SportsRow extends ConsumerStatefulWidget {
     super.key,
     required this.onChannelSelect,
     required this.onViewAll,
+    required this.onBack,
     required this.rowItemLimit,
     required this.useSidebarLayout,
     required this.onSidebarActivate,
@@ -815,6 +822,7 @@ class _SportsRow extends ConsumerStatefulWidget {
 
   final void Function(Channel) onChannelSelect;
   final VoidCallback? onViewAll;
+  final bool Function()? onBack;
   final int rowItemLimit;
   final bool useSidebarLayout;
   final VoidCallback? onSidebarActivate;
@@ -1028,11 +1036,21 @@ class _SportsRowState extends ConsumerState<_SportsRow> {
             channelCount: matches.length,
             autofocus: autofocus,
             onTap: () => unawaited(
-              playSportsFixture(
+              openSportsFixture(
                 context,
                 fixture: fixture,
                 matches: matches,
                 onChannelSelect: widget.onChannelSelect,
+                onBack: widget.onBack,
+              ),
+            ),
+            onLongTap: () => unawaited(
+              openSportsFixtureDetails(
+                context,
+                fixture: fixture,
+                matches: matches,
+                onChannelSelect: widget.onChannelSelect,
+                onBack: widget.onBack,
               ),
             ),
           ),

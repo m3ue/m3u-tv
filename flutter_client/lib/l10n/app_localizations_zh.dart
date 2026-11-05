@@ -2134,16 +2134,73 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sportsNoChannel => '无频道';
 
   @override
-  String get sportsNoChannelFound => '你的播放列表中还没有频道播出这场比赛';
-
-  @override
-  String get sportsGameOver => '这场比赛已结束';
-
-  @override
   String get sportsEventChannel => '赛事频道';
 
   @override
   String get sportsWatch => '观看';
+
+  @override
+  String get sportsViewDetails => '比赛详情';
+
+  @override
+  String get sportsDetailsTitle => '比赛';
+
+  @override
+  String get sportsFollow => '关注';
+
+  @override
+  String get sportsFollowing => '已关注';
+
+  @override
+  String get sportsDetailsOnYourChannels => '你的频道';
+
+  @override
+  String get sportsDetailsLoadFailed => '无法加载比赛详情。稍后将重试。';
+
+  @override
+  String get sportsDetailsUnavailable => '这场比赛暂无更多详情。';
+
+  @override
+  String get sportsDetailsLineScore => '各节比分';
+
+  @override
+  String get sportsDetailsTotalShort => '总';
+
+  @override
+  String get sportsDetailsEvents => '关键时刻';
+
+  @override
+  String get sportsDetailsStats => '球队数据';
+
+  @override
+  String get sportsDetailsSeasonStats => '赛季数据';
+
+  @override
+  String get sportsDetailsLeaders => '最佳球员';
+
+  @override
+  String get sportsDetailsSeasonLeaders => '赛季领先球员';
+
+  @override
+  String get sportsDetailsInfo => '比赛信息';
+
+  @override
+  String get sportsDetailsStart => '开始时间';
+
+  @override
+  String get sportsDetailsVenue => '场地';
+
+  @override
+  String get sportsDetailsAttendance => '观众人数';
+
+  @override
+  String get sportsDetailsOfficials => '裁判';
+
+  @override
+  String get sportsDetailsSeries => '系列赛';
+
+  @override
+  String get sportsDetailsBroadcast => '转播';
 
   @override
   String sportsFollowTeam(String team) {

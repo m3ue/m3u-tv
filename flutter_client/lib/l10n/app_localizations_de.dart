@@ -2225,17 +2225,75 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sportsNoChannel => 'Kein Sender';
 
   @override
-  String get sportsNoChannelFound =>
-      'Noch kein Sender in deiner Playlist zeigt dieses Spiel';
-
-  @override
-  String get sportsGameOver => 'Dieses Spiel ist beendet';
-
-  @override
   String get sportsEventChannel => 'Event-Sender';
 
   @override
   String get sportsWatch => 'Ansehen';
+
+  @override
+  String get sportsViewDetails => 'Spieldetails';
+
+  @override
+  String get sportsDetailsTitle => 'Spiel';
+
+  @override
+  String get sportsFollow => 'Folgen';
+
+  @override
+  String get sportsFollowing => 'Folge ich';
+
+  @override
+  String get sportsDetailsOnYourChannels => 'Auf deinen Kanälen';
+
+  @override
+  String get sportsDetailsLoadFailed =>
+      'Spieldetails konnten nicht geladen werden. Neuer Versuch in Kürze.';
+
+  @override
+  String get sportsDetailsUnavailable =>
+      'Für dieses Spiel sind noch keine weiteren Details verfügbar.';
+
+  @override
+  String get sportsDetailsLineScore => 'Punkte pro Abschnitt';
+
+  @override
+  String get sportsDetailsTotalShort => 'G';
+
+  @override
+  String get sportsDetailsEvents => 'Wichtige Momente';
+
+  @override
+  String get sportsDetailsStats => 'Teamstatistiken';
+
+  @override
+  String get sportsDetailsSeasonStats => 'Saisonstatistiken';
+
+  @override
+  String get sportsDetailsLeaders => 'Beste Spieler';
+
+  @override
+  String get sportsDetailsSeasonLeaders => 'Beste der Saison';
+
+  @override
+  String get sportsDetailsInfo => 'Spielinfos';
+
+  @override
+  String get sportsDetailsStart => 'Beginn';
+
+  @override
+  String get sportsDetailsVenue => 'Spielort';
+
+  @override
+  String get sportsDetailsAttendance => 'Zuschauer';
+
+  @override
+  String get sportsDetailsOfficials => 'Schiedsrichter';
+
+  @override
+  String get sportsDetailsSeries => 'Serie';
+
+  @override
+  String get sportsDetailsBroadcast => 'Übertragung';
 
   @override
   String sportsFollowTeam(String team) {

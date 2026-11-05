@@ -93,7 +93,7 @@ class SportsFixtureCard extends StatelessWidget {
     final scale = FontSizeScope.scaleOf(context);
     final sides = fixture.displayOrder;
     final colors = [
-      for (final side in sides) _washColor(side.team, theme.colorScheme),
+      for (final side in sides) sportsTeamWash(side.team),
     ];
     return Padding(
       padding: EdgeInsets.only(bottom: 10 * scale),
@@ -115,7 +115,7 @@ class SportsFixtureCard extends StatelessWidget {
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final status = _StatusColumn(
+              final status = SportsFixtureStatus(
                 fixture: fixture,
                 showLeague: showLeague,
               );
@@ -171,25 +171,24 @@ class SportsFixtureCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  /// The team's colour, dimmed into the card. Black and white (common
-  /// "no colour" answers) fall back to the alternate, else to no tint.
-  static Color _washColor(SportsTeam team, ColorScheme scheme) {
-    for (final hex in [team.colorHex, team.alternateColorHex]) {
-      final color = _parseHex(hex);
-      if (color == null) continue;
-      final luminance = color.computeLuminance();
-      if (luminance < 0.02 || luminance > 0.85) continue;
-      return color.withValues(alpha: 0.32);
-    }
-    return Colors.transparent;
-  }
+/// The team's colour, dimmed to sit behind a game's content.
+Color sportsTeamWash(SportsTeam team) =>
+    sportsTeamColor(team)?.withValues(alpha: 0.32) ?? Colors.transparent;
 
-  static Color? _parseHex(String? hex) {
-    if (hex == null) return null;
-    final value = int.tryParse(hex, radix: 16);
-    return value == null ? null : Color(0xFF000000 | value);
+/// The team's colour; black and white (common "no colour" answers) fall back
+/// to the alternate, else to none.
+Color? sportsTeamColor(SportsTeam team) {
+  for (final hex in [team.colorHex, team.alternateColorHex]) {
+    final value = hex == null ? null : int.tryParse(hex, radix: 16);
+    if (value == null) continue;
+    final color = Color(0xFF000000 | value);
+    final luminance = color.computeLuminance();
+    if (luminance < 0.02 || luminance > 0.85) continue;
+    return color;
   }
+  return null;
 }
 
 /// A game as a Home row card: status and league, both teams with crests and
@@ -200,6 +199,7 @@ class SportsFixtureTile extends StatelessWidget {
     required this.fixture,
     required this.channelCount,
     required this.onTap,
+    this.onLongTap,
     this.autofocus = false,
   });
 
@@ -210,6 +210,7 @@ class SportsFixtureTile extends StatelessWidget {
   final SportsFixture fixture;
   final int channelCount;
   final VoidCallback onTap;
+  final VoidCallback? onLongTap;
   final bool autofocus;
 
   @override
@@ -219,14 +220,14 @@ class SportsFixtureTile extends StatelessWidget {
     final scale = FontSizeScope.scaleOf(context);
     final sides = fixture.displayOrder;
     final colors = [
-      for (final side in sides)
-        SportsFixtureCard._washColor(side.team, theme.colorScheme),
+      for (final side in sides) sportsTeamWash(side.team),
     ];
     final muted = theme.textTheme.labelMedium?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
     return DpadInkWell(
       onTap: onTap,
+      onLongTap: onLongTap,
       autofocus: autofocus,
       color: theme.colorScheme.surfaceContainerHigh,
       borderRadius: BorderRadius.circular(SportsFixtureCard._radius),
@@ -246,7 +247,10 @@ class SportsFixtureTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: _StatusColumn(fixture: fixture, showLeague: false),
+                  child: SportsFixtureStatus(
+                    fixture: fixture,
+                    showLeague: false,
+                  ),
                 ),
                 Text(fixture.league.abbreviation, style: muted),
               ],
@@ -266,11 +270,17 @@ class SportsFixtureTile extends StatelessWidget {
   }
 }
 
-class _StatusColumn extends StatelessWidget {
-  const _StatusColumn({required this.fixture, required this.showLeague});
+class SportsFixtureStatus extends StatelessWidget {
+  const SportsFixtureStatus({
+    super.key,
+    required this.fixture,
+    required this.showLeague,
+    this.alignment = CrossAxisAlignment.start,
+  });
 
   final SportsFixture fixture;
   final bool showLeague;
+  final CrossAxisAlignment alignment;
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +331,7 @@ class _StatusColumn extends StatelessWidget {
         ? fixture.statusDetail
         : null;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: alignment,
       mainAxisSize: MainAxisSize.min,
       children: [
         headline,

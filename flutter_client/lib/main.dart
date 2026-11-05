@@ -27,6 +27,7 @@ import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/production_storage.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/window_state_service.dart';
+import 'package:m3u_tv/shared/desktop_back_key.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
@@ -513,6 +514,11 @@ class _MyAppState extends State<MyApp> {
         'HIDE_DEBUG_BANNER',
       ),
       routerConfig: _router,
+      // Closes dialogs and menus, which sit outside the shell's Back handling.
+      shortcuts: <ShortcutActivator, Intent>{
+        ...WidgetsApp.defaultShortcuts,
+        const DesktopBackspaceActivator(): const DismissIntent(),
+      },
       scrollBehavior: HostPlatform.isTvOS ? const TvosScrollBehavior() : null,
       localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: appSupportedLocales,

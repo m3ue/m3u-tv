@@ -19,6 +19,7 @@ import 'package:m3u_tv/shared/cached_media_thumbnail.dart';
 import 'package:m3u_tv/shared/catchup_badge.dart';
 import 'package:m3u_tv/shared/channel_rows.dart';
 import 'package:m3u_tv/shared/day_toolbar.dart';
+import 'package:m3u_tv/shared/draggable_text.dart';
 import 'package:m3u_tv/shared/epg_icon_pill.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
@@ -2369,6 +2370,8 @@ class _ChannelCell extends StatelessWidget {
         (compact ? theme.textTheme.labelMedium : theme.textTheme.titleSmall)
             ?.copyWith(fontWeight: focused ? FontWeight.w700 : null);
 
+    final numberInContent = compact && layout != ChannelColumnLayout.logoOnly;
+
     final Widget content = switch (layout) {
       ChannelColumnLayout.logoOnly => Center(
         child: _logoWithRecordingDot(
@@ -2376,18 +2379,39 @@ class _ChannelCell extends StatelessWidget {
           (compact ? 36 : 44) * scale,
         ),
       ),
+      // A phone's column is too narrow to spare the number its own slot: it
+      // shares a line above the title, which gets the full width and a drag
+      // to read the rest.
       ChannelColumnLayout.logoAndTitle when compact => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _logoWithRecordingDot(colorScheme, 26 * scale),
-          const SizedBox(height: 3),
-          Text(
-            channel.name,
-            style: theme.textTheme.labelSmall,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
+          Row(
+            children: [
+              if (number != null) ...[
+                Text('$number', style: numberStyle),
+                const SizedBox(width: 6),
+              ],
+              _logoWithRecordingDot(colorScheme, 26 * scale),
+            ],
           ),
+          const SizedBox(height: 3),
+          DraggableText(channel.name, style: theme.textTheme.labelSmall),
+        ],
+      ),
+      ChannelColumnLayout.titleOnly when compact => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (number != null || isRecording)
+            Row(
+              children: [
+                if (number != null) Text('$number', style: numberStyle),
+                if (number != null && isRecording) const SizedBox(width: 6),
+                if (isRecording) RecordingDot(color: colorScheme.error),
+              ],
+            ),
+          DraggableText(channel.name, style: nameStyle),
         ],
       ),
       ChannelColumnLayout.logoAndTitle => Row(
@@ -2453,7 +2477,9 @@ class _ChannelCell extends StatelessWidget {
               Positioned.fill(
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
-                    number != null && layout != ChannelColumnLayout.logoOnly
+                    number != null &&
+                            !numberInContent &&
+                            layout != ChannelColumnLayout.logoOnly
                         ? 40 * scale
                         : 8,
                     6,
@@ -2463,7 +2489,7 @@ class _ChannelCell extends StatelessWidget {
                   child: content,
                 ),
               ),
-              if (number != null)
+              if (number != null && !numberInContent)
                 Positioned(
                   left: 8,
                   top: layout == ChannelColumnLayout.logoOnly ? 4 : 0,

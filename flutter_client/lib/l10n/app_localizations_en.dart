@@ -2208,17 +2208,75 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sportsNoChannel => 'No channel';
 
   @override
-  String get sportsNoChannelFound =>
-      'No channel in your playlist is showing this game yet';
-
-  @override
-  String get sportsGameOver => 'This game has ended';
-
-  @override
   String get sportsEventChannel => 'Event channel';
 
   @override
   String get sportsWatch => 'Watch';
+
+  @override
+  String get sportsViewDetails => 'Game details';
+
+  @override
+  String get sportsDetailsTitle => 'Game';
+
+  @override
+  String get sportsFollow => 'Follow';
+
+  @override
+  String get sportsFollowing => 'Following';
+
+  @override
+  String get sportsDetailsOnYourChannels => 'On Your Channels';
+
+  @override
+  String get sportsDetailsLoadFailed =>
+      'Couldn\'t load game details. Retrying shortly.';
+
+  @override
+  String get sportsDetailsUnavailable =>
+      'No more details are available for this game yet.';
+
+  @override
+  String get sportsDetailsLineScore => 'Score by period';
+
+  @override
+  String get sportsDetailsTotalShort => 'T';
+
+  @override
+  String get sportsDetailsEvents => 'Key moments';
+
+  @override
+  String get sportsDetailsStats => 'Team stats';
+
+  @override
+  String get sportsDetailsSeasonStats => 'Season stats';
+
+  @override
+  String get sportsDetailsLeaders => 'Top performers';
+
+  @override
+  String get sportsDetailsSeasonLeaders => 'Season leaders';
+
+  @override
+  String get sportsDetailsInfo => 'Game info';
+
+  @override
+  String get sportsDetailsStart => 'Start time';
+
+  @override
+  String get sportsDetailsVenue => 'Venue';
+
+  @override
+  String get sportsDetailsAttendance => 'Attendance';
+
+  @override
+  String get sportsDetailsOfficials => 'Officials';
+
+  @override
+  String get sportsDetailsSeries => 'Series';
+
+  @override
+  String get sportsDetailsBroadcast => 'Broadcast';
 
   @override
   String sportsFollowTeam(String team) {
