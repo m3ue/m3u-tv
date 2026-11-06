@@ -2,7 +2,7 @@
 
 Source of truth for the copy pasted into App Store Connect, Google Play Console and Microsoft Partner Center. Update this file first, then copy into the stores, so the listings never live only in a store dashboard again.
 
-Last reviewed against: **v1.2.4** (2026-10-29). Store artwork is generated separately by `scripts/generate-store-assets.sh` (headers and banners) and `scripts/generate-screenshots.sh` (screenshots).
+Last reviewed against: **v1.2.5** (2026-11-06). Store artwork is generated separately by `scripts/generate-store-assets.sh` (headers and banners) and `scripts/generate-screenshots.sh` (screenshots).
 
 ## Rules for every listing
 
@@ -16,6 +16,7 @@ Last reviewed against: **v1.2.4** (2026-10-29). Store artwork is generated separ
   - Screenshots, previews and header art come only from the demo server (Blender open movies, public-domain films, generated test channels): the `tvos*`, `ios*` and `ipados*` sets in `screenshots/app-screenshots/`. Never real studio posters, network logos or provider channel names. Apple rejected v1.2.3 under 5.2.1 for exactly this.
   - The Support URL must be a real support page, not an issue tracker (rejected under 1.5).
 - **Trakt:** the app syncs **watch history** only. Don't claim watchlist or collection sync.
+- **Sports:** never name a sports data provider, league or team in any listing or release note (ESPN, NFL, Premier League and so on), since those are trademarks. Say the channels are the user's own, and keep Sports screenshots off the Apple listings unless they come from the demo server, which has no Sports yet.
 
 ## Shared details
 
@@ -67,13 +68,13 @@ Self-hosted live TV and movies
 #### Promotional text (170)
 
 ```
-New: an optional Rich Home with a full-screen spotlight, a redesigned remote-first TV guide with live preview, and Multiview. Your own server, built for the big screen.
+New: Sports with live scores and your channels showing each game, multiple playlists on one device, and a nav you can rearrange. Your server, built for the big screen.
 ```
 
 #### Keywords (100)
 
 ```
-epg,playlist,guide,live,player,dvr,recorder,catchup,multiview,trakt,movies,series,selfhosted,media
+epg,playlist,guide,live,player,dvr,recorder,catchup,multiview,trakt,movies,series,selfhosted,sports
 ```
 
 #### Description (4000)
@@ -85,15 +86,24 @@ M3U TV does not include any channels, playlists or content. You need your own M3
 
 HOME
 • Continue Watching with Up Next episodes, so you can pick up right where you left off.
-• Optional Rich Home: a full-screen spotlight with artwork and title logos above your rows.
+• Optional Spotlight home: a full-screen hero with artwork and title logos above your rows.
 • Favorites and quick rows for Live TV, movies and series. Choose which screen the app opens on.
+• Reorder the nav and Home rows, and hide the sections you don't use.
 
 LIVE TV AND GUIDE
 • A multi-day timeline guide built for the Siri Remote, with an optional live preview player.
 • On Now and Upcoming views with station logos.
+• Guide previews carry into full screen without restarting the stream.
 • Catchup playback with seeking on channels that support it.
 • Multiview: watch several channels at once.
 • Custom channel sorting, favorites-first ordering and grid or list layouts.
+
+SPORTS
+• See each day's games with live scores, for the leagues your server is set up for.
+• Find which of your own channels is showing a game, and start it in one press.
+• Game details with the score by period, key moments and team stats.
+• Follow your teams, with My Teams and a Sports row on Home.
+• Needs M3U Editor 0.14.1 or later with Sports turned on.
 
 DVR
 • Record a single airing or a whole series straight from the guide or search.
@@ -118,6 +128,7 @@ PLAYBACK
 
 MADE FOR YOUR HOUSEHOLD
 • Multiple viewers, each with their own history and favorites.
+• Keep several playlists on one device, from one server or more, each with its own favorites and guide.
 • Trakt watch history sync.
 • Quick setup: pair your Apple TV by scanning a QR code with your phone.
 • Adjustable display scale, remote button mapping and navigation sounds.
@@ -132,7 +143,7 @@ Required for tvOS: the App Store on Apple TV can't open links, so it shows this 
 
 ```
 M3U TV PRIVACY POLICY
-Last updated: October 20, 2026
+Last updated: November 6, 2026
 
 M3U TV is a client for your own self-hosted M3U Editor server. It is not a hosted service, and the developer does not operate a backend that stores your content or personal data.
 
@@ -140,7 +151,7 @@ INFORMATION THE APP STORES OR SENDS
 
 Server connection details. The server URL, username and password you enter are stored only on your Apple TV, in the Keychain, and are sent only to the server you configure. They are never sent to the developer or any third party.
 
-Data sent to your own server. To work, the app sends the following to your server, and only to your server: viewing progress and watch history, favorites, viewer profiles, DVR schedules, and basic device details (device name, platform, app version and a random ID the app generates on first launch). If you choose "Upload to server" on the Logs and Diagnostics screen, recent diagnostic logs are also sent to your server so its administrator can troubleshoot. None of this is sent to the developer.
+Data sent to your own server. To work, the app sends the following to your server, and only to your server: viewing progress and watch history, favorites, followed sports teams, viewer profiles, DVR schedules, and basic device details (device name, platform, app version and a random ID the app generates on first launch). If you choose "Upload to server" on the Logs and Diagnostics screen, recent diagnostic logs are also sent to your server so its administrator can troubleshoot. None of this is sent to the developer.
 
 Push notifications. If notifications are enabled, the app registers a device token with Firebase Cloud Messaging (Google) so your server can deliver notifications, such as recording updates. The token is used only for message delivery.
 
@@ -174,13 +185,13 @@ Changes to this policy are reflected in the "Last updated" date. The full policy
 #### Promotional text (170)
 
 ```
-New: an optional Rich Home with a full-screen spotlight, a redesigned TV guide with live preview, and Multiview. Your self-hosted library, on iPhone and iPad.
+New: Sports with live scores and your channels showing each game, multiple playlists on one device, and a nav you can rearrange. Your own server, on iPhone and iPad.
 ```
 
 #### Keywords (100)
 
 ```
-epg,playlist,guide,live,player,dvr,recorder,catchup,multiview,trakt,movies,series,selfhosted,media
+epg,playlist,guide,live,player,dvr,recorder,catchup,multiview,trakt,movies,series,selfhosted,sports
 ```
 
 #### Description (4000)
@@ -192,15 +203,24 @@ M3U TV does not include any channels, playlists or content. You need your own M3
 
 HOME
 • Continue Watching with Up Next episodes, so you can pick up right where you left off.
-• Optional Rich Home: a full-screen spotlight with artwork and title logos above your rows.
+• Optional Spotlight home: a full-screen hero with artwork and title logos above your rows.
 • Favorites and quick rows for Live TV, movies and series. Choose which screen the app opens on.
+• Reorder the nav and Home rows, and hide the sections you don't use.
 
 LIVE TV AND GUIDE
 • A multi-day timeline guide with an optional live preview player.
 • On Now and Upcoming views with station logos.
+• Guide previews carry into full screen without restarting the stream.
 • Catchup playback with seeking on channels that support it.
 • Multiview: watch several channels at once.
 • Custom channel sorting, favorites-first ordering and grid or list layouts.
+
+SPORTS
+• See each day's games with live scores, for the leagues your server is set up for.
+• Find which of your own channels is showing a game, and start it in one tap.
+• Game details with the score by period, key moments and team stats.
+• Follow your teams, with My Teams and a Sports row on Home.
+• Needs M3U Editor 0.14.1 or later with Sports turned on.
 
 DVR
 • Record a single airing or a whole series straight from the guide or search.
@@ -225,6 +245,7 @@ PLAYBACK
 
 MADE FOR YOUR HOUSEHOLD
 • Multiple viewers, each with their own history and favorites.
+• Keep several playlists on one device, from one server or more, each with its own favorites and guide.
 • Trakt watch history sync.
 • A notification center for alerts from your server, with per-channel subscriptions.
 • Adjustable display scale.
@@ -258,16 +279,25 @@ M3U TV does not include any channels, playlists or content. You need your own M3
 
 HOME
 • Continue Watching with Up Next episodes, so you can pick up right where you left off.
-• Optional Rich Home: a full-screen spotlight with artwork and title logos above your rows.
+• Optional Spotlight home: a full-screen hero with artwork and title logos above your rows.
 • Favorites and quick rows for Live TV, movies and series. Choose which screen the app opens on.
+• Reorder the nav and Home rows, and hide the sections you don't use.
 
 LIVE TV AND GUIDE
 • A multi-day timeline guide built for D-pad remotes, with an optional live preview player.
 • On Now and Upcoming views with station logos.
+• Guide previews carry into full screen without restarting the stream.
 • Catchup playback with seeking on channels that support it.
 • Multiview: watch several channels at once.
 • Custom channel sorting, favorites-first ordering and grid or list layouts.
 • Works with Xtream API and standard M3U playlists served by M3U Editor.
+
+SPORTS
+• See each day's games with live scores, for the leagues your server is set up for.
+• Find which of your own channels is showing a game, and start it in one press.
+• Game details with the score by period, key moments and team stats.
+• Follow your teams, with My Teams and a Sports row on Home.
+• Needs M3U Editor 0.14.1 or later with Sports turned on.
 
 DVR
 • Record a single airing or a whole series straight from the guide or search.
@@ -298,6 +328,7 @@ PLAYBACK
 
 MADE FOR YOUR HOUSEHOLD
 • Multiple viewers, each with their own history and favorites.
+• Keep several playlists on one device, from one server or more, each with its own favorites and guide.
 • Trakt watch history sync.
 • A notification center for alerts from your server, with per-channel subscriptions.
 • Quick setup: pair your TV by scanning a QR code with your phone.
@@ -331,16 +362,25 @@ M3U TV does not include any channels, playlists or content. You need your own M3
 
 HOME
 • Continue Watching with Up Next episodes, so you can pick up right where you left off.
-• Optional Rich Home: a full-screen spotlight with artwork and title logos above your rows.
+• Optional Spotlight home: a full-screen hero with artwork and title logos above your rows.
 • Favorites and quick rows for Live TV, movies and series. Choose which screen the app opens on.
+• Reorder the nav and Home rows, and hide the sections you don't use.
 
 LIVE TV AND GUIDE
 • A multi-day timeline guide with arrow-key navigation and an optional live preview player.
 • On Now and Upcoming views with station logos.
+• Guide previews carry into full screen without restarting the stream.
 • Catchup playback with seeking on channels that support it.
 • Multiview: watch several channels at once.
 • Custom channel sorting, favorites-first ordering and grid or list layouts.
 • Works with Xtream API and standard M3U playlists served by M3U Editor.
+
+SPORTS
+• See each day's games with live scores, for the leagues your server is set up for.
+• Find which of your own channels is showing a game, and start it in one click.
+• Game details with the score by period, key moments and team stats.
+• Follow your teams, with My Teams and a Sports row on Home.
+• Needs M3U Editor 0.14.1 or later with Sports turned on.
 
 DVR
 • Record a single airing or a whole series straight from the guide or search.
@@ -370,6 +410,7 @@ PLAYBACK
 
 MADE FOR YOUR HOUSEHOLD
 • Multiple viewers, each with their own history and favorites.
+• Keep several playlists on one device, from one server or more, each with its own favorites and guide.
 • Trakt watch history sync.
 • Adjustable display scale and navigation sounds.
 • Available in English, German, Spanish, French and Simplified Chinese.
@@ -387,13 +428,13 @@ M3U TV and M3U Editor are open source. Bring your own server, your own playlists
 ```
 Connects to your own self-hosted M3U Editor server (no content included)
 Multi-day timeline TV guide with an optional live preview player
-On Now and Upcoming views with station logos
 Catchup playback with seeking on supported channels
 Multiview: watch several channels at once
-Record single airings or whole series from the guide or search
-Automatic commercial skipping on supported recordings
+Record single airings or whole series, with commercial skipping on supported recordings
+Each day's games with live scores and your channels showing them, plus following your teams
 Continue Watching with Up Next episodes
-Optional Rich Home with a full-screen spotlight
+Optional Spotlight home with a full-screen hero
+Reorder the nav and Home rows, and hide what you don't use
 Movie and series detail pages with cast, trailers and related titles
 Skip Intro and Skip Credits prompts powered by TheIntroDB
 Browse and search AIOStreams catalogs alongside your library
@@ -401,9 +442,9 @@ One search across channels, guide listings, movies and series
 Request new movies and shows through your server
 Multiple viewers with their own history and favorites
 Trakt watch history sync
+Several playlists on one device, each with its own favorites and guide
 libmpv playback with audio and subtitle track selection
 Fullscreen with F11 or Alt+Enter, and full keyboard navigation
-Built-in Logs and Diagnostics screen
 English, German, Spanish, French and Simplified Chinese
 ```
 
@@ -440,7 +481,7 @@ M three U TV
 Shown on Xbox and in some Store layouts in place of the full description.
 
 ```
-The Windows app for M3U Editor, the open-source, self-hosted IPTV and media platform. Watch live TV with a multi-day guide, catchup and Multiview, record with the DVR, and browse movies, series and AIOStreams catalogs with Continue Watching, Up Next and Trakt sync. M3U TV does not include any content: you need your own M3U Editor server and your own lawful sources.
+The Windows app for M3U Editor, the open-source, self-hosted IPTV and media platform. Watch live TV with a multi-day guide, catchup and Multiview, follow each day's games with live scores, record with the DVR, and browse movies, series and AIOStreams catalogs with Continue Watching, Up Next and Trakt sync. M3U TV does not include any content: you need your own M3U Editor server and your own lawful sources.
 ```
 
 ### Developed by (255)
@@ -539,6 +580,46 @@ Add a new subsection at the top for each release, built from the GitHub release 
 | Microsoft Store | What's new in this version | 1500 |
 
 The Apple notes follow the Apple rules above (no AIOStreams, no other platforms). Leave out desktop-only items such as fullscreen shortcuts.
+
+### v1.2.5
+
+#### Apple (tvOS, iOS and iPadOS)
+
+```
+• New Sports screen: each day's games with live scores, game details, and which of your own channels is showing them. Needs M3U Editor 0.14.1 or later with Sports turned on.
+• Follow your teams, with My Teams and a Sports row on Home.
+• Keep several playlists on one device and switch between them.
+• Navigation & Home: reorder the nav and Home rows, and hide the sections you don't use.
+• New Storage page shows what the app keeps on your device and clears each part on its own.
+• Guide previews now carry into full screen without restarting the stream.
+• Sort movies and series by title.
+• Smoother video on iPhone and iPad, performance improvements and many fixes.
+```
+
+#### Google Play
+
+```
+• New Sports screen: live scores and your channels showing each game. Needs M3U Editor 0.14.1+.
+• Keep several playlists on one device.
+• Reorder or hide nav and Home sections.
+• New Storage page.
+• Guide previews carry into full screen.
+• Sort movies and series by title.
+• Fixes the OK button on remotes like the Mi Box 3, and launch crashes on older phones and tablets.
+```
+
+#### Microsoft Store
+
+```
+• New Sports screen: each day's games with live scores, game details, and which of your own channels is showing them. Needs M3U Editor 0.14.1 or later with Sports turned on.
+• Follow your teams, with My Teams and a Sports row on Home.
+• Keep several playlists on one device and switch between them.
+• Navigation & Home: reorder the nav and Home rows, and hide the sections you don't use.
+• New Storage page shows what the app keeps on your device and clears each part on its own.
+• Guide previews now carry into full screen without restarting the stream.
+• Sort movies and series by title.
+• Performance improvements and many fixes.
+```
 
 ### v1.2.4
 
