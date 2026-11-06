@@ -1,3 +1,6 @@
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 
@@ -12,8 +15,18 @@ class SportsService {
 
   final XtreamService _xtream;
 
-  /// Every fixture of [leagues] starting in [from, to), soonest first.
-  /// Throws when the editor can't be reached or refuses the request.
+  /// The most leagues in one fixtures request. A first fetch of many leagues
+  /// can outlast a web request on the editor, and whatever a request does fetch
+  /// stays cached there.
+  static const int _fixturesBatchLeagues = 30;
+
+  /// How many fixtures requests run at once.
+  static const int _fixturesConcurrency = 3;
+
+  /// Every fixture of [leagues] starting in [from, to), soonest first. A long
+  /// list is fetched in batches, and if only some of them fail, the games from
+  /// the rest are still returned.
+  /// Throws when the editor can't be reached or refuses every request.
   Future<List<SportsFixture>> fixtures({
     required SportsCapability capability,
     required List<SportsLeague> leagues,
@@ -24,14 +37,44 @@ class SportsService {
     final cappedTo = to.difference(from).inDays > capability.maxRangeDays
         ? from.add(Duration(days: capability.maxRangeDays))
         : to;
-    final json = await _xtream.getSportsFixtures(
-      capability,
-      leagueIds: leagues.map((league) => league.id),
-      from: from,
-      to: cappedTo,
-    );
-    return parseFixtures(json, capability)
-      ..sort((a, b) => a.start.compareTo(b.start));
+    final batches = [
+      for (var i = 0; i < leagues.length; i += _fixturesBatchLeagues)
+        leagues.sublist(i, min(i + _fixturesBatchLeagues, leagues.length)),
+    ];
+    final fixtures = <SportsFixture>[];
+    Object? failure;
+    StackTrace? failureStack;
+    var failed = 0;
+    var next = 0;
+
+    Future<void> fetchBatches() async {
+      while (next < batches.length) {
+        final batch = batches[next++];
+        try {
+          final json = await _xtream.getSportsFixtures(
+            capability,
+            leagueIds: batch.map((league) => league.id),
+            from: from,
+            to: cappedTo,
+          );
+          fixtures.addAll(parseFixtures(json, capability));
+        } on Object catch (error, stack) {
+          debugPrint('[Sports] a batch of fixtures failed: $error');
+          failure = error;
+          failureStack = stack;
+          failed++;
+        }
+      }
+    }
+
+    await Future.wait([
+      for (var i = 0; i < min(_fixturesConcurrency, batches.length); i++)
+        fetchBatches(),
+    ]);
+    if (failed == batches.length) {
+      Error.throwWithStackTrace(failure!, failureStack!);
+    }
+    return fixtures..sort((a, b) => a.start.compareTo(b.start));
   }
 
   /// The channels showing each game of [leagues] starting in [from, to], by

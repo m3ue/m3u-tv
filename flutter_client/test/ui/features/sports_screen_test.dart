@@ -66,7 +66,15 @@ Future<XtreamService> _editor({
 }) async {
   final service = XtreamService(
     transport: (request) async {
-      requests?.add((action: request.action, params: request.params));
+      requests?.add((
+        action: request.action,
+        // A POST sends these in its body
+        params: {
+          ...request.params,
+          for (final MapEntry(:key, :value) in request.body.entries)
+            key: '$value',
+        },
+      ));
       if (request.action == 'get_sports_channels') {
         if (channels != null) return channels();
         return {

@@ -1577,7 +1577,8 @@ class XtreamService {
   );
 
   /// The channels showing each game of a day
-  /// ([SportsCapability.channelsAction]), raw.
+  /// ([SportsCapability.channelsAction]), raw. A POST, because a device can
+  /// list more leagues than fit in a URL.
   Future<Object?> getSportsChannels(
     SportsCapability capability, {
     required Iterable<String> leagueIds,
@@ -1585,7 +1586,8 @@ class XtreamService {
     required DateTime to,
   }) => _request(
     capability.channelsAction,
-    params: {
+    method: 'POST',
+    body: {
       'leagues': leagueIds.join(','),
       'from': '${from.millisecondsSinceEpoch ~/ 1000}',
       'to': '${to.millisecondsSinceEpoch ~/ 1000}',

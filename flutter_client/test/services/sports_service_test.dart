@@ -277,7 +277,8 @@ void main() {
     );
 
     expect(requests.last.action, 'get_sports_channels');
-    expect(requests.last.params, {
+    expect(requests.last.method, 'POST');
+    expect(requests.last.body, {
       'leagues': 'hockey/nhl,soccer/eng.1',
       'from': '${from.millisecondsSinceEpoch ~/ 1000}',
       'to': '${to.millisecondsSinceEpoch ~/ 1000}',
@@ -301,6 +302,115 @@ void main() {
     // PHP sends an empty map as an object, but never mind a list
     expect(SportsService.parseChannels({'channels': <Object>[]}), isEmpty);
     expect(SportsService.parseChannels('junk'), isEmpty);
+  });
+
+  group('a long league list', () {
+    final leagues = [
+      for (var i = 0; i < 70; i++)
+        {'id': 'soccer/league.$i', 'name': 'League $i'},
+    ];
+    final capability = SportsCapability.fromJson({
+      ..._sportsPayload(),
+      'leagues': leagues,
+    });
+    final from = DateTime.utc(2026, 11, 3);
+    final to = DateTime.utc(2026, 11, 4);
+
+    /// A service whose fixtures requests go to [answer].
+    Future<(XtreamService, List<XtreamRequest>)> service(
+      Object? Function(XtreamRequest request) answer,
+    ) async {
+      final requests = <XtreamRequest>[];
+      final xtream = XtreamService(
+        transport: (request) async {
+          if (request.action == null) {
+            return {
+              'user_info': {'auth': 1, 'status': 'Active'},
+              'server_info': {'timezone': 'UTC'},
+              'm3u_editor': {
+                'version': '0.14.1',
+                'features': ['sports'],
+                'sports': _sportsPayload(),
+              },
+            };
+          }
+          requests.add(request);
+          return answer(request);
+        },
+      );
+      await xtream.authenticate(_credentials);
+      return (xtream, requests);
+    }
+
+    Map<String, Object?> gameOfFirstLeague(XtreamRequest request) {
+      final league = request.params['leagues']!.split(',').first;
+      final number = league.split('.').last;
+      return {
+        'fixtures': [
+          _fixture(
+            number,
+            '2026-11-03T${number.padLeft(2, '0')}:00:00Z',
+            league: league,
+          ),
+        ],
+      };
+    }
+
+    test('is fetched in short batches and merged, soonest first', () async {
+      final (xtream, requests) = await service(gameOfFirstLeague);
+
+      final fixtures = await SportsService(xtream).fixtures(
+        capability: capability,
+        leagues: capability.leagues,
+        from: from,
+        to: to,
+      );
+
+      expect(requests, hasLength(3));
+      final asked = [
+        for (final request in requests)
+          ...request.params['leagues']!.split(','),
+      ];
+      expect(asked.toSet(), hasLength(70));
+      expect(
+        requests.map((request) => request.params['leagues']!.split(',').length),
+        everyElement(lessThanOrEqualTo(30)),
+      );
+      expect(fixtures.map((fixture) => fixture.id), ['0', '30', '60']..sort());
+      expect(fixtures.first.start.isBefore(fixtures.last.start), isTrue);
+    });
+
+    test('keeps the games of the batches that worked', () async {
+      final (xtream, _) = await service((request) {
+        if (request.params['leagues']!.startsWith('soccer/league.30,')) {
+          throw Exception('timed out');
+        }
+        return gameOfFirstLeague(request);
+      });
+
+      final fixtures = await SportsService(xtream).fixtures(
+        capability: capability,
+        leagues: capability.leagues,
+        from: from,
+        to: to,
+      );
+
+      expect(fixtures.map((fixture) => fixture.id), ['0', '60']);
+    });
+
+    test('fails when every batch does', () async {
+      final (xtream, _) = await service((_) => throw Exception('down'));
+
+      expect(
+        SportsService(xtream).fixtures(
+          capability: capability,
+          leagues: capability.leagues,
+          from: from,
+          to: to,
+        ),
+        throwsException,
+      );
+    });
   });
 
   test("caps a request at the editor's longest range", () async {
