@@ -366,6 +366,96 @@ class SettingsSectionHeader extends StatelessWidget {
   }
 }
 
+/// A [SingleChildScrollView] that a remote can see all of. Focus only stops on
+/// focusable items and each only scrolls itself into view, so a card or heading
+/// above the first one or below the last one would otherwise stay cut off.
+/// Focus reaching either end scrolls the page to that end.
+class SettingsScrollView extends StatefulWidget {
+  const SettingsScrollView({super.key, this.padding, required this.child});
+
+  final EdgeInsetsGeometry? padding;
+  final Widget child;
+
+  @override
+  State<SettingsScrollView> createState() => _SettingsScrollViewState();
+}
+
+class _SettingsScrollViewState extends State<SettingsScrollView> {
+  final ScrollController _controller = ScrollController();
+  final FocusNode _contentFocusNode = FocusNode(
+    debugLabel: 'settingsScrollContent',
+    canRequestFocus: false,
+    skipTraversal: true,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    FocusManager.instance.addListener(_onPrimaryFocusChanged);
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeListener(_onPrimaryFocusChanged);
+    _contentFocusNode.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onPrimaryFocusChanged() {
+    if (!_contentFocusNode.hasFocus ||
+        FocusManager.instance.highlightMode == FocusHighlightMode.touch) {
+      return;
+    }
+    // The manager notifies after the focus nodes, so this callback runs after
+    // the one DpadFocusable just queued for its own reveal, and overrides it.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _revealPageEnd());
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  void _revealPageEnd() {
+    final focused = FocusManager.instance.primaryFocus;
+    if (!mounted ||
+        focused == null ||
+        !_contentFocusNode.hasFocus ||
+        !_controller.hasClients) {
+      return;
+    }
+    final focusedRect = focused.rect;
+    final items = _contentFocusNode.traversalDescendants;
+    // With a little tolerance, for a row of side by side buttons
+    final isFirst = !items.any((n) => n.rect.top < focusedRect.top - 1);
+    final isLast = !items.any((n) => n.rect.bottom > focusedRect.bottom + 1);
+    // The only item on the page stays wherever its own reveal puts it.
+    if (isFirst == isLast) return;
+
+    // Stops early if the page's end is too far away to keep the item on screen.
+    final viewport = context.findRenderObject()! as RenderBox;
+    final viewportRect = viewport.localToGlobal(Offset.zero) & viewport.size;
+    final position = _controller.position;
+    final target = isFirst
+        ? position.pixels - (viewportRect.bottom - focusedRect.bottom)
+        : position.pixels + (focusedRect.top - viewportRect.top);
+    _controller.animateTo(
+      target.clamp(position.minScrollExtent, position.maxScrollExtent),
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: _contentFocusNode,
+      child: SingleChildScrollView(
+        controller: _controller,
+        padding: widget.padding,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 /// A `Scaffold` + `AppBar` matching the app's other immersive top-level
 /// pages byte-for-byte (`show_detail_screen.dart`,
 /// `dvr_series_rule_options_screen.dart`): same `AppIconButton` back button,
@@ -438,13 +528,13 @@ Future<T?> pushSettingsSubpage<T>(
     content: (context) => _settingsSubpageScaffold(
       context,
       title: title,
-      body: SingleChildScrollView(child: builder(context)),
+      body: SettingsScrollView(child: builder(context)),
     ),
   );
 }
 
 /// Like [pushSettingsSubpage], but gives [builder] the full remaining height
-/// instead of wrapping it in a [SingleChildScrollView], for sub-pages that
+/// instead of wrapping it in a [SettingsScrollView], for sub-pages that
 /// manage their own scrolling/layout (e.g. the Release Notes master/detail
 /// view).
 Future<T?> pushSettingsSubpageFullHeight<T>(

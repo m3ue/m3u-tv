@@ -139,7 +139,7 @@ class _ConnectedViewState extends State<ConnectedView> {
     final auth = widget.authNotifier.authResponse;
     final hasViewSettings = widget.viewSettingsService != null;
 
-    return SingleChildScrollView(
+    return SettingsScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

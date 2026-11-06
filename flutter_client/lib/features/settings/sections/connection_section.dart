@@ -161,7 +161,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
         service.status != DevicePairingStatus.idle) {
       return DpadRegion(
         memoryKey: 'device-pairing',
-        child: SingleChildScrollView(
+        child: SettingsScrollView(
           padding: const EdgeInsets.all(32),
           child: _DevicePairingBody(
             service: service,
@@ -178,7 +178,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
     if (service == null) {
       // No pairing service available - a single manual sign-in form, same
       // as before device pairing existed.
-      return SingleChildScrollView(
+      return SettingsScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -222,7 +222,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
             controller: _tabController,
             children: [
               if (_hasSavedPlaylists)
-                SingleChildScrollView(
+                SettingsScrollView(
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -244,7 +244,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
                     ],
                   ),
                 ),
-              SingleChildScrollView(
+              SettingsScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -296,7 +296,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
                   ],
                 ),
               ),
-              SingleChildScrollView(
+              SettingsScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
