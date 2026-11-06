@@ -571,4 +571,116 @@ void main() {
 
     expect(scrollable.position.pixels, greaterThan(0));
   });
+
+  group('back up to the top', () {
+    ScrollableState pageScrollable(WidgetTester tester) =>
+        tester.state<ScrollableState>(
+          find
+              .descendant(
+                of: find.byType(SportsFixtureDetailsScreen),
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                ),
+              )
+              .first,
+        );
+
+    Future<void> press(WidgetTester tester, LogicalKeyboardKey key) async {
+      await tester.sendKeyEvent(key);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('Up to the Follow buttons shows the whole header', (
+      tester,
+    ) async {
+      responses = [
+        {'details': _details()},
+      ];
+      await pumpHost(
+        tester,
+        fixture: _game(SportsFixtureState.finished),
+        size: const Size(600, 400),
+      );
+      final scrollable = pageScrollable(tester);
+      final reading = FocusManager.instance.primaryFocus;
+
+      for (var i = 0; i < 4; i++) {
+        await press(tester, LogicalKeyboardKey.arrowDown);
+      }
+      expect(scrollable.position.pixels, greaterThan(0));
+
+      for (var i = 0; i < 12; i++) {
+        if (FocusManager.instance.primaryFocus != reading) break;
+        await press(tester, LogicalKeyboardKey.arrowUp);
+      }
+
+      expect(FocusManager.instance.primaryFocus, isNot(reading));
+      expect(scrollable.position.pixels, 0);
+    });
+
+    testWidgets('Up to the first channel shows the whole header', (
+      tester,
+    ) async {
+      responses = [
+        {'details': _details(state: 'live')},
+      ];
+      tester.view
+        ..physicalSize = const Size(600, 400)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final xtream = await editor();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sportsCapabilityProvider.overrideWith((_) => _capability),
+            sportsServiceProvider.overrideWith((_) => SportsService(xtream)),
+            sportsSettingsProvider.overrideWith((_) => settings),
+          ],
+          child: Dpad(
+            child: MaterialApp(
+              theme: ThemeData.dark(useMaterial3: true),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Builder(
+                builder: (context) => Scaffold(
+                  body: TextButton(
+                    onPressed: () => openSportsFixtureDetails(
+                      context,
+                      fixture: _game(SportsFixtureState.live),
+                      matches: const [
+                        SportsChannelMatch(channel: _channel),
+                        SportsChannelMatch(channel: _channel),
+                      ],
+                      onChannelSelect: (_) {},
+                    ),
+                    child: const Text('Open game'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open game'));
+      await tester.pumpAndSettle();
+      final scrollable = pageScrollable(tester);
+      final firstChannel = FocusManager.instance.primaryFocus;
+
+      for (var i = 0; i < 5; i++) {
+        await press(tester, LogicalKeyboardKey.arrowDown);
+      }
+      expect(FocusManager.instance.primaryFocus, isNot(firstChannel));
+      expect(scrollable.position.pixels, greaterThan(0));
+
+      for (var i = 0; i < 12; i++) {
+        if (FocusManager.instance.primaryFocus == firstChannel) break;
+        await press(tester, LogicalKeyboardKey.arrowUp);
+      }
+
+      expect(FocusManager.instance.primaryFocus, firstChannel);
+      expect(scrollable.position.pixels, 0);
+    });
+  });
 }

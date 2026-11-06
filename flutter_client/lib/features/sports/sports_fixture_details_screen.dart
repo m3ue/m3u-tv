@@ -199,6 +199,18 @@ class _SportsFixtureDetailsScreenState
     widget.onChannelSelect(match.channel);
   }
 
+  /// For focus landing on the top of the page. Whatever triggers this needs
+  /// `autoScroll: false`, or its partial reveal overrides this animation and
+  /// the page stops short of the top.
+  void _scrollToTop() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+    );
+  }
+
   double get _scrollStep =>
       (_scrollController.position.viewportDimension * 0.4).clamp(120.0, 400.0);
 
@@ -299,10 +311,17 @@ class _SportsFixtureDetailsScreenState
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _Matchup(
-                            fixture: _fixture,
-                            sides: _SidePair.of(_fixture),
-                            details: _details,
+                          Focus(
+                            canRequestFocus: false,
+                            skipTraversal: true,
+                            onFocusChange: (hasFocus) {
+                              if (hasFocus) _scrollToTop();
+                            },
+                            child: _Matchup(
+                              fixture: _fixture,
+                              sides: _SidePair.of(_fixture),
+                              details: _details,
+                            ),
                           ),
                           if (canWatch)
                             _Section(
@@ -310,6 +329,7 @@ class _SportsFixtureDetailsScreenState
                               child: _ChannelList(
                                 matches: widget.matches,
                                 onWatch: _watch,
+                                onFirstRowFocused: _scrollToTop,
                               ),
                             ),
                           DpadFocusable(
@@ -659,6 +679,8 @@ class _FollowChip extends StatelessWidget {
     final scale = FontSizeScope.scaleOf(context);
     return DpadInkWell(
       onTap: onTap,
+      // The Focus around the matchup scrolls to the top instead
+      autoScroll: false,
       color: theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.7),
       borderRadius: BorderRadius.circular(50),
       child: Padding(
@@ -691,10 +713,15 @@ class _FollowChip extends StatelessWidget {
 /// Every channel carrying the game, each a press away from playing. Long
 /// names drag sideways, as the row can't show them whole.
 class _ChannelList extends StatelessWidget {
-  const _ChannelList({required this.matches, required this.onWatch});
+  const _ChannelList({
+    required this.matches,
+    required this.onWatch,
+    required this.onFirstRowFocused,
+  });
 
   final List<SportsChannelMatch> matches;
   final ValueChanged<SportsChannelMatch> onWatch;
+  final VoidCallback onFirstRowFocused;
 
   @override
   Widget build(BuildContext context) {
@@ -705,6 +732,7 @@ class _ChannelList extends StatelessWidget {
           _ChannelRow(
             match: match,
             autofocus: index == 0,
+            onFocused: index == 0 ? onFirstRowFocused : null,
             onTap: () => onWatch(match),
           ),
       ],
@@ -716,11 +744,16 @@ class _ChannelRow extends StatelessWidget {
   const _ChannelRow({
     required this.match,
     required this.autofocus,
+    required this.onFocused,
     required this.onTap,
   });
 
   final SportsChannelMatch match;
   final bool autofocus;
+
+  /// Takes over scrolling for this row when set, in place of the partial
+  /// reveal the other rows use.
+  final VoidCallback? onFocused;
   final VoidCallback onTap;
 
   @override
@@ -743,9 +776,16 @@ class _ChannelRow extends StatelessWidget {
     final detailStyle = theme.textTheme.labelSmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
+    final onFocused = this.onFocused;
     return DpadInkWell(
       onTap: onTap,
       autofocus: autofocus,
+      autoScroll: onFocused == null,
+      onFocusChange: onFocused == null
+          ? null
+          : (hasFocus) {
+              if (hasFocus) onFocused();
+            },
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: EdgeInsets.all(6 * scale),
