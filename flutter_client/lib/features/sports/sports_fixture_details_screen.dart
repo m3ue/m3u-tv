@@ -113,9 +113,17 @@ class _SportsFixtureDetailsScreenState
   /// The editor caches a live game's details for about this long.
   static const Duration _refreshInterval = Duration(seconds: 30);
 
-  final ScrollController _scrollController = ScrollController();
-  final GlobalKey _readingKey = GlobalKey();
-  bool _isReading = false;
+  /// The least room, in units of the viewer's font size, for the scoreboard
+  /// and columns. Anything less (phones, portrait) keeps the single column.
+  static const double _columnsMinWidth = 900;
+  static const double _columnsMinHeight = 480;
+
+  /// Keeps the columns readable on very wide windows.
+  static const double _columnsMaxWidth = 1600;
+
+  final GlobalKey<_ReadingPaneState> _leftPane = GlobalKey();
+  final GlobalKey<_ReadingPaneState> _rightPane = GlobalKey();
+
   late SportsFixture _fixture = widget.fixture;
   SportsFixtureDetails? _details;
   bool _isLoading = true;
@@ -141,7 +149,6 @@ class _SportsFixtureDetailsScreenState
   @override
   void dispose() {
     _refreshTimer?.cancel();
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -199,67 +206,18 @@ class _SportsFixtureDetailsScreenState
     widget.onChannelSelect(match.channel);
   }
 
-  /// For focus landing on the top of the page. Whatever triggers this needs
-  /// `autoScroll: false`, or its partial reveal overrides this animation and
-  /// the page stops short of the top.
-  void _scrollToTop() {
-    if (!_scrollController.hasClients) return;
-    _scrollController.animateTo(
-      0,
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOut,
-    );
-  }
-
-  double get _scrollStep =>
-      (_scrollController.position.viewportDimension * 0.4).clamp(120.0, 400.0);
-
-  void _scrollBy(double delta) {
-    if (!_scrollController.hasClients) return;
-    final position = _scrollController.position;
-    final target = (position.pixels + delta).clamp(
-      position.minScrollExtent,
-      position.maxScrollExtent,
-    );
-    if ((target - position.pixels).abs() < 0.5) return;
-    _scrollController.animateTo(
-      target,
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeOut,
-    );
-  }
-
-  /// Whether the top of the sections below the buttons is on screen, so Up
-  /// has nothing left to read and can move to those buttons.
-  bool get _readingTopVisible {
-    final box = _readingKey.currentContext?.findRenderObject();
-    if (box == null || !_scrollController.hasClients) return true;
-    final top = RenderAbstractViewport.of(box).getOffsetToReveal(box, 0).offset;
-    return _scrollController.position.pixels <= top + 0.5;
-  }
-
-  // The sections can't hold focus themselves, so one focus target covers them
-  // and Up and Down read through them.
-  bool _onReadingDirection(TraversalDirection direction) {
-    if (!_scrollController.hasClients) return true;
-    switch (direction) {
-      case TraversalDirection.up:
-        if (_readingTopVisible) return false;
-        _scrollBy(-_scrollStep);
-      case TraversalDirection.down:
-        _scrollBy(_scrollStep);
-      case TraversalDirection.left:
-      case TraversalDirection.right:
-        break;
-    }
-    return true;
+  bool _usesColumns(double scale) {
+    final size = MediaQuery.sizeOf(context);
+    return size.width > size.height &&
+        size.width >= _columnsMinWidth * scale &&
+        size.height >= _columnsMinHeight * scale;
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scale = FontSizeScope.scaleOf(context);
-    final canWatch = _canWatch;
+    final usesColumns = _usesColumns(scale);
     final theme = Theme.of(context);
     final wash = [
       for (final side in _fixture.displayOrder) sportsTeamWash(side.team),
@@ -282,7 +240,10 @@ class _SportsFixtureDetailsScreenState
           child: Scaffold(
             backgroundColor: Colors.transparent,
             appBar: AppTopBar(
-              title: Text(l10n.sportsDetailsTitle),
+              // The scoreboard has no line of its own for the league
+              title: usesColumns
+                  ? _LeagueLabel(fixture: _fixture)
+                  : Text(l10n.sportsDetailsTitle),
               scale: scale,
               leadingInset:
                   HostPlatform.isMacOS &&
@@ -293,71 +254,9 @@ class _SportsFixtureDetailsScreenState
             ),
             body: SafeArea(
               top: false,
-              child: Scrollbar(
-                controller: _scrollController,
-                // While reading, nothing else shows a remote user where focus is.
-                thumbVisibility: _isReading,
-                child: SingleChildScrollView(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(
-                    MediaBrowsingMetrics.pagePadding,
-                    8,
-                    MediaBrowsingMetrics.pagePadding,
-                    24,
-                  ),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: 860 * scale),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Focus(
-                            canRequestFocus: false,
-                            skipTraversal: true,
-                            onFocusChange: (hasFocus) {
-                              if (hasFocus) _scrollToTop();
-                            },
-                            child: _Matchup(
-                              fixture: _fixture,
-                              sides: _SidePair.of(_fixture),
-                              details: _details,
-                            ),
-                          ),
-                          if (canWatch)
-                            _Section(
-                              title: l10n.sportsDetailsOnYourChannels,
-                              child: _ChannelList(
-                                matches: widget.matches,
-                                onWatch: _watch,
-                                onFirstRowFocused: _scrollToTop,
-                              ),
-                            ),
-                          DpadFocusable(
-                            key: _readingKey,
-                            autofocus: !canWatch,
-                            // Only here for D-pad scrolling; the scrollbar shows
-                            // focus, as a border around the whole page would look
-                            // selected on touch.
-                            effects: const [],
-                            // It can be taller than the page; revealing it would
-                            // jump past the top.
-                            autoScroll: false,
-                            // Nothing to activate; a tap should just scroll (touch).
-                            tapToSelect: false,
-                            onDirection: _onReadingDirection,
-                            onFocusChange: (focused) =>
-                                setState(() => _isReading = focused),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: _buildSections(l10n, _details),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+              child: usesColumns
+                  ? _buildColumns(l10n, scale)
+                  : _buildSingleColumn(l10n, scale),
             ),
           ),
         ),
@@ -365,71 +264,233 @@ class _SportsFixtureDetailsScreenState
     );
   }
 
-  List<Widget> _buildSections(
+  Widget _buildChannelsSection(
     AppLocalizations l10n,
-    SportsFixtureDetails? details,
-  ) {
+    VoidCallback scrollToTop,
+  ) => _Section(
+    title: l10n.sportsDetailsOnYourChannels,
+    child: _ChannelList(
+      matches: widget.matches,
+      onWatch: _watch,
+      onFirstRowFocused: scrollToTop,
+    ),
+  );
+
+  Widget _buildSingleColumn(AppLocalizations l10n, double scale) {
+    final canWatch = _canWatch;
+    final sections = _sections(l10n);
+    return _ReadingPane(
+      padding: const EdgeInsets.fromLTRB(
+        MediaBrowsingMetrics.pagePadding,
+        8,
+        MediaBrowsingMetrics.pagePadding,
+        24,
+      ),
+      maxContentWidth: 860 * scale,
+      autofocus: !canWatch,
+      leading: (scrollToTop) => [
+        Focus(
+          canRequestFocus: false,
+          skipTraversal: true,
+          onFocusChange: (hasFocus) {
+            if (hasFocus) scrollToTop();
+          },
+          child: _Matchup(
+            fixture: _fixture,
+            sides: _SidePair.of(_fixture),
+            details: _details,
+          ),
+        ),
+        if (canWatch) _buildChannelsSection(l10n, scrollToTop),
+      ],
+      sections: [
+        ...sections.status,
+        ?sections.lineScore,
+        ?sections.events,
+        ?sections.stats,
+        ?sections.leaders,
+        ?sections.info,
+      ],
+    );
+  }
+
+  /// The scoreboard over two columns, which scroll separately: what can be
+  /// acted on or changes most on the left, the numbers on the right. Game info
+  /// goes left too, under the shorter column, unless it's all there is.
+  Widget _buildColumns(AppLocalizations l10n, double scale) {
+    final canWatch = _canWatch;
+    final hasTeams = _fixture.hasTeams;
+    final isLive = _fixture.state == SportsFixtureState.live;
+    final sections = _sections(l10n, newestEventsFirst: isLive);
+    final infoOnLeft = sections.stats != null || sections.leaders != null;
+    final left = [
+      ...sections.status,
+      ?sections.events,
+      if (infoOnLeft) ?sections.info,
+    ];
+    final right = [
+      ?sections.stats,
+      ?sections.leaders,
+      if (!infoOnLeft) ?sections.info,
+    ];
+    final hasLeft = canWatch || left.isNotEmpty;
+    final hasRight = right.isNotEmpty;
+    final gutter = 10 * scale;
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: _columnsMaxWidth * scale),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: MediaBrowsingMetrics.pagePadding,
+              ),
+              child: _Scoreboard(
+                fixture: _fixture,
+                sides: _SidePair.of(_fixture),
+                details: _details,
+                // An empty focus target would hide where focus is
+                autofocusFollow: !canWatch && hasTeams,
+              ),
+            ),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (hasLeft)
+                    Expanded(
+                      key: const ValueKey('sports-details-left'),
+                      child: _ReadingPane(
+                        key: _leftPane,
+                        padding: EdgeInsets.fromLTRB(
+                          MediaBrowsingMetrics.pagePadding,
+                          0,
+                          hasRight ? gutter : MediaBrowsingMetrics.pagePadding,
+                          24,
+                        ),
+                        onSideways: _moveBetweenPanes,
+                        autofocus: !canWatch && !hasTeams,
+                        leading: (scrollToTop) => [
+                          if (canWatch)
+                            _buildChannelsSection(l10n, scrollToTop),
+                        ],
+                        sections: left,
+                      ),
+                    ),
+                  if (hasRight)
+                    Expanded(
+                      key: const ValueKey('sports-details-right'),
+                      child: _ReadingPane(
+                        key: _rightPane,
+                        padding: EdgeInsets.fromLTRB(
+                          hasLeft ? gutter : MediaBrowsingMetrics.pagePadding,
+                          0,
+                          MediaBrowsingMetrics.pagePadding,
+                          24,
+                        ),
+                        onSideways: _moveBetweenPanes,
+                        leading: (_) => const [],
+                        sections: right,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _moveBetweenPanes(TraversalDirection direction) {
+    final target = direction == TraversalDirection.left
+        ? _leftPane
+        : _rightPane;
+    target.currentState?.enter();
+  }
+
+  /// The game's sections, each null when there's nothing to put in it.
+  ({
+    List<Widget> status,
+    Widget? lineScore,
+    Widget? events,
+    Widget? stats,
+    Widget? leaders,
+    Widget? info,
+  })
+  _sections(AppLocalizations l10n, {bool newestEventsFirst = false}) {
+    final details = _details;
     final sides = _SidePair.of(_fixture);
     final isUpcoming = _fixture.state == SportsFixtureState.scheduled;
     final lineScore = details?.lineScore;
     final infoRows = _infoRows(l10n, details);
-    final sections = <Widget>[
-      if (lineScore != null)
-        _Section(
-          title: l10n.sportsDetailsLineScore,
-          child: _LineScoreTable(lineScore: lineScore, sides: sides),
-        ),
-      if (details != null && details.events.isNotEmpty)
-        _Section(
-          title: l10n.sportsDetailsEvents,
-          child: _EventList(events: details.events, sides: sides),
-        ),
-      if (details != null && details.stats.isNotEmpty)
-        _Section(
-          // Before a game, the provider's numbers are its season so far
-          title: isUpcoming
-              ? l10n.sportsDetailsSeasonStats
-              : l10n.sportsDetailsStats,
-          child: _StatList(stats: details.stats, sides: sides),
-        ),
-      if (details != null && details.leaders.isNotEmpty)
-        _Section(
-          title: isUpcoming
-              ? l10n.sportsDetailsSeasonLeaders
-              : l10n.sportsDetailsLeaders,
-          child: _LeaderList(categories: details.leaders, sides: sides),
-        ),
-      if (infoRows.isNotEmpty)
-        _Section(
-          title: l10n.sportsDetailsInfo,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: infoRows,
-          ),
-        ),
-    ];
     final message = _loadFailed
         ? l10n.sportsDetailsLoadFailed
         : !_isLoading && details == null
         ? l10n.sportsDetailsUnavailable
         : null;
-    return [
-      if (_isLoading)
-        const Padding(
-          padding: EdgeInsets.all(32),
-          child: Center(child: AppLoadingIndicator()),
-        ),
-      if (message != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 20),
-          child: Text(
-            message,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
+    return (
+      status: [
+        if (_isLoading)
+          const Padding(
+            padding: EdgeInsets.all(32),
+            child: Center(child: AppLoadingIndicator()),
           ),
-        ),
-      ...sections,
-    ];
+        if (message != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 20),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+      ],
+      lineScore: lineScore == null
+          ? null
+          : _Section(
+              title: l10n.sportsDetailsLineScore,
+              child: _LineScoreTable(lineScore: lineScore, sides: sides),
+            ),
+      events: details == null || details.events.isEmpty
+          ? null
+          : _Section(
+              title: l10n.sportsDetailsEvents,
+              child: _EventList(
+                events: newestEventsFirst
+                    ? details.events.reversed.toList()
+                    : details.events,
+                sides: sides,
+              ),
+            ),
+      stats: details == null || details.stats.isEmpty
+          ? null
+          : _Section(
+              // Before a game, the provider's numbers are its season so far
+              title: isUpcoming
+                  ? l10n.sportsDetailsSeasonStats
+                  : l10n.sportsDetailsStats,
+              child: _StatList(stats: details.stats, sides: sides),
+            ),
+      leaders: details == null || details.leaders.isEmpty
+          ? null
+          : _Section(
+              title: isUpcoming
+                  ? l10n.sportsDetailsSeasonLeaders
+                  : l10n.sportsDetailsLeaders,
+              child: _LeaderList(categories: details.leaders, sides: sides),
+            ),
+      info: infoRows.isEmpty
+          ? null
+          : _Section(
+              title: l10n.sportsDetailsInfo,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: infoRows,
+              ),
+            ),
+    );
   }
 
   List<Widget> _infoRows(
@@ -472,6 +533,176 @@ class _SportsFixtureDetailsScreenState
           value: officials.join(', '),
         ),
     ];
+  }
+}
+
+/// A scrolling stretch of the page: [leading] focusable content, then
+/// [sections], which can't hold focus themselves, so one focus target covers
+/// them and Up and Down read through them.
+class _ReadingPane extends StatefulWidget {
+  const _ReadingPane({
+    super.key,
+    required this.padding,
+    required this.leading,
+    required this.sections,
+    this.maxContentWidth,
+    this.autofocus = false,
+    this.onSideways,
+  });
+
+  final EdgeInsets padding;
+
+  /// Given a callback for focus landing on the top of the pane. Whatever
+  /// triggers it needs `autoScroll: false`, or its partial reveal overrides
+  /// the animation and the pane stops short of the top.
+  final List<Widget> Function(VoidCallback scrollToTop) leading;
+  final List<Widget> sections;
+  final double? maxContentWidth;
+  final bool autofocus;
+
+  /// Set on panes side by side, for Left and Right from the sections. Plain
+  /// traversal can't be trusted there: it measures from the centre of a target
+  /// that may be far taller than the screen. The sections also only take focus
+  /// when there's something to scroll to.
+  final ValueChanged<TraversalDirection>? onSideways;
+
+  @override
+  State<_ReadingPane> createState() => _ReadingPaneState();
+}
+
+class _ReadingPaneState extends State<_ReadingPane> {
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _readingKey = GlobalKey();
+  final FocusNode _contentNode = FocusNode(
+    canRequestFocus: false,
+    skipTraversal: true,
+  );
+  bool _isReading = false;
+  bool _canScroll = false;
+
+  /// Focuses the first thing in the pane, if there's anything to focus.
+  void enter() => _contentNode.traversalDescendants.firstOrNull?.requestFocus();
+
+  @override
+  void dispose() {
+    _contentNode.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToTop() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+    );
+  }
+
+  double get _scrollStep =>
+      (_scrollController.position.viewportDimension * 0.4).clamp(120.0, 400.0);
+
+  void _scrollBy(double delta) {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final target = (position.pixels + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if ((target - position.pixels).abs() < 0.5) return;
+    _scrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+    );
+  }
+
+  /// Whether the top of the sections is on screen, so Up has nothing left to
+  /// read and can move on.
+  bool get _readingTopVisible {
+    final box = _readingKey.currentContext?.findRenderObject();
+    if (box == null || !_scrollController.hasClients) return true;
+    final top = RenderAbstractViewport.of(box).getOffsetToReveal(box, 0).offset;
+    return _scrollController.position.pixels <= top + 0.5;
+  }
+
+  bool _onReadingDirection(TraversalDirection direction) {
+    if (!_scrollController.hasClients) return true;
+    switch (direction) {
+      case TraversalDirection.up:
+        if (_readingTopVisible) return false;
+        _scrollBy(-_scrollStep);
+      case TraversalDirection.down:
+        _scrollBy(_scrollStep);
+      case TraversalDirection.left:
+      case TraversalDirection.right:
+        widget.onSideways?.call(direction);
+    }
+    return true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ...widget.leading(_scrollToTop),
+        if (widget.sections.isNotEmpty)
+          DpadFocusable(
+            key: _readingKey,
+            enabled:
+                widget.onSideways == null ||
+                widget.autofocus ||
+                _canScroll ||
+                _isReading,
+            autofocus: widget.autofocus,
+            // Only here for D-pad scrolling; the scrollbar shows focus, as a
+            // border around the whole page would look selected on touch.
+            effects: const [],
+            // It can be taller than the page; revealing it would jump past
+            // the top.
+            autoScroll: false,
+            // Nothing to activate; a tap should just scroll (touch).
+            tapToSelect: false,
+            onDirection: _onReadingDirection,
+            onFocusChange: (focused) => setState(() => _isReading = focused),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: widget.sections,
+            ),
+          ),
+      ],
+    );
+    final maxContentWidth = widget.maxContentWidth;
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: (notification) {
+        final canScroll = notification.metrics.maxScrollExtent > 0;
+        if (notification.depth == 0 && canScroll != _canScroll) {
+          setState(() => _canScroll = canScroll);
+        }
+        return false;
+      },
+      child: Focus(
+        focusNode: _contentNode,
+        child: Scrollbar(
+          controller: _scrollController,
+          // While reading, nothing else shows a remote user where focus is.
+          thumbVisibility: _isReading,
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            padding: widget.padding,
+            child: maxContentWidth == null
+                ? content
+                : Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: maxContentWidth),
+                      child: content,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -518,9 +749,7 @@ class _Matchup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final scale = FontSizeScope.scaleOf(context);
-    final leagueLogo = fixture.leagueLogoUrl;
     final record = {
       SportsSide.home: details?.homeRecord,
       SportsSide.away: details?.awayRecord,
@@ -528,23 +757,7 @@ class _Matchup extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (leagueLogo != null) ...[
-              SportsTeamLogo(url: leagueLogo, size: 22 * scale),
-              SizedBox(width: 8 * scale),
-            ],
-            Flexible(
-              child: Text(
-                fixture.league.name,
-                style: theme.textTheme.titleSmall,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
+        _LeagueLabel(fixture: fixture),
         SizedBox(height: 12 * scale),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -577,12 +790,184 @@ class _Matchup extends StatelessWidget {
   }
 }
 
-/// The start time before a game; the score and status once it's under way.
-class _MatchupCenter extends StatelessWidget {
-  const _MatchupCenter({required this.fixture, required this.sides});
+class _LeagueLabel extends StatelessWidget {
+  const _LeagueLabel({required this.fixture});
+
+  final SportsFixture fixture;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = FontSizeScope.scaleOf(context);
+    final leagueLogo = fixture.leagueLogoUrl;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (leagueLogo != null) ...[
+          SportsTeamLogo(url: leagueLogo, size: 22 * scale),
+          SizedBox(width: 8 * scale),
+        ],
+        Flexible(
+          child: Text(
+            fixture.league.name,
+            style: Theme.of(context).textTheme.titleSmall,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// [_Matchup] for wide screens, as short as it can be to leave room below:
+/// each team beside its crest, with the score by period under the score.
+class _Scoreboard extends StatelessWidget {
+  const _Scoreboard({
+    required this.fixture,
+    required this.sides,
+    required this.details,
+    required this.autofocusFollow,
+  });
 
   final SportsFixture fixture;
   final _SidePair sides;
+  final SportsFixtureDetails? details;
+  final bool autofocusFollow;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = FontSizeScope.scaleOf(context);
+    final details = this.details;
+    String? recordOf(SportsSide side) =>
+        side == SportsSide.home ? details?.homeRecord : details?.awayRecord;
+    return Row(
+      children: [
+        Expanded(
+          flex: 4,
+          child: _ScoreboardTeam(
+            competitor: sides.competitor(sides.first),
+            record: recordOf(sides.first),
+            autofocusFollow: autofocusFollow,
+          ),
+        ),
+        SizedBox(width: 16 * scale),
+        Expanded(
+          flex: 3,
+          child: _MatchupCenter(
+            fixture: fixture,
+            sides: sides,
+            inlineStatus: true,
+            lineScore: details?.lineScore,
+          ),
+        ),
+        SizedBox(width: 16 * scale),
+        Expanded(
+          flex: 4,
+          child: _ScoreboardTeam(
+            competitor: sides.competitor(sides.second),
+            record: recordOf(sides.second),
+            mirrored: true,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ScoreboardTeam extends ConsumerWidget {
+  const _ScoreboardTeam({
+    required this.competitor,
+    required this.record,
+    this.mirrored = false,
+    this.autofocusFollow = false,
+  });
+
+  final SportsCompetitor? competitor;
+  final String? record;
+
+  /// The right-hand team: crest on the outside, text against the score.
+  final bool mirrored;
+  final bool autofocusFollow;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final competitor = this.competitor;
+    if (competitor == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final scale = FontSizeScope.scaleOf(context);
+    final record = this.record;
+    final team = competitor.team;
+    final settings = ref.watch(sportsSettingsProvider);
+    final crest = SportsTeamLogo(url: team.logoUrl, size: 64 * scale);
+    final text = Flexible(
+      child: Column(
+        crossAxisAlignment: mirrored
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            team.displayName,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: mirrored ? TextAlign.end : TextAlign.start,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          SizedBox(height: 6 * scale),
+          Wrap(
+            alignment: mirrored ? WrapAlignment.end : WrapAlignment.start,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 10 * scale,
+            runSpacing: 4 * scale,
+            children: [
+              if (record != null)
+                Text(
+                  record,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              _FollowChip(
+                following: settings.isFollowing(team.key),
+                autofocus: autofocusFollow,
+                onTap: () => unawaited(settings.toggleFollow(team)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    final gap = SizedBox(width: 14 * scale);
+    // Up against the score, so the eye doesn't have to cross the screen
+    return Row(
+      mainAxisAlignment: mirrored
+          ? MainAxisAlignment.start
+          : MainAxisAlignment.end,
+      children: mirrored ? [text, gap, crest] : [crest, gap, text],
+    );
+  }
+}
+
+/// The start time before a game; the score and status once it's under way.
+class _MatchupCenter extends StatelessWidget {
+  const _MatchupCenter({
+    required this.fixture,
+    required this.sides,
+    this.inlineStatus = false,
+    this.lineScore,
+  });
+
+  final SportsFixture fixture;
+  final _SidePair sides;
+
+  /// The status on one line rather than two.
+  final bool inlineStatus;
+
+  /// Shown under the score, compactly.
+  final SportsLineScore? lineScore;
 
   @override
   Widget build(BuildContext context) {
@@ -605,7 +990,9 @@ class _MatchupCenter extends StatelessWidget {
     }
     final firstScore = sides.competitor(sides.first)?.score;
     final secondScore = sides.competitor(sides.second)?.score;
+    final lineScore = this.lineScore;
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         if (firstScore != null && secondScore != null) ...[
           headline('$firstScore - $secondScore'),
@@ -615,7 +1002,12 @@ class _MatchupCenter extends StatelessWidget {
           fixture: fixture,
           showLeague: false,
           alignment: CrossAxisAlignment.center,
+          inline: inlineStatus,
         ),
+        if (lineScore != null) ...[
+          SizedBox(height: 6 * scale),
+          _LineScoreTable(lineScore: lineScore, sides: sides, compact: true),
+        ],
       ],
     );
   }
@@ -667,10 +1059,15 @@ class _TeamColumn extends ConsumerWidget {
 }
 
 class _FollowChip extends StatelessWidget {
-  const _FollowChip({required this.following, required this.onTap});
+  const _FollowChip({
+    required this.following,
+    required this.onTap,
+    this.autofocus = false,
+  });
 
   final bool following;
   final VoidCallback onTap;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -679,6 +1076,7 @@ class _FollowChip extends StatelessWidget {
     final scale = FontSizeScope.scaleOf(context);
     return DpadInkWell(
       onTap: onTap,
+      autofocus: autofocus,
       // The Focus around the matchup scrolls to the top instead
       autoScroll: false,
       color: theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.7),
@@ -883,10 +1281,17 @@ class _Section extends StatelessWidget {
 /// Teams down the side and periods across, dragged sideways when a long game
 /// (extra innings) doesn't fit.
 class _LineScoreTable extends StatelessWidget {
-  const _LineScoreTable({required this.lineScore, required this.sides});
+  const _LineScoreTable({
+    required this.lineScore,
+    required this.sides,
+    this.compact = false,
+  });
 
   final SportsLineScore lineScore;
   final _SidePair sides;
+
+  /// Tighter rows, for the scoreboard.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -904,7 +1309,7 @@ class _LineScoreTable extends StatelessWidget {
         Padding(
           padding: EdgeInsets.symmetric(
             horizontal: 8 * scale,
-            vertical: 4 * scale,
+            vertical: (compact ? 1 : 4) * scale,
           ),
           child: Text(
             text,

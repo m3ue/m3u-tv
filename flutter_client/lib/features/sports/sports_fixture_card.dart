@@ -325,11 +325,16 @@ class SportsFixtureStatus extends StatelessWidget {
     required this.fixture,
     required this.showLeague,
     this.alignment = CrossAxisAlignment.start,
+    this.inline = false,
   });
 
   final SportsFixture fixture;
   final bool showLeague;
   final CrossAxisAlignment alignment;
+
+  /// The live detail beside the badge rather than under it. Leaves out the
+  /// league.
+  final bool inline;
 
   @override
   Widget build(BuildContext context) {
@@ -379,6 +384,25 @@ class SportsFixtureStatus extends StatelessWidget {
     final detail = fixture.state == SportsFixtureState.live
         ? fixture.statusDetail
         : null;
+    if (inline) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          headline,
+          if (detail != null && detail.isNotEmpty) ...[
+            SizedBox(width: 8 * scale),
+            Flexible(
+              child: Text(
+                detail,
+                style: muted,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: alignment,
       mainAxisSize: MainAxisSize.min,

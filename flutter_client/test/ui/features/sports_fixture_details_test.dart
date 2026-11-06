@@ -11,8 +11,10 @@ import 'package:m3u_tv/services/sports_channel_lookup.dart';
 import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/services/sports_service.dart';
 import 'package:m3u_tv/services/sports_settings.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/draggable_text.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
 const _league = SportsLeague(
@@ -168,6 +170,8 @@ void main() {
     List<SportsChannelMatch> matches = const [],
     ValueChanged<Channel>? onChannelSelect,
     Size size = const Size(1000, 2400),
+    bool openDetails = false,
+    AppFontSize? fontSize,
   }) async {
     tester.view
       ..physicalSize = size
@@ -186,15 +190,33 @@ void main() {
             theme: ThemeData.dark(useMaterial3: true),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
+            builder: fontSize == null
+                ? null
+                : (context, child) => FontSizeScope(
+                    fontSize: fontSize,
+                    child: MediaQuery(
+                      data: MediaQuery.of(
+                        context,
+                      ).copyWith(textScaler: TextScaler.linear(fontSize.scale)),
+                      child: child!,
+                    ),
+                  ),
             home: Builder(
               builder: (context) => Scaffold(
                 body: TextButton(
-                  onPressed: () => openSportsFixture(
-                    context,
-                    fixture: fixture,
-                    matches: matches,
-                    onChannelSelect: onChannelSelect ?? (_) {},
-                  ),
+                  onPressed: () => openDetails
+                      ? openSportsFixtureDetails(
+                          context,
+                          fixture: fixture,
+                          matches: matches,
+                          onChannelSelect: onChannelSelect ?? (_) {},
+                        )
+                      : openSportsFixture(
+                          context,
+                          fixture: fixture,
+                          matches: matches,
+                          onChannelSelect: onChannelSelect ?? (_) {},
+                        ),
                   child: const Text('Open game'),
                 ),
               ),
@@ -570,6 +592,259 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(scrollable.position.pixels, greaterThan(0));
+  });
+
+  group('with room for columns', () {
+    const tv = Size(1600, 900);
+    const channels = [SportsChannelMatch(channel: _channel)];
+
+    ScrollableState paneScrollable(WidgetTester tester, String key) =>
+        tester.state<ScrollableState>(
+          find
+              .descendant(
+                of: find.byKey(ValueKey(key)),
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                ),
+              )
+              .first,
+        );
+
+    testWidgets('fits the channels, moments and numbers on one screen', (
+      tester,
+    ) async {
+      responses = [
+        {'details': _details(state: 'live')},
+      ];
+      await pumpHost(
+        tester,
+        fixture: _game(SportsFixtureState.live),
+        matches: channels,
+        size: tv,
+        openDetails: true,
+      );
+
+      final channelsAt = tester.getTopLeft(find.text('On Your Channels'));
+      final statsAt = tester.getTopLeft(find.text('Team stats'));
+      expect(channelsAt.dx, lessThan(tv.width / 2));
+      expect(statsAt.dx, greaterThan(tv.width / 2));
+      expect(channelsAt.dy, statsAt.dy);
+      for (final text in [
+        'Dylan Guenther Goal (6)',
+        'Jack Roslovic',
+        '18,889',
+      ]) {
+        expect(
+          tester.getBottomLeft(find.text(text)).dy,
+          lessThan(tv.height),
+          reason: text,
+        );
+      }
+      // The scoreboard has the score by period, so it needs no card of its own
+      expect(find.text('Score by period'), findsNothing);
+      expect(find.text('T'), findsOneWidget);
+      expect(find.text('NHL'), findsOneWidget);
+      expect(find.text('Game'), findsNothing);
+    });
+
+    testWidgets('lists the newest moment first while the game is on', (
+      tester,
+    ) async {
+      responses = [
+        {'details': _details(state: 'live')},
+      ];
+      await pumpHost(
+        tester,
+        fixture: _game(SportsFixtureState.live),
+        size: tv,
+        openDetails: true,
+      );
+
+      expect(
+        tester.getTopLeft(find.text('Sent off')).dy,
+        lessThan(tester.getTopLeft(find.text('Dylan Guenther Goal (6)')).dy),
+      );
+    });
+
+    testWidgets('keeps a finished game in the order it happened', (
+      tester,
+    ) async {
+      responses = [
+        {'details': _details()},
+      ];
+      await pumpHost(
+        tester,
+        fixture: _game(SportsFixtureState.finished),
+        size: tv,
+      );
+
+      expect(
+        tester.getTopLeft(find.text('Dylan Guenther Goal (6)')).dy,
+        lessThan(tester.getTopLeft(find.text('Sent off')).dy),
+      );
+    });
+
+    testWidgets('moves game info beside the numbers before a game', (
+      tester,
+    ) async {
+      responses = [
+        {'details': _details(state: 'scheduled')},
+      ];
+      await pumpHost(
+        tester,
+        fixture: _game(SportsFixtureState.scheduled),
+        size: tv,
+      );
+
+      expect(
+        tester.getTopLeft(find.text('Game info')).dx,
+        lessThan(tv.width / 2),
+      );
+      expect(
+        tester.getTopLeft(find.text('Season stats')).dx,
+        greaterThan(tv.width / 2),
+      );
+    });
+
+    testWidgets('starts on Follow when there is nothing to play or scroll', (
+      tester,
+    ) async {
+      responses = [
+        {'details': _details()},
+      ];
+      await pumpHost(
+        tester,
+        fixture: _game(SportsFixtureState.finished),
+        size: tv,
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Following'), findsOneWidget);
+    });
+
+    testWidgets('Right and Left move between columns that scroll separately', (
+      tester,
+    ) async {
+      responses = [
+        {
+          'details': {
+            ..._details(state: 'live'),
+            'stats': [
+              for (var i = 0; i < 40; i++)
+                {'label': 'Stat $i', 'home': '1', 'away': '2'},
+            ],
+          },
+        },
+      ];
+      await pumpHost(
+        tester,
+        fixture: _game(SportsFixtureState.live),
+        matches: channels,
+        size: tv,
+        openDetails: true,
+      );
+      final firstChannel = FocusManager.instance.primaryFocus;
+      final right = paneScrollable(tester, 'sports-details-right');
+      final left = paneScrollable(tester, 'sports-details-left');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(FocusManager.instance.primaryFocus, isNot(firstChannel));
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      expect(right.position.pixels, greaterThan(0));
+      expect(left.position.pixels, 0);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(FocusManager.instance.primaryFocus, firstChannel);
+      // Where the reader left it, for coming back
+      expect(right.position.pixels, greaterThan(0));
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      for (var i = 0; i < 12; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+        await tester.pumpAndSettle();
+        if (right.position.pixels == 0) break;
+      }
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pumpAndSettle();
+      // Up from the top of a column reaches the scoreboard's buttons
+      expect(find.text('Following'), findsOneWidget);
+    });
+
+    testWidgets('Left and Right stay put with nothing to move to', (
+      tester,
+    ) async {
+      responses = [
+        {
+          'details': {
+            ..._details(),
+            'stats': [
+              for (var i = 0; i < 40; i++)
+                {'label': 'Stat $i', 'home': '1', 'away': '2'},
+            ],
+          },
+        },
+      ];
+      await pumpHost(
+        tester,
+        fixture: _game(SportsFixtureState.finished),
+        size: tv,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      final reading = FocusManager.instance.primaryFocus;
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+
+      expect(FocusManager.instance.primaryFocus, reading);
+    });
+
+    for (final (size, fontSize) in [
+      (const Size(1280, 720), AppFontSize.normal),
+      (const Size(1920, 1080), AppFontSize.veryLarge),
+      (const Size(1000, 500), AppFontSize.normal),
+    ]) {
+      testWidgets('fits $size at ${fontSize.name} without overflowing', (
+        tester,
+      ) async {
+        final details = _details(state: 'live');
+        responses = [
+          {
+            'details': {
+              ...details,
+              'line_score': {
+                'periods': [for (var i = 1; i <= 12; i++) '$i'],
+                'home': [for (var i = 1; i <= 12; i++) '0'],
+                'away': [for (var i = 1; i <= 12; i++) '1'],
+              },
+            },
+          },
+        ];
+        await pumpHost(
+          tester,
+          fixture: _game(SportsFixtureState.live),
+          matches: channels,
+          size: size,
+          fontSize: fontSize,
+          openDetails: true,
+        );
+
+        expect(find.text('Toronto Maple Leafs'), findsOneWidget);
+      });
+    }
   });
 
   group('back up to the top', () {
