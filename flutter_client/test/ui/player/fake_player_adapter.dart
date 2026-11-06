@@ -11,6 +11,7 @@ class FakePlayerAdapter
     PlaybackCapabilities? capabilities,
     this.textureId,
     this.usesNativePlane = false,
+    this.planeDrawsLetterbox = false,
   }) : capabilities = capabilities ?? PlaybackCapabilities.androidExoPlayer;
 
   @override
@@ -21,6 +22,9 @@ class FakePlayerAdapter
 
   @override
   final bool usesNativePlane;
+
+  @override
+  final bool planeDrawsLetterbox;
 
   final StreamController<PlaybackState> _stateController =
       StreamController<PlaybackState>.broadcast();

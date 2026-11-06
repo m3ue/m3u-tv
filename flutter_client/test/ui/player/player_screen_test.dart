@@ -1584,6 +1584,59 @@ void main() {
     );
 
     testWidgets(
+      'controls auto-hide on a native plane despite position ticks',
+      (tester) async {
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          usesNativePlane: true,
+          planeDrawsLetterbox: true,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/native-plane.m3u8',
+                title: 'Native Plane Fixture',
+                type: 'live',
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        for (var second = 0; second < 7; second++) {
+          adapter.emitState(
+            PlaybackState(
+              backend: PlaybackBackend.desktopLibmpv,
+              status: PlaybackStatus.playing,
+              position: Duration(seconds: second),
+            ),
+          );
+          await tester.pump(const Duration(seconds: 1));
+        }
+        expect(find.byType(PlaybackControls), findsOneWidget);
+
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pump();
+
+        expect(find.byType(PlaybackControls), findsNothing);
+      },
+    );
+
+    testWidgets(
       'hides the controls bar until playback is ready but keeps the back button',
       (tester) async {
         final adapter = FakePlayerAdapter(

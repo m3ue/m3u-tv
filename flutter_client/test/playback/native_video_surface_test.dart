@@ -24,6 +24,41 @@ void main() {
     expect(blackBoxes, isEmpty);
   });
 
+  group('native plane size for 4:3 video in a 16:9 area', () {
+    for (final (drawsLetterbox, expectedWidth) in [
+      (true, 1600.0),
+      (false, 1200.0),
+    ]) {
+      testWidgets(
+        'planeDrawsLetterbox $drawsLetterbox reports $expectedWidth wide',
+        (
+          tester,
+        ) async {
+          tester.view
+            ..physicalSize = const Size(1600, 900)
+            ..devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final plane = _RecordingNativePlane(drawsLetterbox: drawsLetterbox);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: NativeVideoSurface(
+                textureId: null,
+                platformView: null,
+                nativePlane: plane,
+                aspectRatio: 4 / 3,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(plane.rects.last.width, expectedWidth);
+          expect(plane.rects.last.height, 900);
+        },
+      );
+    }
+  });
+
   testWidgets('texture surface retains its black backing', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
@@ -145,6 +180,9 @@ class _FakeNativePlane implements NativePlaneProvider {
   final bool usesNativePlane;
 
   @override
+  bool get planeDrawsLetterbox => false;
+
+  @override
   void reportVideoRect(
     double x,
     double y,
@@ -155,10 +193,16 @@ class _FakeNativePlane implements NativePlaneProvider {
 }
 
 class _RecordingNativePlane implements NativePlaneProvider {
+  _RecordingNativePlane({this.drawsLetterbox = false});
+
+  final bool drawsLetterbox;
   final rects = <_ReportedRect>[];
 
   @override
   bool get usesNativePlane => true;
+
+  @override
+  bool get planeDrawsLetterbox => drawsLetterbox;
 
   @override
   void reportVideoRect(

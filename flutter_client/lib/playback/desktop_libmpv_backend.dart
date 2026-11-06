@@ -61,6 +61,7 @@ class DesktopLibmpvBackend
   int? _handle;
   int? _textureId;
   bool _usesNativePlane = false;
+  bool _planeDrawsLetterbox = false;
   int _lastSequence = -1;
   int _loadGeneration = 0;
   bool _errorEmitted = false;
@@ -77,6 +78,9 @@ class DesktopLibmpvBackend
 
   @override
   bool get usesNativePlane => _usesNativePlane;
+
+  @override
+  bool get planeDrawsLetterbox => _planeDrawsLetterbox;
 
   @override
   void reportVideoRect(
@@ -171,6 +175,7 @@ class DesktopLibmpvBackend
       final handle = response?['handle'] as int?;
       final textureId = response?['textureId'] as int?;
       final usesNativePlane = response?['usesNativePlane'] == true;
+      final planeDrawsLetterbox = response?['planeDrawsLetterbox'] == true;
       final ok = response?['ok'] == true;
       if (!_isActiveLoad(generation)) {
         if (handle != null) await _disposeNativeHandle(handle);
@@ -232,6 +237,7 @@ class DesktopLibmpvBackend
       // make a listener (e.g. NativeVideoSurface) hole-punch the widget
       // before there was anything for the native plane to show through.
       _usesNativePlane = usesNativePlane;
+      _planeDrawsLetterbox = planeDrawsLetterbox;
     } on PlaybackException {
       _clearLoading(ready);
       rethrow;
@@ -536,6 +542,7 @@ class DesktopLibmpvBackend
     _handle = null;
     _textureId = null;
     _usesNativePlane = false;
+    _planeDrawsLetterbox = false;
     _lastSequence = -1;
     _errorEmitted = false;
     _pendingEvents.clear();

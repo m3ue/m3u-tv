@@ -61,6 +61,11 @@ abstract class NativePlaneProvider {
   /// path (or a black placeholder) until it flips.
   bool get usesNativePlane;
 
+  /// True when the plane should cover the whole video area because the
+  /// native side draws its own letterbox bars. False when it should be sized
+  /// to the video's aspect ratio.
+  bool get planeDrawsLetterbox;
+
   /// Reports the widget's current on-screen rect, in physical pixels within
   /// the native window, plus the current device pixel ratio.
   void reportVideoRect(

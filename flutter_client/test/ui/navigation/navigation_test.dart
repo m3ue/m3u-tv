@@ -2934,6 +2934,9 @@ class _NavigationPlayerAdapter implements PlayerAdapter, NativePlaneProvider {
   bool get usesNativePlane => _usesNativePlane;
 
   @override
+  bool get planeDrawsLetterbox => false;
+
+  @override
   PlaybackCapabilities get capabilities => PlaybackCapabilities.desktopLibmpv;
 
   @override

@@ -1669,6 +1669,11 @@ FlMethodResponse* Load(FlValue* args) {
       mpv_render_context* gpu_render_context = nullptr;
       std::string render_error;
       if (CreateGpuRenderContext(api, handle, *plane, &gpu_context, &gpu_render_context, &render_error)) {
+        // The window around the plane is transparent, so anything the plane
+        // doesn't cover shows the desktop. It fills the whole video area
+        // instead and mpv draws the letterbox bars into it (as Plezy does);
+        // the software texture path below keeps keepaspect=no.
+        api.set_option_string(handle, "keepaspect", "yes");
         const int64_t id = g_next_handle++;
         auto player = std::make_unique<PlayerInstance>(&api, event_dispatch_state, handle, gpu_render_context,
                                                         gpu_context, std::move(plane), id);
@@ -1715,6 +1720,7 @@ FlMethodResponse* Load(FlValue* args) {
         fl_value_set_string_take(result, "ok", fl_value_new_bool(TRUE));
         fl_value_set_string_take(result, "handle", fl_value_new_int(id));
         fl_value_set_string_take(result, "usesNativePlane", fl_value_new_bool(TRUE));
+        fl_value_set_string_take(result, "planeDrawsLetterbox", fl_value_new_bool(TRUE));
         fl_value_set_string_take(result, "display",
                                  fl_value_new_string("Wayland GPU video plane (OpenGL render API)"));
         g_players[id] = std::move(player);

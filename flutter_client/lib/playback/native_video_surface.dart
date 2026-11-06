@@ -85,19 +85,19 @@ class NativeVideoSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final plane = nativePlane;
     if (plane != null && plane.usesNativePlane) {
-      return Center(
-        child: AspectRatio(
-          aspectRatio: aspectRatio,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (clearAncestorPaintForNativePlane)
-                const CustomPaint(painter: _NativePlaneHolePainter()),
-              _NativePlaneReporter(key: surfaceKey, plane: plane),
-            ],
-          ),
-        ),
+      final surface = Stack(
+        fit: StackFit.expand,
+        children: [
+          if (clearAncestorPaintForNativePlane)
+            const CustomPaint(painter: _NativePlaneHolePainter()),
+          _NativePlaneReporter(key: surfaceKey, plane: plane),
+        ],
       );
+      return plane.planeDrawsLetterbox
+          ? SizedBox.expand(child: surface)
+          : Center(
+              child: AspectRatio(aspectRatio: aspectRatio, child: surface),
+            );
     }
     final html = htmlView;
     if (html != null) {
