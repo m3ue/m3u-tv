@@ -15,6 +15,7 @@ import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/channel_rows.dart';
 import 'package:m3u_tv/shared/draggable_text.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../fixtures/list_channel_rows.dart';
@@ -65,6 +66,7 @@ void main() {
     EpgPreviewPlayback previewPlayback = EpgPreviewPlayback.off,
     Duration previewDelay = const Duration(seconds: 5),
     ChannelColumnLayout channelColumnLayout = ChannelColumnLayout.logoOnly,
+    AppFontSize? fontSize,
   }) async {
     Widget guide = SizedBox(
       width: width,
@@ -108,6 +110,17 @@ void main() {
         theme: ThemeData.dark(useMaterial3: true),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
+        builder: fontSize == null
+            ? null
+            : (context, child) => FontSizeScope(
+                fontSize: fontSize,
+                child: MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(textScaler: TextScaler.linear(fontSize.scale)),
+                  child: child!,
+                ),
+              ),
         home: Scaffold(
           body: Align(alignment: Alignment.topLeft, child: guide),
         ),
@@ -406,6 +419,35 @@ void main() {
       expect(find.text('Midday News'), findsOneWidget);
       expect(find.text('Prime Show'), findsNothing);
     });
+
+    for (final fontSize in [AppFontSize.verySmall, AppFontSize.small]) {
+      for (final layout in ChannelColumnLayout.values) {
+        testWidgets('fits at ${fontSize.name} with $layout', (tester) async {
+          final now = DateTime(2026, 7, 31, 12);
+          final program = EpgProgram(
+            channelId: 'bbc.one',
+            title: 'Long Movie',
+            description: 'A description',
+            start: DateTime(2026, 7, 31, 10),
+            end: DateTime(2026, 7, 31, 14),
+          );
+          await pumpGuide(
+            tester,
+            clock: () => now,
+            channels: const [bbcOne],
+            epgService: EpgService(clock: () => now)..loadPrograms([program]),
+            width: 1920,
+            height: 1080,
+            showPreview: true,
+            channelColumnLayout: layout,
+            fontSize: fontSize,
+          );
+
+          expect(tester.takeException(), isNull);
+          expect(find.text('Long Movie'), findsWidgets);
+        });
+      }
+    }
 
     testWidgets('keeps an airing programme title in view', (tester) async {
       final now = DateTime(2026, 7, 31, 12);

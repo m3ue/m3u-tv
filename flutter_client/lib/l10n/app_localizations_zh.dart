@@ -1890,6 +1890,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsFontSize => '显示大小';
 
   @override
+  String get settingsFontSizeVerySmall => '特小';
+
+  @override
+  String get settingsFontSizeSmall => '小';
+
+  @override
   String get settingsFontSizeNormal => '标准';
 
   @override

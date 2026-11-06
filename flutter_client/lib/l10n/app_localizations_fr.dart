@@ -1977,6 +1977,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsFontSize => 'Taille d\'affichage';
 
   @override
+  String get settingsFontSizeVerySmall => 'Très petit';
+
+  @override
+  String get settingsFontSizeSmall => 'Petit';
+
+  @override
   String get settingsFontSizeNormal => 'Normal';
 
   @override

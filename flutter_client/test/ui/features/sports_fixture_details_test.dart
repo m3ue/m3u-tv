@@ -816,6 +816,9 @@ void main() {
       (const Size(1280, 720), AppFontSize.normal),
       (const Size(1920, 1080), AppFontSize.veryLarge),
       (const Size(1000, 500), AppFontSize.normal),
+      (const Size(1280, 720), AppFontSize.small),
+      (const Size(1280, 720), AppFontSize.verySmall),
+      (const Size(1920, 1080), AppFontSize.verySmall),
     ]) {
       testWidgets('fits $size at ${fontSize.name} without overflowing', (
         tester,

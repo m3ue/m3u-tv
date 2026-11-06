@@ -976,6 +976,8 @@
   "settingsOptimizeForSpeed": "Geschwindigkeit",
   "settingsOptimizeForSpeedHint": "Schnelleres Laden, niedrigere Bildqualität.",
   "settingsFontSize": "Anzeigegröße",
+  "settingsFontSizeVerySmall": "Sehr klein",
+  "settingsFontSizeSmall": "Klein",
   "settingsFontSizeNormal": "Normal",
   "settingsFontSizeLarge": "Groß",
   "settingsFontSizeVeryLarge": "Sehr groß",

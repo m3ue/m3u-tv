@@ -976,6 +976,8 @@
   "settingsOptimizeForSpeed": "Velocidad",
   "settingsOptimizeForSpeedHint": "Carga más rápida, menor calidad de imagen.",
   "settingsFontSize": "Tamaño de pantalla",
+  "settingsFontSizeVerySmall": "Muy pequeño",
+  "settingsFontSizeSmall": "Pequeño",
   "settingsFontSizeNormal": "Normal",
   "settingsFontSizeLarge": "Grande",
   "settingsFontSizeVeryLarge": "Muy grande",

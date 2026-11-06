@@ -976,6 +976,8 @@
   "settingsOptimizeForSpeed": "速度",
   "settingsOptimizeForSpeedHint": "加载更快，图像质量降低。",
   "settingsFontSize": "显示大小",
+  "settingsFontSizeVerySmall": "特小",
+  "settingsFontSizeSmall": "小",
   "settingsFontSizeNormal": "标准",
   "settingsFontSizeLarge": "大",
   "settingsFontSizeVeryLarge": "特大",

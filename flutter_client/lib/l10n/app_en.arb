@@ -1115,6 +1115,8 @@
   "settingsOptimizeForSpeed": "Speed",
   "settingsOptimizeForSpeedHint": "Faster loading, lower image quality.",
   "settingsFontSize": "Display size",
+  "settingsFontSizeVerySmall": "Very Small",
+  "settingsFontSizeSmall": "Small",
   "settingsFontSizeNormal": "Normal",
   "settingsFontSizeLarge": "Large",
   "settingsFontSizeVeryLarge": "Very Large",

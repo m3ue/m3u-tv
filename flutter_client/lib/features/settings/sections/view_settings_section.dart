@@ -429,6 +429,14 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
                   selected: _fontSize,
                   options: [
                     SettingsPickerOption(
+                      value: AppFontSize.verySmall,
+                      label: l.settingsFontSizeVerySmall,
+                    ),
+                    SettingsPickerOption(
+                      value: AppFontSize.small,
+                      label: l.settingsFontSizeSmall,
+                    ),
+                    SettingsPickerOption(
                       value: AppFontSize.normal,
                       label: l.settingsFontSizeNormal,
                       icon: Icons.smartphone,
@@ -524,6 +532,8 @@ String _optimizeForLabel(AppLocalizations l, OptimizeFor optimizeFor) =>
 
 String _fontSizeLabel(AppLocalizations l, AppFontSize fontSize) =>
     switch (fontSize) {
+      AppFontSize.verySmall => l.settingsFontSizeVerySmall,
+      AppFontSize.small => l.settingsFontSizeSmall,
       AppFontSize.normal => l.settingsFontSizeNormal,
       AppFontSize.large => l.settingsFontSizeLarge,
       AppFontSize.veryLarge => l.settingsFontSizeVeryLarge,

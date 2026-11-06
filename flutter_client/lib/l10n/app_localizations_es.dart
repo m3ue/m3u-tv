@@ -1972,6 +1972,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsFontSize => 'Tamaño de pantalla';
 
   @override
+  String get settingsFontSizeVerySmall => 'Muy pequeño';
+
+  @override
+  String get settingsFontSizeSmall => 'Pequeño';
+
+  @override
   String get settingsFontSizeNormal => 'Normal';
 
   @override

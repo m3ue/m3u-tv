@@ -3422,6 +3422,18 @@ abstract class AppLocalizations {
   /// **'Display size'**
   String get settingsFontSize;
 
+  /// No description provided for @settingsFontSizeVerySmall.
+  ///
+  /// In en, this message translates to:
+  /// **'Very Small'**
+  String get settingsFontSizeVerySmall;
+
+  /// No description provided for @settingsFontSizeSmall.
+  ///
+  /// In en, this message translates to:
+  /// **'Small'**
+  String get settingsFontSizeSmall;
+
   /// No description provided for @settingsFontSizeNormal.
   ///
   /// In en, this message translates to:

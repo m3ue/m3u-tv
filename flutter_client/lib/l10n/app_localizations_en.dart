@@ -1955,6 +1955,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsFontSize => 'Display size';
 
   @override
+  String get settingsFontSizeVerySmall => 'Very Small';
+
+  @override
+  String get settingsFontSizeSmall => 'Small';
+
+  @override
   String get settingsFontSizeNormal => 'Normal';
 
   @override
