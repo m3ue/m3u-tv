@@ -358,6 +358,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get playerStartFromBeginning => 'Von vorne abspielen';
 
   @override
+  String get playerPlay => 'Abspielen';
+
+  @override
   String get playerResume => 'Fortsetzen';
 
   @override

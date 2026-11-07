@@ -2530,6 +2530,44 @@ class AppStateController extends ChangeNotifier {
     return true;
   }
 
+  bool _recentlyWatchedRefreshRunning = false;
+  bool _recentlyWatchedRefreshAgain = false;
+
+  /// Re-reads Continue Watching from the server after something changed
+  /// what it should hold: playback closed, or an item was marked watched or
+  /// unwatched. The server works out "up next" (the episode after a finished
+  /// one), so without this the finished episode lingered until a relaunch.
+  /// Waits for pending playback reports first; a call made while one is
+  /// running queues a single follow-up instead of piling up requests (a
+  /// season mark fires one per episode).
+  Future<void> refreshRecentlyWatched() async {
+    if (_recentlyWatchedRefreshRunning) {
+      _recentlyWatchedRefreshAgain = true;
+      return;
+    }
+    _recentlyWatchedRefreshRunning = true;
+    try {
+      do {
+        _recentlyWatchedRefreshAgain = false;
+        final viewer = _activeViewer;
+        if (viewer == null || _sourceType != AppSourceType.xtream) return;
+        final sourceGeneration = _sourceOperationGeneration.current;
+        final viewerGeneration = _viewerOperationGeneration.current;
+        await xtreamService.playbackProgressSettled().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {},
+        );
+        await _refreshRecentlyWatchedForActiveViewer(
+          viewer,
+          sourceGeneration: sourceGeneration,
+          viewerGeneration: viewerGeneration,
+        );
+      } while (_recentlyWatchedRefreshAgain);
+    } finally {
+      _recentlyWatchedRefreshRunning = false;
+    }
+  }
+
   Future<void> _refreshRecentlyWatchedForActiveViewer(
     Viewer viewer, {
     required int sourceGeneration,

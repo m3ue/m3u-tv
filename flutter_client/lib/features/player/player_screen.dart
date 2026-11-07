@@ -181,6 +181,7 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> {
   static const Duration _loadingTimeout = Duration(seconds: 20);
   static const Duration _progressInterval = Duration(seconds: 10);
+  static const double _kCompletedFraction = 0.9;
   static const Duration _overlayTimeout = Duration(seconds: 8);
 
   PlaybackStatus _status = PlaybackStatus.idle;
@@ -1306,6 +1307,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         widget.progressReporter == null) {
       return;
     }
+    final durationSeconds = _duration.inSeconds;
     widget.progressReporter!(
       Progress(
         viewerId: widget.viewerId,
@@ -1314,11 +1316,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
             : ContentType.vod,
         streamId: widget.args.streamId ?? 0,
         positionSeconds: position.inSeconds,
-        durationSeconds: _duration.inSeconds > 0 ? _duration.inSeconds : null,
+        durationSeconds: durationSeconds > 0 ? durationSeconds : null,
+        // Same 90% rule the editor applies on update_progress, so the local
+        // copy drops out of Continue Watching right away instead of sitting
+        // there as a "100%" card until the next server sync.
+        completed:
+            durationSeconds > 0 &&
+            position.inSeconds >= durationSeconds * _kCompletedFraction,
         seriesId: widget.args.seriesId,
         seasonNumber: widget.args.seasonNumber,
       ),
     );
+  }
+
+  /// One last report as the viewer leaves, so the saved position (and with
+  /// it Continue Watching's "up next") reflects where they actually stopped
+  /// rather than the last periodic tick. Skipped when playback never got
+  /// going, so a failed open can't zero an existing resume point.
+  void _reportFinalProgress() {
+    if (!_hasStartedPlayback ||
+        _errorMessage != null ||
+        _currentPosition <= Duration.zero) {
+      return;
+    }
+    _reportProgress(_currentPosition);
   }
 
   void _startEpgRefresh() {
@@ -1419,6 +1440,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (!_screenFocusNode.hasPrimaryFocus) {
       _screenFocusNode.requestFocus();
     }
+    _reportFinalProgress();
     if (widget.onClose != null) {
       widget.onClose!();
     } else {

@@ -563,8 +563,10 @@ HomeSpotlight _progressSpotlight(
     final series = progress.seriesId == null
         ? null
         : enricher.series(progress.seriesId!);
+    // The series art first: for an episode the editor sends the episode's
+    // own still, which is usually low resolution.
     final backdrop =
-        nullIfBlank(progress.backdropUrl) ?? nullIfBlank(series?.backdropUrl);
+        nullIfBlank(series?.backdropUrl) ?? nullIfBlank(progress.backdropUrl);
     final season = progress.seasonNumber;
     final episode = progress.episodeNumber;
     final numbering = season != null && episode != null

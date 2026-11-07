@@ -53,16 +53,39 @@ Future<ResumeModalResult?> showResumeModal(
   );
 }
 
+/// Shows the dialog for a Continue Watching "up next" episode, which has no
+/// position to resume: Play (resolves [ResumeAction.startOver]) or Mark
+/// watched (resolves [ResumeAction.markWatched]) to skip past it. Null when
+/// dismissed.
+Future<ResumeModalResult?> showUpNextModal(
+  BuildContext context, {
+  required String title,
+}) {
+  return showAppDialog<ResumeModalResult>(
+    context: context,
+    builder: (_) => _ResumeModal(
+      title: title,
+      positionSeconds: 0,
+      showManageActions: true,
+      upNext: true,
+    ),
+  );
+}
+
 class _ResumeModal extends StatelessWidget {
   const _ResumeModal({
     required this.title,
     required this.positionSeconds,
     required this.showManageActions,
+    this.upNext = false,
   });
 
   final String title;
   final int positionSeconds;
   final bool showManageActions;
+
+  /// Nothing to resume: offers Play and Mark watched only.
+  final bool upNext;
 
   @override
   Widget build(BuildContext context) {
@@ -71,12 +94,19 @@ class _ResumeModal extends StatelessWidget {
     final l = AppLocalizations.of(context);
 
     final scale = FontSizeScope.scaleOf(context);
+    const playFromStart = ResumeModalResult(ResumeAction.startOver);
+    final resume = upNext
+        ? playFromStart
+        : ResumeModalResult(
+            ResumeAction.resume,
+            startPositionSeconds: positionSeconds.toDouble(),
+          );
 
     return OptionsDialog(
       maxWidth: 400 * scale,
       children: [
         Text(
-          l.playerResumeWatching,
+          upNext ? l.homeUpNext : l.playerResumeWatching,
           style: theme.textTheme.titleLarge,
         ),
         const SizedBox(height: 4),
@@ -91,34 +121,33 @@ class _ResumeModal extends StatelessWidget {
         const SizedBox(height: 20),
         DialogPrimaryOption(
           icon: Icons.play_arrow,
-          title: l.playerContinue,
-          subtitle: l.playerFromTime(
-            formatTime(Duration(seconds: positionSeconds)),
-          ),
-          onTap: () => Navigator.of(context).pop(
-            ResumeModalResult(
-              ResumeAction.resume,
-              startPositionSeconds: positionSeconds.toDouble(),
-            ),
-          ),
+          title: upNext ? l.playerPlay : l.playerContinue,
+          subtitle: upNext
+              ? null
+              : l.playerFromTime(
+                  formatTime(Duration(seconds: positionSeconds)),
+                ),
+          onTap: () => Navigator.of(context).pop(resume),
         ),
-        const SizedBox(height: 8),
-        DialogActionTile(
-          icon: Icons.replay,
-          label: l.playerStartFromBeginning,
-          onTap: () => Navigator.of(
-            context,
-          ).pop(const ResumeModalResult(ResumeAction.startOver)),
-        ),
-        if (showManageActions) ...[
+        if (!upNext) ...[
           const SizedBox(height: 8),
           DialogActionTile(
-            icon: Icons.remove_done,
-            label: l.playerClearProgress,
-            onTap: () => Navigator.of(context).pop(
-              const ResumeModalResult(ResumeAction.clearProgress),
-            ),
+            icon: Icons.replay,
+            label: l.playerStartFromBeginning,
+            onTap: () => Navigator.of(context).pop(playFromStart),
           ),
+        ],
+        if (showManageActions) ...[
+          if (!upNext) ...[
+            const SizedBox(height: 8),
+            DialogActionTile(
+              icon: Icons.remove_done,
+              label: l.playerClearProgress,
+              onTap: () => Navigator.of(context).pop(
+                const ResumeModalResult(ResumeAction.clearProgress),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           DialogActionTile(
             icon: Icons.done_all,
@@ -138,13 +167,8 @@ class _ResumeModal extends StatelessWidget {
             AppButton(
               autofocus: true,
               variant: AppButtonVariant.primary,
-              label: l.playerResume,
-              onPressed: () => Navigator.of(context).pop(
-                ResumeModalResult(
-                  ResumeAction.resume,
-                  startPositionSeconds: positionSeconds.toDouble(),
-                ),
-              ),
+              label: upNext ? l.playerPlay : l.playerResume,
+              onPressed: () => Navigator.of(context).pop(resume),
             ),
           ],
         ),

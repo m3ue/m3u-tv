@@ -169,6 +169,7 @@
     }
   },
   "playerStartFromBeginning": "从头开始",
+  "playerPlay": "播放",
   "playerResume": "恢复播放",
   "playerClearProgress": "清除进度",
   "playerProgressCleared": "进度已清除",

@@ -649,6 +649,100 @@ void main() {
     },
   );
 
+  testWidgets('tapping an in-progress episode card asks to resume first', (
+    tester,
+  ) async {
+    PlayerArgs? played;
+    final calls = <({int streamId, bool watched})>[];
+    await tester.pumpWidget(
+      _app(
+        _info(),
+        viewerId: 'v1',
+        onPlay: (args) => played = args,
+        progressList: [_prog(102, season: 1, episode: 2, position: 600)],
+        seriesProgress: [_prog(102, season: 1, episode: 2, position: 600)],
+        onMarkEpisodeWatched:
+            ({
+              required streamId,
+              required seriesId,
+              required seasonNumber,
+              required episodeNumber,
+              durationSeconds,
+              seriesName,
+              episodeTitle,
+              required watched,
+            }) async {
+              calls.add((streamId: streamId, watched: watched));
+              return true;
+            },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final card = find.textContaining('S1E2 Title', findRichText: true).first;
+    await tester.ensureVisible(card);
+    await tester.pumpAndSettle();
+    await tester.tap(card, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(played, isNull);
+    expect(find.text('Resume Watching'), findsOneWidget);
+    expect(find.text('Fixture Show - S1E2'), findsOneWidget);
+    expect(find.text('Clear progress'), findsOneWidget);
+
+    await tester.tap(find.text('Mark watched'));
+    await tester.pumpAndSettle();
+    expect(played, isNull);
+    expect(calls.single, (streamId: 102, watched: true));
+  });
+
+  testWidgets(
+    'tapping an in-progress episode card can resume from the dialog',
+    (
+      tester,
+    ) async {
+      PlayerArgs? played;
+      await tester.pumpWidget(
+        _app(
+          _info(),
+          onPlay: (args) => played = args,
+          progressList: [_prog(102, season: 1, episode: 2, position: 600)],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final card = find.textContaining('S1E2 Title', findRichText: true).first;
+      await tester.ensureVisible(card);
+      await tester.pumpAndSettle();
+      await tester.tap(card, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mark watched'), findsNothing);
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(played?.streamId, 102);
+      expect(played?.startPosition, 600);
+    },
+  );
+
+  testWidgets('tapping an unstarted episode card plays it from the start', (
+    tester,
+  ) async {
+    PlayerArgs? played;
+    await tester.pumpWidget(_app(_info(), onPlay: (args) => played = args));
+    await tester.pumpAndSettle();
+
+    final card = find.textContaining('S1E3 Title', findRichText: true).first;
+    await tester.ensureVisible(card);
+    await tester.pumpAndSettle();
+    await tester.tap(card, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Resume Watching'), findsNothing);
+    expect(played?.streamId, 103);
+    expect(played?.startPosition, 0);
+  });
+
   testWidgets('long-pressing an episode card confirms before marking watched', (
     tester,
   ) async {

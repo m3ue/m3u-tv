@@ -241,6 +241,7 @@
     }
   },
   "playerStartFromBeginning": "Start from Beginning",
+  "playerPlay": "Play",
   "playerResume": "Resume",
   "playerClearProgress": "Clear progress",
   "playerProgressCleared": "Progress cleared",

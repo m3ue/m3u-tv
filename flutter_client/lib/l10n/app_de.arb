@@ -169,6 +169,7 @@
     }
   },
   "playerStartFromBeginning": "Von vorne abspielen",
+  "playerPlay": "Abspielen",
   "playerResume": "Fortsetzen",
   "playerClearProgress": "Fortschritt löschen",
   "playerProgressCleared": "Fortschritt gelöscht",

@@ -716,6 +716,12 @@ abstract class AppLocalizations {
   /// **'Start from Beginning'**
   String get playerStartFromBeginning;
 
+  /// No description provided for @playerPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get playerPlay;
+
   /// No description provided for @playerResume.
   ///
   /// In en, this message translates to:

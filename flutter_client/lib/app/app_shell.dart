@@ -897,6 +897,10 @@ class AppShellState extends ConsumerState<AppShell>
     final nativePlaneSub = _playerNativePlaneSub;
     final savedFocus = _focusBeforePlayer;
     _focusBeforePlayer = null;
+    if (args?.type == 'series' || args?.type == 'vod') {
+      // A finished episode only turns into its "up next" on the server.
+      unawaited(_appState.refreshRecentlyWatched());
+    }
     if (lease != null &&
         adoptBack != null &&
         orch != null &&
@@ -1370,7 +1374,10 @@ class AppShellState extends ConsumerState<AppShell>
       }
     }
     await _appState.resumeService.save(progress);
-    if (mounted) _appState.updateProgressEntry(progress);
+    if (mounted) {
+      _appState.updateProgressEntry(progress);
+      unawaited(_appState.refreshRecentlyWatched());
+    }
     return serverOk;
   }
 
@@ -1378,7 +1385,7 @@ class AppShellState extends ConsumerState<AppShell>
   /// watched or unwatched from the resume dialog. "Unwatched" zeroes the row
   /// (position 0, not completed); "watched" completes it at its full runtime.
   /// Either way the title drops out of Continue Watching, and for a series the
-  /// next episode surfaces as "up next" on the following refresh. Server write
+  /// next episode surfaces as "up next" once the refresh below lands. Server write
   /// is best-effort - the local resume store and in-memory list always update,
   /// and a missed server write self-heals on the next successful sync.
   Future<void> _setWatchState(
@@ -1422,6 +1429,7 @@ class AppShellState extends ConsumerState<AppShell>
     await _appState.resumeService.save(updated);
     if (!mounted) return;
     _appState.updateProgressEntry(updated);
+    unawaited(_appState.refreshRecentlyWatched());
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -1498,6 +1506,29 @@ class AppShellState extends ConsumerState<AppShell>
         id: progress.seriesId!,
       );
       if (series != null && mounted) {
+        if (progress.upNext) {
+          // Nothing to resume, but the viewer may want to skip this episode:
+          // marking it watched surfaces the one after it as "up next".
+          final l = AppLocalizations.of(context);
+          final season = progress.seasonNumber;
+          final episode = progress.episodeNumber;
+          final choice = await showUpNextModal(
+            context,
+            title: season != null && episode != null
+                ? '${progress.seriesName ?? series.name} - S${season}E$episode'
+                : progress.episodeTitle ?? series.name,
+          );
+          if (choice == null || !mounted) return;
+          if (choice.action == ResumeAction.markWatched) {
+            await _setWatchState(
+              progress,
+              watched: true,
+              message: l.seriesMarkedWatched,
+            );
+            return;
+          }
+        }
+        if (!mounted) return;
         final streamUrl = _appState.xtreamService.getSeriesStreamUrl(
           progress.streamId.toString(),
         );

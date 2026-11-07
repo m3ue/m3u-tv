@@ -169,6 +169,7 @@
     }
   },
   "playerStartFromBeginning": "Recommencer depuis le début",
+  "playerPlay": "Lire",
   "playerResume": "Reprendre",
   "playerClearProgress": "Effacer la progression",
   "playerProgressCleared": "Progression effacée",

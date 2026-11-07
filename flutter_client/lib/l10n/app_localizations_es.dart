@@ -358,6 +358,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get playerStartFromBeginning => 'Empezar desde el principio';
 
   @override
+  String get playerPlay => 'Reproducir';
+
+  @override
   String get playerResume => 'Reanudar';
 
   @override

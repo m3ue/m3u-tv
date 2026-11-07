@@ -1130,16 +1130,22 @@ class XtreamService {
   }
 
   Future<void>? _playbackProgressInFlight;
+  Progress? _queuedPlaybackProgress;
 
-  /// The player's periodic progress report, skipped (resolving `false`)
-  /// while the previous one is still pending: against an editor that stopped
-  /// answering, a report every few seconds otherwise piles up in the
-  /// connection pool, and the next tick carries a fresher position anyway
-  /// (Plezy a63c80ced). Explicit writes such as mark watched go through
-  /// [updateProgress] and are never skipped.
+  /// The player's periodic progress report. While the previous one is still
+  /// pending, the new report is queued instead (resolving `false`) and sent
+  /// once that one settles; a newer report replaces a queued one. Against an
+  /// editor that stopped answering, a report every few seconds would
+  /// otherwise pile up in the connection pool (Plezy a63c80ced), but dropping
+  /// it outright could lose the position a closing player reports last.
+  /// Explicit writes such as mark watched go through [updateProgress] and are
+  /// never queued.
   Future<bool> reportPlaybackProgress(Progress progress) async {
-    if (_playbackProgressInFlight != null) return false;
-    final inFlight = updateProgress(progress);
+    if (_playbackProgressInFlight != null) {
+      _queuedPlaybackProgress = progress;
+      return false;
+    }
+    final inFlight = _sendPlaybackProgress(progress);
     _playbackProgressInFlight = inFlight;
     try {
       await inFlight;
@@ -1147,6 +1153,41 @@ class XtreamService {
       _playbackProgressInFlight = null;
     }
     return true;
+  }
+
+  /// Sends [first], then whatever report was queued meanwhile, until the
+  /// queue is empty. Only [first]'s failure reaches its caller.
+  Future<void> _sendPlaybackProgress(Progress first) async {
+    Object? firstError;
+    StackTrace? firstStack;
+    var current = first;
+    while (true) {
+      try {
+        await updateProgress(current);
+      } on Object catch (error, stack) {
+        if (identical(current, first)) {
+          firstError = error;
+          firstStack = stack;
+        }
+      }
+      final queued = _queuedPlaybackProgress;
+      _queuedPlaybackProgress = null;
+      if (queued == null) break;
+      current = queued;
+    }
+    if (firstError != null) Error.throwWithStackTrace(firstError, firstStack!);
+  }
+
+  /// Resolves once every pending playback report (including a queued one)
+  /// has been sent, so a read right after playback sees the final position.
+  Future<void> playbackProgressSettled() async {
+    final inFlight = _playbackProgressInFlight;
+    if (inFlight == null) return;
+    try {
+      await inFlight;
+    } on Object {
+      // The reporter already surfaced it; settling only waits.
+    }
   }
 
   Future<List<Progress>> getSeriesProgress(

@@ -349,6 +349,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playerStartFromBeginning => '从头开始';
 
   @override
+  String get playerPlay => '播放';
+
+  @override
   String get playerResume => '恢复播放';
 
   @override
