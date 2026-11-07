@@ -30,8 +30,8 @@ import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
-import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
+import 'package:m3u_tv/services/watch_history_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_icons.dart';
@@ -86,7 +86,7 @@ class PlayerScreen extends StatefulWidget {
     this.introDbSettings,
     this.hasDvrFeature = false,
     this.progressReporter,
-    this.traktService,
+    this.watchHistoryServices = const <WatchHistoryService>[],
     this.wakelockController = const PlatformWakelockController(),
     this.viewerId = '',
     this.onClose,
@@ -134,7 +134,7 @@ class PlayerScreen extends StatefulWidget {
   final IntroDbSettings? introDbSettings;
   final bool hasDvrFeature;
   final void Function(Progress progress)? progressReporter;
-  final TraktService? traktService;
+  final List<WatchHistoryService> watchHistoryServices;
   final WakelockController wakelockController;
   final String viewerId;
   final ViewSettingsService? viewSettingsService;
@@ -315,7 +315,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   StreamSubscription<bool>? _nativePlaneSubscription;
 
   bool _disposed = false;
-  bool _traktScrobbleActive = false;
+  bool _scrobbleActive = false;
   bool _failureReported = false;
   double _lastValidProgress = 0;
 
@@ -566,8 +566,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
     if (_isSamePlaybackSession(oldWidget.args, widget.args)) return;
 
-    if (_traktScrobbleActive) _scrobbleFor(oldWidget.args, 'stop');
-    _traktScrobbleActive = false;
+    if (_scrobbleActive) _scrobbleFor(oldWidget.args, 'stop');
+    _scrobbleActive = false;
     _failureReported = false;
     _lastValidProgress = 0;
     _stopPositionTimer();
@@ -856,11 +856,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return null;
   }
 
-  void _scrobble(String action) => _scrobbleFor(widget.args, action);
+  /// The year may arrive as an int or at the start of a full release date.
+  static int? _yearFrom(Object? value) =>
+      int.tryParse(RegExp(r'^\d{4}').stringMatch('${value ?? ''}') ?? '');
 
-  void _scrobbleFor(PlayerArgs args, String action) {
-    final service = widget.traktService;
-    if (service == null || service.status != TraktAuthStatus.connected) return;
+  void _scrobble(String action, {bool heartbeat = false}) =>
+      _scrobbleFor(widget.args, action, heartbeat: heartbeat);
+
+  void _scrobbleFor(
+    PlayerArgs args,
+    String action, {
+    bool heartbeat = false,
+  }) {
+    final services = widget.watchHistoryServices
+        .where(
+          (service) =>
+              service.isConnected &&
+              (!heartbeat || service.wantsProgressHeartbeat),
+        )
+        .toList(growable: false);
+    if (services.isEmpty) return;
     if (args.type == 'live' || args.type == 'catchup') return;
     final duration = _duration.inSeconds;
     var progress = duration > 0
@@ -874,20 +889,23 @@ class _PlayerScreenState extends State<PlayerScreen> {
       progress = _lastValidProgress;
     }
     if (progress > 0) _lastValidProgress = progress;
-    unawaited(
-      service.scrobble(
-        action: action,
-        title: args.title,
-        seriesTitle: args.type == 'series'
-            ? args.metadata['series_name'] as String?
-            : null,
-        season: args.seasonNumber ?? args.metadata['season_number'] as int?,
-        episode: args.metadata['episode_number'] as int?,
-        tmdbId: args.metadata['tmdb_id'] as int?,
-        imdbId: args.metadata['aio_item_id'] as String?,
-        progress: progress,
-      ),
-    );
+    for (final service in services) {
+      unawaited(
+        service.scrobble(
+          action: action,
+          title: args.title,
+          seriesTitle: args.type == 'series'
+              ? args.metadata['series_name'] as String?
+              : null,
+          season: args.seasonNumber ?? args.metadata['season_number'] as int?,
+          episode: args.metadata['episode_number'] as int?,
+          tmdbId: args.metadata['tmdb_id'] as int?,
+          imdbId: args.metadata['aio_item_id'] as String?,
+          year: _yearFrom(args.metadata['year']),
+          progress: progress,
+        ),
+      );
+    }
   }
 
   @override
@@ -911,7 +929,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
       );
     }
-    if (_traktScrobbleActive) _scrobble('stop');
+    if (_scrobbleActive) _scrobble('stop');
     _loadingTimer?.cancel();
     _videoSurfaceSettleTimer?.cancel();
     _videoSurfaceMaxHoldTimer?.cancel();
@@ -1150,7 +1168,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _isPlaying = true;
         _errorMessage = null;
         if (!_isLive) _startPositionTimer();
-        _traktScrobbleActive = true;
+        _scrobbleActive = true;
         // Position ticks resend `playing` many times a second - only
         // scrobble 'start' on the actual transition into playback, not on
         // every tick, or Trakt gets flooded and starts rate-limiting.
@@ -1159,7 +1177,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           state.status == PlaybackStatus.buffering) {
         if (state.status == PlaybackStatus.paused) {
           _isPlaying = false;
-          if (_traktScrobbleActive) _scrobble('pause');
+          if (_scrobbleActive) _scrobble('pause');
         }
         _stopPositionTimer();
       } else if (state.status == PlaybackStatus.completed &&
@@ -1167,8 +1185,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
           !_catchupReopenPending) {
         _isPlaying = false;
         _stopPositionTimer();
-        if (_traktScrobbleActive) {
-          _traktScrobbleActive = false;
+        if (_scrobbleActive) {
+          _scrobbleActive = false;
           _scrobble('stop');
         }
         if (_isLive) {
@@ -1270,7 +1288,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _progressTimer = Timer.periodic(_progressInterval, (_) {
       if (_disposed || !mounted) return;
       _reportProgress(_currentPosition);
-      if (_traktScrobbleActive) _scrobble('start');
+      if (_scrobbleActive) _scrobble('start', heartbeat: true);
     });
   }
 

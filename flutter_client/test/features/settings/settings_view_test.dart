@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:m3u_tv/features/settings/sections/simkl_card.dart';
+import 'package:m3u_tv/features/settings/sections/trakt_card.dart';
 import 'package:m3u_tv/features/settings/settings_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
@@ -6,6 +8,7 @@ import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/simkl_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
@@ -34,6 +37,7 @@ void main() {
     late ViewSettingsService viewSettingsService;
     late AuthNotifier authNotifier;
     late TraktService traktService;
+    late SimklService simklService;
     late ProxyPlaybackSettings proxyPlaybackSettings;
     late ComskipSettings comskipSettings;
     late IntroDbSettings introDbSettings;
@@ -46,6 +50,7 @@ void main() {
         secureStorage: secureStorage,
       );
       traktService = TraktService(storage: secureStorage);
+      simklService = SimklService(storage: secureStorage);
       proxyPlaybackSettings = ProxyPlaybackSettings();
       comskipSettings = ComskipSettings();
       introDbSettings = IntroDbSettings();
@@ -54,6 +59,7 @@ void main() {
     tearDown(() {
       authNotifier.dispose();
       traktService.dispose();
+      simklService.dispose();
       viewSettingsService.dispose();
       proxyPlaybackSettings.dispose();
       comskipSettings.dispose();
@@ -68,6 +74,7 @@ void main() {
           home: SettingsScreen(
             authNotifier: authNotifier,
             traktService: traktService,
+            simklService: simklService,
             sourceLabel: 'Test',
             isConfiguredOverride: true,
             viewSettingsService: viewSettingsService,
@@ -90,6 +97,21 @@ void main() {
       await tester.tap(find.text(l.settingsAppearance));
       await tester.pumpAndSettle();
     }
+
+    testWidgets('Integrations lists Simkl above Trakt', (tester) async {
+      await pumpSettingsScreen(tester);
+      final l = AppLocalizations.of(
+        tester.element(find.byType(SettingsScreen)),
+      );
+
+      await tester.tap(find.text(l.settingsIntegrations));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getTopLeft(find.byType(SimklCard)).dy,
+        lessThan(tester.getTopLeft(find.byType(TraktCard)).dy),
+      );
+    });
 
     testWidgets('renders view settings rows and persists layout via picker', (
       tester,

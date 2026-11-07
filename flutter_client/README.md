@@ -312,6 +312,16 @@ To use your own registered app instead of the built-in default:
 --dart-define=TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
 ```
 
+## Simkl setup
+
+Simkl uses a public client id for its device login. The app ships with a default client id built in, so no setup is needed. To use your own registered app instead:
+
+1. Register an app at <https://simkl.com/settings/developer/> with the client type "TV, devices & command line". Don't ship a client secret: device login doesn't need one.
+2. Pass the client id on every `flutter run` / `flutter build`:
+   ```bash
+   flutter run --dart-define=SIMKL_CLIENT_ID=your_client_id -d <device-id>
+   ```
+
 ## Developer dart-defines
 
 These compile-time flags are for local development and debugging. Pass them via `--dart-define` - they default to off and are never required for normal builds.
@@ -319,6 +329,7 @@ These compile-time flags are for local development and debugging. Pass them via 
 | Flag | Default | Purpose |
 |---|---|---|
 | `TRAKT_CLIENT_ID` | built-in app client id | Overrides the default Trakt API client ID. See [Trakt setup](#trakt-setup). |
+| `SIMKL_CLIENT_ID` | built-in app client id | Overrides the default Simkl client ID. See [Simkl setup](#simkl-setup). |
 | `M3U_TV_SHOW_PLAYBACK_DIAGNOSTICS` | `false` | Renders the in-player backend diagnostics panel and fallback reason badge. Useful when debugging playback fallback behaviour. |
 
 Example enabling diagnostics on a debug run:

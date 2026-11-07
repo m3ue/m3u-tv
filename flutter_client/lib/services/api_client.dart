@@ -37,11 +37,13 @@ class ApiClient {
     String method,
     Uri uri, {
     Object? json,
+    Map<String, String>? form,
     Map<String, String> headers = const {},
     Duration? timeout,
   }) async {
     final limit = timeout ?? this.timeout;
     final request = http.Request(method, uri)..headers.addAll(headers);
+    if (form != null) request.bodyFields = form;
     if (json != null) {
       request
         ..headers['content-type'] = 'application/json'

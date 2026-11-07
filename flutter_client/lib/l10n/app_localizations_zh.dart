@@ -1181,6 +1181,28 @@ class AppLocalizationsZh extends AppLocalizations {
   String get traktDisconnectButton => '断开 Trakt';
 
   @override
+  String get simklName => 'Simkl';
+
+  @override
+  String get simklConnectPrompt => '连接你的 Simkl 账户，自动记录你观看的内容。';
+
+  @override
+  String get simklConnectButton => '连接 Simkl';
+
+  @override
+  String get simklConnected => '已连接到 Simkl';
+
+  @override
+  String get simklDisconnectButton => '断开 Simkl';
+
+  @override
+  String get simklNotConfigured => '未配置 Simkl 客户端 ID。';
+
+  @override
+  String get simklNotConfiguredHint =>
+      '请在 simkl.com/settings/developer 注册应用，并通过 --dart-define=SIMKL_CLIENT_ID 设置客户端 ID。';
+
+  @override
   String get vodAllMovies => '全部电影';
 
   @override

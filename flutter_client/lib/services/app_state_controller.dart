@@ -32,6 +32,7 @@ import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/reverb_service.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/simkl_service.dart';
 import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/services/sports_settings.dart';
 import 'package:m3u_tv/services/storage_usage.dart';
@@ -149,6 +150,7 @@ class AppStateController extends ChangeNotifier {
       viewerService: viewerService ?? ViewerService(store: store),
       epgService: epgService ?? EpgService(),
       traktService: TraktService(storage: resolvedSecureStorage),
+      simklService: SimklService(storage: resolvedSecureStorage),
       devicePairingService: devicePairingService ?? DevicePairingService(),
       deviceIdentityService: resolvedDeviceIdentityService,
       tvNotificationService:
@@ -189,6 +191,7 @@ class AppStateController extends ChangeNotifier {
     required this.viewerService,
     required this.epgService,
     required this.traktService,
+    required this.simklService,
     required this.devicePairingService,
     required this.deviceIdentityService,
     required this._tvNotificationService,
@@ -497,6 +500,7 @@ class AppStateController extends ChangeNotifier {
   final ViewerService viewerService;
   final EpgService epgService;
   final TraktService traktService;
+  final SimklService simklService;
   final DevicePairingService devicePairingService;
 
   AppSourceType _sourceType = AppSourceType.none;
@@ -644,6 +648,7 @@ class AppStateController extends ChangeNotifier {
     _error = null;
     notifyListeners();
     unawaited(traktService.init());
+    unawaited(simklService.init());
     unawaited(comskipSettings.load());
     unawaited(sportsSettings.ensureLoaded());
     unawaited(introDbSettings.load());

@@ -8,6 +8,7 @@ import 'package:m3u_tv/features/settings/sections/app_version_card.dart';
 import 'package:m3u_tv/features/settings/sections/playback_settings_page.dart';
 import 'package:m3u_tv/features/settings/sections/playlists_page.dart';
 import 'package:m3u_tv/features/settings/sections/settings_status_row.dart';
+import 'package:m3u_tv/features/settings/sections/simkl_card.dart';
 import 'package:m3u_tv/features/settings/sections/storage_page.dart';
 import 'package:m3u_tv/features/settings/sections/trakt_card.dart';
 import 'package:m3u_tv/features/settings/sections/view_settings_section.dart';
@@ -22,6 +23,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
+import 'package:m3u_tv/services/simkl_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
@@ -38,6 +40,7 @@ class ConnectedView extends StatefulWidget {
     super.key,
     required this.authNotifier,
     required this.traktService,
+    required this.simklService,
     this.activeViewer,
     this.viewers = const [],
     this.sourceLabel,
@@ -65,6 +68,7 @@ class ConnectedView extends StatefulWidget {
 
   final AuthNotifier authNotifier;
   final TraktService traktService;
+  final SimklService simklService;
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
   final IntroDbSettings? introDbSettings;
@@ -237,6 +241,15 @@ class _ConnectedViewState extends State<ConnectedView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SettingsSectionHeader(l.settingsSectionServices),
+                        ListenableBuilder(
+                          listenable: widget.simklService,
+                          builder: (context, _) => SettingsCard(
+                            child: SimklCard(
+                              simklService: widget.simklService,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         ListenableBuilder(
                           listenable: widget.traktService,
                           builder: (context, _) => SettingsCard(

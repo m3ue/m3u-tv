@@ -1,14 +1,12 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'dart:async';
-import 'dart:convert';
-import 'dart:math';
-
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/services/api_client.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
+import 'package:m3u_tv/services/pkce.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/watch_history_service.dart';
 
 // Register your public app at https://trakt.tv/oauth/applications and pass the
 // client id with TRAKT_CLIENT_ID when building, or fall back to the app's
@@ -43,16 +41,6 @@ class TraktPendingAuth {
 typedef TraktTransport = Future<TraktResponse> Function(TraktRequest request);
 typedef TraktCodeVerifierFactory = String Function();
 
-String _generateCodeVerifier() {
-  final random = Random.secure();
-  final bytes = List<int>.generate(32, (_) => random.nextInt(256));
-  return base64UrlEncode(bytes).replaceAll('=', '');
-}
-
-String _codeChallenge(String verifier) => base64UrlEncode(
-  sha256.convert(ascii.encode(verifier)).bytes,
-).replaceAll('=', '');
-
 class TraktRequest {
   const TraktRequest({
     required this.path,
@@ -79,7 +67,7 @@ class TraktResponse {
 /// `pending.userCode` and `pending.verificationUrl` and show a spinner.
 /// The service polls automatically and transitions to
 /// `TraktAuthStatus.connected` on success.
-class TraktService extends ChangeNotifier {
+class TraktService extends ChangeNotifier implements WatchHistoryService {
   // Keep the public constructor parameter names stable for callers.
   TraktService({
     required SecureStorage storage,
@@ -89,7 +77,7 @@ class TraktService extends ChangeNotifier {
   }) : _storage = storage,
        _clientId = clientId,
        _transport = transport,
-       _codeVerifierFactory = codeVerifierFactory ?? _generateCodeVerifier;
+       _codeVerifierFactory = codeVerifierFactory ?? generatePkceVerifier;
 
   final SecureStorage _storage;
   final String _clientId;
@@ -110,6 +98,13 @@ class TraktService extends ChangeNotifier {
   var _disposed = false;
 
   TraktAuthStatus get status => _status;
+
+  @override
+  bool get isConnected => _status == TraktAuthStatus.connected;
+
+  @override
+  bool get wantsProgressHeartbeat => true;
+
   TraktPendingAuth? get pending => _pending;
 
   @visibleForTesting
@@ -150,7 +145,7 @@ class TraktService extends ChangeNotifier {
     try {
       final data = await _post('/oauth/device/code', {
         'client_id': _clientId,
-        'code_challenge': _codeChallenge(verifier),
+        'code_challenge': pkceChallenge(verifier),
         'code_challenge_method': 'S256',
       });
       if (_disposed || attempt != _authAttempt) return;
@@ -353,6 +348,7 @@ class TraktService extends ChangeNotifier {
   /// [progress] is 0 to 100.
   ///
   /// Errors are silently ignored because scrobbling is best-effort.
+  @override
   Future<void> scrobble({
     required String action,
     required String title,
@@ -361,6 +357,7 @@ class TraktService extends ChangeNotifier {
     int? episode,
     int? tmdbId,
     String? imdbId,
+    int? year,
     required double progress,
   }) async {
     final token = _accessToken;

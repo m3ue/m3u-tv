@@ -1231,6 +1231,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get traktDisconnectButton => 'Disconnect Trakt';
 
   @override
+  String get simklName => 'Simkl';
+
+  @override
+  String get simklConnectPrompt =>
+      'Connect your Simkl account to automatically track what you watch.';
+
+  @override
+  String get simklConnectButton => 'Connect with Simkl';
+
+  @override
+  String get simklConnected => 'Connected to Simkl';
+
+  @override
+  String get simklDisconnectButton => 'Disconnect Simkl';
+
+  @override
+  String get simklNotConfigured => 'Simkl client ID is not configured.';
+
+  @override
+  String get simklNotConfiguredHint =>
+      'Register an app at simkl.com/settings/developer and set the client ID via --dart-define=SIMKL_CLIENT_ID.';
+
+  @override
   String get vodAllMovies => 'All Movies';
 
   @override

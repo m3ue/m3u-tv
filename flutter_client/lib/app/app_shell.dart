@@ -1513,6 +1513,7 @@ class AppShellState extends ConsumerState<AppShell>
               seasonNumber: progress.seasonNumber,
               metadata: <String, Object?>{
                 if (series.tmdbId != null) 'tmdb_id': series.tmdbId,
+                if (series.year != null) 'year': series.year,
                 if (series.coverUrl != null) 'poster_url': series.coverUrl,
                 if (series.backdropUrl != null)
                   'backdrop_url': series.backdropUrl,
@@ -1724,6 +1725,7 @@ class AppShellState extends ConsumerState<AppShell>
           sourceError: _appState.error,
           isConfiguredOverride: _appState.isConfigured,
           traktService: _appState.traktService,
+          simklService: _appState.simklService,
           devicePairingService: _appState.devicePairingService,
           // A saved playlist that is still stored opens at once, as a
           // switch does.
@@ -2038,7 +2040,10 @@ class AppShellState extends ConsumerState<AppShell>
                         );
                       }
                     },
-                    traktService: _appState.traktService,
+                    watchHistoryServices: [
+                      _appState.simklService,
+                      _appState.traktService,
+                    ],
                     onPlaybackFailure: () {
                       if (!mounted) return;
                       setState(() => _playerHasFailed = true);

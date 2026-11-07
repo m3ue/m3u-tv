@@ -10,6 +10,7 @@ import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/simkl_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:material_ui/material_ui.dart';
@@ -229,6 +230,7 @@ void main() {
           body: SettingsScreen(
             authNotifier: auth,
             traktService: TraktService(storage: InMemorySecureStorage()),
+            simklService: SimklService(storage: InMemorySecureStorage()),
             devicePairingService: pairing,
             isConfiguredOverride: false,
             onConnect: (credentials) async {

@@ -275,6 +275,7 @@ class _VodDetailsBody extends StatelessWidget {
           if (details.coverUrl != null) 'thumbnail_url': details.coverUrl,
           if (details.coverUrl != null) 'poster_url': details.coverUrl,
           if (details.tmdbId != null) 'tmdb_id': details.tmdbId,
+          if (details.year != null) 'year': details.year,
           if (details.plot != null) 'plot': details.plot,
           if (details.edlUrl != null) 'edl_url': details.edlUrl,
         },

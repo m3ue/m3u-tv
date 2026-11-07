@@ -2192,6 +2192,48 @@ abstract class AppLocalizations {
   /// **'Disconnect Trakt'**
   String get traktDisconnectButton;
 
+  /// No description provided for @simklName.
+  ///
+  /// In en, this message translates to:
+  /// **'Simkl'**
+  String get simklName;
+
+  /// No description provided for @simklConnectPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect your Simkl account to automatically track what you watch.'**
+  String get simklConnectPrompt;
+
+  /// No description provided for @simklConnectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect with Simkl'**
+  String get simklConnectButton;
+
+  /// No description provided for @simklConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to Simkl'**
+  String get simklConnected;
+
+  /// No description provided for @simklDisconnectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect Simkl'**
+  String get simklDisconnectButton;
+
+  /// No description provided for @simklNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Simkl client ID is not configured.'**
+  String get simklNotConfigured;
+
+  /// No description provided for @simklNotConfiguredHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Register an app at simkl.com/settings/developer and set the client ID via --dart-define=SIMKL_CLIENT_ID.'**
+  String get simklNotConfiguredHint;
+
   /// No description provided for @vodAllMovies.
   ///
   /// In en, this message translates to:

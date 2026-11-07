@@ -23,6 +23,7 @@ import 'package:m3u_tv/services/comskip_service.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/services/watch_history_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/cached_backdrop_image.dart';
 import 'package:m3u_tv/shared/sort_option_row.dart';
@@ -1580,6 +1581,70 @@ void main() {
         await tester.pump();
 
         expect(find.byType(PlaybackControls), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'only heartbeat-wanting trackers get the periodic start, and a signed-out one gets nothing',
+      (tester) async {
+        final adapter = FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.desktopLibmpv,
+          textureId: 1,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+        final heartbeat = _FakeWatchHistory(wantsProgressHeartbeat: true);
+        final eventsOnly = _FakeWatchHistory(wantsProgressHeartbeat: false);
+        final signedOut = _FakeWatchHistory(
+          wantsProgressHeartbeat: true,
+          isConnected: false,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlayerScreen(
+              args: const PlayerArgs(
+                streamUrl: 'https://example.com/movie.mkv',
+                title: 'Movie',
+                type: 'vod',
+                metadata: <String, dynamic>{'year': '2010-07-16'},
+              ),
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+              watchHistoryServices: [eventsOnly, heartbeat, signedOut],
+            ),
+          ),
+        );
+        await tester.pump();
+
+        adapter.emitState(
+          const PlaybackState(
+            backend: PlaybackBackend.desktopLibmpv,
+            status: PlaybackStatus.playing,
+            position: Duration(seconds: 5),
+            duration: Duration(minutes: 100),
+          ),
+        );
+        await tester.pump();
+        expect(heartbeat.actions, ['start']);
+        expect(eventsOnly.actions, ['start']);
+        expect(eventsOnly.years, [2010]);
+
+        await tester.pump(const Duration(seconds: 25));
+        expect(heartbeat.actions.length, greaterThan(1));
+        expect(eventsOnly.actions, ['start']);
+        expect(signedOut.actions, isEmpty);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
       },
     );
 
@@ -5216,5 +5281,37 @@ class _CompletesOnStopAdapter extends FakePlayerAdapter {
         status: PlaybackStatus.completed,
       ),
     );
+  }
+}
+
+class _FakeWatchHistory implements WatchHistoryService {
+  _FakeWatchHistory({
+    required this.wantsProgressHeartbeat,
+    this.isConnected = true,
+  });
+
+  @override
+  final bool wantsProgressHeartbeat;
+
+  @override
+  final bool isConnected;
+
+  final actions = <String>[];
+  final years = <int?>[];
+
+  @override
+  Future<void> scrobble({
+    required String action,
+    required String title,
+    String? seriesTitle,
+    int? season,
+    int? episode,
+    int? tmdbId,
+    String? imdbId,
+    int? year,
+    required double progress,
+  }) async {
+    actions.add(action);
+    years.add(year);
   }
 }
