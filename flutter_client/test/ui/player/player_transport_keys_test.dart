@@ -19,6 +19,9 @@ void main() {
   Future<void> pumpPlayer(
     WidgetTester tester, {
     PlaybackStatus status = PlaybackStatus.playing,
+    String type = 'vod',
+    VoidCallback? onNextChannel,
+    VoidCallback? onPreviousChannel,
   }) async {
     closes = 0;
     adapter = FakePlayerAdapter(
@@ -38,11 +41,13 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: PlayerScreen(
-          args: const PlayerArgs(
+          args: PlayerArgs(
             streamUrl: 'https://example.com/movie.mkv',
             title: 'Movie Fixture',
-            type: 'vod',
+            type: type,
           ),
+          onNextChannel: onNextChannel,
+          onPreviousChannel: onPreviousChannel,
           orchestrator: orchestrator,
           epgService: EpgService(clock: () => DateTime.utc(2026)),
           onClose: () => closes++,
@@ -126,6 +131,51 @@ void main() {
     await press(tester, LogicalKeyboardKey.mediaStop);
 
     expect(closes, 1);
+  });
+
+  testWidgets('Next and Previous skip through a movie', (tester) async {
+    await pumpPlayer(tester);
+
+    await press(tester, LogicalKeyboardKey.mediaTrackNext);
+    await tester.pump(const Duration(seconds: 1));
+    expect(adapter.seekCalls.last, const Duration(seconds: 10));
+
+    await press(tester, LogicalKeyboardKey.mediaTrackPrevious);
+    await tester.pump(const Duration(seconds: 1));
+    expect(adapter.seekCalls, hasLength(2));
+    // Back from wherever playback has reached since the first skip landed.
+    expect(adapter.seekCalls.last, lessThan(const Duration(seconds: 5)));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Next changes channel on live TV without seeking', (
+    tester,
+  ) async {
+    var nextChannels = 0;
+    await pumpPlayer(tester, type: 'live', onNextChannel: () => nextChannels++);
+
+    await press(tester, LogicalKeyboardKey.mediaTrackNext);
+
+    expect(nextChannels, 1);
+    expect(adapter.seekCalls, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Previous changes channel on live TV without seeking', (
+    tester,
+  ) async {
+    var previousChannels = 0;
+    await pumpPlayer(
+      tester,
+      type: 'live',
+      onPreviousChannel: () => previousChannels++,
+    );
+
+    await press(tester, LogicalKeyboardKey.mediaTrackPrevious);
+
+    expect(previousChannels, 1);
+    expect(adapter.seekCalls, isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('transport keys are released when the player closes', (

@@ -148,6 +148,8 @@ class NavigationSidebar extends StatelessWidget {
                 ),
               for (var index = footerStart; index < routes.length; index++)
                 _destination(context, index, expanded, scale),
+              // Keeps Settings off the screen's bottom edge.
+              SizedBox(height: 8 * scale),
             ],
           ),
         ),

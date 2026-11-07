@@ -1925,6 +1925,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
               const PlayerSeekForwardIntent(),
           LogicalKeySet(LogicalKeyboardKey.mediaSkipBackward):
               const PlayerSeekBackIntent(),
+          // Next/Previous mean the next thing to watch on live TV, where
+          // there's usually nothing to skip through.
+          LogicalKeySet(LogicalKeyboardKey.mediaTrackNext): _isLive
+              ? const PlayerChannelUpIntent()
+              : const PlayerSeekForwardIntent(),
+          LogicalKeySet(LogicalKeyboardKey.mediaTrackPrevious): _isLive
+              ? const PlayerChannelDownIntent()
+              : const PlayerSeekBackIntent(),
           // Only claim arrow keys when the overlay is hidden - when visible,
           // let dpad's root Shortcuts handle them for spatial navigation.
           if (!_overlayVisible) ...{
