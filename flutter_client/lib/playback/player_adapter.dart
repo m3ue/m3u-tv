@@ -100,6 +100,15 @@ abstract class HdrToggleProvider {
   );
 }
 
+/// A [PlayerAdapter] that can load a subtitle file during playback, without
+/// restarting the stream. [ExternalSubtitle.uri] must be a local file: mpv's
+/// `sub-add` runs on the UI thread on Linux and Windows.
+// ignore: one_member_abstracts
+abstract class RuntimeSubtitleProvider {
+  /// Loads [subtitle] and selects it.
+  Future<void> addExternalSubtitle(ExternalSubtitle subtitle);
+}
+
 /// A [PlayerAdapter] whose native side can change the display's mode (see
 /// [PlaybackSource.allowDisplayModeChanges]) and can turn that on or off
 /// for the stream already playing, without reloading it. Turning it off

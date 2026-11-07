@@ -537,6 +537,25 @@ class MpvPlayerCore(
 
     fun setSubtitleTrack(trackId: String?) = setProperty("sid", trackId ?: "no")
 
+    fun addExternalSubtitle(uri: String, title: String?, language: String?) {
+        scope.launch {
+            mutex.withLock {
+                val current = player ?: return@withLock
+                val subArgs = mutableListOf("sub-add", uri, "select")
+                if (!title.isNullOrEmpty()) {
+                    subArgs.add(title)
+                    if (!language.isNullOrEmpty()) subArgs.add(language)
+                }
+                try {
+                    current.command(*subArgs.toTypedArray())
+                    emit("PLAYBACK_RESTART", snapshot(current, includeTracks = true))
+                } catch (error: Exception) {
+                    Log.w(TAG, "sub-add failed: ${error.message}")
+                }
+            }
+        }
+    }
+
     fun setPlaybackSpeed(speed: Double) = setProperty("speed", speed.toString())
 
     private fun setProperty(name: String, value: String) {

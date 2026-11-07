@@ -1726,6 +1726,7 @@ class AppShellState extends ConsumerState<AppShell>
           isConfiguredOverride: _appState.isConfigured,
           traktService: _appState.traktService,
           simklService: _appState.simklService,
+          onlineSubtitleSettings: _appState.onlineSubtitleSettings,
           devicePairingService: _appState.devicePairingService,
           // A saved playlist that is still stored opens at once, as a
           // switch does.
@@ -2044,6 +2045,8 @@ class AppShellState extends ConsumerState<AppShell>
                       _appState.simklService,
                       _appState.traktService,
                     ],
+                    onlineSubtitleService: _appState.onlineSubtitleService,
+                    onlineSubtitleSettings: _appState.onlineSubtitleSettings,
                     onPlaybackFailure: () {
                       if (!mounted) return;
                       setState(() => _playerHasFailed = true);

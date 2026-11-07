@@ -1880,6 +1880,24 @@ void Control(const std::string& method, const flutter::EncodableMap* args) {
     player->ReadSnapshotProperties(&snapshot);
     player->ReadTrackLists(&snapshot);
     player->QueueEvent(std::move(snapshot));
+  } else if (method == "addExternalSubtitle") {
+    const std::string uri = StringArg(args, "uri");
+    const std::string title = StringArg(args, "title");
+    const std::string language = StringArg(args, "language");
+    if (!uri.empty()) {
+      std::vector<const char*> sub_args = {"sub-add", uri.c_str(), "select"};
+      if (!title.empty()) {
+        sub_args.push_back(title.c_str());
+        if (!language.empty()) sub_args.push_back(language.c_str());
+      }
+      sub_args.push_back(nullptr);
+      player->api->command(player->handle, sub_args.data());
+    }
+    EventSnapshot snapshot;
+    snapshot.kind = "PLAYBACK_RESTART";
+    player->ReadSnapshotProperties(&snapshot);
+    player->ReadTrackLists(&snapshot);
+    player->QueueEvent(std::move(snapshot));
   } else if (method == "setPlaybackSpeed") {
     const std::string speed = std::to_string(DoubleArg(args, "speed", 1.0));
     const char* command[] = {"set", "speed", speed.c_str(), nullptr};

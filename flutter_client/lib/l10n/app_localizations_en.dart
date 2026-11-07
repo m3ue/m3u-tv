@@ -2093,6 +2093,52 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playerTrackSubtitlesOff => 'Off';
 
   @override
+  String get playerOnlineSubtitlesSearch => 'Search online';
+
+  @override
+  String get playerOnlineSubtitlesTitle => 'Online subtitles';
+
+  @override
+  String get playerOnlineSubtitlesSearching => 'Searching for subtitles…';
+
+  @override
+  String get playerOnlineSubtitlesLoading => 'Loading subtitle…';
+
+  @override
+  String get playerOnlineSubtitlesEmpty => 'No subtitles found for this title.';
+
+  @override
+  String get playerOnlineSubtitlesFailed =>
+      'Couldn\'t load subtitles. Check your connection and try again.';
+
+  @override
+  String get playerOnlineSubtitlesRetry => 'Try again';
+
+  @override
+  String get playerOnlineSubtitlesAllLanguages => 'All languages';
+
+  @override
+  String get settingsOnlineSubtitles => 'Online subtitles';
+
+  @override
+  String get settingsOnlineSubtitlesSubtitle =>
+      'Find subtitles for movies and episodes from the player\'s subtitle menu.';
+
+  @override
+  String get settingsOnlineSubtitlesAddress => 'Subtitle source';
+
+  @override
+  String get settingsOnlineSubtitlesAddressHint =>
+      'Stremio subtitle add-on address';
+
+  @override
+  String get settingsOnlineSubtitlesAddressInvalid =>
+      'Enter a valid http or https address.';
+
+  @override
+  String get settingsOnlineSubtitlesUseDefault => 'Use default';
+
+  @override
   String get playerHdrOn => 'HDR On';
 
   @override

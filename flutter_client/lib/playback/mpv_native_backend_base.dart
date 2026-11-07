@@ -18,7 +18,11 @@ import 'package:m3u_tv/playback/player_adapter.dart';
 /// consumers of this FSM, differing only in their method/event channel
 /// names, [PlaybackCapabilities], error codes, and (macOS only) `setVolume`.
 abstract class MpvNativeBackendBase
-    implements PlayerAdapter, SeekWindowProvider, DisplayModeController {
+    implements
+        PlayerAdapter,
+        SeekWindowProvider,
+        DisplayModeController,
+        RuntimeSubtitleProvider {
   MpvNativeBackendBase({
     required this.viewId,
     required this._channel,
@@ -245,6 +249,15 @@ abstract class MpvNativeBackendBase
   Future<void> setSubtitleTrack(String? trackId) async {
     await _invokeControl('setSubtitleTrack', <String, Object?>{
       'trackId': trackId,
+    });
+  }
+
+  @override
+  Future<void> addExternalSubtitle(ExternalSubtitle subtitle) async {
+    await _invokeControl('addExternalSubtitle', <String, Object?>{
+      'uri': subtitle.uri,
+      'title': subtitle.title,
+      'language': subtitle.language,
     });
   }
 

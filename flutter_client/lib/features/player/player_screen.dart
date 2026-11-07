@@ -9,6 +9,7 @@ import 'package:m3u_tv/features/player/catchup_timeline.dart';
 import 'package:m3u_tv/features/player/epg_overlay.dart';
 import 'package:m3u_tv/features/player/episode_picker.dart';
 import 'package:m3u_tv/features/player/now_playing_overlay.dart';
+import 'package:m3u_tv/features/player/online_subtitle_picker.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/features/player/player_diagnostics_panel.dart';
 import 'package:m3u_tv/features/player/player_shortcuts.dart';
@@ -30,6 +31,8 @@ import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
+import 'package:m3u_tv/services/online_subtitle_service.dart';
+import 'package:m3u_tv/services/online_subtitle_settings.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/watch_history_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
@@ -87,6 +90,8 @@ class PlayerScreen extends StatefulWidget {
     this.hasDvrFeature = false,
     this.progressReporter,
     this.watchHistoryServices = const <WatchHistoryService>[],
+    this.onlineSubtitleService,
+    this.onlineSubtitleSettings,
     this.wakelockController = const PlatformWakelockController(),
     this.viewerId = '',
     this.onClose,
@@ -135,6 +140,8 @@ class PlayerScreen extends StatefulWidget {
   final bool hasDvrFeature;
   final void Function(Progress progress)? progressReporter;
   final List<WatchHistoryService> watchHistoryServices;
+  final OnlineSubtitleService? onlineSubtitleService;
+  final OnlineSubtitleSettings? onlineSubtitleSettings;
   final WakelockController wakelockController;
   final String viewerId;
   final ViewSettingsService? viewSettingsService;
@@ -1675,6 +1682,79 @@ class _PlayerScreenState extends State<PlayerScreen> {
     unawaited(widget.orchestrator.setSubtitleTrack(trackId));
   }
 
+  /// The id to search with, for the current movie or episode. The series info
+  /// loads shortly after an episode starts, so its id can arrive late.
+  String? get _onlineSubtitleImdbId {
+    final metadata = widget.args.metadata;
+    for (final candidate in [
+      metadata['imdb_id'],
+      metadata['aio_item_id'],
+      _seriesInfo?.series.imdbId,
+    ]) {
+      if (candidate is String &&
+          OnlineSubtitleService.isSearchableId(candidate)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  bool get _canSearchOnlineSubtitles {
+    final type = widget.args.type;
+    if (type == 'live' || type == 'catchup') return false;
+    if (type == 'series' &&
+        (_onlineSubtitleSeason == null || _onlineSubtitleEpisode == null)) {
+      return false;
+    }
+    return widget.onlineSubtitleService != null &&
+        widget.onlineSubtitleSettings?.enabled == true &&
+        widget.orchestrator.activeRuntimeSubtitleProvider != null &&
+        _onlineSubtitleImdbId != null;
+  }
+
+  int? get _onlineSubtitleSeason =>
+      widget.args.seasonNumber ?? widget.args.metadata['season_number'] as int?;
+
+  int? get _onlineSubtitleEpisode =>
+      widget.args.metadata['episode_number'] as int?;
+
+  void _showOnlineSubtitlePicker() {
+    final service = widget.onlineSubtitleService;
+    final settings = widget.onlineSubtitleSettings;
+    final imdbId = _onlineSubtitleImdbId;
+    if (service == null || settings == null || imdbId == null) return;
+    final isSeries = widget.args.type == 'series';
+    _handleTrackDialogVisibilityChanged(true);
+    unawaited(
+      showOnlineSubtitlePicker(
+        context,
+        lastLanguage: settings.lastLanguage,
+        onLanguagePicked: (language) =>
+            unawaited(settings.setLastLanguage(language)),
+        search: () => service.search(
+          addonUrl: settings.addonUrl,
+          imdbId: imdbId,
+          season: isSeries ? _onlineSubtitleSeason : null,
+          episode: isSeries ? _onlineSubtitleEpisode : null,
+        ),
+        onSelected: (subtitle) async {
+          final path = await service.download(subtitle);
+          final provider = widget.orchestrator.activeRuntimeSubtitleProvider;
+          if (_disposed || provider == null) return;
+          await provider.addExternalSubtitle(
+            ExternalSubtitle(
+              uri: path,
+              title:
+                  '${onlineSubtitleLanguageName(subtitle.language)} - '
+                  '${subtitle.release}',
+              language: subtitle.language,
+            ),
+          );
+        },
+      ).whenComplete(() => _handleTrackDialogVisibilityChanged(false)),
+    );
+  }
+
   bool get _supportsHdrToggle =>
       widget.orchestrator.activeHdrToggleProvider != null;
 
@@ -2168,6 +2248,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             onAudioTrackSelected: _handleAudioTrackSelected,
                             onSubtitleTrackSelected:
                                 _handleSubtitleTrackSelected,
+                            onSearchOnlineSubtitles: _canSearchOnlineSubtitles
+                                ? _showOnlineSubtitlePicker
+                                : null,
                             supportsHdrToggle: _supportsHdrToggle,
                             hdrEnabled: _hdrEnabled,
                             onHdrEnabledChanged: _handleHdrEnabledChanged,

@@ -25,6 +25,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -217,6 +218,15 @@ class Media3PlaybackPlugin(
                     selectTrack(playerId, C.TRACK_TYPE_TEXT, call.optionalStringArgument("trackId"))
                     result.success(null)
                 }
+                "addExternalSubtitle" -> {
+                    addExternalSubtitle(
+                        playerId,
+                        call.argument<String>("uri") ?: throw IllegalArgumentException("uri required"),
+                        call.optionalStringArgument("title"),
+                        call.optionalStringArgument("language"),
+                    )
+                    result.success(null)
+                }
                 "setPlaybackSpeed" -> {
                     val speed = call.argument<Number>("speed")?.toFloat()
                     val playbackParameters = PlaybackSpeedValidation.validateAndCreatePlaybackParameters(speed)
@@ -331,7 +341,12 @@ class Media3PlaybackPlugin(
         )
         val player = ExoPlayer.Builder(context)
             .setTrackSelector(trackSelector)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(httpDataSourceFactory))
+            .setMediaSourceFactory(
+                // DefaultDataSource passes web URLs to the HTTP factory and also reads
+                // the local files online subtitles are downloaded to.
+                DefaultMediaSourceFactory(context)
+                    .setDataSourceFactory(DefaultDataSource.Factory(context, httpDataSourceFactory))
+            )
             .setAudioAttributes(audioAttributes, handleAudioFocus)
             .build()
         val subtitleConfigurations = buildSubtitleConfigurations(source["externalSubtitles"])
@@ -418,6 +433,36 @@ class Media3PlaybackPlugin(
         if (message != null) event["message"] = message
         if (recoverable != null) event["recoverable"] = recoverable
         events?.success(event)
+    }
+
+    /**
+     * ExoPlayer can only take a sideloaded subtitle as part of the media item, so
+     * this re-prepares at the current position. [PlayerState.subtitleConfigurations]
+     * keeps it for a later retryAsTs.
+     */
+    private fun addExternalSubtitle(playerId: String, uri: String, title: String?, language: String?) {
+        val state = states[playerId] ?: throw IllegalStateException("Unknown player: $playerId")
+        val player = state.player
+        val item = player.currentMediaItem ?: return
+        val configuration = MediaItem.SubtitleConfiguration.Builder(Uri.parse(uri))
+            .setMimeType(subtitleMimeTypeFromUri(uri))
+            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+            .apply {
+                if (language != null) setLanguage(language)
+                if (title != null) setLabel(title)
+            }
+            .build()
+        state.subtitleConfigurations = state.subtitleConfigurations + configuration
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            .setPreferredTextLanguage(language)
+            .build()
+        player.setMediaItem(
+            item.buildUpon().setSubtitleConfigurations(state.subtitleConfigurations).build(),
+            player.currentPosition,
+        )
+        player.prepare()
     }
 
     private fun selectTrack(playerId: String, trackType: Int, trackId: String?) {
@@ -752,7 +797,7 @@ class Media3PlaybackPlugin(
         val playerId: String,
         val player: ExoPlayer,
         val uri: String,
-        val subtitleConfigurations: List<MediaItem.SubtitleConfiguration> = emptyList(),
+        var subtitleConfigurations: List<MediaItem.SubtitleConfiguration> = emptyList(),
         var mediaSession: MediaSession? = null,
         var retriedHlsAsProgressive: Boolean = false,
         var lastVideoWidth: Int = 0,

@@ -52,6 +52,7 @@ class AndroidBackendCapabilities {
 class AndroidPlaybackAdapter
     implements
         PlayerAdapter,
+        RuntimeSubtitleProvider,
         PlatformViewProvider,
         MultiviewBackend,
         DisplayModeController {
@@ -246,6 +247,13 @@ class AndroidPlaybackAdapter
   }
 
   @override
+  Future<void> addExternalSubtitle(ExternalSubtitle subtitle) async {
+    if (_activeBackend == PlaybackBackend.androidExoPlayer) {
+      await _media3Host.addExternalSubtitle(subtitle);
+    }
+  }
+
+  @override
   Future<void> setPlaybackSpeed(double speed) async {
     if (!speed.isFinite || speed <= 0) {
       throw ArgumentError.value(
@@ -392,6 +400,7 @@ abstract class AndroidMedia3Host {
   Future<void> stop();
   Future<void> setAudioTrack(String? trackId);
   Future<void> setSubtitleTrack(String? trackId);
+  Future<void> addExternalSubtitle(ExternalSubtitle subtitle);
   Future<void> setPlaybackSpeed(double speed);
   Future<void> setVolume(double volume);
 
@@ -517,6 +526,15 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
       _method.invokeMethod<void>('setSubtitleTrack', <String, Object?>{
         'playerId': playerId,
         'trackId': trackId,
+      });
+
+  @override
+  Future<void> addExternalSubtitle(ExternalSubtitle subtitle) =>
+      _method.invokeMethod<void>('addExternalSubtitle', <String, Object?>{
+        'playerId': playerId,
+        'uri': subtitle.uri,
+        'title': subtitle.title,
+        'language': subtitle.language,
       });
 
   @override

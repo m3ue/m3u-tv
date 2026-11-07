@@ -198,6 +198,7 @@ class VodInfo {
     this.clearLogoUrl,
     this.containerExtension,
     this.tmdbId,
+    this.imdbId,
     this.edlUrl,
     this.related,
     this.trailerUrl,
@@ -231,6 +232,9 @@ class VodInfo {
   final String? clearLogoUrl;
   final String? containerExtension;
   final int? tmdbId;
+
+  /// From `get_vod_info`. Older editors don't send it.
+  final String? imdbId;
   final String? edlUrl;
 
   /// YouTube trailer watch URL (`youtube_trailer`), opened externally - see
@@ -285,6 +289,7 @@ class VodInfo {
         pick(['container_extension', 'containerExtension']),
       ),
       tmdbId: _asIntOrNull(pick(['tmdb_id', 'tmdb'])),
+      imdbId: _asNullableString(pick(['imdb_id', 'imdb'])),
       edlUrl: _asNullableString(pick(['edl_url'])),
       related: _parseRelatedList(pick(['related'])),
       trailerUrl: _youtubeTrailerUrl(pick(['youtube_trailer'])),
@@ -540,6 +545,7 @@ class Series {
     this.rating,
     this.contentRating,
     this.tmdbId,
+    this.imdbId,
     this.richCast,
     this.year,
     this.genre,
@@ -571,6 +577,10 @@ class Series {
   /// m3u-editor uses for movies - see [VodInfo.contentRating].
   final String? contentRating;
   final int? tmdbId;
+
+  /// From `get_series_info` only, not stored in the catalog. Older editors
+  /// don't send it.
+  final String? imdbId;
   final List<CastMember>? richCast;
 
   /// Four-digit release year, derived from m3u-editor's `get_series`
@@ -607,6 +617,7 @@ class Series {
     rating: _asDoubleOrNull(json['rating'] ?? json['rating_5based']),
     contentRating: _contentRating([json['mpaa_rating'], json['age']]),
     tmdbId: _asIntOrNull(json['tmdb_id'] ?? json['tmdb']),
+    imdbId: _asNullableString(json['imdb_id']),
     richCast: _parseCastList(json['cast_list']),
     year: _yearString(
       json['releaseDate'] ?? json['release_date'] ?? json['year'],

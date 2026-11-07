@@ -2025,6 +2025,48 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playerTrackSubtitlesOff => '关闭';
 
   @override
+  String get playerOnlineSubtitlesSearch => '在线搜索';
+
+  @override
+  String get playerOnlineSubtitlesTitle => '在线字幕';
+
+  @override
+  String get playerOnlineSubtitlesSearching => '正在搜索字幕…';
+
+  @override
+  String get playerOnlineSubtitlesLoading => '正在加载字幕…';
+
+  @override
+  String get playerOnlineSubtitlesEmpty => '未找到此内容的字幕。';
+
+  @override
+  String get playerOnlineSubtitlesFailed => '无法加载字幕。请检查网络连接后重试。';
+
+  @override
+  String get playerOnlineSubtitlesRetry => '重试';
+
+  @override
+  String get playerOnlineSubtitlesAllLanguages => '所有语言';
+
+  @override
+  String get settingsOnlineSubtitles => '在线字幕';
+
+  @override
+  String get settingsOnlineSubtitlesSubtitle => '在播放器的字幕菜单中查找电影和剧集的字幕。';
+
+  @override
+  String get settingsOnlineSubtitlesAddress => '字幕来源';
+
+  @override
+  String get settingsOnlineSubtitlesAddressHint => 'Stremio 字幕插件地址';
+
+  @override
+  String get settingsOnlineSubtitlesAddressInvalid => '请输入有效的 http 或 https 地址。';
+
+  @override
+  String get settingsOnlineSubtitlesUseDefault => '使用默认值';
+
+  @override
   String get playerHdrOn => 'HDR 开';
 
   @override

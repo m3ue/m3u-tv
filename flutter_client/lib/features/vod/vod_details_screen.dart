@@ -275,6 +275,7 @@ class _VodDetailsBody extends StatelessWidget {
           if (details.coverUrl != null) 'thumbnail_url': details.coverUrl,
           if (details.coverUrl != null) 'poster_url': details.coverUrl,
           if (details.tmdbId != null) 'tmdb_id': details.tmdbId,
+          if (details.imdbId != null) 'imdb_id': details.imdbId,
           if (details.year != null) 'year': details.year,
           if (details.plot != null) 'plot': details.plot,
           if (details.edlUrl != null) 'edl_url': details.edlUrl,
@@ -298,6 +299,8 @@ class _ResolvedVodDetails {
   List<CastMember>? get richCast => info?.richCast;
   List<RelatedItem>? get related => info?.related;
   String? get year => nullIfBlank(info?.year) ?? nullIfBlank(info?.releaseDate);
+
+  String? get imdbId => nullIfBlank(info?.imdbId);
   String? get duration => nullIfBlank(info?.duration);
   double? get rating => info?.rating ?? item.rating;
   String? get contentRating => info?.contentRating;

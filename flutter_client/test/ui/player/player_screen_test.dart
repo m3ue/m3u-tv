@@ -9,6 +9,7 @@ import 'package:http/testing.dart';
 import 'package:m3u_tv/features/player/epg_overlay.dart';
 import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/features/player/now_playing_overlay.dart';
+import 'package:m3u_tv/features/player/online_subtitle_picker.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
 import 'package:m3u_tv/features/player/track_selector.dart';
@@ -23,6 +24,8 @@ import 'package:m3u_tv/services/comskip_service.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/services/online_subtitle_service.dart';
+import 'package:m3u_tv/services/online_subtitle_settings.dart';
 import 'package:m3u_tv/services/watch_history_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/cached_backdrop_image.dart';
@@ -1583,6 +1586,176 @@ void main() {
         expect(find.byType(PlaybackControls), findsNothing);
       },
     );
+
+    group('online subtitle search', () {
+      Future<_RuntimeSubtitleAdapter> pump(
+        WidgetTester tester, {
+        required PlayerArgs args,
+        OnlineSubtitleService? service,
+        OnlineSubtitleSettings? settings,
+        PlayerAdapter? plainAdapter,
+      }) async {
+        final adapter = _RuntimeSubtitleAdapter();
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.desktop,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.desktopLibmpv: plainAdapter ?? adapter,
+          },
+          transcodeGateway: FakeTranscodeGateway(),
+        );
+        addTearDown(orchestrator.dispose);
+        await tester.binding.setSurfaceSize(const Size(1600, 900));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: PlayerScreen(
+              args: args,
+              orchestrator: orchestrator,
+              epgService: EpgService(clock: () => DateTime.utc(2026)),
+              onlineSubtitleService: service,
+              onlineSubtitleSettings: settings,
+            ),
+          ),
+        );
+        await tester.pump();
+        (plainAdapter is FakePlayerAdapter ? plainAdapter : adapter).emitState(
+          const PlaybackState(
+            backend: PlaybackBackend.desktopLibmpv,
+            status: PlaybackStatus.playing,
+            duration: Duration(minutes: 100),
+          ),
+        );
+        await tester.pump();
+        return adapter;
+      }
+
+      const movie = PlayerArgs(
+        streamUrl: 'https://example.com/movie.mkv',
+        title: 'Movie',
+        type: 'vod',
+        metadata: <String, dynamic>{'imdb_id': 'tt1375666'},
+      );
+
+      Finder subtitleButton(WidgetTester tester) => find.text(
+        AppLocalizations.of(
+          tester.element(find.byType(PlayerScreen)),
+        ).playerTrackSubtitles,
+      );
+
+      testWidgets('searches, downloads, and loads the pick', (tester) async {
+        final service = _FakeOnlineSubtitleService();
+        final adapter = await pump(
+          tester,
+          args: movie,
+          service: service,
+          settings: OnlineSubtitleSettings(),
+        );
+        final l = AppLocalizations.of(
+          tester.element(find.byType(PlayerScreen)),
+        );
+
+        await tester.tap(subtitleButton(tester));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l.playerOnlineSubtitlesSearch));
+        await tester.pumpAndSettle();
+        expect(service.searchedId, 'tt1375666');
+        expect(service.searchedSeason, isNull);
+
+        await tester.tap(find.text('Some.Release'));
+        await tester.pumpAndSettle();
+
+        expect(adapter.added.single.uri, '/cache/1.srt');
+        expect(adapter.added.single.language, 'eng');
+        expect(adapter.added.single.title, 'English - Some.Release');
+        expect(find.byType(OnlineSubtitleResults), findsNothing);
+      });
+
+      for (final (name, args) in [
+        (
+          'a live stream',
+          const PlayerArgs(
+            streamUrl: 'https://example.com/live.m3u8',
+            title: 'Live',
+            type: 'live',
+            metadata: <String, dynamic>{'imdb_id': 'tt1'},
+          ),
+        ),
+        (
+          'a title with no IMDb id',
+          const PlayerArgs(
+            streamUrl: 'https://example.com/movie.mkv',
+            title: 'Movie',
+            type: 'vod',
+          ),
+        ),
+        (
+          'an id that is not from IMDb',
+          const PlayerArgs(
+            streamUrl: 'https://example.com/movie.mkv',
+            title: 'Movie',
+            type: 'vod',
+            metadata: <String, dynamic>{'aio_item_id': 'kitsu:123'},
+          ),
+        ),
+      ]) {
+        testWidgets('offers no search for $name', (tester) async {
+          await pump(
+            tester,
+            args: args,
+            service: OnlineSubtitleService(),
+            settings: OnlineSubtitleSettings(),
+          );
+
+          expect(subtitleButton(tester), findsNothing);
+        });
+      }
+
+      testWidgets('offers no search when turned off', (tester) async {
+        await pump(
+          tester,
+          args: movie,
+          service: OnlineSubtitleService(),
+          settings: OnlineSubtitleSettings()
+            ..setEnabled(enabled: false).ignore(),
+        );
+
+        expect(subtitleButton(tester), findsNothing);
+      });
+
+      testWidgets('offers no search on a player that cannot load one', (
+        tester,
+      ) async {
+        await pump(
+          tester,
+          args: movie,
+          service: OnlineSubtitleService(),
+          settings: OnlineSubtitleSettings(),
+          plainAdapter: FakePlayerAdapter(
+            capabilities: PlaybackCapabilities.desktopLibmpv,
+          ),
+        );
+
+        expect(subtitleButton(tester), findsNothing);
+      });
+
+      testWidgets('an AIOStreams IMDb id can be searched', (tester) async {
+        await pump(
+          tester,
+          args: const PlayerArgs(
+            streamUrl: 'https://example.com/movie.mkv',
+            title: 'Movie',
+            type: 'vod',
+            metadata: <String, dynamic>{'aio_item_id': 'tt1375666'},
+          ),
+          service: OnlineSubtitleService(),
+          settings: OnlineSubtitleSettings(),
+        );
+
+        expect(subtitleButton(tester), findsOneWidget);
+      });
+    });
 
     testWidgets(
       'only heartbeat-wanting trackers get the periodic start, and a signed-out one gets nothing',
@@ -5314,4 +5487,44 @@ class _FakeWatchHistory implements WatchHistoryService {
     actions.add(action);
     years.add(year);
   }
+}
+
+class _RuntimeSubtitleAdapter extends FakePlayerAdapter
+    implements RuntimeSubtitleProvider {
+  _RuntimeSubtitleAdapter()
+    : super(capabilities: PlaybackCapabilities.desktopLibmpv, textureId: 1);
+
+  final added = <ExternalSubtitle>[];
+
+  @override
+  Future<void> addExternalSubtitle(ExternalSubtitle subtitle) async {
+    added.add(subtitle);
+  }
+}
+
+class _FakeOnlineSubtitleService extends OnlineSubtitleService {
+  String? searchedId;
+  int? searchedSeason;
+
+  @override
+  Future<List<OnlineSubtitle>> search({
+    required String addonUrl,
+    required String imdbId,
+    int? season,
+    int? episode,
+  }) async {
+    searchedId = imdbId;
+    searchedSeason = season;
+    return const [
+      OnlineSubtitle(
+        id: '1',
+        url: 'https://subs.example/1',
+        language: 'eng',
+        release: 'Some.Release',
+      ),
+    ];
+  }
+
+  @override
+  Future<String> download(OnlineSubtitle subtitle) async => '/cache/1.srt';
 }

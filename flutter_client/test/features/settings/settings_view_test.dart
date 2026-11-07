@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:m3u_tv/features/settings/sections/online_subtitle_settings_group.dart';
 import 'package:m3u_tv/features/settings/sections/simkl_card.dart';
 import 'package:m3u_tv/features/settings/sections/trakt_card.dart';
 import 'package:m3u_tv/features/settings/settings_screen.dart';
@@ -6,6 +7,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
+import 'package:m3u_tv/services/online_subtitle_settings.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/simkl_service.dart';
@@ -75,6 +77,7 @@ void main() {
             authNotifier: authNotifier,
             traktService: traktService,
             simklService: simklService,
+            onlineSubtitleSettings: OnlineSubtitleSettings(),
             sourceLabel: 'Test',
             isConfiguredOverride: true,
             viewSettingsService: viewSettingsService,
@@ -113,6 +116,10 @@ void main() {
       );
       expect(find.text(l.simklName), findsOneWidget);
       expect(find.text(l.traktName), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.byType(OnlineSubtitleSettingsGroup)).dy,
+        greaterThan(tester.getTopLeft(find.text(l.settingsIntroDb)).dy),
+      );
     });
 
     testWidgets('renders view settings rows and persists layout via picker', (

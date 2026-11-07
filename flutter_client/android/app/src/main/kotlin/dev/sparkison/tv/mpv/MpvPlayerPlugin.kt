@@ -172,6 +172,17 @@ class MpvPlayerPlugin(
                 core(viewId)?.setSubtitleTrack(args["trackId"] as? String)
                 result.success(null)
             }
+            "addExternalSubtitle" -> {
+                val uri = args["uri"] as? String
+                if (!uri.isNullOrEmpty()) {
+                    core(viewId)?.addExternalSubtitle(
+                        uri,
+                        args["title"] as? String,
+                        args["language"] as? String,
+                    )
+                }
+                result.success(null)
+            }
             "setPlaybackSpeed" -> {
                 core(viewId)?.setPlaybackSpeed((args["speed"] as? Number)?.toDouble() ?: 1.0)
                 result.success(null)

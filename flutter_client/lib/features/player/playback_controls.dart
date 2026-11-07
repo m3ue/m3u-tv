@@ -69,6 +69,7 @@ class PlaybackControls extends StatelessWidget {
     this.supportsHdrToggle = false,
     this.hdrEnabled = true,
     this.onHdrEnabledChanged,
+    this.onSearchOnlineSubtitles,
     this.volume = 1.0,
     this.onVolumeChanged,
     this.isFullscreen = false,
@@ -117,6 +118,7 @@ class PlaybackControls extends StatelessWidget {
   final bool supportsHdrToggle;
   final bool hdrEnabled;
   final ValueChanged<bool>? onHdrEnabledChanged;
+  final VoidCallback? onSearchOnlineSubtitles;
 
   /// App playback volume (0.0-1.0), independent of system volume. The
   /// slider only renders when [onVolumeChanged] is non-null -- the parent
@@ -420,7 +422,10 @@ class PlaybackControls extends StatelessWidget {
   }
 
   bool get _hasTrackControls =>
-      audioTracks.isNotEmpty || subtitleTracks.isNotEmpty || supportsHdrToggle;
+      audioTracks.isNotEmpty ||
+      subtitleTracks.isNotEmpty ||
+      supportsHdrToggle ||
+      onSearchOnlineSubtitles != null;
 
   bool get _showVolumeControl => onVolumeChanged != null;
 
@@ -443,6 +448,7 @@ class PlaybackControls extends StatelessWidget {
       supportsHdrToggle: supportsHdrToggle,
       hdrEnabled: hdrEnabled,
       onHdrEnabledChanged: onHdrEnabledChanged,
+      onSearchOnlineSubtitles: onSearchOnlineSubtitles,
     );
   }
 

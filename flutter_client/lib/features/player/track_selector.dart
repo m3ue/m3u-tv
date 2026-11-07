@@ -26,6 +26,7 @@ class TrackSelector extends StatelessWidget {
     this.supportsHdrToggle = false,
     this.hdrEnabled = true,
     this.onHdrEnabledChanged,
+    this.onSearchOnlineSubtitles,
     super.key,
   });
 
@@ -75,6 +76,13 @@ class TrackSelector extends StatelessWidget {
   /// Called when the user taps the HDR button to flip [hdrEnabled].
   final ValueChanged<bool>? onHdrEnabledChanged;
 
+  /// Adds "Search online" to the subtitle menu, and shows the Subtitles button
+  /// even when the stream has no tracks of its own.
+  final VoidCallback? onSearchOnlineSubtitles;
+
+  bool get _showsSubtitleButton =>
+      subtitleTracks.isNotEmpty || onSearchOnlineSubtitles != null;
+
   @override
   Widget build(BuildContext context) {
     // Each button now sizes to its own content (height pinned, width
@@ -96,7 +104,7 @@ class TrackSelector extends StatelessWidget {
         if (supportsHdrToggle)
           Padding(
             padding: EdgeInsets.only(
-              right: audioTracks.isNotEmpty || subtitleTracks.isNotEmpty
+              right: audioTracks.isNotEmpty || _showsSubtitleButton
                   ? buttonGap
                   : 0,
             ),
@@ -118,9 +126,9 @@ class TrackSelector extends StatelessWidget {
               onPressed: () => _showAudioDialog(context),
             ),
           ),
-        if (audioTracks.isNotEmpty && subtitleTracks.isNotEmpty)
+        if (audioTracks.isNotEmpty && _showsSubtitleButton)
           const SizedBox(width: buttonGap),
-        if (subtitleTracks.isNotEmpty)
+        if (_showsSubtitleButton)
           SizedBox(
             height: scaledButtonHeight,
             child: AppButton(
@@ -180,6 +188,7 @@ class TrackSelector extends StatelessWidget {
       hasSelection:
           isSubtitleTrackSelectionKnown || selectedSubtitleTrackId != null,
       onSelected: onSubtitleTrackSelected,
+      onSearchOnline: onSearchOnlineSubtitles,
     );
   }
 
@@ -190,9 +199,11 @@ class TrackSelector extends StatelessWidget {
     required String? selectedId,
     required bool hasSelection,
     required ValueChanged<String?> onSelected,
+    VoidCallback? onSearchOnline,
   }) {
     final l = AppLocalizations.of(context);
     onDialogVisibilityChanged?.call(true);
+    var searchOnlineChosen = false;
     unawaited(
       ListPickerSheet.show(
         context,
@@ -218,8 +229,24 @@ class TrackSelector extends StatelessWidget {
                 );
               },
             ),
+          if (onSearchOnline != null)
+            Builder(
+              builder: (rowContext) => SortOptionRow(
+                icon: Icons.search,
+                label: l.playerOnlineSubtitlesSearch,
+                onTap: () {
+                  searchOnlineChosen = true;
+                  Navigator.of(rowContext).pop();
+                },
+              ),
+            ),
         ],
-      ).whenComplete(() => onDialogVisibilityChanged?.call(false)),
+      ).whenComplete(() {
+        onDialogVisibilityChanged?.call(false);
+        // Only once this sheet is gone, so the two dialogs' visibility
+        // callbacks can't interleave.
+        if (searchOnlineChosen) onSearchOnline?.call();
+      }),
     );
   }
 }

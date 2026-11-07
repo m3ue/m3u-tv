@@ -221,6 +221,12 @@ class PlaybackOrchestrator {
     return adapter! as HtmlViewProvider;
   }
 
+  RuntimeSubtitleProvider? get activeRuntimeSubtitleProvider {
+    final adapter = _activeAdapter;
+    if (adapter is! RuntimeSubtitleProvider) return null;
+    return adapter! as RuntimeSubtitleProvider;
+  }
+
   HdrToggleProvider? get activeHdrToggleProvider {
     final adapter = _activeAdapter;
     if (adapter is! HdrToggleProvider) return null;

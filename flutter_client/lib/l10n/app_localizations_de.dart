@@ -2110,6 +2110,53 @@ class AppLocalizationsDe extends AppLocalizations {
   String get playerTrackSubtitlesOff => 'Aus';
 
   @override
+  String get playerOnlineSubtitlesSearch => 'Online suchen';
+
+  @override
+  String get playerOnlineSubtitlesTitle => 'Online-Untertitel';
+
+  @override
+  String get playerOnlineSubtitlesSearching => 'Untertitel werden gesucht…';
+
+  @override
+  String get playerOnlineSubtitlesLoading => 'Untertitel wird geladen…';
+
+  @override
+  String get playerOnlineSubtitlesEmpty =>
+      'Für diesen Titel wurden keine Untertitel gefunden.';
+
+  @override
+  String get playerOnlineSubtitlesFailed =>
+      'Untertitel konnten nicht geladen werden. Prüfe deine Verbindung und versuche es erneut.';
+
+  @override
+  String get playerOnlineSubtitlesRetry => 'Erneut versuchen';
+
+  @override
+  String get playerOnlineSubtitlesAllLanguages => 'Alle Sprachen';
+
+  @override
+  String get settingsOnlineSubtitles => 'Online-Untertitel';
+
+  @override
+  String get settingsOnlineSubtitlesSubtitle =>
+      'Finde Untertitel für Filme und Episoden über das Untertitelmenü des Players.';
+
+  @override
+  String get settingsOnlineSubtitlesAddress => 'Untertitelquelle';
+
+  @override
+  String get settingsOnlineSubtitlesAddressHint =>
+      'Adresse des Stremio-Untertitel-Add-ons';
+
+  @override
+  String get settingsOnlineSubtitlesAddressInvalid =>
+      'Gib eine gültige http- oder https-Adresse ein.';
+
+  @override
+  String get settingsOnlineSubtitlesUseDefault => 'Standard verwenden';
+
+  @override
   String get playerHdrOn => 'HDR an';
 
   @override

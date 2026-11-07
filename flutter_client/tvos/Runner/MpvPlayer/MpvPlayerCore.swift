@@ -371,6 +371,20 @@ final class MpvPlayerCore {
     }
   }
 
+  func addExternalSubtitle(uri: String, title: String?, language: String?) {
+    queue.async { [weak self] in
+      guard let self, let handle = self.mpv else { return }
+      var subArgs = ["sub-add", uri, "select"]
+      if let title, !title.isEmpty {
+        subArgs.append(title)
+        if let language, !language.isEmpty {
+          subArgs.append(language)
+        }
+      }
+      self.command(handle, subArgs)
+    }
+  }
+
   func setPlaybackSpeed(_ speed: Double) {
     queue.async { [weak self] in
       guard let self, let handle = self.mpv else { return }

@@ -24,6 +24,8 @@ import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
 import 'package:m3u_tv/services/notification_coordinator.dart';
+import 'package:m3u_tv/services/online_subtitle_service.dart';
+import 'package:m3u_tv/services/online_subtitle_settings.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/push_notification_service.dart';
@@ -151,6 +153,8 @@ class AppStateController extends ChangeNotifier {
       epgService: epgService ?? EpgService(),
       traktService: TraktService(storage: resolvedSecureStorage),
       simklService: SimklService(storage: resolvedSecureStorage),
+      onlineSubtitleService: OnlineSubtitleService(),
+      onlineSubtitleSettings: OnlineSubtitleSettings(store: store),
       devicePairingService: devicePairingService ?? DevicePairingService(),
       deviceIdentityService: resolvedDeviceIdentityService,
       tvNotificationService:
@@ -192,6 +196,8 @@ class AppStateController extends ChangeNotifier {
     required this.epgService,
     required this.traktService,
     required this.simklService,
+    required this.onlineSubtitleService,
+    required this.onlineSubtitleSettings,
     required this.devicePairingService,
     required this.deviceIdentityService,
     required this._tvNotificationService,
@@ -501,6 +507,8 @@ class AppStateController extends ChangeNotifier {
   final EpgService epgService;
   final TraktService traktService;
   final SimklService simklService;
+  final OnlineSubtitleService onlineSubtitleService;
+  final OnlineSubtitleSettings onlineSubtitleSettings;
   final DevicePairingService devicePairingService;
 
   AppSourceType _sourceType = AppSourceType.none;
@@ -652,6 +660,7 @@ class AppStateController extends ChangeNotifier {
     unawaited(comskipSettings.load());
     unawaited(sportsSettings.ensureLoaded());
     unawaited(introDbSettings.load());
+    unawaited(onlineSubtitleSettings.load());
 
     // One-time move of the content cache into its own file for installs that
     // predate the split. No-op once done, or when a single store is in use.

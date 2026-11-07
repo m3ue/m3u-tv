@@ -558,6 +558,9 @@ class _FakeAndroidMedia3Host implements AndroidMedia3Host {
       commands.add('setSubtitleTrack:$trackId');
 
   @override
+  Future<void> addExternalSubtitle(ExternalSubtitle subtitle) async {}
+
+  @override
   Future<void> setPlaybackSpeed(double speed) async =>
       commands.add('setPlaybackSpeed:$speed');
 

@@ -3674,6 +3674,90 @@ abstract class AppLocalizations {
   /// **'Off'**
   String get playerTrackSubtitlesOff;
 
+  /// No description provided for @playerOnlineSubtitlesSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search online'**
+  String get playerOnlineSubtitlesSearch;
+
+  /// No description provided for @playerOnlineSubtitlesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Online subtitles'**
+  String get playerOnlineSubtitlesTitle;
+
+  /// No description provided for @playerOnlineSubtitlesSearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching for subtitles…'**
+  String get playerOnlineSubtitlesSearching;
+
+  /// No description provided for @playerOnlineSubtitlesLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading subtitle…'**
+  String get playerOnlineSubtitlesLoading;
+
+  /// No description provided for @playerOnlineSubtitlesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No subtitles found for this title.'**
+  String get playerOnlineSubtitlesEmpty;
+
+  /// No description provided for @playerOnlineSubtitlesFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load subtitles. Check your connection and try again.'**
+  String get playerOnlineSubtitlesFailed;
+
+  /// No description provided for @playerOnlineSubtitlesRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get playerOnlineSubtitlesRetry;
+
+  /// No description provided for @playerOnlineSubtitlesAllLanguages.
+  ///
+  /// In en, this message translates to:
+  /// **'All languages'**
+  String get playerOnlineSubtitlesAllLanguages;
+
+  /// No description provided for @settingsOnlineSubtitles.
+  ///
+  /// In en, this message translates to:
+  /// **'Online subtitles'**
+  String get settingsOnlineSubtitles;
+
+  /// No description provided for @settingsOnlineSubtitlesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Find subtitles for movies and episodes from the player\'s subtitle menu.'**
+  String get settingsOnlineSubtitlesSubtitle;
+
+  /// No description provided for @settingsOnlineSubtitlesAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle source'**
+  String get settingsOnlineSubtitlesAddress;
+
+  /// No description provided for @settingsOnlineSubtitlesAddressHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Stremio subtitle add-on address'**
+  String get settingsOnlineSubtitlesAddressHint;
+
+  /// No description provided for @settingsOnlineSubtitlesAddressInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid http or https address.'**
+  String get settingsOnlineSubtitlesAddressInvalid;
+
+  /// No description provided for @settingsOnlineSubtitlesUseDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Use default'**
+  String get settingsOnlineSubtitlesUseDefault;
+
   /// No description provided for @playerHdrOn.
   ///
   /// In en, this message translates to:

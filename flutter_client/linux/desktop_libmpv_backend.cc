@@ -1873,6 +1873,26 @@ FlMethodResponse* Control(const gchar* method, FlValue* args) {
     player->ReadSnapshotProperties(&snapshot);
     player->ReadTrackLists(&snapshot);
     player->QueueEvent(snapshot);
+  } else if (g_strcmp0(method, "addExternalSubtitle") == 0) {
+    const std::string uri = StringArg(args, "uri");
+    const std::string title = StringArg(args, "title");
+    const std::string language = StringArg(args, "language");
+    if (!uri.empty()) {
+      std::vector<const char*> sub_args = {"sub-add", uri.c_str(), "select"};
+      if (!title.empty()) {
+        sub_args.push_back(title.c_str());
+        if (!language.empty()) sub_args.push_back(language.c_str());
+      }
+      sub_args.push_back(nullptr);
+      player->api->command(player->handle, sub_args.data());
+    }
+    EventSnapshot snapshot;
+    snapshot.handle = player->id;
+    snapshot.sequence = player->sequence.fetch_add(1);
+    snapshot.kind = "PLAYBACK_RESTART";
+    player->ReadSnapshotProperties(&snapshot);
+    player->ReadTrackLists(&snapshot);
+    player->QueueEvent(snapshot);
   } else if (g_strcmp0(method, "setPlaybackSpeed") == 0) {
     FlValue* value = args == nullptr ? nullptr : fl_value_lookup_string(args, "speed");
     const double speed = value != nullptr && fl_value_get_type(value) == FL_VALUE_TYPE_FLOAT

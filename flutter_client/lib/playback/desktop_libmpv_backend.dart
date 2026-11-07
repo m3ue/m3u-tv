@@ -33,6 +33,7 @@ class DesktopLibmpvBackend
         VideoTextureProvider,
         NativePlaneProvider,
         HdrToggleProvider,
+        RuntimeSubtitleProvider,
         SeekWindowProvider,
         MultiviewBackend,
         DisplayModeController {
@@ -312,6 +313,15 @@ class DesktopLibmpvBackend
   Future<void> setSubtitleTrack(String? trackId) async {
     await _invokeControl('setSubtitleTrack', <String, Object?>{
       'trackId': trackId,
+    });
+  }
+
+  @override
+  Future<void> addExternalSubtitle(ExternalSubtitle subtitle) async {
+    await _invokeControl('addExternalSubtitle', <String, Object?>{
+      'uri': subtitle.uri,
+      'title': subtitle.title,
+      'language': subtitle.language,
     });
   }
 

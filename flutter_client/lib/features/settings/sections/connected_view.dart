@@ -5,6 +5,7 @@ import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
 import 'package:m3u_tv/features/settings/diagnostics_screen.dart';
 import 'package:m3u_tv/features/settings/release_notes_view.dart';
 import 'package:m3u_tv/features/settings/sections/app_version_card.dart';
+import 'package:m3u_tv/features/settings/sections/online_subtitle_settings_group.dart';
 import 'package:m3u_tv/features/settings/sections/playback_settings_page.dart';
 import 'package:m3u_tv/features/settings/sections/playlists_page.dart';
 import 'package:m3u_tv/features/settings/sections/settings_status_row.dart';
@@ -21,6 +22,7 @@ import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
+import 'package:m3u_tv/services/online_subtitle_settings.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/services/simkl_service.dart';
@@ -41,6 +43,7 @@ class ConnectedView extends StatefulWidget {
     required this.authNotifier,
     required this.traktService,
     required this.simklService,
+    this.onlineSubtitleSettings,
     this.activeViewer,
     this.viewers = const [],
     this.sourceLabel,
@@ -69,6 +72,7 @@ class ConnectedView extends StatefulWidget {
   final AuthNotifier authNotifier;
   final TraktService traktService;
   final SimklService simklService;
+  final OnlineSubtitleSettings? onlineSubtitleSettings;
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
   final IntroDbSettings? introDbSettings;
@@ -280,6 +284,12 @@ class _ConnectedViewState extends State<ConnectedView> {
                                 ),
                               ],
                             ),
+                          ),
+                        ],
+                        if (widget.onlineSubtitleSettings != null) ...[
+                          const SizedBox(height: 12),
+                          OnlineSubtitleSettingsGroup(
+                            settings: widget.onlineSubtitleSettings!,
                           ),
                         ],
                       ],
