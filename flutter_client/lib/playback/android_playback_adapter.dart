@@ -351,6 +351,7 @@ class AndroidPlaybackAdapter
           message: event.message ?? 'Android Media3 playback failed',
           code: event.code ?? 'android-media3-error',
           recoverable: event.recoverable,
+          position: event.position,
         ),
       );
       return;

@@ -99,8 +99,8 @@ Future<void> main() async {
   // focus change until Settings was opened once; volumeSync defaults to
   // full volume, so a custom desktop volume would similarly be ignored by
   // the very first stream opened in a session. The player reads
-  // hdrEnabledSync, matchRefreshRateSync, deinterlaceSync and
-  // prebufferLiveSync when it opens a stream, so without these an
+  // hdrEnabledSync, matchRefreshRateSync, deinterlaceSync, prebufferLiveSync
+  // and vodPlayerSync when it opens a stream, so without these an
   // Android/Windows user's Auto Frame Rate stayed off (and a tvOS user's
   // opt-out, or anyone's HDR opt-out, was undone) after every cold start
   // until Settings was opened (issue #314).
@@ -117,6 +117,7 @@ Future<void> main() async {
     appState.viewSettingsService.matchRefreshRate(),
     appState.viewSettingsService.deinterlace(),
     appState.viewSettingsService.prebufferLive(),
+    appState.viewSettingsService.vodPlayer(),
     appState.viewSettingsService.navigationSoundEnabled(),
     appState.viewSettingsService.volume(),
     // Home picks its layout synchronously on first build; reading the style

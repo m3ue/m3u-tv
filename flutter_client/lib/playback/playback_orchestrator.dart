@@ -328,7 +328,7 @@ class PlaybackOrchestrator {
       if (rejection != null && rejection.isNotEmpty) {
         _emitError(
           PlaybackError(
-            backend: _nativeBackends().first,
+            backend: _nativeBackends(sessionSource).first,
             message: rejection,
             code: 'stream_rejected',
           ),
@@ -338,7 +338,7 @@ class PlaybackOrchestrator {
     }
 
     await _tryBackendsThenTranscode(
-      _nativeBackends(),
+      _nativeBackends(sessionSource),
       sessionSource,
       generation,
     );
@@ -460,15 +460,18 @@ class PlaybackOrchestrator {
     await _nativePlaneController.close();
   }
 
-  Iterable<PlaybackBackend> _nativeBackends() sync* {
-    for (final capabilities in PlaybackCapabilities.forPlatform(_platform)) {
-      if (capabilities.backend == PlaybackBackend.serverTranscode) {
-        continue;
-      }
-      if (_adapters.containsKey(capabilities.backend)) {
-        yield capabilities.backend;
-      }
+  /// The registered backends to try for [source], in order.
+  List<PlaybackBackend> _nativeBackends(PlaybackSource source) {
+    final backends = <PlaybackBackend>[
+      for (final capabilities in PlaybackCapabilities.forPlatform(_platform))
+        if (capabilities.backend != PlaybackBackend.serverTranscode &&
+            _adapters.containsKey(capabilities.backend))
+          capabilities.backend,
+    ];
+    if (source.preferMpv && backends.remove(PlaybackBackend.androidMpv)) {
+      backends.insert(0, PlaybackBackend.androidMpv);
     }
+    return backends;
   }
 
   Future<PlaybackException?> _tryLoadBackend({
@@ -967,30 +970,38 @@ class PlaybackOrchestrator {
 
   Future<void> _handleRecoverableActiveFailure(PlaybackError error) async {
     if (_disposed || _recovering) return;
-    _cancelBufferingTimer();
     final adapter = _activeAdapter;
     final backend = _activeBackend;
     final source = _activeSource;
+    final isAudioTiming = looksLikeAudioTimingFailure(error.code);
+    final remainingBackends = source == null
+        ? const <PlaybackBackend>[]
+        : _nativeBackends(
+            source,
+          ).skipWhile((candidate) => candidate != backend).skip(1).toList();
+    // Nothing to move to: leave it playing rather than turn a player that is
+    // still trying into an error.
+    if (isAudioTiming && remainingBackends.isEmpty) {
+      _diagnostics.add('audio-timing:no-fallback:${backend?.name}');
+      return;
+    }
+
+    _cancelBufferingTimer();
     if (adapter == null || backend == null || source == null) {
       _emitError(error);
       return;
     }
 
-    if (looksLikeDecoderFailure(error.code)) {
-      final remainingBackends = _nativeBackends()
-          .skipWhile((candidate) => candidate != backend)
-          .skip(1)
-          .toList();
-      if (remainingBackends.isNotEmpty) {
-        await _fallBackToNextBackend(
-          adapter: adapter,
-          backend: backend,
-          source: source,
-          remainingBackends: remainingBackends,
-          error: error,
-        );
-        return;
-      }
+    if ((isAudioTiming || looksLikeDecoderFailure(error.code)) &&
+        remainingBackends.isNotEmpty) {
+      await _fallBackToNextBackend(
+        adapter: adapter,
+        backend: backend,
+        source: _resumingFrom(source, error.position),
+        remainingBackends: remainingBackends,
+        error: error,
+      );
+      return;
     }
 
     if (_activeRecoveryAttempts >= 1) {
@@ -1039,6 +1050,22 @@ class PlaybackOrchestrator {
     } finally {
       _recovering = false;
     }
+  }
+
+  /// [source] picking up at [position], so moving to another backend mid-title
+  /// doesn't send the viewer back to where they started. A catch-up stream's
+  /// position belongs to its EPG timeline, so that keeps its own start.
+  static PlaybackSource _resumingFrom(
+    PlaybackSource source,
+    Duration? position,
+  ) {
+    if (source.isLive ||
+        source.isCatchup ||
+        position == null ||
+        position <= Duration.zero) {
+      return source;
+    }
+    return source.copyWith(startPosition: position);
   }
 
   /// Switches away from [backend] to the first of [remainingBackends] after

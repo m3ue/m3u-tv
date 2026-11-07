@@ -28,6 +28,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.video.VideoFrameMetadataListener
@@ -363,6 +365,11 @@ class Media3PlaybackPlugin(
 
         player.setVideoSurfaceView(surfaceView)
         player.addListener(Media3Listener(playerId))
+        // A live stream's splices jump the audio clock in normal use, and live has
+        // nothing to resume, so this only watches on-demand content.
+        if (source["isLive"] as? Boolean != true) {
+            player.addAnalyticsListener(AudioDiscontinuityListener(playerId, player))
+        }
         if (matchDisplayRefreshRate && allowDisplayModeChanges) {
             frameRateManager.log("ExoPlayer load: Auto Frame Rate on")
             player.setVideoFrameMetadataListener(FrameRateProbe(playerId, player))
@@ -793,6 +800,45 @@ class Media3PlaybackPlugin(
         }
     }
 
+    /** Reports a title ExoPlayer can't keep in time. See [AudioDiscontinuityPolicy]. */
+    private inner class AudioDiscontinuityListener(
+        private val playerId: String,
+        private val player: ExoPlayer,
+    ) : AnalyticsListener {
+        private val policy = AudioDiscontinuityPolicy()
+        private var stallCheck: Runnable? = null
+
+        override fun onAudioSinkError(eventTime: AnalyticsListener.EventTime, audioSinkError: Exception) {
+            if (audioSinkError !is AudioSink.UnexpectedDiscontinuityException) return
+            stallCheck?.let { mainHandler.removeCallbacks(it) }
+            stallCheck = null
+            if (policy.record(eventTime.realtimeMs)) {
+                report()
+                return
+            }
+            val jumpPositionMs = player.currentPosition
+            val check = Runnable {
+                stallCheck = null
+                // A released player's position can't be read, and it has nothing left to report.
+                if (states[playerId]?.player !== player) return@Runnable
+                if (policy.checkStalled(jumpPositionMs, player.currentPosition, player.playWhenReady)) report()
+            }
+            stallCheck = check
+            mainHandler.postDelayed(check, AudioDiscontinuityPolicy.STALL_CHECK_MS)
+        }
+
+        private fun report() {
+            emit(
+                playerId,
+                "error",
+                positionMs = player.currentPosition,
+                code = AUDIO_DISCONTINUITY_ERROR_CODE,
+                message = "Repeated audio timestamp discontinuities",
+                recoverable = true,
+            )
+        }
+    }
+
     private data class PlayerState(
         val playerId: String,
         val player: ExoPlayer,
@@ -901,6 +947,9 @@ class Media3PlaybackPlugin(
     companion object {
         const val METHOD_CHANNEL = "m3u_tv/android_media3"
         const val EVENT_CHANNEL = "m3u_tv/android_media3/events"
+
+        /** See `looksLikeAudioTimingFailure` in decoder_failure.dart. */
+        const val AUDIO_DISCONTINUITY_ERROR_CODE = "AUDIO_TIMESTAMP_DISCONTINUITY"
     }
 }
 

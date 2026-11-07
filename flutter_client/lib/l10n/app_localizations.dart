@@ -929,7 +929,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsPlaybackSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Proxy and DVR'**
+  /// **'Player, proxy, and DVR'**
   String get settingsPlaybackSubtitle;
 
   /// No description provided for @settingsReleaseNotesSubtitle.
@@ -3361,6 +3361,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Spotlight'**
   String get settingsHomeScreenStyleRich;
+
+  /// No description provided for @settingsSectionPlayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Player'**
+  String get settingsSectionPlayer;
+
+  /// No description provided for @settingsVodPlayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Movies and series player'**
+  String get settingsVodPlayer;
+
+  /// No description provided for @settingsVodPlayerExoPlayerFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Try ExoPlayer first'**
+  String get settingsVodPlayerExoPlayerFirst;
+
+  /// No description provided for @settingsVodPlayerMpv.
+  ///
+  /// In en, this message translates to:
+  /// **'Use mpv'**
+  String get settingsVodPlayerMpv;
 
   /// No description provided for @settingsHdrMode.
   ///

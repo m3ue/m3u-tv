@@ -24,6 +24,16 @@ void main() {
       expect(await service.defaultStartPage(), DefaultStartPage.home);
     });
 
+    test('VOD player defaults to ExoPlayer first and persists', () async {
+      expect(await service.vodPlayer(), VodPlayerPreference.exoPlayerFirst);
+      expect(service.vodPlayerSync, VodPlayerPreference.exoPlayerFirst);
+
+      await service.setVodPlayer(VodPlayerPreference.mpv);
+
+      expect(await service.vodPlayer(), VodPlayerPreference.mpv);
+      expect(service.vodPlayerSync, VodPlayerPreference.mpv);
+    });
+
     test('persists and restores the default start page', () async {
       for (final page in DefaultStartPage.values) {
         await service.setDefaultStartPage(page);

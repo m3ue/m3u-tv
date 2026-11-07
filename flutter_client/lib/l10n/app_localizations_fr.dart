@@ -467,7 +467,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsPlayback => 'Lecture';
 
   @override
-  String get settingsPlaybackSubtitle => 'Proxy et DVR';
+  String get settingsPlaybackSubtitle => 'Lecteur, proxy et DVR';
 
   @override
   String get settingsReleaseNotesSubtitle => 'Nouveautés de cette version';
@@ -1939,6 +1939,18 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsHomeScreenStyleRich => 'Spotlight';
+
+  @override
+  String get settingsSectionPlayer => 'Lecteur';
+
+  @override
+  String get settingsVodPlayer => 'Lecteur des films et séries';
+
+  @override
+  String get settingsVodPlayerExoPlayerFirst => 'Essayer ExoPlayer d\'abord';
+
+  @override
+  String get settingsVodPlayerMpv => 'Utiliser mpv';
 
   @override
   String get settingsHdrMode => 'Mode HDR';

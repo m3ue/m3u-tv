@@ -458,7 +458,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPlayback => '播放';
 
   @override
-  String get settingsPlaybackSubtitle => '代理和 DVR';
+  String get settingsPlaybackSubtitle => '播放器、代理和 DVR';
 
   @override
   String get settingsReleaseNotesSubtitle => '本版本的更新内容';
@@ -1856,6 +1856,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsHomeScreenStyleRich => '聚光灯';
+
+  @override
+  String get settingsSectionPlayer => '播放器';
+
+  @override
+  String get settingsVodPlayer => '电影和剧集播放器';
+
+  @override
+  String get settingsVodPlayerExoPlayerFirst => '优先尝试 ExoPlayer';
+
+  @override
+  String get settingsVodPlayerMpv => '使用 mpv';
 
   @override
   String get settingsHdrMode => 'HDR 模式';

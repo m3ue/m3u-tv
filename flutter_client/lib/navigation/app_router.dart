@@ -164,9 +164,10 @@ PlaybackOrchestrator buildPlaybackOrchestrator({
     // in that order. Native mpv (`AndroidMpvBackend`, a PlatformView hosting a
     // `SurfaceView`) is the automatic fallback; ExoPlayer was made primary to
     // avoid mpv GPU/Tegra issues (e.g. Shield), where mpv also tone-maps HDR
-    // to SDR. Registration order in this map doesn't decide priority. Do not
-    // wrap either in `FallbackPlayerAdapter`, see the desktop branch below for
-    // why.
+    // to SDR. `PlaybackSource.preferMpv` swaps the two for one source (the
+    // viewer's VOD player setting). Registration order in this map doesn't
+    // decide priority. Do not wrap either in `FallbackPlayerAdapter`, see the
+    // desktop branch below for why.
     adapters[PlaybackBackend.androidMpv] = AndroidMpvBackend();
     adapters[PlaybackBackend.androidExoPlayer] = AndroidPlaybackAdapter(
       playerId: playerId ?? AndroidPlaybackAdapter.defaultPlayerId,

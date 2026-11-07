@@ -10,7 +10,7 @@ import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:material_ui/material_ui.dart';
 
 // ---------------------------------------------------------------------------
-// Playback settings sub-page (proxy, live TV, DVR)
+// Playback settings sub-page (player, proxy, live TV, DVR)
 // ---------------------------------------------------------------------------
 
 class PlaybackSettingsPage extends StatelessWidget {
@@ -34,6 +34,26 @@ class PlaybackSettingsPage extends StatelessWidget {
   // it there, like Deinterlace.
   static final bool _showPrebufferLiveToggle = !HostPlatform.isAndroid;
 
+  // Android is the only platform with two full players to choose between.
+  static final bool _showVodPlayer = HostPlatform.isAndroid;
+
+  // The mpv HDR override ships on the Linux and Windows desktop backends
+  // only. Refresh-rate matching ships on Windows (DisplayModeManager),
+  // Android (FrameRateManager), and tvOS (MpvPlayerCore.swift's
+  // AVDisplayManager use, decoupled from its always-on HDR criteria so this
+  // toggle actually controls it). Windows/Android default off -- the mode
+  // switch briefly blanks/flashes the display; tvOS defaults on, since it
+  // shipped unconditionally before this toggle existed (see
+  // ViewSettingsService.matchRefreshRate's platform-aware default).
+  static final bool _showHdrToggle =
+      HostPlatform.isWindows || HostPlatform.isLinux;
+  static final bool _showRefreshRateToggle =
+      HostPlatform.isWindows || HostPlatform.isAndroid || HostPlatform.isTvOS;
+
+  // Deinterlacing is an mpv filter. Android plays through ExoPlayer, which
+  // has no filter chain (mpv there is only a fallback), so hide it there.
+  static final bool _showDeinterlaceToggle = !HostPlatform.isAndroid;
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -42,6 +62,25 @@ class PlaybackSettingsPage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (viewSettings != null &&
+            (_showVodPlayer ||
+                _showHdrToggle ||
+                _showRefreshRateToggle ||
+                _showDeinterlaceToggle)) ...[
+          SettingsSectionHeader(l.settingsSectionPlayer),
+          ListenableBuilder(
+            listenable: viewSettings,
+            builder: (context, _) => PlayerSettingsGroup(
+              service: viewSettings,
+              showVodPlayer: _showVodPlayer,
+              showHdr: _showHdrToggle,
+              showRefreshRate: _showRefreshRateToggle,
+              showDeinterlace: _showDeinterlaceToggle,
+              onHandleTopLevelBack: onHandleTopLevelBack,
+            ),
+          ),
+        ],
+
         // Web always routes through the editor's in-app-player transcoding
         // path (WebVideoBackend appends proxy=true&player=true to every
         // stream URL -- see its doc comment), the same way the editor's own
@@ -197,3 +236,90 @@ class PlaybackSettingsPage extends StatelessWidget {
     );
   }
 }
+
+/// The player section of [PlaybackSettingsPage]. Reads the cached settings
+/// `main()` loads before the first frame, so wrap it in a listener on
+/// [service].
+class PlayerSettingsGroup extends StatelessWidget {
+  const PlayerSettingsGroup({
+    super.key,
+    required this.service,
+    required this.showVodPlayer,
+    required this.showHdr,
+    required this.showRefreshRate,
+    required this.showDeinterlace,
+    this.onHandleTopLevelBack,
+  });
+
+  final ViewSettingsService service;
+  final bool showVodPlayer;
+  final bool showHdr;
+  final bool showRefreshRate;
+  final bool showDeinterlace;
+  final bool Function()? onHandleTopLevelBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return SettingsGroup(
+      children: [
+        if (showVodPlayer)
+          SettingsRow(
+            title: l.settingsVodPlayer,
+            subtitle: _vodPlayerLabel(l, service.vodPlayerSync),
+            icon: Icons.smart_display_outlined,
+            trailing: const SettingsChevron(),
+            onTap: () => unawaited(
+              pushSettingsPicker<VodPlayerPreference>(
+                context,
+                title: (context) =>
+                    AppLocalizations.of(context).settingsVodPlayer,
+                onBack: onHandleTopLevelBack,
+                selected: service.vodPlayerSync,
+                options: [
+                  for (final preference in VodPlayerPreference.values)
+                    SettingsPickerOption(
+                      value: preference,
+                      label: _vodPlayerLabel(l, preference),
+                    ),
+                ],
+                onSelected: service.setVodPlayer,
+              ),
+            ),
+          ),
+        if (showHdr)
+          SettingsSwitchRow(
+            title: l.settingsHdrMode,
+            subtitle: l.settingsHdrModeHint,
+            icon: Icons.hdr_on_outlined,
+            value: service.hdrEnabledSync,
+            onChanged: service.setHdrEnabled,
+          ),
+        if (showRefreshRate)
+          SettingsSwitchRow(
+            title: l.settingsMatchRefreshRate,
+            subtitle: l.settingsMatchRefreshRateHint,
+            icon: Icons.speed_outlined,
+            value: service.matchRefreshRateSync,
+            onChanged: service.setMatchRefreshRate,
+          ),
+        if (showDeinterlace)
+          SettingsSwitchRow(
+            title: l.settingsDeinterlace,
+            subtitle: l.settingsDeinterlaceHint,
+            icon: Icons.reorder,
+            value: service.deinterlaceSync,
+            onChanged: service.setDeinterlace,
+          ),
+      ],
+    );
+  }
+}
+
+String _vodPlayerLabel(
+  AppLocalizations l,
+  VodPlayerPreference preference,
+) => switch (preference) {
+  VodPlayerPreference.exoPlayerFirst => l.settingsVodPlayerExoPlayerFirst,
+  VodPlayerPreference.mpv => l.settingsVodPlayerMpv,
+};

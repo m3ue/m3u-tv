@@ -78,6 +78,22 @@ enum EpgStartView {
 }
 
 /// Whether the EPG timeline's preview panel plays the live channel.
+/// Which player Android starts movies, episodes and other non-live content
+/// with. The other one stays as the automatic fallback either way.
+enum VodPlayerPreference {
+  exoPlayerFirst('exoPlayerFirst'),
+  mpv('mpv');
+
+  const VodPlayerPreference(this.value);
+  final String value;
+
+  static VodPlayerPreference fromValue(String? value) =>
+      VodPlayerPreference.values.firstWhere(
+        (preference) => preference.value == value,
+        orElse: () => VodPlayerPreference.exoPlayerFirst,
+      );
+}
+
 enum EpgPreviewPlayback {
   /// Static artwork only.
   off('off'),
@@ -248,6 +264,7 @@ class ViewSettingsService extends ChangeNotifier {
   static const matchRefreshRateKey = 'm3ue_tv_match_refresh_rate';
   static const deinterlaceKey = 'm3ue_tv_deinterlace';
   static const prebufferLiveKey = 'm3ue_tv_prebuffer_live';
+  static const vodPlayerKey = 'm3ue_tv_vod_player';
   static const defaultStartPageKey = 'm3ue_tv_default_start_page';
   static const homeScreenStyleKey = 'm3ue_tv_home_screen_style';
   static const navLayoutKey = 'm3ue_tv_nav_layout';
@@ -544,6 +561,21 @@ class ViewSettingsService extends ChangeNotifier {
     bool enabled,
   ) async {
     await _write(matchRefreshRateKey, enabled);
+    notifyListeners();
+  }
+
+  /// See [VodPlayerPreference]. Only offered on Android.
+  Future<VodPlayerPreference> vodPlayer() async {
+    final raw = await _read(vodPlayerKey);
+    return VodPlayerPreference.fromValue(raw as String?);
+  }
+
+  /// Synchronous access to the in-memory cached player preference.
+  VodPlayerPreference get vodPlayerSync =>
+      VodPlayerPreference.fromValue(_memory[vodPlayerKey] as String?);
+
+  Future<void> setVodPlayer(VodPlayerPreference preference) async {
+    await _write(vodPlayerKey, preference.value);
     notifyListeners();
   }
 

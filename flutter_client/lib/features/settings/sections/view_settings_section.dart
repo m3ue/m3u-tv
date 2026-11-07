@@ -6,7 +6,6 @@ import 'package:m3u_tv/features/settings/sections/nav_layout_page.dart';
 import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
-import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:material_ui/material_ui.dart';
 
 // ---------------------------------------------------------------------------
@@ -40,33 +39,9 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
   bool _rememberMediaSort = false;
   DefaultStartPage _defaultStartPage = DefaultStartPage.home;
   HomeScreenStyle _homeScreenStyle = HomeScreenStyle.simplified;
-  bool _hdrEnabled = true;
-  bool _matchRefreshRate = false;
-  bool _deinterlace = false;
   bool _navigationSoundEnabled = true;
   OptimizeFor _optimizeFor = OptimizeFor.quality;
   AppFontSize _fontSize = AppFontSize.normal;
-
-  // The mpv HDR override ships on the Linux and Windows desktop backends
-  // only. Refresh-rate matching ships on Windows (DisplayModeManager),
-  // Android (FrameRateManager), and tvOS (MpvPlayerCore.swift's
-  // AVDisplayManager use, decoupled from its always-on HDR criteria so this
-  // toggle actually controls it). Windows/Android default off -- the mode
-  // switch briefly blanks/flashes the display; tvOS defaults on, since it
-  // shipped unconditionally before this toggle existed (see
-  // ViewSettingsService.matchRefreshRate's platform-aware default).
-  static final bool _showHdrToggle =
-      HostPlatform.isWindows || HostPlatform.isLinux;
-  static final bool _showRefreshRateToggle =
-      HostPlatform.isWindows || HostPlatform.isAndroid || _isTvOS;
-
-  // Deinterlacing is an mpv filter. Android plays through ExoPlayer, which
-  // has no filter chain (mpv there is only a fallback), so hide it there.
-  static final bool _showDeinterlaceToggle = !HostPlatform.isAndroid;
-
-  // Mirrors the tvOS/Android-TV detection duplicated in go_router_config.dart
-  // and dvr_series_rule_options_screen.dart -- no shared helper exists yet.
-  static bool get _isTvOS => HostPlatform.isTvOS;
 
   // The navigation click sound only ever plays on TV/desktop (see main.dart);
   // hide the toggle where it would have no effect.
@@ -101,9 +76,6 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
     final rememberMediaSort = await widget.service.rememberMediaSort();
     final defaultStartPage = await widget.service.defaultStartPage();
     final homeScreenStyle = await widget.service.homeScreenStyle();
-    final hdrEnabled = await widget.service.hdrEnabled();
-    final matchRefreshRate = await widget.service.matchRefreshRate();
-    final deinterlace = await widget.service.deinterlace();
     final navigationSoundEnabled = await widget.service
         .navigationSoundEnabled();
     final optimizeFor = await widget.service.optimizeFor();
@@ -122,9 +94,6 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
       _rememberMediaSort = rememberMediaSort;
       _defaultStartPage = defaultStartPage;
       _homeScreenStyle = homeScreenStyle;
-      _hdrEnabled = hdrEnabled;
-      _matchRefreshRate = matchRefreshRate;
-      _deinterlace = deinterlace;
       _navigationSoundEnabled = navigationSoundEnabled;
       _optimizeFor = optimizeFor;
       _fontSize = fontSize;
@@ -357,30 +326,6 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
         SettingsSectionHeader(l.settingsSectionDisplay),
         SettingsGroup(
           children: [
-            if (_showHdrToggle)
-              SettingsSwitchRow(
-                title: l.settingsHdrMode,
-                subtitle: l.settingsHdrModeHint,
-                icon: Icons.hdr_on_outlined,
-                value: _hdrEnabled,
-                onChanged: widget.service.setHdrEnabled,
-              ),
-            if (_showRefreshRateToggle)
-              SettingsSwitchRow(
-                title: l.settingsMatchRefreshRate,
-                subtitle: l.settingsMatchRefreshRateHint,
-                icon: Icons.speed_outlined,
-                value: _matchRefreshRate,
-                onChanged: widget.service.setMatchRefreshRate,
-              ),
-            if (_showDeinterlaceToggle)
-              SettingsSwitchRow(
-                title: l.settingsDeinterlace,
-                subtitle: l.settingsDeinterlaceHint,
-                icon: Icons.reorder,
-                value: _deinterlace,
-                onChanged: widget.service.setDeinterlace,
-              ),
             if (_showNavigationSoundToggle)
               SettingsSwitchRow(
                 title: l.settingsNavigationSound,

@@ -160,10 +160,6 @@ class MpvPlayerPlugin(
                 core(viewId)?.setAllowDisplayModeChanges(args["allowed"] as? Boolean ?: true)
                 result.success(null)
             }
-            "setHdrEnabled" -> {
-                core(viewId)?.setHdrEnabled(args["enabled"] as? Boolean ?: true)
-                result.success(null)
-            }
             "setAudioTrack" -> {
                 core(viewId)?.setAudioTrack(args["trackId"] as? String)
                 result.success(null)

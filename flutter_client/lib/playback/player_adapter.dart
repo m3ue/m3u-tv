@@ -292,6 +292,7 @@ class PlaybackSource {
     this.deinterlace = false,
     this.prebufferLive = false,
     this.allowDisplayModeChanges = true,
+    this.preferMpv = false,
   });
 
   final String uri;
@@ -350,6 +351,11 @@ class PlaybackSource {
   /// that player goes full screen.
   final bool allowDisplayModeChanges;
 
+  /// Whether Android should start with mpv and keep ExoPlayer as the fallback,
+  /// instead of the other way round. Mirrors
+  /// `ViewSettingsService.vodPlayer` for non-live content.
+  final bool preferMpv;
+
   double? get videoAspectRatio => playbackAspectRatioFromMetadata(metadata);
 
   PlaybackSource copyWith({
@@ -369,6 +375,7 @@ class PlaybackSource {
     bool? deinterlace,
     bool? prebufferLive,
     bool? allowDisplayModeChanges,
+    bool? preferMpv,
   }) {
     return PlaybackSource(
       uri: uri ?? this.uri,
@@ -389,6 +396,7 @@ class PlaybackSource {
       prebufferLive: prebufferLive ?? this.prebufferLive,
       allowDisplayModeChanges:
           allowDisplayModeChanges ?? this.allowDisplayModeChanges,
+      preferMpv: preferMpv ?? this.preferMpv,
     );
   }
 }
@@ -535,6 +543,7 @@ class PlaybackError {
     required this.message,
     required this.code,
     this.recoverable = false,
+    this.position,
   });
 
   factory PlaybackError.fromException(PlaybackException exception) {
@@ -550,6 +559,9 @@ class PlaybackError {
   final String message;
   final String code;
   final bool recoverable;
+
+  /// Where playback had got to, when the backend reports it.
+  final Duration? position;
 }
 
 class PlaybackException implements Exception {
