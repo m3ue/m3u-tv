@@ -83,15 +83,23 @@ add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
 # Runtime ANGLE DLLs for the GPU-texture rendering path
 # (angle_surface_manager.cc). d3dcompiler_47.dll/zlib.dll are ANGLE's own
 # runtime dependencies. Deliberately not copying ANGLE's bundled
-# vk_swiftshader.dll/vulkan-1.dll (its software Vulkan fallback for machines
-# with no real GPU at all) -- this project already has its own proven SW
-# pixel-buffer fallback for that case (see TryLoadGpuTexture's runtime
-# capability check in desktop_libmpv_backend.cpp), so ANGLE's own software
-# path is never reached here.
+# vk_swiftshader.dll (its software Vulkan fallback for machines with no real
+# GPU at all) -- this project already has its own proven SW pixel-buffer
+# fallback for that case (see TryLoadGpuTexture's runtime capability check in
+# desktop_libmpv_backend.cpp), so ANGLE's own software path is never reached
+# here.
+#
+# vulkan-1.dll (the Khronos loader) IS copied: libmpv imports it directly, not
+# delay-loaded, so on PCs whose graphics driver installed no Vulkan loader
+# (common on Windows 10) libmpv-gpu-2.dll fails to load at all and every
+# playback reports "libmpv DLL not found" (#356). Nothing here renders through
+# Vulkan, so the loader only has to be present; without a Vulkan driver it
+# still loads.
 add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${ANGLE_LIB_DIR}/libEGL.dll" "${ANGLE_LIB_DIR}/libGLESv2.dll"
     "${ANGLE_LIB_DIR}/d3dcompiler_47.dll" "${ANGLE_LIB_DIR}/zlib.dll"
+    "${ANGLE_LIB_DIR}/vulkan-1.dll"
     "$<TARGET_FILE_DIR:${BINARY_NAME}>/"
   COMMENT "Copying ANGLE runtime DLLs"
 )

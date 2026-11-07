@@ -168,6 +168,7 @@ jobs:
             "libGLESv2.dll",
             "d3dcompiler_47.dll",
             "zlib.dll",
+            "vulkan-1.dll",
             "msvcp140.dll",
             "vcruntime140.dll",
             "vcruntime140_1.dll",
