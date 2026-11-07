@@ -168,6 +168,9 @@ jobs:
             "libGLESv2.dll",
             "d3dcompiler_47.dll",
             "zlib.dll",
+            "msvcp140.dll",
+            "vcruntime140.dll",
+            "vcruntime140_1.dll",
             "data\icudtl.dat",
             "data\flutter_assets\AssetManifest.bin"
           )

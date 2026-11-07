@@ -167,6 +167,14 @@ endif()
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}")
 
+# Ship the MSVC C++ runtime (msvcp140.dll, vcruntime140.dll,
+# vcruntime140_1.dll) next to the exe, so PCs without the Visual C++
+# Redistributable installed can still start the app (#356). The ZIP, the
+# installer and the Store MSIX all package this whole directory.
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION "${INSTALL_BUNDLE_LIB_DIR}")
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT Runtime)
+include(InstallRequiredSystemLibraries)
+
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
 
