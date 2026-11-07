@@ -1181,6 +1181,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get traktDisconnectButton => '断开 Trakt';
 
   @override
+  String get traktName => 'Trakt';
+
+  @override
   String get simklName => 'Simkl';
 
   @override

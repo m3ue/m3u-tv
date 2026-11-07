@@ -572,6 +572,7 @@
   "traktPendingWaiting": "Warte auf Autorisierung…",
   "traktConnected": "Mit Trakt verbunden",
   "traktDisconnectButton": "Trakt trennen",
+  "traktName": "Trakt",
   "simklName": "Simkl",
   "simklConnectPrompt": "Verbinde deinen Simkl-Account, um automatisch zu verfolgen, was du schaust.",
   "simklConnectButton": "Mit Simkl verbinden",

@@ -1,7 +1,9 @@
 import 'package:m3u_tv/features/settings/sections/device_auth_pending.dart';
+import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/simkl_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
 class SimklCard extends StatelessWidget {
@@ -13,6 +15,8 @@ class SimklCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l = AppLocalizations.of(context);
+    final scale = FontSizeScope.scaleOf(context);
+    final logoSize = 40 * scale;
     final pending = simklService.pending;
     final body = !simklService.isConfigured
         ? Column(
@@ -46,11 +50,18 @@ class SimklCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          l.simklName,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
+        IntegrationCardHeader(
+          logo: ClipRRect(
+            borderRadius: BorderRadius.circular(8 * scale),
+            child: Image.asset(
+              'assets/icons/simkl-logo.png',
+              key: const ValueKey('simkl-logo'),
+              width: logoSize,
+              height: logoSize,
+              excludeFromSemantics: true,
+            ),
           ),
+          title: l.simklName,
         ),
         const SizedBox(height: 16),
         body,

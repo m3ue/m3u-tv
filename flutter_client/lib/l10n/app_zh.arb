@@ -572,6 +572,7 @@
   "traktPendingWaiting": "等待授权…",
   "traktConnected": "已连接到 Trakt",
   "traktDisconnectButton": "断开 Trakt",
+  "traktName": "Trakt",
   "simklName": "Simkl",
   "simklConnectPrompt": "连接你的 Simkl 账户，自动记录你观看的内容。",
   "simklConnectButton": "连接 Simkl",

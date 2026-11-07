@@ -2192,6 +2192,12 @@ abstract class AppLocalizations {
   /// **'Disconnect Trakt'**
   String get traktDisconnectButton;
 
+  /// No description provided for @traktName.
+  ///
+  /// In en, this message translates to:
+  /// **'Trakt'**
+  String get traktName;
+
   /// No description provided for @simklName.
   ///
   /// In en, this message translates to:

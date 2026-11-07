@@ -1246,6 +1246,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get traktDisconnectButton => 'Déconnecter Trakt';
 
   @override
+  String get traktName => 'Trakt';
+
+  @override
   String get simklName => 'Simkl';
 
   @override

@@ -111,6 +111,8 @@ void main() {
         tester.getTopLeft(find.byType(SimklCard)).dy,
         lessThan(tester.getTopLeft(find.byType(TraktCard)).dy),
       );
+      expect(find.text(l.simklName), findsOneWidget);
+      expect(find.text(l.traktName), findsOneWidget);
     });
 
     testWidgets('renders view settings rows and persists layout via picker', (

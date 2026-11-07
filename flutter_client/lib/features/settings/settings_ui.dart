@@ -320,6 +320,34 @@ class SettingsGroup extends StatelessWidget {
   }
 }
 
+/// The logo and name at the top of an integration's [SettingsCard].
+class IntegrationCardHeader extends StatelessWidget {
+  const IntegrationCardHeader({
+    super.key,
+    required this.logo,
+    required this.title,
+  });
+
+  final Widget logo;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        logo,
+        SizedBox(width: 12 * FontSizeScope.scaleOf(context)),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// A plain rounded card for settings content that doesn't fit the
 /// row-per-line [SettingsGroup] shape (status readouts, the app version
 /// card, the Trakt integration panel).

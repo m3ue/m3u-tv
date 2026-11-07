@@ -704,6 +704,7 @@
   "traktPendingWaiting": "Waiting for authorization…",
   "traktConnected": "Connected to Trakt",
   "traktDisconnectButton": "Disconnect Trakt",
+  "traktName": "Trakt",
   "simklName": "Simkl",
   "simklConnectPrompt": "Connect your Simkl account to automatically track what you watch.",
   "simklConnectButton": "Connect with Simkl",

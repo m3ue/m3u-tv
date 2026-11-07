@@ -1,5 +1,6 @@
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/features/settings/sections/device_auth_pending.dart';
+import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
@@ -56,7 +57,7 @@ class TraktCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        logo,
+        IntegrationCardHeader(logo: logo, title: l.traktName),
         const SizedBox(height: 16),
         body,
       ],

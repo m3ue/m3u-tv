@@ -67,6 +67,8 @@ void main() {
     final l = await pump(tester, simkl);
 
     expect(find.text(l.simklName), findsOneWidget);
+    expect(find.byKey(const ValueKey('simkl-logo')), findsOneWidget);
+    expect(tester.takeException(), isNull);
     expect(find.text(l.simklConnectPrompt), findsOneWidget);
     expect(find.text(l.simklConnectButton), findsOneWidget);
   });

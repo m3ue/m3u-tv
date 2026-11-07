@@ -1240,6 +1240,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get traktDisconnectButton => 'Trakt trennen';
 
   @override
+  String get traktName => 'Trakt';
+
+  @override
   String get simklName => 'Simkl';
 
   @override
