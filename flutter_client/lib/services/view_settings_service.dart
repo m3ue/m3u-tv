@@ -28,9 +28,9 @@ enum DefaultStartPage {
       );
 }
 
-/// Which Home screen layout TV/desktop show. [simplified] is the original
-/// rows-only page and stays the default; [rich] adds a fixed spotlight hero
-/// (backdrop, title, metadata) above the rows that follows the focused item.
+/// Which Home screen layout TV/desktop show. [rich], the default, adds a fixed
+/// spotlight hero (backdrop, title, metadata) above the rows that follows the
+/// focused item; [simplified] is the original rows-only page.
 /// Touch layouts always render [simplified].
 enum HomeScreenStyle {
   simplified('simplified'),
@@ -42,7 +42,7 @@ enum HomeScreenStyle {
   static HomeScreenStyle fromValue(String? value) =>
       HomeScreenStyle.values.firstWhere(
         (style) => style.value == value,
-        orElse: () => HomeScreenStyle.simplified,
+        orElse: () => HomeScreenStyle.rich,
       );
 }
 
@@ -422,20 +422,19 @@ class ViewSettingsService extends ChangeNotifier {
   }
 
   /// Whether the user's chosen media sort order (VOD, Series, Live TV)
-  /// survives across launches. Defaults to `false` so existing users keep
-  /// today's session-only behavior (resets to server order on each fresh
-  /// boot of the app). Shared across every sortable screen - persisted as
+  /// survives across launches. Defaults on; off resets to server order on
+  /// each fresh boot of the app. Shared across every sortable screen - persisted as
   /// its own key so toggling this off doesn't clear the separately-stored
   /// [vodSortOption]/[seriesSortOption]/[liveTvSortOption], which are simply
   /// ignored until re-enabled.
   Future<bool> rememberMediaSort() async {
     final raw = await _read(rememberMediaSortKey);
-    return raw as bool? ?? false;
+    return raw as bool? ?? true;
   }
 
   /// Synchronous accessor - see [hdrEnabledSync].
   bool get rememberMediaSortSync =>
-      (_memory[rememberMediaSortKey] as bool?) ?? false;
+      (_memory[rememberMediaSortKey] as bool?) ?? true;
 
   Future<void> setRememberMediaSort(
     // ignore: avoid_positional_boolean_parameters

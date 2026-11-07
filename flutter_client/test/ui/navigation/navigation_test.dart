@@ -2208,8 +2208,18 @@ void main() {
       return appState;
     }
 
-    testWidgets('TV defaults to the simplified Home', (tester) async {
-      final appState = await connectedAppState();
+    testWidgets('TV defaults to the Spotlight Home', (tester) async {
+      final appState = _testAppState(
+        xtreamService: _NavigationXtreamService(),
+        defaultHomeStyle: true,
+      );
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
       addTearDown(appState.dispose);
 
       await tester.pumpWidget(
@@ -2217,7 +2227,7 @@ void main() {
       );
       await _pumpAppFrame(tester);
 
-      expect(find.byType(RichHomeLayout), findsNothing);
+      expect(find.byType(RichHomeLayout), findsOneWidget);
       expect(find.text('Movies'), findsAtLeast(1));
     });
 
@@ -2872,8 +2882,14 @@ class _TestAppState extends State<_TestApp> {
 AppStateController _testAppState({
   required XtreamService xtreamService,
   EpgService? epgService,
+  bool defaultHomeStyle = false,
 }) {
-  final memory = <String, Object?>{};
+  final memory = <String, Object?>{
+    // Most of these tests look for row text, which the default Spotlight
+    // layout's hero repeats.
+    if (!defaultHomeStyle)
+      ViewSettingsService.homeScreenStyleKey: HomeScreenStyle.simplified.value,
+  };
   // CacheService and AppStateController must share one CatalogRepository -
   // each self-defaults its own private in-memory one otherwise (see
   // CacheService/AppStateController constructors), so connectXtream's

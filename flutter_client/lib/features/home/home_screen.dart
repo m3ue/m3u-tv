@@ -170,7 +170,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     HardwareKeyboard.instance.addHandler(_onKey);
     _viewSettings = ref.read(viewSettingsServiceProvider);
     _shownPlaylistKey = ref.read(shownPlaylistKeyProvider);
-    _style = _viewSettings.homeScreenStyleCached ?? HomeScreenStyle.simplified;
+    _style = _viewSettings.homeScreenStyleCached ?? HomeScreenStyle.rich;
     _navLayout = _viewSettings.navLayoutSync;
     _liveTvOrder = _viewSettings.liveTvBrowseOrder;
     _vodOrder = _viewSettings.vodBrowseOrder;

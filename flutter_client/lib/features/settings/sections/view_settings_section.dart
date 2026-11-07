@@ -36,9 +36,9 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
     seconds: ViewSettingsService.defaultEpgPreviewDelaySeconds,
   );
   ChannelColumnLayout _channelColumnLayout = ChannelColumnLayout.logoOnly;
-  bool _rememberMediaSort = false;
+  bool _rememberMediaSort = true;
   DefaultStartPage _defaultStartPage = DefaultStartPage.home;
-  HomeScreenStyle _homeScreenStyle = HomeScreenStyle.simplified;
+  HomeScreenStyle _homeScreenStyle = HomeScreenStyle.rich;
   bool _navigationSoundEnabled = true;
   OptimizeFor _optimizeFor = OptimizeFor.quality;
   AppFontSize _fontSize = AppFontSize.normal;

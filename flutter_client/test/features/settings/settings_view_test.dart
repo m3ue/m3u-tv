@@ -150,16 +150,17 @@ void main() {
     });
 
     testWidgets(
-      'Filter Persistence defaults to Reset and toggles via switch row',
+      'Filter Persistence defaults to Remember and toggles via switch row',
       (tester) async {
         await pumpSettingsScreen(tester);
         final l = await AppLocalizations.delegate.load(const Locale('en'));
 
         await openAppearancePage(tester, l);
 
-        // Default state: rememberMediaSort is false → subtitle shows "Reset".
-        expect(await viewSettingsService.rememberMediaSort(), isFalse);
-        expect(find.text(l.settingsFilterPersistenceReset), findsOneWidget);
+        // Default state: rememberMediaSort is true, so the subtitle shows
+        // "Remember".
+        expect(await viewSettingsService.rememberMediaSort(), isTrue);
+        expect(find.text(l.settingsFilterPersistenceRemember), findsOneWidget);
 
         final filterRow = find.text(l.settingsFilterPersistence);
         await tester.ensureVisible(filterRow);
@@ -167,15 +168,15 @@ void main() {
         await tester.tap(filterRow);
         await tester.pumpAndSettle();
 
-        expect(await viewSettingsService.rememberMediaSort(), isTrue);
-        expect(find.text(l.settingsFilterPersistenceRemember), findsOneWidget);
+        expect(await viewSettingsService.rememberMediaSort(), isFalse);
+        expect(find.text(l.settingsFilterPersistenceReset), findsOneWidget);
 
         await tester.ensureVisible(filterRow);
         await tester.pumpAndSettle();
         await tester.tap(filterRow);
         await tester.pumpAndSettle();
 
-        expect(await viewSettingsService.rememberMediaSort(), isFalse);
+        expect(await viewSettingsService.rememberMediaSort(), isTrue);
       },
     );
 
