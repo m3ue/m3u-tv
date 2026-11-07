@@ -405,6 +405,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // shouldn't let the screen sleep. Enabled here, disabled in dispose().
     unawaited(widget.wakelockController.enable());
     widget.backController?._handler = _handleBack;
+    HardwareKeyboard.instance.addHandler(_handleTransportKey);
     DesktopFullscreenService.instance?.deferEscape = _defersFullscreenEscape;
     if (HostPlatform.isAndroid) {
       _pipChannel.setMethodCallHandler(_handlePipChannelCall);
@@ -917,6 +918,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void dispose() {
     _disposed = true;
+    HardwareKeyboard.instance.removeHandler(_handleTransportKey);
     // A new session's player can mount before this one unmounts, so only
     // detach what is still ours.
     final backController = widget.backController;
@@ -1432,6 +1434,42 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
+  /// A remote's Play, Pause, Play/Pause and Stop buttons, wherever focus is.
+  /// Consumes every phase of the press, even with nothing to control yet: a
+  /// key Flutter leaves unhandled goes on to Android's MediaSession, whose
+  /// Stop would stop ExoPlayer underneath this screen.
+  bool _handleTransportKey(KeyEvent event) {
+    final command = playerTransportCommandFor(event.logicalKey);
+    if (command == null) return false;
+    // Only the first press: holding Play/Pause must not flip back and forth.
+    if (event is KeyDownEvent) {
+      final hasBackend = widget.orchestrator.activeBackend != null;
+      switch (command) {
+        case PlayerTransportCommand.play:
+          if (hasBackend) unawaited(widget.orchestrator.play());
+        case PlayerTransportCommand.pause:
+          if (hasBackend) unawaited(widget.orchestrator.pause());
+        case PlayerTransportCommand.toggle:
+          if (hasBackend) _togglePlayPause();
+        case PlayerTransportCommand.stop:
+          _handleStop();
+      }
+    }
+    return true;
+  }
+
+  /// Leaves the player at once, where Back first hides an open OSD. An open
+  /// track dialog closes first: nothing should vanish from under it.
+  void _handleStop() {
+    if (_trackDialogVisible) {
+      Navigator.of(context, rootNavigator: true).maybePop();
+      return;
+    }
+    _liveEndHoldTimer?.cancel();
+    _liveEndHold = false;
+    _goBack();
+  }
+
   // Holding a remote's skip/FF/rewind button (or the arrow keys, when the
   // overlay is hidden) fires a stream of KeyDownEvent/KeyRepeatEvent, one per
   // OS repeat tick. Seeking the orchestrator on every tick would be jumpy
@@ -1866,8 +1904,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
           LogicalKeySet(LogicalKeyboardKey.escape): const PlayerBackIntent(),
           const DesktopBackspaceActivator(): const PlayerBackIntent(),
           LogicalKeySet(LogicalKeyboardKey.goBack): const PlayerBackIntent(),
-          LogicalKeySet(LogicalKeyboardKey.mediaPlayPause):
-              const PlayerPlayPauseIntent(),
           // Channel up/down and skip fwd/back are dedicated remote buttons,
           // distinct from the arrow keys dpad uses for spatial navigation,
           // so they're safe to claim regardless of overlay visibility.
@@ -1901,7 +1937,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
         child: Actions(
           actions: <Type, Action<Intent>>{
             PlayerBackIntent: PlayerBackAction(widget.onBackKey ?? _handleBack),
-            PlayerPlayPauseIntent: PlayerPlayPauseAction(_togglePlayPause),
             PlayerSeekBackIntent: PlayerSeekAction(() => _adjustSkip(-1)),
             PlayerSeekForwardIntent: PlayerSeekAction(() => _adjustSkip(1)),
             PlayerChannelUpIntent: PlayerChannelChangeAction(
@@ -1927,7 +1962,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     key == LogicalKeyboardKey.escape ||
                     key == LogicalKeyboardKey.goBack ||
                     isDesktopBackspaceBack(event, HardwareKeyboard.instance);
-                if (!isBack) _showOverlay();
+                final isStop = key == LogicalKeyboardKey.mediaStop;
+                if (!isBack && !isStop) _showOverlay();
               }
               return KeyEventResult.ignored;
             },
