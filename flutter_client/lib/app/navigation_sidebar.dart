@@ -1,3 +1,4 @@
+import 'package:dpad/dpad.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -79,82 +80,98 @@ class NavigationSidebar extends StatelessWidget {
               onDeactivateSidebar();
               return KeyEventResult.handled;
             }
-            return KeyEventResult.ignored;
+            return _handleVerticalKey(event);
           },
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  height: 72 * scale,
-                  child: Padding(
-                    // Horizontal (14) scales to keep the logo centered in
-                    // the collapsed rail, matching how SidebarDestinationItem
-                    // centers its icons (outer + inner padding + icon size
-                    // summing symmetrically around the rail's midpoint) - at
-                    // scale 1, 64 (kSidebarRailInset) - 14 - 36 (logo width)
-                    // = 14, so left inset equals right space. Leaving this
-                    // unscaled while the logo itself scaled was the bug: the
-                    // logo drifted off-center as scale grew.
-                    padding: EdgeInsets.fromLTRB(
-                      14 * scale,
-                      20,
-                      14 * scale,
-                      16,
-                    ),
-                    child: OverflowBox(
-                      maxWidth: 200 * scale,
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SvgPicture.asset(
-                            'assets/icons/logo.svg',
-                            width: 36 * scale,
-                            height: 36 * scale,
-                          ),
-                          if (expanded) ...[
-                            const SizedBox(width: 12),
-                            Text(
-                              'M3U TV',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: theme.colorScheme.onSurface,
-                                fontWeight: FontWeight.w700,
-                              ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 72 * scale,
+                child: Padding(
+                  // Horizontal (14) scales to keep the logo centered in
+                  // the collapsed rail, matching how SidebarDestinationItem
+                  // centers its icons (outer + inner padding + icon size
+                  // summing symmetrically around the rail's midpoint) - at
+                  // scale 1, 64 (kSidebarRailInset) - 14 - 36 (logo width)
+                  // = 14, so left inset equals right space. Leaving this
+                  // unscaled while the logo itself scaled was the bug: the
+                  // logo drifted off-center as scale grew.
+                  padding: EdgeInsets.fromLTRB(14 * scale, 20, 14 * scale, 16),
+                  child: OverflowBox(
+                    maxWidth: 200 * scale,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SvgPicture.asset(
+                          'assets/icons/logo.svg',
+                          width: 36 * scale,
+                          height: 36 * scale,
+                        ),
+                        if (expanded) ...[
+                          const SizedBox(width: 12),
+                          Text(
+                            'M3U TV',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: theme.colorScheme.onSurface,
+                              fontWeight: FontWeight.w700,
                             ),
-                          ],
+                          ),
                         ],
-                      ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                for (var index = 0; index < footerStart; index++)
-                  _destination(context, index, expanded, scale),
-                // A hairline sets Notifications and Settings apart from
-                // the content destinations.
-                if (footerStart < routes.length)
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 16 * scale,
-                      vertical: 6 * scale,
-                    ),
-                    child: Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: theme.colorScheme.onSurface.withValues(
-                        alpha: 0.07,
-                      ),
-                    ),
+              ),
+              Expanded(
+                child: _SidebarScrollArea(
+                  children: [
+                    const SizedBox(height: 12),
+                    for (var index = 0; index < footerStart; index++)
+                      _destination(context, index, expanded, scale),
+                  ],
+                ),
+              ),
+              // A hairline sets Notifications and Settings apart from
+              // the content destinations.
+              if (footerStart < routes.length)
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16 * scale,
+                    vertical: 6 * scale,
                   ),
-                for (var index = footerStart; index < routes.length; index++)
-                  _destination(context, index, expanded, scale),
-              ],
-            ),
+                  child: Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.07),
+                  ),
+                ),
+              for (var index = footerStart; index < routes.length; index++)
+                _destination(context, index, expanded, scale),
+            ],
           ),
         ),
       ),
     );
+  }
+
+  /// Up/Down step through the list by index. dpad's traversal goes by where
+  /// things are on screen, and a destination scrolled out of view still has a
+  /// position - behind the logo or the pinned footer - so it would pick those
+  /// hidden items over the visible neighbor.
+  KeyEventResult _handleVerticalKey(KeyEvent event) {
+    if (event is KeyUpEvent) return KeyEventResult.ignored;
+    final step = switch (event.logicalKey) {
+      LogicalKeyboardKey.arrowUp => -1,
+      LogicalKeyboardKey.arrowDown => 1,
+      _ => 0,
+    };
+    if (step == 0) return KeyEventResult.ignored;
+    final current = focusNodes.indexWhere((node) => node.hasPrimaryFocus);
+    if (current == -1) return KeyEventResult.ignored;
+    final next = current + step;
+    if (next >= 0 && next < routes.length) focusNodes[next].requestFocus();
+    return KeyEventResult.handled;
   }
 
   /// Index of the first trailing Notifications/Settings destination, which
@@ -193,6 +210,130 @@ class NavigationSidebar extends StatelessWidget {
             ? unreadNotificationCount
             : 0,
         onTap: () => onNavigate(index),
+      ),
+    );
+  }
+}
+
+/// The destinations that scroll between the pinned logo and footer, with a
+/// soft shadow on each edge that has more above or below it.
+class _SidebarScrollArea extends StatefulWidget {
+  const _SidebarScrollArea({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  State<_SidebarScrollArea> createState() => _SidebarScrollAreaState();
+}
+
+class _SidebarScrollAreaState extends State<_SidebarScrollArea> {
+  final ScrollController _controller = ScrollController();
+  bool _moreAbove = false;
+  bool _moreBelow = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_syncEdges);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _syncEdges() {
+    if (!mounted || !_controller.hasClients) return;
+    final position = _controller.position;
+    if (!position.hasContentDimensions) return;
+    final moreAbove = position.extentBefore > 0;
+    final moreBelow = position.extentAfter > 0;
+    if (moreAbove == _moreAbove && moreBelow == _moreBelow) return;
+    setState(() {
+      _moreAbove = moreAbove;
+      _moreBelow = moreBelow;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final shadowHeight = 20 * FontSizeScope.scaleOf(context);
+    // Also fires on first layout and when the list or the screen resizes,
+    // which a scroll listener alone would miss.
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: (_) {
+        _syncEdges();
+        return false;
+      },
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: SingleChildScrollView(
+              controller: _controller,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: widget.children,
+              ),
+            ),
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: shadowHeight,
+            child: _SidebarEdgeShadow(
+              visible: _moreAbove,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: shadowHeight,
+            child: _SidebarEdgeShadow(
+              visible: _moreBelow,
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SidebarEdgeShadow extends StatelessWidget {
+  const _SidebarEdgeShadow({
+    required this.visible,
+    required this.begin,
+    required this.end,
+  });
+
+  final bool visible;
+  final Alignment begin;
+  final Alignment end;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: const Duration(milliseconds: 150),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: begin,
+              end: end,
+              colors: [
+                Colors.black.withValues(alpha: 0.4),
+                Colors.black.withValues(alpha: 0),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -237,6 +378,7 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
   void initState() {
     super.initState();
     widget.focusNode.addListener(_onFocusChange);
+    if (widget.selected) _scheduleReveal();
   }
 
   @override
@@ -247,6 +389,7 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
       widget.focusNode.addListener(_onFocusChange);
       _focused = widget.focusNode.hasFocus;
     }
+    if (widget.selected && !oldWidget.selected) _scheduleReveal();
   }
 
   @override
@@ -258,6 +401,23 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
   void _onFocusChange() {
     setState(() {
       _focused = widget.focusNode.hasFocus;
+    });
+    if (_focused) _scheduleReveal();
+  }
+
+  /// Keeps this item, and enough room for the next one to show, on screen.
+  /// Covers every way here: Up/Down, the sidebar opening on the current
+  /// destination, and navigating from elsewhere with the rail collapsed.
+  /// Instant, like the app's other D-pad scrolling (see main.dart's Dpad
+  /// theme).
+  void _scheduleReveal() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      DpadScroll.ensureVisible(
+        widget.focusNode,
+        padding: 56 * FontSizeScope.scaleOf(context),
+        duration: Duration.zero,
+      );
     });
   }
 
