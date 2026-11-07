@@ -164,6 +164,12 @@ enum MediaSortOption {
       );
 }
 
+/// The order a Movies or Series screen shows, which its Home row follows.
+typedef MediaBrowseOrder = ({MediaSortOption sort, bool favoritesFirst});
+
+/// The order the Live TV screen shows, which its Home row follows.
+typedef ChannelBrowseOrder = ({ChannelSortOption sort, bool favoritesFirst});
+
 /// Sort order for the Live TV channel list/grid. A separate enum from
 /// [MediaSortOption] rather than appended values on it - VOD/Series sort by
 /// rating/release date, while channels have neither field and sort by
@@ -435,7 +441,64 @@ class ViewSettingsService extends ChangeNotifier {
     // ignore: avoid_positional_boolean_parameters
     bool value,
   ) async {
+    // Flipping this only changes what the next launch starts with: the
+    // screens keep showing their current order, so Home must too.
+    _vodBrowseOrder = vodBrowseOrder;
+    _seriesBrowseOrder = seriesBrowseOrder;
+    _liveTvBrowseOrder = liveTvBrowseOrder;
     await _write(rememberMediaSortKey, value);
+    notifyListeners();
+  }
+
+  // What each screen was set to this session. Separate from the persisted
+  // options, which are only written under [rememberMediaSort], so Home can
+  // follow a screen's order with Filter Persistence off too.
+  MediaBrowseOrder? _vodBrowseOrder;
+  MediaBrowseOrder? _seriesBrowseOrder;
+  ChannelBrowseOrder? _liveTvBrowseOrder;
+
+  /// The order the Movies screen shows, and so its Home row.
+  MediaBrowseOrder get vodBrowseOrder =>
+      _vodBrowseOrder ??
+      (
+        sort: rememberMediaSortSync
+            ? vodSortOptionSync
+            : MediaSortOption.defaultOrder,
+        favoritesFirst: !rememberMediaSortSync || vodFavoritesFirstSync,
+      );
+
+  void setVodBrowseOrder(MediaBrowseOrder order) {
+    _vodBrowseOrder = order;
+    notifyListeners();
+  }
+
+  /// The order the Series screen shows, and so its Home row.
+  MediaBrowseOrder get seriesBrowseOrder =>
+      _seriesBrowseOrder ??
+      (
+        sort: rememberMediaSortSync
+            ? seriesSortOptionSync
+            : MediaSortOption.defaultOrder,
+        favoritesFirst: !rememberMediaSortSync || seriesFavoritesFirstSync,
+      );
+
+  void setSeriesBrowseOrder(MediaBrowseOrder order) {
+    _seriesBrowseOrder = order;
+    notifyListeners();
+  }
+
+  /// The order the Live TV screen shows, and so its Home row.
+  ChannelBrowseOrder get liveTvBrowseOrder =>
+      _liveTvBrowseOrder ??
+      (
+        sort: rememberMediaSortSync
+            ? liveTvSortOptionSync
+            : ChannelSortOption.playlistOrder,
+        favoritesFirst: !rememberMediaSortSync || liveTvFavoritesFirstSync,
+      );
+
+  void setLiveTvBrowseOrder(ChannelBrowseOrder order) {
+    _liveTvBrowseOrder = order;
     notifyListeners();
   }
 
@@ -449,6 +512,10 @@ class ViewSettingsService extends ChangeNotifier {
       MediaSortOption.fromValue(_memory[vodSortOptionKey] as String?);
 
   Future<void> setVodSortOption(MediaSortOption option) async {
+    final order = _vodBrowseOrder;
+    if (order != null) {
+      _vodBrowseOrder = (sort: option, favoritesFirst: order.favoritesFirst);
+    }
     await _write(vodSortOptionKey, option.value);
     notifyListeners();
   }
@@ -463,6 +530,10 @@ class ViewSettingsService extends ChangeNotifier {
       MediaSortOption.fromValue(_memory[seriesSortOptionKey] as String?);
 
   Future<void> setSeriesSortOption(MediaSortOption option) async {
+    final order = _seriesBrowseOrder;
+    if (order != null) {
+      _seriesBrowseOrder = (sort: option, favoritesFirst: order.favoritesFirst);
+    }
     await _write(seriesSortOptionKey, option.value);
     notifyListeners();
   }
@@ -477,6 +548,10 @@ class ViewSettingsService extends ChangeNotifier {
       ChannelSortOption.fromValue(_memory[liveTvSortOptionKey] as String?);
 
   Future<void> setLiveTvSortOption(ChannelSortOption option) async {
+    final order = _liveTvBrowseOrder;
+    if (order != null) {
+      _liveTvBrowseOrder = (sort: option, favoritesFirst: order.favoritesFirst);
+    }
     await _write(liveTvSortOptionKey, option.value);
     notifyListeners();
   }
@@ -498,6 +573,10 @@ class ViewSettingsService extends ChangeNotifier {
     // ignore: avoid_positional_boolean_parameters
     bool value,
   ) async {
+    final order = _vodBrowseOrder;
+    if (order != null) {
+      _vodBrowseOrder = (sort: order.sort, favoritesFirst: value);
+    }
     await _write(vodFavoritesFirstKey, value);
     notifyListeners();
   }
@@ -516,6 +595,10 @@ class ViewSettingsService extends ChangeNotifier {
     // ignore: avoid_positional_boolean_parameters
     bool value,
   ) async {
+    final order = _seriesBrowseOrder;
+    if (order != null) {
+      _seriesBrowseOrder = (sort: order.sort, favoritesFirst: value);
+    }
     await _write(seriesFavoritesFirstKey, value);
     notifyListeners();
   }
@@ -534,6 +617,10 @@ class ViewSettingsService extends ChangeNotifier {
     // ignore: avoid_positional_boolean_parameters
     bool value,
   ) async {
+    final order = _liveTvBrowseOrder;
+    if (order != null) {
+      _liveTvBrowseOrder = (sort: order.sort, favoritesFirst: value);
+    }
     await _write(liveTvFavoritesFirstKey, value);
     notifyListeners();
   }

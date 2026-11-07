@@ -113,18 +113,17 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
   /// [MediaSortOption.defaultOrder]. See VodScreen's identical helper for
   /// why this reads the sync getters instead of awaiting the async ones.
   MediaSortOption _initialSortOption() {
-    final service = ref.read(viewSettingsServiceProvider);
-    if (!service.rememberMediaSortSync) return MediaSortOption.defaultOrder;
-    return service.seriesSortOptionSync;
+    return ref.read(viewSettingsServiceProvider).seriesBrowseOrder.sort;
   }
 
   /// Favorites First's starting state: the persisted Series choice under
   /// Filter Persistence, otherwise on. Sync for the same reason as
   /// [_initialSortOption].
   bool _initialFavoritesFirst() {
-    final service = ref.read(viewSettingsServiceProvider);
-    if (!service.rememberMediaSortSync) return true;
-    return service.seriesFavoritesFirstSync;
+    return ref
+        .read(viewSettingsServiceProvider)
+        .seriesBrowseOrder
+        .favoritesFirst;
   }
 
   @override
@@ -562,6 +561,10 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
       _favoritesFirst = favoritesFirst;
     });
     _reconfigureWindow();
+    service.setSeriesBrowseOrder((
+      sort: _sortOption,
+      favoritesFirst: _favoritesFirst,
+    ));
     if (!remember) return;
     if (selected != null) unawaited(service.setSeriesSortOption(selected));
     if (favoritesFirstChanged) {

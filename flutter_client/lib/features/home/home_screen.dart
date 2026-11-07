@@ -25,9 +25,11 @@ import 'package:m3u_tv/shared/app_callout.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/channel_grid_tile.dart';
+import 'package:m3u_tv/shared/channel_sort.dart';
 import 'package:m3u_tv/shared/continue_watching_items.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:m3u_tv/shared/media_sort.dart';
 import 'package:material_ui/material_ui.dart';
 
 class _OfflineBanner extends StatelessWidget {
@@ -118,6 +120,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   late final FavoritesService _vodFavoritesService;
   late final FavoritesService _seriesFavoritesService;
   late final ViewSettingsService _viewSettings;
+  late ChannelBrowseOrder _liveTvOrder;
+  late MediaBrowseOrder _vodOrder;
+  late MediaBrowseOrder _seriesOrder;
 
   /// Seeded from the cache `main.dart` fills before the first frame, so the
   /// right layout builds immediately (a Simplified-then-Rich swap flashed and
@@ -167,6 +172,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _shownPlaylistKey = ref.read(shownPlaylistKeyProvider);
     _style = _viewSettings.homeScreenStyleCached ?? HomeScreenStyle.simplified;
     _navLayout = _viewSettings.navLayoutSync;
+    _liveTvOrder = _viewSettings.liveTvBrowseOrder;
+    _vodOrder = _viewSettings.vodBrowseOrder;
+    _seriesOrder = _viewSettings.seriesBrowseOrder;
     _viewSettings.addListener(_onViewSettingsChanged);
     unawaited(_loadStyle());
     _liveFavoritesService = ref.read(liveFavoritesServiceProvider);
@@ -195,7 +203,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _onViewSettingsChanged() {
     unawaited(_loadStyle());
     final layout = _viewSettings.navLayoutSync;
-    if (layout != _navLayout) setState(() => _navLayout = layout);
+    if (layout != _navLayout ||
+        _liveTvOrder != _viewSettings.liveTvBrowseOrder ||
+        _vodOrder != _viewSettings.vodBrowseOrder ||
+        _seriesOrder != _viewSettings.seriesBrowseOrder) {
+      setState(() {
+        _navLayout = layout;
+        _liveTvOrder = _viewSettings.liveTvBrowseOrder;
+        _vodOrder = _viewSettings.vodBrowseOrder;
+        _seriesOrder = _viewSettings.seriesBrowseOrder;
+      });
+    }
   }
 
   /// Continue Watching re-syncs with the server after launch and can drop
@@ -360,6 +378,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     RouteNames.liveTv => _LiveRow(
       key: ValueKey(('live', playlistKey)),
       favoriteChannelIds: _favoriteChannelIds,
+      order: _liveTvOrder,
       onChannelSelect: widget.onChannelSelect,
       onChannelContextChanged: widget.onChannelContextChanged,
       onToggleFavorite: (channel) => _liveFavoritesService.toggle(channel.id),
@@ -385,6 +404,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     RouteNames.vod => _MoviesRow(
       key: ValueKey(('movies', playlistKey)),
       favoriteVodIds: _favoriteVodIds,
+      order: _vodOrder,
       onVodSelect: widget.onVodSelect,
       onToggleFavorite: (item) => _vodFavoritesService.toggle(item.id),
       rowItemLimit: _rowItemLimit,
@@ -397,6 +417,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     RouteNames.series => _SeriesRow(
       key: ValueKey(('series', playlistKey)),
       favoriteSeriesIds: _favoriteSeriesIds,
+      order: _seriesOrder,
       onSeriesSelect: widget.onSeriesSelect,
       onToggleFavorite: (series) => _seriesFavoritesService.toggle(series.id),
       rowItemLimit: _rowItemLimit,
@@ -698,6 +719,7 @@ class _LiveRow extends ConsumerStatefulWidget {
   const _LiveRow({
     super.key,
     required this.favoriteChannelIds,
+    required this.order,
     required this.onChannelSelect,
     required this.onChannelContextChanged,
     required this.onToggleFavorite,
@@ -711,6 +733,7 @@ class _LiveRow extends ConsumerStatefulWidget {
 
   /// Null until known; the row waits for them before loading.
   final Set<int>? favoriteChannelIds;
+  final ChannelBrowseOrder order;
   final void Function(Channel) onChannelSelect;
   final void Function(ChannelContext)? onChannelContextChanged;
   final Future<void> Function(Channel) onToggleFavorite;
@@ -737,8 +760,8 @@ typedef _LiveRowSlice = ({
 
 class _LiveRowState extends ConsumerState<_LiveRow> {
   // The row is read from the catalog, refetched when the catalog reloads (a
-  // new category list) or the favorites change.
-  (List<Category>, Set<int>, int)? _fetchedFor;
+  // new category list), the favorites change, or Live TV is re-sorted.
+  (List<Category>, Set<int>, int, ChannelBrowseOrder)? _fetchedFor;
   _LiveRowSlice? _windowSlice;
 
   void _fetch(
@@ -746,21 +769,24 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
     Set<int> favorites,
     CatalogRepository repo,
   ) {
-    final key = (catalog, favorites, widget.rowItemLimit);
+    final order = widget.order;
+    final key = (catalog, favorites, widget.rowItemLimit, order);
     _fetchedFor = key;
     unawaited(() async {
-      final favoritesQuery = LiveChannelQuery(ids: favorites);
-      var query = favoritesQuery;
+      final sort = catalogSortForChannels(order.sort);
+      var query = LiveChannelQuery(ids: favorites, sort: sort);
       var channels = const <Channel>[];
       var showsFavorites = false;
       var length = 0;
       try {
-        if (favorites.isNotEmpty) {
+        // With Favorites First off, Live TV doesn't lead with them, so
+        // neither does its row.
+        if (order.favoritesFirst && favorites.isNotEmpty) {
           channels = await query.page(repo, 0, widget.rowItemLimit);
         }
         showsFavorites = channels.isNotEmpty;
         if (!showsFavorites) {
-          query = const LiveChannelQuery();
+          query = LiveChannelQuery(sort: sort);
           channels = await query.page(repo, 0, widget.rowItemLimit);
         }
         length = await query.count(repo);
@@ -793,7 +819,8 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
     final catalog = ref.watch(liveCategoriesProvider);
     final favorites = widget.favoriteChannelIds;
     if (favorites != null &&
-        _fetchedFor != (catalog, favorites, widget.rowItemLimit)) {
+        _fetchedFor !=
+            (catalog, favorites, widget.rowItemLimit, widget.order)) {
       _fetch(catalog, favorites, ref.read(catalogRepositoryProvider));
     }
     final isLoading = _windowSlice == null;
@@ -808,7 +835,7 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
     if (!isLoading && rowChannels.isEmpty) return const SizedBox.shrink();
     // Until it loads, guess the row shows favorites when there are any.
     final showsFavorites = isLoading
-        ? favorites?.isNotEmpty ?? false
+        ? widget.order.favoritesFirst && (favorites?.isNotEmpty ?? false)
         : slice.showsFavorites;
     final spotlight = widget.spotlight;
     final epgService = ref.watch(epgServiceProvider);
@@ -1176,6 +1203,7 @@ class _MoviesRow extends ConsumerStatefulWidget {
   const _MoviesRow({
     super.key,
     required this.favoriteVodIds,
+    required this.order,
     required this.onVodSelect,
     required this.onToggleFavorite,
     required this.rowItemLimit,
@@ -1187,6 +1215,7 @@ class _MoviesRow extends ConsumerStatefulWidget {
   });
 
   final Set<int> favoriteVodIds;
+  final MediaBrowseOrder order;
   final void Function(VodItem) onVodSelect;
   final Future<void> Function(VodItem) onToggleFavorite;
   final int rowItemLimit;
@@ -1203,18 +1232,30 @@ class _MoviesRow extends ConsumerStatefulWidget {
 }
 
 class _MoviesRowState extends ConsumerState<_MoviesRow> {
-  List<Category>? _fetchedFor;
+  (List<Category>, MediaBrowseOrder, Set<int>)? _fetchedFor;
 
   /// Null until the first page loads. A reload keeps these on screen.
   List<VodItem>? _items;
 
+  (List<Category>, MediaBrowseOrder, Set<int>) _fetchKey(
+    List<Category> categories,
+  ) => (
+    categories,
+    widget.order,
+    // Only a change in the favorites the order leads with moves the row.
+    widget.order.favoritesFirst ? widget.favoriteVodIds : const <int>{},
+  );
+
   void _fetch(List<Category> categories, CatalogRepository repo) {
-    _fetchedFor = categories;
+    final key = _fetchKey(categories);
+    _fetchedFor = key;
     unawaited(() async {
       List<VodItem> items;
       try {
         items = await repo.pageActiveItems<VodItem>(
           kind: kCatalogKindVod,
+          sort: catalogSortFor(key.$2.sort),
+          favoritesFirst: key.$3,
           offset: 0,
           limit: widget.rowItemLimit,
         );
@@ -1224,7 +1265,7 @@ class _MoviesRowState extends ConsumerState<_MoviesRow> {
         debugPrint('Home: could not read movies: $error');
         items = const <VodItem>[];
       }
-      if (mounted && identical(_fetchedFor, categories)) {
+      if (mounted && _fetchedFor == key) {
         setState(() => _items = items);
         widget.onLoaded(items.isNotEmpty);
       }
@@ -1234,7 +1275,7 @@ class _MoviesRowState extends ConsumerState<_MoviesRow> {
   @override
   Widget build(BuildContext context) {
     final categories = ref.watch(vodCategoriesProvider);
-    if (!identical(categories, _fetchedFor)) {
+    if (_fetchKey(categories) != _fetchedFor) {
       _fetch(categories, ref.read(catalogRepositoryProvider));
     }
     final items = _items;
@@ -1288,6 +1329,7 @@ class _SeriesRow extends ConsumerStatefulWidget {
   const _SeriesRow({
     super.key,
     required this.favoriteSeriesIds,
+    required this.order,
     required this.onSeriesSelect,
     required this.onToggleFavorite,
     required this.rowItemLimit,
@@ -1299,6 +1341,7 @@ class _SeriesRow extends ConsumerStatefulWidget {
   });
 
   final Set<int> favoriteSeriesIds;
+  final MediaBrowseOrder order;
   final void Function(Series) onSeriesSelect;
   final Future<void> Function(Series) onToggleFavorite;
   final int rowItemLimit;
@@ -1315,18 +1358,30 @@ class _SeriesRow extends ConsumerStatefulWidget {
 }
 
 class _SeriesRowState extends ConsumerState<_SeriesRow> {
-  List<Category>? _fetchedFor;
+  (List<Category>, MediaBrowseOrder, Set<int>)? _fetchedFor;
 
   /// Null until the first page loads. A reload keeps these on screen.
   List<Series>? _items;
 
+  (List<Category>, MediaBrowseOrder, Set<int>) _fetchKey(
+    List<Category> categories,
+  ) => (
+    categories,
+    widget.order,
+    // Only a change in the favorites the order leads with moves the row.
+    widget.order.favoritesFirst ? widget.favoriteSeriesIds : const <int>{},
+  );
+
   void _fetch(List<Category> categories, CatalogRepository repo) {
-    _fetchedFor = categories;
+    final key = _fetchKey(categories);
+    _fetchedFor = key;
     unawaited(() async {
       List<Series> items;
       try {
         items = await repo.pageActiveItems<Series>(
           kind: kCatalogKindSeries,
+          sort: catalogSortFor(key.$2.sort),
+          favoritesFirst: key.$3,
           offset: 0,
           limit: widget.rowItemLimit,
         );
@@ -1336,7 +1391,7 @@ class _SeriesRowState extends ConsumerState<_SeriesRow> {
         debugPrint('Home: could not read series: $error');
         items = const <Series>[];
       }
-      if (mounted && identical(_fetchedFor, categories)) {
+      if (mounted && _fetchedFor == key) {
         setState(() => _items = items);
         widget.onLoaded(items.isNotEmpty);
       }
@@ -1346,7 +1401,7 @@ class _SeriesRowState extends ConsumerState<_SeriesRow> {
   @override
   Widget build(BuildContext context) {
     final categories = ref.watch(seriesCategoriesProvider);
-    if (!identical(categories, _fetchedFor)) {
+    if (_fetchKey(categories) != _fetchedFor) {
       _fetch(categories, ref.read(catalogRepositoryProvider));
     }
     final items = _items;

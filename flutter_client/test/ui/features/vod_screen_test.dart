@@ -738,9 +738,11 @@ void main() {
     );
 
     testWidgets(
-      'with rememberMediaSort false (default), restart does not restore Rating sort',
+      'with rememberMediaSort false, restart does not restore Rating sort',
       (tester) async {
-        final service = ViewSettingsService();
+        final memory = <String, Object?>{};
+        final service = ViewSettingsService(memory: memory);
+        await service.setRememberMediaSort(false);
         // Distinct Keys between pumps force Flutter to recreate the
         // Element/State subtree - otherwise pumpWidget reuses the State
         // because the widget types match, and `_loadSortPreference`'s
@@ -770,15 +772,15 @@ void main() {
         expect(await service.vodSortOption(), MediaSortOption.defaultOrder);
         expect(await service.rememberMediaSort(), isFalse);
 
-        // Re-mount from scratch with the same persistent service. The new
-        // _VodScreenState starts with `_sortOption = defaultOrder` and the
-        // remember=false guard skips the persisted vodSortOption read.
+        // Re-mount from scratch with a new service over the same storage, as
+        // a relaunch does. The session's order is gone and the remember=false
+        // guard skips the persisted vodSortOption read.
         await tester.pumpWidget(
           _TestApp(
             key: secondKey,
             catalogRepository: repo,
             categories: sortCategories,
-            viewSettingsService: service,
+            viewSettingsService: ViewSettingsService(memory: memory),
           ),
         );
         await tester.pumpAndSettle();
@@ -1255,7 +1257,9 @@ void main() {
     testWidgets(
       'with rememberMediaSort false, switching it off resets to on at restart',
       (tester) async {
-        final service = ViewSettingsService();
+        final memory = <String, Object?>{};
+        final service = ViewSettingsService(memory: memory);
+        await service.setRememberMediaSort(false);
         final repo = await _buildRepo(tester, items);
         await tester.pumpWidget(
           _TestApp(
@@ -1277,7 +1281,7 @@ void main() {
             catalogRepository: repo,
             categories: categories,
             favoritesService: favorites,
-            viewSettingsService: service,
+            viewSettingsService: ViewSettingsService(memory: memory),
           ),
         );
         await tester.pumpAndSettle();

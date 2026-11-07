@@ -427,20 +427,15 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   /// `main.dart` preloads it into the service's in-memory cache during
   /// bootstrap, so by the time this screen mounts it's warm.
   ChannelSortOption _initialSortOption() {
-    final service = widget.viewSettingsService;
-    if (service == null || !service.rememberMediaSortSync) {
-      return ChannelSortOption.playlistOrder;
-    }
-    return service.liveTvSortOptionSync;
+    return widget.viewSettingsService?.liveTvBrowseOrder.sort ??
+        ChannelSortOption.playlistOrder;
   }
 
   /// Favorites First's starting state: the persisted Live TV choice under
   /// Filter Persistence, otherwise on. Sync for the same reason as
   /// [_initialSortOption].
   bool _initialFavoritesFirst() {
-    final service = widget.viewSettingsService;
-    if (service == null || !service.rememberMediaSortSync) return true;
-    return service.liveTvFavoritesFirstSync;
+    return widget.viewSettingsService?.liveTvBrowseOrder.favoritesFirst ?? true;
   }
 
   /// Back on a guide programme returns to its channel cell; from the
@@ -1230,6 +1225,10 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       _favoritesFirst = favoritesFirst;
     });
     _reconfigureWindow();
+    service?.setLiveTvBrowseOrder((
+      sort: _sortOption,
+      favoritesFirst: _favoritesFirst,
+    ));
     if (!remember) return;
     if (selected != null) unawaited(service!.setLiveTvSortOption(selected));
     if (favoritesFirstChanged) {
