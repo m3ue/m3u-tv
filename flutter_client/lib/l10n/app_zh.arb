@@ -1001,6 +1001,8 @@
   "personDetailsNoLibraryMatches": "该演员的作品年表中没有你库中已有的内容。",
   "settingsLogsDiagnostics": "日志与诊断",
   "settingsLogsDiagnosticsSubtitle": "设备详情和本次会话的日志，用于排查问题",
+  "settingsPlaybackDiagnostics": "显示播放诊断信息",
+  "settingsPlaybackDiagnosticsHint": "在播放器控件中显示当前播放器及其切换原因，用于排查问题。",
   "diagnosticsUpload": "上传到服务器",
   "diagnosticsRefresh": "刷新",
   "diagnosticsClear": "清除日志",

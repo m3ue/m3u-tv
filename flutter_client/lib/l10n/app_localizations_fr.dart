@@ -2058,6 +2058,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Détails de l\'appareil et journaux de cette session, pour le dépannage';
 
   @override
+  String get settingsPlaybackDiagnostics => 'Afficher le diagnostic de lecture';
+
+  @override
+  String get settingsPlaybackDiagnosticsHint =>
+      'Affiche dans les commandes le lecteur actif et la raison de son changement, pour le dépannage.';
+
+  @override
   String get diagnosticsUpload => 'Envoyer au serveur';
 
   @override

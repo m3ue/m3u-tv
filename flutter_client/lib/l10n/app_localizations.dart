@@ -3572,6 +3572,18 @@ abstract class AppLocalizations {
   /// **'Device details and this session\'s logs, for troubleshooting'**
   String get settingsLogsDiagnosticsSubtitle;
 
+  /// No description provided for @settingsPlaybackDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Show playback diagnostics'**
+  String get settingsPlaybackDiagnostics;
+
+  /// No description provided for @settingsPlaybackDiagnosticsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the active player and why it switched in the player\'s controls, for troubleshooting.'**
+  String get settingsPlaybackDiagnosticsHint;
+
   /// No description provided for @diagnosticsUpload.
   ///
   /// In en, this message translates to:

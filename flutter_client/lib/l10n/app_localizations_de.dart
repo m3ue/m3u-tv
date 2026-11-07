@@ -2049,6 +2049,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Gerätedetails und Protokolle dieser Sitzung zur Fehlersuche';
 
   @override
+  String get settingsPlaybackDiagnostics => 'Wiedergabediagnose anzeigen';
+
+  @override
+  String get settingsPlaybackDiagnosticsHint =>
+      'Zeigt in den Player-Steuerelementen den aktiven Player und den Grund für einen Wechsel an, zur Fehlersuche.';
+
+  @override
   String get diagnosticsUpload => 'Auf den Server hochladen';
 
   @override

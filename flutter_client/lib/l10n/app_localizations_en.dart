@@ -2034,6 +2034,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Device details and this session\'s logs, for troubleshooting';
 
   @override
+  String get settingsPlaybackDiagnostics => 'Show playback diagnostics';
+
+  @override
+  String get settingsPlaybackDiagnosticsHint =>
+      'Show the active player and why it switched in the player\'s controls, for troubleshooting.';
+
+  @override
   String get diagnosticsUpload => 'Upload to server';
 
   @override

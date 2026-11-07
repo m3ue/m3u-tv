@@ -1140,6 +1140,8 @@
   "personDetailsNoLibraryMatches": "None of this actor's filmography is in your library.",
   "settingsLogsDiagnostics": "Logs & Diagnostics",
   "settingsLogsDiagnosticsSubtitle": "Device details and this session's logs, for troubleshooting",
+  "settingsPlaybackDiagnostics": "Show playback diagnostics",
+  "settingsPlaybackDiagnosticsHint": "Show the active player and why it switched in the player's controls, for troubleshooting.",
   "diagnosticsUpload": "Upload to server",
   "diagnosticsRefresh": "Refresh",
   "diagnosticsClear": "Clear logs",

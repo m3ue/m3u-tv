@@ -2053,6 +2053,14 @@ class AppLocalizationsEs extends AppLocalizations {
       'Detalles del dispositivo y registros de esta sesión, para solucionar problemas';
 
   @override
+  String get settingsPlaybackDiagnostics =>
+      'Mostrar diagnóstico de reproducción';
+
+  @override
+  String get settingsPlaybackDiagnosticsHint =>
+      'Muestra en los controles el reproductor activo y por qué cambió, para resolver problemas.';
+
+  @override
   String get diagnosticsUpload => 'Subir al servidor';
 
   @override

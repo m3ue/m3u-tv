@@ -1,5 +1,6 @@
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
+import 'package:m3u_tv/services/app_log_buffer.dart';
 import 'package:material_ui/material_ui.dart';
 
 class PlaybackDiagnosticsPanel extends StatelessWidget {
@@ -182,6 +183,11 @@ class _PlaybackDiagnosticsSnapshot {
         if (backend != null) backendLabel = _backendLabel(backend);
       } else if (item.startsWith('fallback-reason:')) {
         final parsed = _parseKeyValueDiagnostic(item, 'fallback-reason:');
+        codecDecision = parsed.key;
+        // Backend messages can quote a stream URL, and people screenshot this.
+        fallbackReason = AppLogBuffer.instance.redact(parsed.value);
+      } else if (item.startsWith('decoder-fallback:')) {
+        final parsed = _parseKeyValueDiagnostic(item, 'decoder-fallback:');
         codecDecision = parsed.key;
         fallbackReason = parsed.value;
       } else if (item.startsWith('server-transcode:')) {

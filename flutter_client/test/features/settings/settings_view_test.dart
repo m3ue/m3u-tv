@@ -199,6 +199,22 @@ void main() {
       );
     });
 
+    testWidgets('playback diagnostics turn on from General', (tester) async {
+      await pumpSettingsScreen(tester);
+      final l = await AppLocalizations.delegate.load(const Locale('en'));
+
+      await tester.tap(find.text(l.settingsGeneral));
+      await tester.pumpAndSettle();
+
+      final row = find.text(l.settingsPlaybackDiagnostics);
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+
+      expect(viewSettingsService.showPlaybackDiagnosticsSync, isTrue);
+    });
+
     testWidgets(
       'TheIntroDB toggle defaults on and turns off from Integrations',
       (

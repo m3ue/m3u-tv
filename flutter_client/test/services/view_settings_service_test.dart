@@ -24,6 +24,16 @@ void main() {
       expect(await service.defaultStartPage(), DefaultStartPage.home);
     });
 
+    test('playback diagnostics default off and persist', () async {
+      expect(await service.showPlaybackDiagnostics(), isFalse);
+      expect(service.showPlaybackDiagnosticsSync, isFalse);
+
+      await service.setShowPlaybackDiagnostics(true);
+
+      expect(await service.showPlaybackDiagnostics(), isTrue);
+      expect(service.showPlaybackDiagnosticsSync, isTrue);
+    });
+
     test('VOD player defaults to ExoPlayer first and persists', () async {
       expect(await service.vodPlayer(), VodPlayerPreference.exoPlayerFirst);
       expect(service.vodPlayerSync, VodPlayerPreference.exoPlayerFirst);

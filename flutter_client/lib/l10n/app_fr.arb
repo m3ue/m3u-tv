@@ -1001,6 +1001,8 @@
   "personDetailsNoLibraryMatches": "Aucun élément de la filmographie de cet acteur n'est dans votre bibliothèque.",
   "settingsLogsDiagnostics": "Journaux et diagnostics",
   "settingsLogsDiagnosticsSubtitle": "Détails de l'appareil et journaux de cette session, pour le dépannage",
+  "settingsPlaybackDiagnostics": "Afficher le diagnostic de lecture",
+  "settingsPlaybackDiagnosticsHint": "Affiche dans les commandes le lecteur actif et la raison de son changement, pour le dépannage.",
   "diagnosticsUpload": "Envoyer au serveur",
   "diagnosticsRefresh": "Actualiser",
   "diagnosticsClear": "Effacer les journaux",

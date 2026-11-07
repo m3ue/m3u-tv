@@ -393,28 +393,41 @@ class _ConnectedViewState extends State<ConnectedView> {
 
         SettingsSectionHeader(l.settingsApp),
         const SettingsCard(child: AppVersionCard()),
-        if (widget.loadDiagnosticsHeader case final loadHeader?) ...[
+        if (widget.loadDiagnosticsHeader != null ||
+            widget.viewSettingsService != null) ...[
           const SizedBox(height: 12),
           SettingsGroup(
             children: [
-              SettingsRow(
-                title: l.settingsLogsDiagnostics,
-                subtitle: l.settingsLogsDiagnosticsSubtitle,
-                icon: Icons.bug_report_outlined,
-                trailing: const SettingsChevron(),
-                onTap: () => unawaited(
-                  pushSettingsSubpageFullHeight<void>(
-                    context,
-                    title: (context) =>
-                        AppLocalizations.of(context).settingsLogsDiagnostics,
-                    onBack: widget.onHandleTopLevelBack,
-                    builder: (_) => DiagnosticsScreen(
-                      loadHeader: loadHeader,
-                      onUpload: widget.onUploadLogs,
+              if (widget.loadDiagnosticsHeader case final loadHeader?)
+                SettingsRow(
+                  title: l.settingsLogsDiagnostics,
+                  subtitle: l.settingsLogsDiagnosticsSubtitle,
+                  icon: Icons.bug_report_outlined,
+                  trailing: const SettingsChevron(),
+                  onTap: () => unawaited(
+                    pushSettingsSubpageFullHeight<void>(
+                      context,
+                      title: (context) =>
+                          AppLocalizations.of(context).settingsLogsDiagnostics,
+                      onBack: widget.onHandleTopLevelBack,
+                      builder: (_) => DiagnosticsScreen(
+                        loadHeader: loadHeader,
+                        onUpload: widget.onUploadLogs,
+                      ),
                     ),
                   ),
                 ),
-              ),
+              if (widget.viewSettingsService case final viewSettings?)
+                ListenableBuilder(
+                  listenable: viewSettings,
+                  builder: (context, _) => SettingsSwitchRow(
+                    title: l.settingsPlaybackDiagnostics,
+                    subtitle: l.settingsPlaybackDiagnosticsHint,
+                    icon: Icons.monitor_heart_outlined,
+                    value: viewSettings.showPlaybackDiagnosticsSync,
+                    onChanged: viewSettings.setShowPlaybackDiagnostics,
+                  ),
+                ),
             ],
           ),
         ],

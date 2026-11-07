@@ -11,6 +11,7 @@ import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/features/player/now_playing_overlay.dart';
 import 'package:m3u_tv/features/player/online_subtitle_picker.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
+import 'package:m3u_tv/features/player/player_diagnostics_panel.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
 import 'package:m3u_tv/features/player/track_selector.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -26,6 +27,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/online_subtitle_service.dart';
 import 'package:m3u_tv/services/online_subtitle_settings.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/watch_history_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/cached_backdrop_image.dart';
@@ -1594,6 +1596,7 @@ void main() {
         OnlineSubtitleService? service,
         OnlineSubtitleSettings? settings,
         PlayerAdapter? plainAdapter,
+        ViewSettingsService? viewSettings,
       }) async {
         final adapter = _RuntimeSubtitleAdapter();
         final orchestrator = PlaybackOrchestrator(
@@ -1616,6 +1619,7 @@ void main() {
               epgService: EpgService(clock: () => DateTime.utc(2026)),
               onlineSubtitleService: service,
               onlineSubtitleSettings: settings,
+              viewSettingsService: viewSettings,
             ),
           ),
         );
@@ -1643,6 +1647,16 @@ void main() {
           tester.element(find.byType(PlayerScreen)),
         ).playerTrackSubtitles,
       );
+
+      testWidgets('the diagnostics panel follows its setting', (tester) async {
+        final viewSettings = ViewSettingsService();
+        await pump(tester, args: movie, viewSettings: viewSettings);
+        expect(find.byType(PlaybackDiagnosticsPanel), findsNothing);
+
+        await viewSettings.setShowPlaybackDiagnostics(true);
+        await pump(tester, args: movie, viewSettings: viewSettings);
+        expect(find.byType(PlaybackDiagnosticsPanel), findsOneWidget);
+      });
 
       testWidgets('searches, downloads, and loads the pick', (tester) async {
         final service = _FakeOnlineSubtitleService();

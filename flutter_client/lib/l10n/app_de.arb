@@ -1001,6 +1001,8 @@
   "personDetailsNoLibraryMatches": "Nichts aus der Filmografie dieses Schauspielers ist in deiner Bibliothek.",
   "settingsLogsDiagnostics": "Protokolle & Diagnose",
   "settingsLogsDiagnosticsSubtitle": "Gerätedetails und Protokolle dieser Sitzung zur Fehlersuche",
+  "settingsPlaybackDiagnostics": "Wiedergabediagnose anzeigen",
+  "settingsPlaybackDiagnosticsHint": "Zeigt in den Player-Steuerelementen den aktiven Player und den Grund für einen Wechsel an, zur Fehlersuche.",
   "diagnosticsUpload": "Auf den Server hochladen",
   "diagnosticsRefresh": "Aktualisieren",
   "diagnosticsClear": "Protokolle löschen",

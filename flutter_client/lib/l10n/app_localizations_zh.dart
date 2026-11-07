@@ -1966,6 +1966,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLogsDiagnosticsSubtitle => '设备详情和本次会话的日志，用于排查问题';
 
   @override
+  String get settingsPlaybackDiagnostics => '显示播放诊断信息';
+
+  @override
+  String get settingsPlaybackDiagnosticsHint => '在播放器控件中显示当前播放器及其切换原因，用于排查问题。';
+
+  @override
   String get diagnosticsUpload => '上传到服务器';
 
   @override

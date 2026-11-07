@@ -1001,6 +1001,8 @@
   "personDetailsNoLibraryMatches": "Nada de la filmografía de este actor está en tu biblioteca.",
   "settingsLogsDiagnostics": "Registros y diagnóstico",
   "settingsLogsDiagnosticsSubtitle": "Detalles del dispositivo y registros de esta sesión, para solucionar problemas",
+  "settingsPlaybackDiagnostics": "Mostrar diagnóstico de reproducción",
+  "settingsPlaybackDiagnosticsHint": "Muestra en los controles el reproductor activo y por qué cambió, para resolver problemas.",
   "diagnosticsUpload": "Subir al servidor",
   "diagnosticsRefresh": "Actualizar",
   "diagnosticsClear": "Borrar registros",

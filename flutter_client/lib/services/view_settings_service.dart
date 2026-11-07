@@ -265,6 +265,7 @@ class ViewSettingsService extends ChangeNotifier {
   static const deinterlaceKey = 'm3ue_tv_deinterlace';
   static const prebufferLiveKey = 'm3ue_tv_prebuffer_live';
   static const vodPlayerKey = 'm3ue_tv_vod_player';
+  static const showPlaybackDiagnosticsKey = 'm3ue_tv_show_playback_diagnostics';
   static const defaultStartPageKey = 'm3ue_tv_default_start_page';
   static const homeScreenStyleKey = 'm3ue_tv_home_screen_style';
   static const navLayoutKey = 'm3ue_tv_nav_layout';
@@ -561,6 +562,25 @@ class ViewSettingsService extends ChangeNotifier {
     bool enabled,
   ) async {
     await _write(matchRefreshRateKey, enabled);
+    notifyListeners();
+  }
+
+  /// Whether the player's controls show which backend is playing and why it
+  /// fell back. For troubleshooting, so off by default.
+  Future<bool> showPlaybackDiagnostics() async {
+    final raw = await _read(showPlaybackDiagnosticsKey);
+    return raw as bool? ?? false;
+  }
+
+  /// Synchronous access to the in-memory cached diagnostics setting.
+  bool get showPlaybackDiagnosticsSync =>
+      (_memory[showPlaybackDiagnosticsKey] as bool?) ?? false;
+
+  Future<void> setShowPlaybackDiagnostics(
+    // ignore: avoid_positional_boolean_parameters
+    bool enabled,
+  ) async {
+    await _write(showPlaybackDiagnosticsKey, enabled);
     notifyListeners();
   }
 

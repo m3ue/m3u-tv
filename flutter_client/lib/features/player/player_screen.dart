@@ -25,6 +25,7 @@ import 'package:m3u_tv/playback/native_video_surface.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/services/app_log_buffer.dart';
 import 'package:m3u_tv/services/comskip_service.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
@@ -45,10 +46,6 @@ import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:material_ui/material_ui.dart';
-
-const bool _showPlaybackDiagnostics = bool.fromEnvironment(
-  'M3U_TV_SHOW_PLAYBACK_DIAGNOSTICS',
-);
 
 /// App-level playback volume only applies on desktop -- TV/mobile have their
 /// own hardware/system volume controls and should always play at full
@@ -253,6 +250,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _isAudioTrackSelectionKnown = false;
   bool _isSubtitleTrackSelectionKnown = false;
   late bool _hdrEnabled = widget.viewSettingsService?.hdrEnabledSync ?? true;
+  bool get _showPlaybackDiagnostics =>
+      widget.viewSettingsService?.showPlaybackDiagnosticsSync ?? false;
   late double _volume = widget.viewSettingsService?.volumeSync ?? 1.0;
 
   EpgCurrentNext? _epgData;
@@ -1278,7 +1277,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       final backend = widget.orchestrator.activeBackend;
       if (backend == PlaybackBackend.serverTranscode) {
         setState(() {
-          _fallbackReason = error.message;
+          _fallbackReason = AppLogBuffer.instance.redact(error.message);
         });
         return;
       }
@@ -1979,8 +1978,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 // Must match PlaybackControls' own edgePadding or the
                 // back button and this overlay's top edges drift apart.
                 final overlayTop = mediaQuery.padding.top + edgePadding;
-                // Reserve room on the right for the diagnostics panel (debug
-                // builds only) so the two don't draw on top of each other --
+                // Reserve room on the right for the diagnostics panel (when
+                // turned on) so the two don't draw on top of each other --
                 // on a compact/handheld screen the title overlay would
                 // otherwise stretch to within a few pixels of the right
                 // edge, exactly where the diagnostics panel sits.
