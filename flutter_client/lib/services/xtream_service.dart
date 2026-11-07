@@ -88,6 +88,23 @@ String userFacingXtreamError(Object error) {
   return message;
 }
 
+/// Whether a failed DVR library load means the server answered with an error
+/// or couldn't be reached at all.
+DvrRecordingsLoadState dvrRecordingsLoadStateFor(Object error) {
+  if (error is XtreamHttpException) {
+    return error.isServerUnavailable
+        ? DvrRecordingsLoadState.offline
+        : DvrRecordingsLoadState.error;
+  }
+  if (error is XtreamResponseException ||
+      error is XtreamAuthException ||
+      error is FormatException ||
+      error is TypeError) {
+    return DvrRecordingsLoadState.error;
+  }
+  return DvrRecordingsLoadState.offline;
+}
+
 extension XtreamHttpExceptionClassification on XtreamHttpException {
   bool get isServerUnavailable =>
       statusCode == 502 || statusCode == 503 || statusCode == 504;
@@ -679,12 +696,23 @@ class XtreamService {
     ).map((item) => Series.fromXtream(_asMap(item))).toList(growable: false);
   }
 
+  /// Largest page m3u-editor's `get_dvr_recordings` returns (it caps
+  /// `limit` at 200).
+  static const int dvrRecordingsPageSize = 200;
+
+  /// Upper bound on pages per full load (10,000 recordings), so a server that
+  /// keeps returning full pages can't loop forever.
+  static const int _dvrRecordingsMaxPages = 50;
+
   Future<List<DvrRecording>> getDvrRecordings({
     DvrRecordingStatus? status,
     int? limit,
+    int? offset,
   }) async {
-    final params = {'status': ?status?.name, 'limit': ?limit?.toString()};
-    final response = await _request('get_dvr_recordings', params: params);
+    final response = await _request(
+      'get_dvr_recordings',
+      params: _dvrRecordingsParams(status, limit, offset),
+    );
     return _asList(response)
         .map((item) => DvrRecording.fromXtream(_asMap(item)))
         .toList(growable: false);
@@ -694,15 +722,86 @@ class XtreamService {
     UserCredentials credentials, {
     DvrRecordingStatus? status,
     int? limit,
+    int? offset,
   }) async {
     final response = await _requestWithCredentials(
       credentials,
       'get_dvr_recordings',
-      params: {'status': ?status?.name, 'limit': ?limit?.toString()},
+      params: _dvrRecordingsParams(status, limit, offset),
     );
     return _asList(response)
         .map((item) => DvrRecording.fromXtream(_asMap(item)))
         .toList(growable: false);
+  }
+
+  static Map<String, String> _dvrRecordingsParams(
+    DvrRecordingStatus? status,
+    int? limit,
+    int? offset,
+  ) {
+    final wireStatus = status == null ? null : dvrRecordingStatusToWire(status);
+    return {
+      'status': ?wireStatus,
+      'limit': ?limit?.toString(),
+      if (offset != null && offset > 0) 'offset': offset.toString(),
+    };
+  }
+
+  /// Loads the whole DVR library (every status), page by page.
+  Future<DvrRecordingsFetch> getAllDvrRecordings() => collectDvrRecordingPages(
+    (offset) => getDvrRecordings(limit: dvrRecordingsPageSize, offset: offset),
+  );
+
+  Future<DvrRecordingsFetch> getAllDvrRecordingsFor(
+    UserCredentials credentials,
+  ) => collectDvrRecordingPages(
+    (offset) => getDvrRecordingsFor(
+      credentials,
+      limit: dvrRecordingsPageSize,
+      offset: offset,
+    ),
+  );
+
+  /// Fetches pages of [dvrRecordingsPageSize] until a short page comes back.
+  /// A failed first page is returned as [DvrRecordingsFetch.failed]; a later
+  /// failure keeps what loaded and reports [DvrRecordingsLoadState.partial].
+  /// Stops early when a page adds nothing new, which is what a server that
+  /// ignores `offset` looks like.
+  static Future<DvrRecordingsFetch> collectDvrRecordingPages(
+    Future<List<DvrRecording>> Function(int offset) fetchPage,
+  ) async {
+    final recordings = <DvrRecording>[];
+    final seen = <String>{};
+    var offset = 0;
+    for (var page = 0; page < _dvrRecordingsMaxPages; page++) {
+      final List<DvrRecording> batch;
+      try {
+        batch = await fetchPage(offset);
+      } on Object catch (error) {
+        if (page == 0) {
+          return DvrRecordingsFetch.failed(dvrRecordingsLoadStateFor(error));
+        }
+        return DvrRecordingsFetch(
+          List<DvrRecording>.unmodifiable(recordings),
+          state: DvrRecordingsLoadState.partial,
+        );
+      }
+      var added = 0;
+      for (final recording in batch) {
+        if (seen.add(recording.uuid)) {
+          recordings.add(recording);
+          added++;
+        }
+      }
+      if (batch.length < dvrRecordingsPageSize || added == 0) {
+        return DvrRecordingsFetch(List<DvrRecording>.unmodifiable(recordings));
+      }
+      offset += batch.length;
+    }
+    return DvrRecordingsFetch(
+      List<DvrRecording>.unmodifiable(recordings),
+      state: DvrRecordingsLoadState.partial,
+    );
   }
 
   Future<DvrRecording> getDvrRecording(String uuid) async {

@@ -2500,4 +2500,60 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsNavLayoutResetConfirm => 'Rétablir';
+
+  @override
+  String get dvrStatusProcessing => 'Traitement';
+
+  @override
+  String get dvrStatusCompleted => 'Terminé';
+
+  @override
+  String get dvrStatusCancelled => 'Annulé';
+
+  @override
+  String get dvrFilterAll => 'Tous';
+
+  @override
+  String dvrFilterWithCount(String label, int count) {
+    return '$label ($count)';
+  }
+
+  @override
+  String get dvrFilterEmpty => 'Aucun enregistrement ne correspond à ce filtre';
+
+  @override
+  String dvrSortButton(String option) {
+    return 'Trier : $option';
+  }
+
+  @override
+  String get dvrSortDialogTitle => 'Trier les enregistrements';
+
+  @override
+  String get dvrSortNewest => 'Plus récents en premier';
+
+  @override
+  String get dvrSortOldest => 'Plus anciens en premier';
+
+  @override
+  String get dvrSortTitle => 'Titre (A-Z)';
+
+  @override
+  String get dvrLoadError =>
+      'Impossible de charger vos enregistrements. Le serveur a renvoyé une erreur.';
+
+  @override
+  String get dvrLoadOffline =>
+      'Impossible de joindre votre serveur. Vérifiez votre connexion et réessayez.';
+
+  @override
+  String get dvrLoadPartial =>
+      'Certains enregistrements plus anciens n\'ont pas pu être chargés.';
+
+  @override
+  String get dvrLoadRefreshFailed =>
+      'Impossible d\'actualiser vos enregistrements. La dernière liste chargée est affichée.';
+
+  @override
+  String get dvrRetry => 'Réessayer';
 }

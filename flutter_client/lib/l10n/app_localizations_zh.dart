@@ -2383,4 +2383,56 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsNavLayoutResetConfirm => '恢复';
+
+  @override
+  String get dvrStatusProcessing => '处理中';
+
+  @override
+  String get dvrStatusCompleted => '已完成';
+
+  @override
+  String get dvrStatusCancelled => '已取消';
+
+  @override
+  String get dvrFilterAll => '全部';
+
+  @override
+  String dvrFilterWithCount(String label, int count) {
+    return '$label（$count）';
+  }
+
+  @override
+  String get dvrFilterEmpty => '没有符合此筛选条件的录像';
+
+  @override
+  String dvrSortButton(String option) {
+    return '排序：$option';
+  }
+
+  @override
+  String get dvrSortDialogTitle => '录像排序';
+
+  @override
+  String get dvrSortNewest => '最新优先';
+
+  @override
+  String get dvrSortOldest => '最早优先';
+
+  @override
+  String get dvrSortTitle => '标题（A-Z）';
+
+  @override
+  String get dvrLoadError => '无法加载你的录像，服务器返回了错误。';
+
+  @override
+  String get dvrLoadOffline => '无法连接到你的服务器。请检查网络连接后重试。';
+
+  @override
+  String get dvrLoadPartial => '部分较早的录像未能加载。';
+
+  @override
+  String get dvrLoadRefreshFailed => '无法刷新你的录像，当前显示的是上次加载的列表。';
+
+  @override
+  String get dvrRetry => '重试';
 }

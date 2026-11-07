@@ -1128,5 +1128,21 @@
   "settingsNavLayoutColumnNav": "Nav",
   "settingsNavLayoutReset": "Rétablir les valeurs par défaut",
   "settingsNavLayoutResetMessage": "Cela rétablit l'ordre et la visibilité d'origine de ces sections.",
-  "settingsNavLayoutResetConfirm": "Rétablir"
+  "settingsNavLayoutResetConfirm": "Rétablir",
+  "dvrStatusProcessing": "Traitement",
+  "dvrStatusCompleted": "Terminé",
+  "dvrStatusCancelled": "Annulé",
+  "dvrFilterAll": "Tous",
+  "dvrFilterWithCount": "{label} ({count})",
+  "dvrFilterEmpty": "Aucun enregistrement ne correspond à ce filtre",
+  "dvrSortButton": "Trier : {option}",
+  "dvrSortDialogTitle": "Trier les enregistrements",
+  "dvrSortNewest": "Plus récents en premier",
+  "dvrSortOldest": "Plus anciens en premier",
+  "dvrSortTitle": "Titre (A-Z)",
+  "dvrLoadError": "Impossible de charger vos enregistrements. Le serveur a renvoyé une erreur.",
+  "dvrLoadOffline": "Impossible de joindre votre serveur. Vérifiez votre connexion et réessayez.",
+  "dvrLoadPartial": "Certains enregistrements plus anciens n'ont pas pu être chargés.",
+  "dvrLoadRefreshFailed": "Impossible d'actualiser vos enregistrements. La dernière liste chargée est affichée.",
+  "dvrRetry": "Réessayer"
 }

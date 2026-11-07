@@ -772,6 +772,37 @@ void main() {
     );
 
     test(
+      'sends the post_processing wire name and pages the whole library',
+      () async {
+        final transport = FakeXtreamTransport({
+          'auth': xtreamAuth(auth: 1),
+          'get_dvr_recordings': [recordingDvrRecording()],
+        });
+        final service = XtreamService(transport: transport.call);
+        await service.authenticate(
+          const UserCredentials(
+            server: 'https://xtream.example/',
+            username: 'demo',
+            password: 'secret',
+          ),
+        );
+
+        await service.getDvrRecordings(
+          status: DvrRecordingStatus.postProcessing,
+        );
+        expect(transport.requests.last.params['status'], 'post_processing');
+
+        final fetch = await service.getAllDvrRecordings();
+        expect(fetch.state, DvrRecordingsLoadState.loaded);
+        expect(fetch.recordings, hasLength(1));
+        final params = transport.requests.last.params;
+        expect(params['limit'], '200');
+        expect(params.containsKey('offset'), isFalse);
+        expect(params.containsKey('status'), isFalse);
+      },
+    );
+
+    test(
       'updateDvrSeriesRule sends only present keys and omits an unchanged channel',
       () async {
         final transport = FakeXtreamTransport({

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show ChangeNotifier;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
+import 'package:m3u_tv/features/epg/epg_recording_index.dart';
 import 'package:m3u_tv/features/multiview/multiview_controller.dart';
 import 'package:m3u_tv/playback/editor_stream_session_gateway.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
@@ -119,6 +120,18 @@ final progressListProvider = Provider<List<Progress>>((ref) {
 
 final dvrRecordingsProvider = Provider<List<DvrRecording>>((ref) {
   return ref.watch(appStateControllerProvider).appState.dvrRecordings;
+});
+
+/// How the last full DVR library load went (loaded, partial, error...).
+final dvrRecordingsLoadStateProvider = Provider<DvrRecordingsLoadState>((ref) {
+  return ref.watch(appStateControllerProvider).appState.dvrRecordingsLoadState;
+});
+
+/// Recording badges for guide and show rows. Rebuilt only when the
+/// recordings list itself changes, not on every app-state notification, since
+/// the list holds the whole DVR library.
+final epgRecordingIndexProvider = Provider<EpgRecordingIndex>((ref) {
+  return EpgRecordingIndex.fromRecordings(ref.watch(dvrRecordingsProvider));
 });
 
 final dvrStorageInfoProvider = Provider<DvrStorageInfo?>((ref) {

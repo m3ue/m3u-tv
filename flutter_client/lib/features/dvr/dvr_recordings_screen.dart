@@ -7,7 +7,10 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_button.dart';
+import 'package:m3u_tv/shared/app_callout.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
+import 'package:m3u_tv/shared/app_menu_dialog.dart';
+import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/app_top_bar.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
@@ -17,7 +20,10 @@ import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/leading_tile.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
+import 'package:m3u_tv/shared/natural_sort.dart';
 import 'package:m3u_tv/shared/row_action_menu.dart';
+import 'package:m3u_tv/shared/selectable_chip.dart';
+import 'package:m3u_tv/shared/sort_option_row.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Fallback for detecting the expand-in-place row actions (desktop/TV) vs.
@@ -54,6 +60,8 @@ class DvrRecordingsScreen extends StatefulWidget {
     required this.isLoading,
     required this.isConfigured,
     required this.onPlay,
+    this.loadState = DvrRecordingsLoadState.loaded,
+    this.onRetry,
     this.storageInfo,
     this.onCancelRecording,
     this.onCancelAndDeleteRecording,
@@ -71,6 +79,14 @@ class DvrRecordingsScreen extends StatefulWidget {
   final List<DvrRecording> recordings;
   final bool isLoading;
   final bool isConfigured;
+
+  /// How the last full library load went. Separates "nothing recorded" from
+  /// "couldn't load", and flags a list missing its older pages.
+  final DvrRecordingsLoadState loadState;
+
+  /// Reloads the whole library (Try again on an error or partial load).
+  final Future<void> Function()? onRetry;
+
   final DvrStorageInfo? storageInfo;
   final void Function(PlayerArgs args) onPlay;
   final Future<void> Function(String uuid)? onCancelRecording;
@@ -128,6 +144,55 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
     vsync: this,
   );
   final FocusNode _showsSearchFocus = FocusNode(debugLabel: 'dvr/shows-search');
+
+  /// Status filter for the Recordings tab; null shows every status.
+  DvrRecordingStatus? _statusFilter;
+  DvrRecordingSort _sort = DvrRecordingSort.newest;
+
+  // Memoized so a library of thousands isn't re-counted, filtered and sorted
+  // on every rebuild; recomputed only when the list, filter or sort changes.
+  List<DvrRecording>? _countsSource;
+  Map<DvrRecordingStatus, int> _statusCounts = const {};
+  List<DvrRecording>? _viewSource;
+  DvrRecordingStatus? _viewFilter;
+  DvrRecordingSort? _viewSort;
+  List<DvrRecording> _view = const <DvrRecording>[];
+
+  Map<DvrRecordingStatus, int> _countsFor(List<DvrRecording> recordings) {
+    if (!identical(recordings, _countsSource)) {
+      final counts = <DvrRecordingStatus, int>{};
+      for (final recording in recordings) {
+        counts.update(recording.status, (n) => n + 1, ifAbsent: () => 1);
+      }
+      _countsSource = recordings;
+      _statusCounts = counts;
+    }
+    return _statusCounts;
+  }
+
+  List<DvrRecording> _visibleRecordings(List<DvrRecording> recordings) {
+    if (identical(recordings, _viewSource) &&
+        _viewFilter == _statusFilter &&
+        _viewSort == _sort) {
+      return _view;
+    }
+    final filter = _statusFilter;
+    final filtered = filter == null
+        ? recordings.toList()
+        : recordings.where((r) => r.status == filter).toList();
+    sortDvrRecordings(filtered, _sort);
+    _viewSource = recordings;
+    _viewFilter = filter;
+    _viewSort = _sort;
+    _view = filtered;
+    return filtered;
+  }
+
+  Future<void> _pickSort() async {
+    final picked = await showDvrRecordingSortDialog(context, current: _sort);
+    if (picked == null || picked == _sort || !mounted) return;
+    setState(() => _sort = picked);
+  }
 
   @override
   void initState() {
@@ -211,7 +276,6 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
   }
 
   Widget _buildRecordingsTab(BuildContext context, bool inline) {
-    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -219,18 +283,80 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
           _DvrStorageSummary(info: widget.storageInfo!),
           const SizedBox(height: MediaBrowsingMetrics.contentPadding),
         ],
+        Expanded(child: _buildRecordingsBody(context, inline)),
+      ],
+    );
+  }
+
+  Widget _buildRecordingsBody(BuildContext context, bool inline) {
+    final l10n = AppLocalizations.of(context);
+    final recordings = widget.recordings;
+    final loadState = widget.loadState;
+    final loadFailed =
+        loadState == DvrRecordingsLoadState.error ||
+        loadState == DvrRecordingsLoadState.offline;
+
+    if (recordings.isEmpty) {
+      if (widget.isLoading || loadState == DvrRecordingsLoadState.loading) {
+        return const Center(child: AppLoadingIndicator());
+      }
+      if (loadFailed) {
+        return _DvrLoadFailure(
+          offline: loadState == DvrRecordingsLoadState.offline,
+          onRetry: widget.onRetry,
+          onSidebarActivate: widget.onSidebarActivate,
+        );
+      }
+      return Center(
+        child: Text(
+          l10n.dvrNoRecordings,
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
+      );
+    }
+
+    final counts = _countsFor(recordings);
+    final visible = _visibleRecordings(recordings);
+    final notice = switch (loadState) {
+      DvrRecordingsLoadState.partial => l10n.dvrLoadPartial,
+      DvrRecordingsLoadState.error ||
+      DvrRecordingsLoadState.offline => l10n.dvrLoadRefreshFailed,
+      _ => null,
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (notice != null) ...[
+          _DvrLoadNotice(
+            message: notice,
+            onRetry: widget.onRetry,
+            onSidebarActivate: widget.onSidebarActivate,
+          ),
+          const SizedBox(height: MediaBrowsingMetrics.contentPadding),
+        ],
+        _RecordingFilterBar(
+          total: recordings.length,
+          counts: counts,
+          selected: _statusFilter,
+          sort: _sort,
+          onSelect: (status) => setState(() => _statusFilter = status),
+          onSort: _pickSort,
+          onSidebarActivate: widget.onSidebarActivate,
+        ),
+        const SizedBox(height: MediaBrowsingMetrics.contentPadding),
         Expanded(
-          child: widget.isLoading
-              ? const Center(child: AppLoadingIndicator())
-              : widget.recordings.isEmpty
+          child: visible.isEmpty
               ? Center(
                   child: Text(
-                    l10n.dvrNoRecordings,
+                    l10n.dvrFilterEmpty,
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                 )
               : _RecordingList(
-                  recordings: widget.recordings,
+                  // A new filter starts a fresh selection, so a selection
+                  // can't include recordings the filter hides.
+                  key: ValueKey<DvrRecordingStatus?>(_statusFilter),
+                  recordings: visible,
                   onPlay: widget.onPlay,
                   onCancelRecording: widget.onCancelRecording,
                   onCancelAndDeleteRecording: widget.onCancelAndDeleteRecording,
@@ -274,6 +400,294 @@ class _DvrRecordingsScreenState extends State<DvrRecordingsScreen>
 }
 
 Future<List<EpgShow>> _emptyShowsSearch(String query) async => <EpgShow>[];
+
+/// Recordings tab sort orders.
+enum DvrRecordingSort {
+  /// Latest scheduled start first (the server's own order).
+  newest,
+
+  /// Earliest scheduled start first.
+  oldest,
+
+  /// Title in natural A-Z order.
+  title,
+}
+
+/// Sorts [recordings] in place. Recordings with no scheduled start go last
+/// for the date orders, and ties keep their incoming order.
+@visibleForTesting
+void sortDvrRecordings(List<DvrRecording> recordings, DvrRecordingSort sort) {
+  if (recordings.length < 2) return;
+  final indexed =
+      [
+        for (var i = 0; i < recordings.length; i++)
+          (
+            index: i,
+            item: recordings[i],
+            titleKey: sort == DvrRecordingSort.title
+                ? NaturalSortKey.of(recordings[i].title)
+                : null,
+          ),
+      ]..sort((a, b) {
+        final int cmp;
+        if (sort == DvrRecordingSort.title) {
+          cmp = a.titleKey!.compareTo(b.titleKey!);
+        } else {
+          final aStart = a.item.scheduledStart;
+          final bStart = b.item.scheduledStart;
+          if (aStart == null || bStart == null) {
+            if (aStart != bStart) return aStart == null ? 1 : -1;
+            cmp = 0;
+          } else {
+            cmp = sort == DvrRecordingSort.newest
+                ? bStart.compareTo(aStart)
+                : aStart.compareTo(bStart);
+          }
+        }
+        return cmp != 0 ? cmp : a.index - b.index;
+      });
+  for (var i = 0; i < indexed.length; i++) {
+    recordings[i] = indexed[i].item;
+  }
+}
+
+String dvrRecordingSortLabel(AppLocalizations l10n, DvrRecordingSort sort) {
+  return switch (sort) {
+    DvrRecordingSort.newest => l10n.dvrSortNewest,
+    DvrRecordingSort.oldest => l10n.dvrSortOldest,
+    DvrRecordingSort.title => l10n.dvrSortTitle,
+  };
+}
+
+/// The Recordings tab's sort picker, in the same modal style as the media
+/// grids' Sort By. Returns null when dismissed.
+Future<DvrRecordingSort?> showDvrRecordingSortDialog(
+  BuildContext context, {
+  required DvrRecordingSort current,
+}) {
+  final l10n = AppLocalizations.of(context);
+  final options = <(IconData, DvrRecordingSort)>[
+    (Icons.south, DvrRecordingSort.newest),
+    (Icons.north, DvrRecordingSort.oldest),
+    (Icons.sort_by_alpha, DvrRecordingSort.title),
+  ];
+  return showAppDialog<DvrRecordingSort>(
+    context: context,
+    builder: (dialogContext) {
+      final scale = FontSizeScope.scaleOf(dialogContext);
+      return AppMenuDialog(
+        title: Row(
+          children: [
+            Icon(Icons.sort, size: 18 * scale),
+            SizedBox(width: 8 * scale),
+            Expanded(child: Text(l10n.dvrSortDialogTitle)),
+          ],
+        ),
+        children: [
+          DpadRegion(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final (icon, option) in options)
+                  SortOptionRow(
+                    icon: icon,
+                    label: dvrRecordingSortLabel(l10n, option),
+                    isActive: current == option,
+                    autofocus: current == option,
+                    onTap: () => Navigator.of(dialogContext).pop(option),
+                  ),
+                SortOptionRow(
+                  icon: Icons.close,
+                  label: l10n.close,
+                  onTap: () => Navigator.of(dialogContext).pop(),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+/// Statuses offered as filters, in the order the chips appear.
+const List<DvrRecordingStatus> _filterStatuses = <DvrRecordingStatus>[
+  DvrRecordingStatus.recording,
+  DvrRecordingStatus.scheduled,
+  DvrRecordingStatus.postProcessing,
+  DvrRecordingStatus.completed,
+  DvrRecordingStatus.failed,
+  DvrRecordingStatus.cancelled,
+];
+
+String _statusFilterLabel(AppLocalizations l10n, DvrRecordingStatus status) {
+  return switch (status) {
+    DvrRecordingStatus.recording => l10n.dvrStatusRecording,
+    DvrRecordingStatus.scheduled => l10n.dvrStatusScheduled,
+    DvrRecordingStatus.postProcessing => l10n.dvrStatusProcessing,
+    DvrRecordingStatus.completed => l10n.dvrStatusCompleted,
+    DvrRecordingStatus.failed => l10n.dvrStatusFailed,
+    DvrRecordingStatus.cancelled => l10n.dvrStatusCancelled,
+    DvrRecordingStatus.deleted ||
+    DvrRecordingStatus.unknown => l10n.dvrFilterAll,
+  };
+}
+
+/// Status chips (All plus each status the library holds, with counts) and
+/// the sort button above the recordings list.
+class _RecordingFilterBar extends StatelessWidget {
+  const _RecordingFilterBar({
+    required this.total,
+    required this.counts,
+    required this.selected,
+    required this.sort,
+    required this.onSelect,
+    required this.onSort,
+    this.onSidebarActivate,
+  });
+
+  final int total;
+  final Map<DvrRecordingStatus, int> counts;
+  final DvrRecordingStatus? selected;
+  final DvrRecordingSort sort;
+  final ValueChanged<DvrRecordingStatus?> onSelect;
+  final VoidCallback onSort;
+  final VoidCallback? onSidebarActivate;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final scale = FontSizeScope.scaleOf(context);
+    return DpadRegion(
+      memoryKey: 'dvr/recordings-filters',
+      horizontalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.left) onSidebarActivate?.call();
+      },
+      child: Wrap(
+        spacing: 8 * scale,
+        runSpacing: 8 * scale,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          SelectableChip(
+            label: l10n.dvrFilterWithCount(l10n.dvrFilterAll, total),
+            selected: selected == null,
+            onTap: () => onSelect(null),
+          ),
+          for (final status in _filterStatuses)
+            if ((counts[status] ?? 0) > 0 || selected == status)
+              SelectableChip(
+                label: l10n.dvrFilterWithCount(
+                  _statusFilterLabel(l10n, status),
+                  counts[status] ?? 0,
+                ),
+                selected: selected == status,
+                onTap: () => onSelect(status),
+              ),
+          SelectableChip(
+            label: l10n.dvrSortButton(dvrRecordingSortLabel(l10n, sort)),
+            selected: false,
+            onTap: onSort,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Full-tab message when the library couldn't load and nothing is cached.
+class _DvrLoadFailure extends StatelessWidget {
+  const _DvrLoadFailure({
+    required this.offline,
+    this.onRetry,
+    this.onSidebarActivate,
+  });
+
+  final bool offline;
+  final Future<void> Function()? onRetry;
+  final VoidCallback? onSidebarActivate;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final retry = onRetry;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppCallout(
+              message: offline ? l10n.dvrLoadOffline : l10n.dvrLoadError,
+              variant: AppCalloutVariant.error,
+            ),
+            if (retry != null) ...[
+              const SizedBox(height: 16),
+              DpadRegion(
+                horizontalEdge: DpadEdgeBehavior.stop,
+                onEdge: (direction) {
+                  if (direction == TraversalDirection.left) {
+                    onSidebarActivate?.call();
+                  }
+                },
+                child: AppButton(
+                  icon: Icons.refresh,
+                  label: l10n.dvrRetry,
+                  autofocus: true,
+                  onPressed: retry,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Banner above a list that is incomplete (older pages missing) or stale (a
+/// refresh failed), with Try again.
+class _DvrLoadNotice extends StatelessWidget {
+  const _DvrLoadNotice({
+    required this.message,
+    this.onRetry,
+    this.onSidebarActivate,
+  });
+
+  final String message;
+  final Future<void> Function()? onRetry;
+  final VoidCallback? onSidebarActivate;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final retry = onRetry;
+    return DpadRegion(
+      horizontalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.left) onSidebarActivate?.call();
+      },
+      child: Row(
+        children: [
+          Expanded(
+            child: AppCallout(
+              message: message,
+              variant: AppCalloutVariant.warning,
+            ),
+          ),
+          if (retry != null) ...[
+            const SizedBox(width: 12),
+            AppButton(
+              icon: Icons.refresh,
+              label: l10n.dvrRetry,
+              onPressed: retry,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
 
 class _SeriesRulesList extends StatefulWidget {
   const _SeriesRulesList({
@@ -739,6 +1153,7 @@ class _DvrStorageSummary extends StatelessWidget {
 
 class _RecordingList extends ConsumerStatefulWidget {
   const _RecordingList({
+    super.key,
     required this.recordings,
     required this.onPlay,
     required this.inline,

@@ -6,6 +6,8 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/shared/app_loading_indicator.dart';
+import 'package:m3u_tv/shared/row_action_menu.dart';
 import 'package:material_ui/material_ui.dart';
 
 void main() {
@@ -183,7 +185,9 @@ void main() {
         // No status word was rendered for completed/cancelled/postProcessing
         // before; failed DOES show a status word so the meta line leads with
         // "Failed" (in the error color, asserted via `DefaultTextStyle` below).
-        expect(find.textContaining('Failed'), findsOneWidget);
+        // The Failed filter chip ("Failed (1)") is the other match.
+        expect(find.text('Failed (1)'), findsOneWidget);
+        expect(find.textContaining('Failed'), findsNWidgets(2));
         // The error status surfaces as an Icons.error glyph in the leading
         // tile (the prior layout used the same icon, so this is a smoke test).
         expect(find.byIcon(Icons.error), findsOneWidget);
@@ -342,13 +346,10 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Enter select mode from the first row's overflow, then tap the
-        // other deletable rows to extend the selection (the in-progress
-        // row is non-deletable so it should be filtered out by the action
-        // bar's Play/Delete availability).
-        await tester.tap(find.byIcon(Icons.more_vert).first);
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Select'));
+        // Enter select mode from the completed row (rows are sorted newest
+        // first, so it isn't the first row), then tap another deletable row
+        // to extend the selection.
+        await tester.longPress(find.text('Evening Movie'));
         await tester.pumpAndSettle();
 
         // Toggle the failed row's selection via tap. In select mode, tapping
@@ -393,6 +394,213 @@ void main() {
       },
     );
 
+    group('filters, sort and load states (#133)', () {
+      List<String> visibleTitles(WidgetTester tester) {
+        const titles = [
+          'Upcoming Show',
+          'Live News',
+          'Evening Movie',
+          'Skipped Show',
+          'Broken Show',
+        ];
+        return [
+          for (final title in titles)
+            if (find.text(title).evaluate().isNotEmpty) title,
+        ]..sort(
+          (a, b) => tester
+              .getTopLeft(find.text(a))
+              .dy
+              .compareTo(tester.getTopLeft(find.text(b)).dy),
+        );
+      }
+
+      final library = [
+        _failedRecording(),
+        _completedRecording(),
+        _scheduledRecording(),
+        _cancelledRecording(),
+        _recordingNow(),
+      ];
+
+      testWidgets('lists newest first with a chip per status present', (
+        tester,
+      ) async {
+        await tester.pumpWidget(_TestApp(recordings: library));
+        await tester.pumpAndSettle();
+
+        expect(visibleTitles(tester), [
+          'Upcoming Show',
+          'Live News',
+          'Evening Movie',
+          'Skipped Show',
+          'Broken Show',
+        ]);
+        expect(find.text('All (5)'), findsOneWidget);
+        expect(find.text('Scheduled (1)'), findsOneWidget);
+        expect(find.text('Completed (1)'), findsOneWidget);
+        expect(find.text('Cancelled (1)'), findsOneWidget);
+        // No recording is post-processing, so that chip is hidden.
+        expect(find.textContaining('Processing'), findsNothing);
+      });
+
+      testWidgets('a status chip filters the list and All restores it', (
+        tester,
+      ) async {
+        await tester.pumpWidget(_TestApp(recordings: library));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Completed (1)'));
+        await tester.pumpAndSettle();
+        expect(visibleTitles(tester), ['Evening Movie']);
+
+        await tester.tap(find.text('All (5)'));
+        await tester.pumpAndSettle();
+        expect(visibleTitles(tester), hasLength(5));
+      });
+
+      testWidgets('the sort dialog reorders by title and oldest first', (
+        tester,
+      ) async {
+        await tester.pumpWidget(_TestApp(recordings: library));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Sort: Newest first'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Title (A-Z)'));
+        await tester.pumpAndSettle();
+        expect(visibleTitles(tester), [
+          'Broken Show',
+          'Evening Movie',
+          'Live News',
+          'Skipped Show',
+          'Upcoming Show',
+        ]);
+
+        await tester.tap(find.text('Sort: Title (A-Z)'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Oldest first'));
+        await tester.pumpAndSettle();
+        expect(visibleTitles(tester).first, 'Broken Show');
+        expect(visibleTitles(tester).last, 'Upcoming Show');
+      });
+
+      testWidgets('shows a spinner while the first load is in flight', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          const _TestApp(
+            recordings: <DvrRecording>[],
+            loadState: DvrRecordingsLoadState.loading,
+          ),
+        );
+        await tester.pump();
+
+        expect(find.byType(AppLoadingIndicator), findsOneWidget);
+        expect(find.text('No DVR recordings available'), findsNothing);
+      });
+
+      testWidgets('an empty library that loaded shows the empty message', (
+        tester,
+      ) async {
+        await tester.pumpWidget(const _TestApp(recordings: <DvrRecording>[]));
+        await tester.pumpAndSettle();
+
+        expect(find.text('No DVR recordings available'), findsOneWidget);
+        expect(find.text('Try again'), findsNothing);
+      });
+
+      testWidgets('a failed load shows the error with Try again', (
+        tester,
+      ) async {
+        var retries = 0;
+        await tester.pumpWidget(
+          _TestApp(
+            recordings: const <DvrRecording>[],
+            loadState: DvrRecordingsLoadState.error,
+            onRetry: () async => retries++,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining('server returned an error'), findsOneWidget);
+        expect(find.text('No DVR recordings available'), findsNothing);
+        await tester.tap(find.text('Try again'));
+        await tester.pumpAndSettle();
+        expect(retries, 1);
+      });
+
+      testWidgets('an unreachable server gets its own message', (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            recordings: const <DvrRecording>[],
+            loadState: DvrRecordingsLoadState.offline,
+            onRetry: () async {},
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining("Can't reach your server"), findsOneWidget);
+        expect(find.textContaining('server returned an error'), findsNothing);
+      });
+
+      testWidgets('a partial load keeps the list and warns about older ones', (
+        tester,
+      ) async {
+        var retries = 0;
+        await tester.pumpWidget(
+          _TestApp(
+            recordings: library,
+            loadState: DvrRecordingsLoadState.partial,
+            onRetry: () async => retries++,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(visibleTitles(tester).first, 'Upcoming Show');
+        expect(
+          find.text("Some older recordings couldn't be loaded."),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Try again'));
+        await tester.pumpAndSettle();
+        expect(retries, 1);
+      });
+
+      testWidgets('a failed refresh keeps the last list with a notice', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          _TestApp(
+            recordings: library,
+            loadState: DvrRecordingsLoadState.offline,
+            onRetry: () async {},
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(visibleTitles(tester).first, 'Upcoming Show');
+        expect(
+          find.textContaining('Showing the last list loaded'),
+          findsOneWidget,
+        );
+      });
+    });
+
+    test('sortDvrRecordings puts recordings without a start last', () {
+      const undated = DvrRecording(
+        uuid: 'rec-x',
+        title: 'Undated',
+        status: DvrRecordingStatus.completed,
+      );
+      final list = [undated, _failedRecording(), _completedRecording()];
+
+      sortDvrRecordings(list, DvrRecordingSort.newest);
+      expect(list.map((r) => r.uuid), ['rec-1', 'rec-4', 'rec-x']);
+
+      sortDvrRecordings(list, DvrRecordingSort.oldest);
+      expect(list.map((r) => r.uuid), ['rec-4', 'rec-1', 'rec-x']);
+    });
+
     group('inline row actions (desktop/TV)', () {
       testWidgets(
         'completed recording starts collapsed to just the more button',
@@ -431,7 +639,15 @@ void main() {
           // floating MenuAnchor overlay. The trigger stays the same "more"
           // icon (just rotated) rather than swapping to a close icon.
           expect(find.byIcon(Icons.play_arrow), findsOneWidget);
-          expect(find.byIcon(Icons.check), findsOneWidget);
+          // Scoped to the row: the selected "All" filter chip has a check
+          // mark too.
+          expect(
+            find.descendant(
+              of: find.byType(RowActionMenu),
+              matching: find.byIcon(Icons.check),
+            ),
+            findsOneWidget,
+          );
           expect(find.byIcon(Icons.delete), findsOneWidget);
           expect(find.byType(MenuItemButton), findsNothing);
           expect(find.byIcon(Icons.more_vert), findsOneWidget);
@@ -1084,9 +1300,13 @@ class _TestApp extends StatelessWidget {
     this.onDeleteSeriesRule,
     this.onUpdateSeriesRule,
     this.navigationMode,
+    this.loadState = DvrRecordingsLoadState.loaded,
+    this.onRetry,
   });
 
   final List<DvrRecording> recordings;
+  final DvrRecordingsLoadState loadState;
+  final Future<void> Function()? onRetry;
   final void Function(PlayerArgs args)? onPlay;
   final Future<void> Function(String uuid)? onCancelRecording;
   final Future<void> Function(String uuid)? onCancelAndDeleteRecording;
@@ -1133,6 +1353,8 @@ class _TestApp extends StatelessWidget {
           recordings: recordings,
           isLoading: false,
           isConfigured: true,
+          loadState: loadState,
+          onRetry: onRetry,
           onPlay: onPlay ?? (_) {},
           onCancelRecording: onCancelRecording,
           onCancelAndDeleteRecording: onCancelAndDeleteRecording,

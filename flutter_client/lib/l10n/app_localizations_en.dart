@@ -2470,4 +2470,59 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsNavLayoutResetConfirm => 'Reset';
+
+  @override
+  String get dvrStatusProcessing => 'Processing';
+
+  @override
+  String get dvrStatusCompleted => 'Completed';
+
+  @override
+  String get dvrStatusCancelled => 'Cancelled';
+
+  @override
+  String get dvrFilterAll => 'All';
+
+  @override
+  String dvrFilterWithCount(String label, int count) {
+    return '$label ($count)';
+  }
+
+  @override
+  String get dvrFilterEmpty => 'No recordings match this filter';
+
+  @override
+  String dvrSortButton(String option) {
+    return 'Sort: $option';
+  }
+
+  @override
+  String get dvrSortDialogTitle => 'Sort recordings';
+
+  @override
+  String get dvrSortNewest => 'Newest first';
+
+  @override
+  String get dvrSortOldest => 'Oldest first';
+
+  @override
+  String get dvrSortTitle => 'Title (A-Z)';
+
+  @override
+  String get dvrLoadError =>
+      'Couldn\'t load your recordings. The server returned an error.';
+
+  @override
+  String get dvrLoadOffline =>
+      'Can\'t reach your server. Check your connection and try again.';
+
+  @override
+  String get dvrLoadPartial => 'Some older recordings couldn\'t be loaded.';
+
+  @override
+  String get dvrLoadRefreshFailed =>
+      'Couldn\'t refresh your recordings. Showing the last list loaded.';
+
+  @override
+  String get dvrRetry => 'Try again';
 }

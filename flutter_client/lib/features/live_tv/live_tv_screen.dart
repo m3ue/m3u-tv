@@ -1076,9 +1076,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
                           filtered,
                           epgService,
                           recordingChannelIds,
-                          EpgRecordingIndex.fromRecordings(
-                            ref.watch(dvrRecordingsProvider),
-                          ),
+                          ref.watch(epgRecordingIndexProvider),
                         ),
                         _ViewMode.logoGrid => _buildGridView(
                           filtered,

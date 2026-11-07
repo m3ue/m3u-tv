@@ -1128,5 +1128,21 @@
   "settingsNavLayoutColumnNav": "导航",
   "settingsNavLayoutReset": "恢复默认",
   "settingsNavLayoutResetMessage": "这将恢复这些栏目的原始顺序和显示状态。",
-  "settingsNavLayoutResetConfirm": "恢复"
+  "settingsNavLayoutResetConfirm": "恢复",
+  "dvrStatusProcessing": "处理中",
+  "dvrStatusCompleted": "已完成",
+  "dvrStatusCancelled": "已取消",
+  "dvrFilterAll": "全部",
+  "dvrFilterWithCount": "{label}（{count}）",
+  "dvrFilterEmpty": "没有符合此筛选条件的录像",
+  "dvrSortButton": "排序：{option}",
+  "dvrSortDialogTitle": "录像排序",
+  "dvrSortNewest": "最新优先",
+  "dvrSortOldest": "最早优先",
+  "dvrSortTitle": "标题（A-Z）",
+  "dvrLoadError": "无法加载你的录像，服务器返回了错误。",
+  "dvrLoadOffline": "无法连接到你的服务器。请检查网络连接后重试。",
+  "dvrLoadPartial": "部分较早的录像未能加载。",
+  "dvrLoadRefreshFailed": "无法刷新你的录像，当前显示的是上次加载的列表。",
+  "dvrRetry": "重试"
 }

@@ -3187,6 +3187,7 @@ class _NavigationXtreamService extends XtreamService {
   Future<List<DvrRecording>> getDvrRecordings({
     DvrRecordingStatus? status,
     int? limit,
+    int? offset,
   }) async => dvrRecordings;
 
   @override
@@ -3194,6 +3195,7 @@ class _NavigationXtreamService extends XtreamService {
     UserCredentials credentials, {
     DvrRecordingStatus? status,
     int? limit,
+    int? offset,
   }) async => dvrRecordings;
 
   @override

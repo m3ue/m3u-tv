@@ -601,6 +601,7 @@ class AppStateController extends ChangeNotifier {
   /// here exclusively; screens page or look up rows rather than hold lists.
   CatalogRepository get catalogRepository => _catalogRepository;
   List<DvrRecording> get dvrRecordings => _dvr.recordings;
+  DvrRecordingsLoadState get dvrRecordingsLoadState => _dvr.recordingsLoadState;
   DvrStorageInfo? get dvrStorageInfo => _dvr.storageInfo;
   Set<int> get recordingChannelIds => _dvr.recordingChannelIds;
   List<DvrSeriesRule> get dvrSeriesRules => _dvr.seriesRules;
@@ -2146,10 +2147,10 @@ class AppStateController extends ChangeNotifier {
       final vodItemsFuture = xtreamService.getVodStreams();
       final seriesFuture = xtreamService.getSeries();
       final recordingsFuture = hasDvrFeature
-          ? xtreamService.getDvrRecordings().catchError(
-              (Object _) => const <DvrRecording>[],
-            )
-          : Future<List<DvrRecording>>.value(const <DvrRecording>[]);
+          ? xtreamService.getAllDvrRecordings()
+          : Future<DvrRecordingsFetch>.value(
+              const DvrRecordingsFetch(<DvrRecording>[]),
+            );
       final seriesRulesFuture = hasDvrFeature
           ? xtreamService.listDvrSeriesRules().catchError(
               (Object _) => const <DvrSeriesRule>[],
@@ -2414,7 +2415,7 @@ class AppStateController extends ChangeNotifier {
   /// already resolves to an empty list on failure (catchError at the call
   /// site), so [Future.wait] here never throws.
   Future<void> _applyDvrAndRequestExtras(
-    Future<List<DvrRecording>> recordingsFuture,
+    Future<DvrRecordingsFetch> recordingsFuture,
     Future<List<DvrSeriesRule>> seriesRulesFuture,
     Future<List<MediaRequestSummary>> mediaRequestsFuture, {
     required int sourceGeneration,
@@ -2428,7 +2429,7 @@ class AppStateController extends ChangeNotifier {
       return;
     }
     _dvr.applyFetched(
-      results[0] as List<DvrRecording>,
+      results[0] as DvrRecordingsFetch,
       results[1] as List<DvrSeriesRule>,
     );
     _requests.applyFetched(results[2] as List<MediaRequestSummary>);

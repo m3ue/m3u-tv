@@ -1128,5 +1128,21 @@
   "settingsNavLayoutColumnNav": "Nav",
   "settingsNavLayoutReset": "Restablecer valores",
   "settingsNavLayoutResetMessage": "Esto restaura el orden y la visibilidad originales de estas secciones.",
-  "settingsNavLayoutResetConfirm": "Restablecer"
+  "settingsNavLayoutResetConfirm": "Restablecer",
+  "dvrStatusProcessing": "Procesando",
+  "dvrStatusCompleted": "Completada",
+  "dvrStatusCancelled": "Cancelada",
+  "dvrFilterAll": "Todas",
+  "dvrFilterWithCount": "{label} ({count})",
+  "dvrFilterEmpty": "Ninguna grabación coincide con este filtro",
+  "dvrSortButton": "Ordenar: {option}",
+  "dvrSortDialogTitle": "Ordenar grabaciones",
+  "dvrSortNewest": "Más recientes primero",
+  "dvrSortOldest": "Más antiguas primero",
+  "dvrSortTitle": "Título (A-Z)",
+  "dvrLoadError": "No se pudieron cargar tus grabaciones. El servidor devolvió un error.",
+  "dvrLoadOffline": "No se puede conectar con tu servidor. Comprueba tu conexión e inténtalo de nuevo.",
+  "dvrLoadPartial": "No se pudieron cargar algunas grabaciones antiguas.",
+  "dvrLoadRefreshFailed": "No se pudieron actualizar tus grabaciones. Se muestra la última lista cargada.",
+  "dvrRetry": "Reintentar"
 }

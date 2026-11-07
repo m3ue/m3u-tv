@@ -2489,4 +2489,60 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsNavLayoutResetConfirm => 'Zurücksetzen';
+
+  @override
+  String get dvrStatusProcessing => 'Wird verarbeitet';
+
+  @override
+  String get dvrStatusCompleted => 'Abgeschlossen';
+
+  @override
+  String get dvrStatusCancelled => 'Abgebrochen';
+
+  @override
+  String get dvrFilterAll => 'Alle';
+
+  @override
+  String dvrFilterWithCount(String label, int count) {
+    return '$label ($count)';
+  }
+
+  @override
+  String get dvrFilterEmpty => 'Keine Aufnahmen für diesen Filter';
+
+  @override
+  String dvrSortButton(String option) {
+    return 'Sortieren: $option';
+  }
+
+  @override
+  String get dvrSortDialogTitle => 'Aufnahmen sortieren';
+
+  @override
+  String get dvrSortNewest => 'Neueste zuerst';
+
+  @override
+  String get dvrSortOldest => 'Älteste zuerst';
+
+  @override
+  String get dvrSortTitle => 'Titel (A-Z)';
+
+  @override
+  String get dvrLoadError =>
+      'Deine Aufnahmen konnten nicht geladen werden. Der Server hat einen Fehler gemeldet.';
+
+  @override
+  String get dvrLoadOffline =>
+      'Dein Server ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut.';
+
+  @override
+  String get dvrLoadPartial =>
+      'Einige ältere Aufnahmen konnten nicht geladen werden.';
+
+  @override
+  String get dvrLoadRefreshFailed =>
+      'Deine Aufnahmen konnten nicht aktualisiert werden. Angezeigt wird die zuletzt geladene Liste.';
+
+  @override
+  String get dvrRetry => 'Erneut versuchen';
 }

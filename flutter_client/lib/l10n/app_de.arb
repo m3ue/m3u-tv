@@ -1128,5 +1128,21 @@
   "settingsNavLayoutColumnNav": "Nav",
   "settingsNavLayoutReset": "Auf Standard zurücksetzen",
   "settingsNavLayoutResetMessage": "Dadurch werden die ursprüngliche Reihenfolge und Sichtbarkeit dieser Bereiche wiederhergestellt.",
-  "settingsNavLayoutResetConfirm": "Zurücksetzen"
+  "settingsNavLayoutResetConfirm": "Zurücksetzen",
+  "dvrStatusProcessing": "Wird verarbeitet",
+  "dvrStatusCompleted": "Abgeschlossen",
+  "dvrStatusCancelled": "Abgebrochen",
+  "dvrFilterAll": "Alle",
+  "dvrFilterWithCount": "{label} ({count})",
+  "dvrFilterEmpty": "Keine Aufnahmen für diesen Filter",
+  "dvrSortButton": "Sortieren: {option}",
+  "dvrSortDialogTitle": "Aufnahmen sortieren",
+  "dvrSortNewest": "Neueste zuerst",
+  "dvrSortOldest": "Älteste zuerst",
+  "dvrSortTitle": "Titel (A-Z)",
+  "dvrLoadError": "Deine Aufnahmen konnten nicht geladen werden. Der Server hat einen Fehler gemeldet.",
+  "dvrLoadOffline": "Dein Server ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut.",
+  "dvrLoadPartial": "Einige ältere Aufnahmen konnten nicht geladen werden.",
+  "dvrLoadRefreshFailed": "Deine Aufnahmen konnten nicht aktualisiert werden. Angezeigt wird die zuletzt geladene Liste.",
+  "dvrRetry": "Erneut versuchen"
 }

@@ -4339,6 +4339,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reset'**
   String get settingsNavLayoutResetConfirm;
+
+  /// No description provided for @dvrStatusProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing'**
+  String get dvrStatusProcessing;
+
+  /// No description provided for @dvrStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get dvrStatusCompleted;
+
+  /// No description provided for @dvrStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get dvrStatusCancelled;
+
+  /// No description provided for @dvrFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get dvrFilterAll;
+
+  /// No description provided for @dvrFilterWithCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} ({count})'**
+  String dvrFilterWithCount(String label, int count);
+
+  /// No description provided for @dvrFilterEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No recordings match this filter'**
+  String get dvrFilterEmpty;
+
+  /// No description provided for @dvrSortButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort: {option}'**
+  String dvrSortButton(String option);
+
+  /// No description provided for @dvrSortDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort recordings'**
+  String get dvrSortDialogTitle;
+
+  /// No description provided for @dvrSortNewest.
+  ///
+  /// In en, this message translates to:
+  /// **'Newest first'**
+  String get dvrSortNewest;
+
+  /// No description provided for @dvrSortOldest.
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest first'**
+  String get dvrSortOldest;
+
+  /// No description provided for @dvrSortTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title (A-Z)'**
+  String get dvrSortTitle;
+
+  /// No description provided for @dvrLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your recordings. The server returned an error.'**
+  String get dvrLoadError;
+
+  /// No description provided for @dvrLoadOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t reach your server. Check your connection and try again.'**
+  String get dvrLoadOffline;
+
+  /// No description provided for @dvrLoadPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Some older recordings couldn\'t be loaded.'**
+  String get dvrLoadPartial;
+
+  /// No description provided for @dvrLoadRefreshFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t refresh your recordings. Showing the last list loaded.'**
+  String get dvrLoadRefreshFailed;
+
+  /// No description provided for @dvrRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get dvrRetry;
 }
 
 class _AppLocalizationsDelegate

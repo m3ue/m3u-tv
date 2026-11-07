@@ -1700,6 +1700,8 @@ class AppShellState extends ConsumerState<AppShell>
           return DvrRecordingsScreen(
             recordings: _appState.dvrRecordings,
             isLoading: _appState.isLoadingContent,
+            loadState: _appState.dvrRecordingsLoadState,
+            onRetry: _appState.refreshDvrRecordings,
             isConfigured: _appState.isConfigured,
             useInlineRowActions: shouldUseSidebar(widget.deviceType),
             storageInfo: ref.watch(dvrStorageInfoProvider),

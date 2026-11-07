@@ -785,6 +785,65 @@ DvrRecordingStatus dvrRecordingStatusFromWire(String value) {
   };
 }
 
+/// The `status` filter value m3u-editor's `get_dvr_recordings` accepts, or
+/// null for the local-only states the server has no filter for. The enum
+/// names don't match the wire (`postProcessing` vs `post_processing`), and an
+/// unrecognised filter makes the server return every status.
+String? dvrRecordingStatusToWire(DvrRecordingStatus status) {
+  return switch (status) {
+    DvrRecordingStatus.scheduled => 'scheduled',
+    DvrRecordingStatus.recording => 'recording',
+    DvrRecordingStatus.postProcessing => 'post_processing',
+    DvrRecordingStatus.completed => 'completed',
+    DvrRecordingStatus.failed => 'failed',
+    DvrRecordingStatus.cancelled => 'cancelled',
+    DvrRecordingStatus.deleted || DvrRecordingStatus.unknown => null,
+  };
+}
+
+/// How the last full load of the DVR library went, so the Recordings screen
+/// can tell "nothing recorded" apart from "couldn't load".
+enum DvrRecordingsLoadState {
+  /// No load has finished yet for this playlist.
+  notLoaded,
+
+  /// A load is in flight. The list may still hold the previous result.
+  loading,
+
+  /// Every page loaded.
+  loaded,
+
+  /// The first pages loaded but a later one failed, so older recordings are
+  /// missing from the list.
+  partial,
+
+  /// The server answered with an error.
+  error,
+
+  /// The server couldn't be reached (network error or timeout).
+  offline,
+}
+
+/// Result of loading the whole DVR library page by page
+/// (`XtreamService.getAllDvrRecordings`).
+class DvrRecordingsFetch {
+  const DvrRecordingsFetch(
+    this.recordings, {
+    this.state = DvrRecordingsLoadState.loaded,
+  });
+
+  /// A load whose first page failed: nothing usable came back.
+  const DvrRecordingsFetch.failed(this.state)
+    : recordings = const <DvrRecording>[];
+
+  final List<DvrRecording> recordings;
+  final DvrRecordingsLoadState state;
+
+  bool get failed =>
+      state == DvrRecordingsLoadState.error ||
+      state == DvrRecordingsLoadState.offline;
+}
+
 class DvrRecording {
   const DvrRecording({
     required this.uuid,

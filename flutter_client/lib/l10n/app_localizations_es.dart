@@ -2493,4 +2493,60 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsNavLayoutResetConfirm => 'Restablecer';
+
+  @override
+  String get dvrStatusProcessing => 'Procesando';
+
+  @override
+  String get dvrStatusCompleted => 'Completada';
+
+  @override
+  String get dvrStatusCancelled => 'Cancelada';
+
+  @override
+  String get dvrFilterAll => 'Todas';
+
+  @override
+  String dvrFilterWithCount(String label, int count) {
+    return '$label ($count)';
+  }
+
+  @override
+  String get dvrFilterEmpty => 'Ninguna grabación coincide con este filtro';
+
+  @override
+  String dvrSortButton(String option) {
+    return 'Ordenar: $option';
+  }
+
+  @override
+  String get dvrSortDialogTitle => 'Ordenar grabaciones';
+
+  @override
+  String get dvrSortNewest => 'Más recientes primero';
+
+  @override
+  String get dvrSortOldest => 'Más antiguas primero';
+
+  @override
+  String get dvrSortTitle => 'Título (A-Z)';
+
+  @override
+  String get dvrLoadError =>
+      'No se pudieron cargar tus grabaciones. El servidor devolvió un error.';
+
+  @override
+  String get dvrLoadOffline =>
+      'No se puede conectar con tu servidor. Comprueba tu conexión e inténtalo de nuevo.';
+
+  @override
+  String get dvrLoadPartial =>
+      'No se pudieron cargar algunas grabaciones antiguas.';
+
+  @override
+  String get dvrLoadRefreshFailed =>
+      'No se pudieron actualizar tus grabaciones. Se muestra la última lista cargada.';
+
+  @override
+  String get dvrRetry => 'Reintentar';
 }

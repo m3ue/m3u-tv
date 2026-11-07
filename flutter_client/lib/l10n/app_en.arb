@@ -1375,5 +1375,38 @@
   "settingsNavLayoutColumnNav": "Nav",
   "settingsNavLayoutReset": "Reset to default",
   "settingsNavLayoutResetMessage": "This restores the original order and visibility of these sections.",
-  "settingsNavLayoutResetConfirm": "Reset"
+  "settingsNavLayoutResetConfirm": "Reset",
+  "dvrStatusProcessing": "Processing",
+  "dvrStatusCompleted": "Completed",
+  "dvrStatusCancelled": "Cancelled",
+  "dvrFilterAll": "All",
+  "dvrFilterWithCount": "{label} ({count})",
+  "@dvrFilterWithCount": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrFilterEmpty": "No recordings match this filter",
+  "dvrSortButton": "Sort: {option}",
+  "@dvrSortButton": {
+    "placeholders": {
+      "option": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrSortDialogTitle": "Sort recordings",
+  "dvrSortNewest": "Newest first",
+  "dvrSortOldest": "Oldest first",
+  "dvrSortTitle": "Title (A-Z)",
+  "dvrLoadError": "Couldn't load your recordings. The server returned an error.",
+  "dvrLoadOffline": "Can't reach your server. Check your connection and try again.",
+  "dvrLoadPartial": "Some older recordings couldn't be loaded.",
+  "dvrLoadRefreshFailed": "Couldn't refresh your recordings. Showing the last list loaded.",
+  "dvrRetry": "Try again"
 }
