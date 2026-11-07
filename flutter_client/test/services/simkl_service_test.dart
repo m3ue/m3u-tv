@@ -49,7 +49,6 @@ void main() {
       final transport = _FakeTransport([]);
       final service = SimklService(
         storage: InMemorySecureStorage(),
-        // ignore: avoid_redundant_argument_values, the test must not depend on it.
         clientId: '',
         transport: transport.call,
       );
