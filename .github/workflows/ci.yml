@@ -18,6 +18,7 @@ jobs:
     outputs:
       desktop: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.desktop == 'true' }}
       apple: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.apple == 'true' }}
+      tvos: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.tvos == 'true' }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -40,6 +41,14 @@ jobs:
               - 'flutter_client/pubspec.yaml'
               - 'flutter_client/pubspec.lock'
               - 'flutter_client/ci/GoogleService-Info.stub.plist'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/release.yml'
+            tvos:
+              - 'flutter_client/tvos/**'
+              - 'flutter_client/lib/**'
+              - 'flutter_client/pubspec.yaml'
+              - 'flutter_client/pubspec.lock'
+              - '.github/actions/tvos-build/**'
               - '.github/workflows/ci.yml'
               - '.github/workflows/release.yml'
 
@@ -224,3 +233,20 @@ jobs:
           FLUTTER_XCODE_CODE_SIGNING_ALLOWED: "NO"
           FLUTTER_XCODE_DEVELOPMENT_TEAM: ""
         run: flutter build macos --release
+
+  build-tvos:
+    # tvOS builds with the separate flutter-tvos toolchain and links mpv
+    # through the MPVKit Swift package pinned in tvos/Runner.xcodeproj, so
+    # neither the iOS build above nor the Dart gates cover it. Without this
+    # job, a tvOS-only break (a Dart change the tvOS engine rejects, or an
+    # mpv-build re-pin) first fails in release.yml at tag time. Same steps
+    # as the release build, via the shared action; no IPA is packaged.
+    name: Build tvOS app (verify only)
+    needs: changes
+    if: needs.changes.outputs.tvos == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build tvOS archive
+        uses: ./.github/actions/tvos-build

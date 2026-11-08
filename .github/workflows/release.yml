@@ -297,25 +297,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install flutter-tvos
-        # flutter-tvos is a companion CLI (github.com/fluttertv/flutter-tvos) that
-        # provides the tvOS Flutter engine and build toolchain. It is separate from
-        # the standard Flutter SDK and must be installed before building tvOS targets.
-        run: |
-          git clone --depth 1 --branch v3.47.7-tvos.1.11.3 \
-            https://github.com/fluttertv/flutter-tvos.git $HOME/flutter-tvos
-          echo "$HOME/flutter-tvos/bin" >> $GITHUB_PATH
-
-      - name: Precache tvOS engine artifacts
-        run: flutter-tvos precache
-
-      - name: Get dependencies
-        run: flutter-tvos pub get
-
-      - name: Set version
-        run: |
-          sed -i '' "s/^version: .*/version: ${{ needs.validate.outputs.version }}+${{ needs.validate.outputs.build_number }}/" pubspec.yaml
-
       # Uncomment to enable signed builds (add secrets listed in the job comment above):
       # - name: Install Apple certificate & provisioning profile
       #   env:
@@ -335,76 +316,13 @@ jobs:
       #     mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
       #     cp "$PP" ~/Library/MobileDevice/Provisioning\ Profiles/
 
-      - name: Disable code signing in tvOS project
-        # flutter-tvos ignores FLUTTER_XCODE_* env vars for signing. Clear all
-        # signing-related build settings so xcodebuild doesn't search for profiles.
-        # SDK-conditional keys ("KEY[sdk=appletvos*]") take precedence over their
-        # base equivalents when building for physical tvOS hardware, so both must
-        # be cleared. Use [^;]* (not [A-Z0-9]*) to avoid zero-length matches that
-        # double-quote an already-empty value and corrupt the pbxproj plist.
-        # CODE_SIGN_STYLE must be set to Manual (not just clearing DEVELOPMENT_TEAM)
-        # because Automatic signing contacts Apple servers to generate profiles even
-        # with an empty team, which fails in CI with "no devices" error.
-        run: |
-          sed -i '' \
-            -e 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' \
-            -e 's/DEVELOPMENT_TEAM = [^;]*/DEVELOPMENT_TEAM = ""/g' \
-            -e 's/"DEVELOPMENT_TEAM\[sdk=appletvos\*\]" = [^;]*/"DEVELOPMENT_TEAM[sdk=appletvos*]" = ""/g' \
-            -e 's/PROVISIONING_PROFILE_SPECIFIER = [^;]*/PROVISIONING_PROFILE_SPECIFIER = ""/g' \
-            -e 's/"PROVISIONING_PROFILE_SPECIFIER\[sdk=appletvos\*\]" = [^;]*/"PROVISIONING_PROFILE_SPECIFIER[sdk=appletvos*]" = ""/g' \
-            -e 's/CODE_SIGN_IDENTITY = "Apple Development"/CODE_SIGN_IDENTITY = ""/g' \
-            -e 's/"CODE_SIGN_IDENTITY\[sdk=appletvos\*\]" = [^;]*/"CODE_SIGN_IDENTITY[sdk=appletvos*]" = ""/g' \
-            tvos/Runner.xcodeproj/project.pbxproj
-
-      - name: Stage tvOS Flutter artifacts
-        # `flutter-tvos build tvos --release` always forces CODE_SIGN_STYLE=Automatic
-        # on the xcodebuild archive call it runs internally, with no way to opt out -
-        # against this project's Manual-signing tvOS config that call reliably fails
-        # with "conflicting provisioning settings" (see flutter_client/README.md,
-        # "Apple TV / tvOS (manual App Store submission)"). That failure is expected
-        # and cosmetic: the Dart AOT compile + asset bundling that writes
-        # tvos/Flutter/App.framework and tvos/Flutter/flutter_assets completes first,
-        # before the doomed internal xcodebuild call even runs (`_copyFlutterAssets`
-        # in this fork's lib/build_targets/application.dart probes for
-        # AssetManifest.bin, which release builds do produce, so no separate
-        # bundling step is needed - a prior `flutter-tvos build bundle --release`
-        # step here relied on a stock-Flutter subcommand this fork deliberately
-        # removed, since it built the wrong bundle; see lib/commands/build.dart).
-        # So this step's exit code is tolerated - but what it actually staged is
-        # verified explicitly below, since a tolerated exit code with no such
-        # check is exactly what let a genuinely-empty flutter_assets slip
-        # through as issue #186.
-        run: |
-          flutter-tvos build tvos --release || \
-            echo "flutter-tvos build tvos exited non-zero - expected, see step description. Verifying staged output below."
-
-      - name: Verify staged tvOS Flutter artifacts
-        run: |
-          set -euo pipefail
-          if [ ! -s "tvos/Flutter/flutter_assets/AssetManifest.bin" ]; then
-            echo "ERROR: tvos/Flutter/flutter_assets/AssetManifest.bin missing or empty after flutter-tvos build - Flutter asset staging did not complete."
-            exit 1
-          fi
-          if [ ! -d "tvos/Flutter/App.framework" ]; then
-            echo "ERROR: tvos/Flutter/App.framework missing after flutter-tvos build - Dart AOT compile did not complete."
-            exit 1
-          fi
-
-      - name: Archive tvOS (unsigned)
-        # Do the actual archive+package ourselves via a direct xcodebuild call
-        # rather than relying on flutter-tvos's own internal xcodebuild invocation
-        # (see "Stage tvOS Flutter artifacts" above for why that one is unreliable
-        # here). This picks up the artifacts staged in tvos/Flutter/ by the
-        # previous step and runs this project's own Manual-signing (now
-        # disabled/unsigned per the earlier step) tvOS project config directly -
-        # the same path documented as reliable in flutter_client/README.md.
-        run: |
-          xcodebuild archive \
-            -workspace tvos/Runner.xcworkspace -scheme Runner \
-            -sdk appletvos -configuration Release \
-            -destination 'generic/platform=tvOS' \
-            -archivePath build/Runner.xcarchive \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+      # Shared with ci.yml: installs the pinned flutter-tvos, stages the
+      # Flutter artifacts and archives the unsigned app to
+      # build/Runner.xcarchive. See .github/actions/tvos-build/action.yml.
+      - name: Build tvOS archive
+        uses: ./.github/actions/tvos-build
+        with:
+          version: ${{ needs.validate.outputs.version }}+${{ needs.validate.outputs.build_number }}
 
       - name: Package IPA
         run: |
