@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:m3u_tv/features/player/playback_controls.dart'
     show isHandheldLayout;
+import 'package:m3u_tv/features/player/sync_offset_bar.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/shared/app_button.dart';
@@ -27,6 +28,10 @@ class TrackSelector extends StatelessWidget {
     this.hdrEnabled = true,
     this.onHdrEnabledChanged,
     this.onSearchOnlineSubtitles,
+    this.audioSyncOffset,
+    this.subtitleSyncOffset,
+    this.onAdjustAudioSync,
+    this.onAdjustSubtitleSync,
     super.key,
   });
 
@@ -80,6 +85,15 @@ class TrackSelector extends StatelessWidget {
   /// even when the stream has no tracks of its own.
   final VoidCallback? onSearchOnlineSubtitles;
 
+  /// The current offsets, shown on the pickers' sync rows.
+  final Duration? audioSyncOffset;
+  final Duration? subtitleSyncOffset;
+
+  /// Open the sync bar. Null when the playing backend can't shift audio or
+  /// subtitles, which hides the row and the long-press shortcut.
+  final VoidCallback? onAdjustAudioSync;
+  final VoidCallback? onAdjustSubtitleSync;
+
   bool get _showsSubtitleButton =>
       subtitleTracks.isNotEmpty || onSearchOnlineSubtitles != null;
 
@@ -124,6 +138,7 @@ class TrackSelector extends StatelessWidget {
               icon: Icons.audiotrack,
               label: l.playerTrackAudio,
               onPressed: () => _showAudioDialog(context),
+              onLongPress: onAdjustAudioSync,
             ),
           ),
         if (audioTracks.isNotEmpty && _showsSubtitleButton)
@@ -135,6 +150,7 @@ class TrackSelector extends StatelessWidget {
               icon: Icons.subtitles,
               label: l.playerTrackSubtitles,
               onPressed: () => _showSubtitleDialog(context),
+              onLongPress: onAdjustSubtitleSync,
             ),
           ),
       ],
@@ -166,6 +182,17 @@ class TrackSelector extends StatelessWidget {
       selectedId: selectedId,
       hasSelection: true,
       onSelected: onAudioTrackSelected,
+      actions: [
+        if (onAdjustAudioSync != null)
+          (
+            icon: Icons.graphic_eq,
+            label: l.playerSyncRow(
+              l.playerAudioSync,
+              formatSyncOffset(l, audioSyncOffset ?? Duration.zero),
+            ),
+            action: onAdjustAudioSync!,
+          ),
+      ],
     );
   }
 
@@ -188,7 +215,23 @@ class TrackSelector extends StatelessWidget {
       hasSelection:
           isSubtitleTrackSelectionKnown || selectedSubtitleTrackId != null,
       onSelected: onSubtitleTrackSelected,
-      onSearchOnline: onSearchOnlineSubtitles,
+      actions: [
+        if (onAdjustSubtitleSync != null)
+          (
+            icon: Icons.av_timer,
+            label: l.playerSyncRow(
+              l.playerSubtitleSync,
+              formatSyncOffset(l, subtitleSyncOffset ?? Duration.zero),
+            ),
+            action: onAdjustSubtitleSync!,
+          ),
+        if (onSearchOnlineSubtitles != null)
+          (
+            icon: Icons.search,
+            label: l.playerOnlineSubtitlesSearch,
+            action: onSearchOnlineSubtitles!,
+          ),
+      ],
     );
   }
 
@@ -199,11 +242,12 @@ class TrackSelector extends StatelessWidget {
     required String? selectedId,
     required bool hasSelection,
     required ValueChanged<String?> onSelected,
-    VoidCallback? onSearchOnline,
+    List<({IconData icon, String label, VoidCallback action})> actions =
+        const [],
   }) {
     final l = AppLocalizations.of(context);
     onDialogVisibilityChanged?.call(true);
-    var searchOnlineChosen = false;
+    VoidCallback? chosenAction;
     unawaited(
       ListPickerSheet.show(
         context,
@@ -229,13 +273,13 @@ class TrackSelector extends StatelessWidget {
                 );
               },
             ),
-          if (onSearchOnline != null)
+          for (final action in actions)
             Builder(
               builder: (rowContext) => SortOptionRow(
-                icon: Icons.search,
-                label: l.playerOnlineSubtitlesSearch,
+                icon: action.icon,
+                label: action.label,
                 onTap: () {
-                  searchOnlineChosen = true;
+                  chosenAction = action.action;
                   Navigator.of(rowContext).pop();
                 },
               ),
@@ -245,7 +289,7 @@ class TrackSelector extends StatelessWidget {
         onDialogVisibilityChanged?.call(false);
         // Only once this sheet is gone, so the two dialogs' visibility
         // callbacks can't interleave.
-        if (searchOnlineChosen) onSearchOnline?.call();
+        chosenAction?.call();
       }),
     );
   }

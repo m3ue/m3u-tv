@@ -711,6 +711,17 @@ int64_t IntArg(FlValue* args, const char* key) {
   return fl_value_get_int(value);
 }
 
+// "-1.250" for -1250: formatted by hand, not with std::to_string, so the
+// decimal separator can't follow the locale (mpv only parses a dot).
+std::string FormatMillisecondsAsSeconds(int64_t milliseconds) {
+  const bool negative = milliseconds < 0;
+  const uint64_t magnitude =
+      negative ? static_cast<uint64_t>(-(milliseconds + 1)) + 1 : static_cast<uint64_t>(milliseconds);
+  std::string fraction = std::to_string(magnitude % 1000);
+  fraction.insert(0, 3 - fraction.size(), '0');
+  return (negative ? "-" : "") + std::to_string(magnitude / 1000) + "." + fraction;
+}
+
 bool BoolArg(FlValue* args, const char* key, bool fallback) {
   if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP) return fallback;
   FlValue* value = fl_value_lookup_string(args, key);
@@ -1901,6 +1912,14 @@ FlMethodResponse* Control(const gchar* method, FlValue* args) {
     const std::string speed_value = std::to_string(speed);
     const char* command[] = {"set", "speed", speed_value.c_str(), nullptr};
     player->api->command(player->handle, command);
+  } else if (g_strcmp0(method, "setSyncOffset") == 0) {
+    // Audio or subtitle sync offset in whole milliseconds; mpv takes seconds.
+    const std::string property = StringArg(args, "property");
+    if (property == "audio-delay" || property == "sub-delay") {
+      const std::string seconds = FormatMillisecondsAsSeconds(IntArg(args, "milliseconds"));
+      const char* command[] = {"set", property.c_str(), seconds.c_str(), nullptr};
+      player->api->command(player->handle, command);
+    }
   } else if (g_strcmp0(method, "setVolume") == 0) {
     FlValue* value = args == nullptr ? nullptr : fl_value_lookup_string(args, "volume");
     const double volume = value != nullptr && fl_value_get_type(value) == FL_VALUE_TYPE_FLOAT

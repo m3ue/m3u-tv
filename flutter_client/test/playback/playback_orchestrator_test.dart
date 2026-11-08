@@ -63,6 +63,89 @@ void main() {
       },
     );
 
+    group('sync offsets', () {
+      Future<void> settle() async {
+        await Future<void>.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      test('applies saved offsets once a backend has loaded', () async {
+        final exoPlayer = _SyncOffsetFakeAdapter(
+          capabilities: PlaybackCapabilities.androidExoPlayer,
+        );
+        final orchestrator = _orchestrator(
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.androidExoPlayer: exoPlayer,
+          },
+          transcodeGateway: _FakeTranscodeGateway(),
+        );
+
+        await orchestrator.setSyncOffsets(
+          audio: const Duration(milliseconds: 120),
+          subtitle: Duration.zero,
+        );
+        await orchestrator.open(_source(isLive: false));
+        await settle();
+
+        expect(exoPlayer.syncCommands, ['audio:120']);
+        expect(orchestrator.activeSyncOffsetProvider, same(exoPlayer));
+      });
+
+      test('carries offsets over to a fallback backend', () async {
+        final exoPlayer = _SyncOffsetFakeAdapter(
+          capabilities: PlaybackCapabilities.androidExoPlayer,
+        );
+        final mpv = _SyncOffsetFakeAdapter(
+          capabilities: PlaybackCapabilities.androidMpv,
+        );
+        final orchestrator = _orchestrator(
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.androidExoPlayer: exoPlayer,
+            PlaybackBackend.androidMpv: mpv,
+          },
+          transcodeGateway: _FakeTranscodeGateway(),
+        );
+
+        await orchestrator.open(_source(isLive: false));
+        await orchestrator.setSyncOffsets(
+          subtitle: const Duration(milliseconds: -500),
+        );
+        exoPlayer.emitError(
+          const PlaybackError(
+            backend: PlaybackBackend.androidExoPlayer,
+            message: 'Repeated audio timestamp discontinuities',
+            code: 'AUDIO_TIMESTAMP_DISCONTINUITY',
+            recoverable: true,
+            position: Duration(minutes: 3),
+          ),
+        );
+        await settle();
+
+        expect(orchestrator.activeBackend, PlaybackBackend.androidMpv);
+        expect(exoPlayer.syncCommands, ['subtitle:-500']);
+        expect(mpv.syncCommands, ['subtitle:-500']);
+      });
+
+      test('a backend without sync support is simply skipped', () async {
+        final plain = _FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.androidExoPlayer,
+        );
+        final orchestrator = _orchestrator(
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.androidExoPlayer: plain,
+          },
+          transcodeGateway: _FakeTranscodeGateway(),
+        );
+
+        await orchestrator.open(_source(isLive: false));
+        await orchestrator.setSyncOffsets(
+          audio: const Duration(milliseconds: 40),
+        );
+
+        expect(orchestrator.activeSyncOffsetProvider, isNull);
+      });
+    });
+
     group('audio timing failure', () {
       const audioTiming = PlaybackError(
         backend: PlaybackBackend.androidExoPlayer,
@@ -1446,6 +1529,21 @@ class _GatedPlayerAdapter implements PlayerAdapter {
     _state = state;
     _stateController.add(state);
   }
+}
+
+class _SyncOffsetFakeAdapter extends _FakePlayerAdapter
+    implements SyncOffsetProvider {
+  _SyncOffsetFakeAdapter({required super.capabilities});
+
+  final List<String> syncCommands = <String>[];
+
+  @override
+  Future<void> setAudioDelay(Duration delay) async =>
+      syncCommands.add('audio:${delay.inMilliseconds}');
+
+  @override
+  Future<void> setSubtitleDelay(Duration delay) async =>
+      syncCommands.add('subtitle:${delay.inMilliseconds}');
 }
 
 class _FakePlayerAdapter implements PlayerAdapter {

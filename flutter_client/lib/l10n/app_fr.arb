@@ -1145,5 +1145,14 @@
   "dvrLoadPartial": "Certains enregistrements plus anciens n'ont pas pu être chargés.",
   "dvrLoadRefreshFailed": "Impossible d'actualiser vos enregistrements. La dernière liste chargée est affichée.",
   "dvrRetry": "Réessayer",
-  "requestsProviderHeading": "Demander à"
+  "requestsProviderHeading": "Demander à",
+  "playerAudioSync": "Synchro audio",
+  "playerSubtitleSync": "Synchro des sous-titres",
+  "playerSyncRow": "{label} : {value}",
+  "playerSyncMilliseconds": "{value} ms",
+  "playerSyncSeconds": "{value} s",
+  "playerSyncReset": "Réinitialiser",
+  "playerSyncDone": "Terminé",
+  "playerAudioSyncHint": "Plus retarde le son, moins l'avance. Enregistré pour cette chaîne ou ce titre.",
+  "playerSubtitleSyncHint": "Plus retarde les sous-titres, moins les avance. Enregistré pour cette chaîne ou ce titre."
 }

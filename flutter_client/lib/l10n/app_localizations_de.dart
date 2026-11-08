@@ -2548,4 +2548,39 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get requestsProviderHeading => 'Anfragen bei';
+
+  @override
+  String get playerAudioSync => 'Audio-Synchronisierung';
+
+  @override
+  String get playerSubtitleSync => 'Untertitel-Synchronisierung';
+
+  @override
+  String playerSyncRow(String label, String value) {
+    return '$label: $value';
+  }
+
+  @override
+  String playerSyncMilliseconds(String value) {
+    return '$value ms';
+  }
+
+  @override
+  String playerSyncSeconds(String value) {
+    return '$value s';
+  }
+
+  @override
+  String get playerSyncReset => 'Zurücksetzen';
+
+  @override
+  String get playerSyncDone => 'Fertig';
+
+  @override
+  String get playerAudioSyncHint =>
+      'Plus verzögert den Ton, Minus spielt ihn früher ab. Wird für diesen Sender oder Titel gespeichert.';
+
+  @override
+  String get playerSubtitleSyncHint =>
+      'Plus verzögert die Untertitel, Minus zeigt sie früher an. Wird für diesen Sender oder Titel gespeichert.';
 }

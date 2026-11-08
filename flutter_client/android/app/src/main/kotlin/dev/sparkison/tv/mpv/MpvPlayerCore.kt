@@ -557,6 +557,16 @@ class MpvPlayerCore(
 
     fun setPlaybackSpeed(speed: Double) = setProperty("speed", speed.toString())
 
+    /**
+     * Audio or subtitle sync offset: `audio-delay` or `sub-delay`, in seconds
+     * (positive plays them later). Any other property is ignored.
+     */
+    fun setSyncOffset(property: String, seconds: Double) {
+        if (property != "audio-delay" && property != "sub-delay") return
+        if (!seconds.isFinite()) return
+        setProperty(property, seconds.toString())
+    }
+
     private fun setProperty(name: String, value: String) {
         scope.launch {
             mutex.withLock {

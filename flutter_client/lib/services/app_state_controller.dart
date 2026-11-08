@@ -38,6 +38,7 @@ import 'package:m3u_tv/services/simkl_service.dart';
 import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/services/sports_settings.dart';
 import 'package:m3u_tv/services/storage_usage.dart';
+import 'package:m3u_tv/services/sync_offset_store.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/services/tv_notification_store.dart';
@@ -87,6 +88,7 @@ class AppStateController extends ChangeNotifier {
     AIOStreamsFavoritesService? aioFavoritesService,
     ProxyPlaybackSettings? proxyPlaybackSettings,
     ComskipSettings? comskipSettings,
+    SyncOffsetStore? syncOffsetStore,
     SportsSettings? sportsSettings,
     IntroDbSettings? introDbSettings,
     PushNotificationService? pushNotificationService,
@@ -168,6 +170,7 @@ class AppStateController extends ChangeNotifier {
       proxyPlaybackSettings:
           proxyPlaybackSettings ?? ProxyPlaybackSettings(store: store),
       comskipSettings: comskipSettings ?? ComskipSettings(store: store),
+      syncOffsetStore: syncOffsetStore ?? SyncOffsetStore(store: store),
       sportsSettings: sportsSettings ?? SportsSettings(store: store),
       introDbSettings: introDbSettings ?? IntroDbSettings(store: store),
       pushNotificationService:
@@ -206,6 +209,7 @@ class AppStateController extends ChangeNotifier {
     required this.aioFavoritesService,
     required this.proxyPlaybackSettings,
     required this.comskipSettings,
+    required this.syncOffsetStore,
     required this.sportsSettings,
     required this.introDbSettings,
     required this._pushNotificationService,
@@ -239,6 +243,7 @@ class AppStateController extends ChangeNotifier {
     seriesFavoritesService.playlistScope = _playlistScope;
     aioFavoritesService.playlistScope = _playlistScope;
     proxyPlaybackSettings.playlistScope = _playlistScope;
+    syncOffsetStore.playlistScope = _playlistScope;
     authNotifier.addListener(_registerLogSecrets);
     _registerLogSecrets();
   }
@@ -339,6 +344,7 @@ class AppStateController extends ChangeNotifier {
   final AIOStreamsFavoritesService aioFavoritesService;
   final ProxyPlaybackSettings proxyPlaybackSettings;
   final ComskipSettings comskipSettings;
+  final SyncOffsetStore syncOffsetStore;
   final SportsSettings sportsSettings;
   final IntroDbSettings introDbSettings;
   final ViewSettingsService viewSettingsService;

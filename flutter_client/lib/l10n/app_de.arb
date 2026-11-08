@@ -1145,5 +1145,14 @@
   "dvrLoadPartial": "Einige ältere Aufnahmen konnten nicht geladen werden.",
   "dvrLoadRefreshFailed": "Deine Aufnahmen konnten nicht aktualisiert werden. Angezeigt wird die zuletzt geladene Liste.",
   "dvrRetry": "Erneut versuchen",
-  "requestsProviderHeading": "Anfragen bei"
+  "requestsProviderHeading": "Anfragen bei",
+  "playerAudioSync": "Audio-Synchronisierung",
+  "playerSubtitleSync": "Untertitel-Synchronisierung",
+  "playerSyncRow": "{label}: {value}",
+  "playerSyncMilliseconds": "{value} ms",
+  "playerSyncSeconds": "{value} s",
+  "playerSyncReset": "Zurücksetzen",
+  "playerSyncDone": "Fertig",
+  "playerAudioSyncHint": "Plus verzögert den Ton, Minus spielt ihn früher ab. Wird für diesen Sender oder Titel gespeichert.",
+  "playerSubtitleSyncHint": "Plus verzögert die Untertitel, Minus zeigt sie früher an. Wird für diesen Sender oder Titel gespeichert."
 }

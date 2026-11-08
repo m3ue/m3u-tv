@@ -16,6 +16,7 @@ import 'package:m3u_tv/features/player/player_shortcuts.dart';
 import 'package:m3u_tv/features/player/player_skip_prompts.dart';
 import 'package:m3u_tv/features/player/player_skip_segments.dart';
 import 'package:m3u_tv/features/player/player_source_settings.dart';
+import 'package:m3u_tv/features/player/sync_offset_bar.dart';
 import 'package:m3u_tv/features/player/up_next_overlay.dart';
 import 'package:m3u_tv/features/player/wakelock_controller.dart';
 import 'package:m3u_tv/features/series/episode_player_args.dart';
@@ -34,6 +35,7 @@ import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
 import 'package:m3u_tv/services/online_subtitle_service.dart';
 import 'package:m3u_tv/services/online_subtitle_settings.dart';
+import 'package:m3u_tv/services/sync_offset_store.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/watch_history_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
@@ -82,6 +84,7 @@ class PlayerScreen extends StatefulWidget {
     required this.epgService,
     this.xtreamService,
     this.comskipSettings,
+    this.syncOffsetStore,
     this.comskipService,
     this.introDbSettings,
     this.hasDvrFeature = false,
@@ -127,6 +130,9 @@ class PlayerScreen extends StatefulWidget {
   final EpgService epgService;
   final XtreamService? xtreamService;
   final ComskipSettings? comskipSettings;
+
+  /// Remembers the audio/subtitle sync offsets per channel or title.
+  final SyncOffsetStore? syncOffsetStore;
 
   /// Fetches the recording's commercial-break segments. Defaults to a fresh
   /// [ComskipService]; tests inject one over a fake HTTP client.
@@ -251,6 +257,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _isAudioTrackSelectionKnown = false;
   bool _isSubtitleTrackSelectionKnown = false;
   late bool _hdrEnabled = widget.viewSettingsService?.hdrEnabledSync ?? true;
+
+  /// The sync offsets for what's playing, and the channel or title they're
+  /// saved under (see [syncOffsetKeyFor]).
+  SyncOffsets _syncOffsets = zeroSyncOffsets;
+  String? _syncOffsetKey;
   bool get _showPlaybackDiagnostics =>
       widget.viewSettingsService?.showPlaybackDiagnosticsSync ?? false;
   late double _volume = widget.viewSettingsService?.volumeSync ?? 1.0;
@@ -1005,8 +1016,115 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _duration = _catchup?.duration ?? Duration.zero;
   }
 
+  /// Hands the orchestrator this channel's or title's saved offsets. Called
+  /// without awaiting, so playback never waits on the store: on a change of
+  /// channel or title the previous offsets are cleared before the stream
+  /// opens, and the saved ones apply once read (the orchestrator applies them
+  /// to a backend still loading, or straight to the active one).
+  /// Never throws: a failed read just plays without an offset.
+  Future<void> _prepareSyncOffsets() async {
+    final args = widget.args;
+    final key = syncOffsetKeyFor(
+      type: args.type,
+      streamId: args.streamId,
+      seriesId: args.seriesId,
+    );
+    if (key == _syncOffsetKey) return _applySyncOffsets();
+    _syncOffsetKey = key;
+    _updateSyncOffsets(zeroSyncOffsets);
+    unawaited(_applySyncOffsets());
+    final store = widget.syncOffsetStore;
+    if (key == null || store == null) return;
+    SyncOffsets offsets;
+    try {
+      offsets = await store.read(key);
+    } on Object catch (error) {
+      debugPrint('Sync offsets: read failed: $error');
+      return;
+    }
+    if (_disposed || _syncOffsetKey != key || offsets == zeroSyncOffsets) {
+      return;
+    }
+    _updateSyncOffsets(offsets);
+    await _applySyncOffsets();
+  }
+
+  void _updateSyncOffsets(SyncOffsets offsets) {
+    if (offsets == _syncOffsets) return;
+    if (mounted) {
+      setState(() => _syncOffsets = offsets);
+    } else {
+      _syncOffsets = offsets;
+    }
+  }
+
+  Future<void> _applySyncOffsets() async {
+    try {
+      await widget.orchestrator.setSyncOffsets(
+        audio: _syncOffsets.audio,
+        subtitle: _syncOffsets.subtitle,
+      );
+    } on Object catch (error) {
+      debugPrint('Sync offsets: apply failed: $error');
+    }
+  }
+
+  bool get _supportsSyncOffsets =>
+      widget.orchestrator.activeSyncOffsetProvider != null;
+
+  void _adjustSync(SyncOffsetKind kind) {
+    _handleTrackDialogVisibilityChanged(true);
+    unawaited(
+      showSyncOffsetBar(
+        context,
+        kind: kind,
+        initial: kind == SyncOffsetKind.audio
+            ? _syncOffsets.audio
+            : _syncOffsets.subtitle,
+        onChanged: (offset) => _setSyncOffset(kind, offset),
+      ).whenComplete(() {
+        _handleTrackDialogVisibilityChanged(false);
+        _persistSyncOffsets();
+      }),
+    );
+  }
+
+  void _setSyncOffset(SyncOffsetKind kind, Duration offset) {
+    final isAudio = kind == SyncOffsetKind.audio;
+    setState(
+      () => _syncOffsets = isAudio
+          ? (audio: offset, subtitle: _syncOffsets.subtitle)
+          : (audio: _syncOffsets.audio, subtitle: offset),
+    );
+    unawaited(
+      widget.orchestrator
+          .setSyncOffsets(
+            audio: isAudio ? offset : null,
+            subtitle: isAudio ? null : offset,
+          )
+          .catchError(
+            (Object error) => debugPrint('Sync offsets: set failed: $error'),
+          ),
+    );
+  }
+
+  /// Saved when the bar closes rather than on every step.
+  void _persistSyncOffsets() {
+    final key = _syncOffsetKey;
+    final store = widget.syncOffsetStore;
+    if (key == null || store == null) return;
+    unawaited(
+      store
+          .write(key, _syncOffsets)
+          .catchError(
+            (Object error) => debugPrint('Sync offsets: save failed: $error'),
+          ),
+    );
+  }
+
   Future<void> _openAndSeek(PlaybackSource source) async {
     try {
+      unawaited(_prepareSyncOffsets());
       await widget.orchestrator.open(source);
       applyPlayerOpenedSettings(
         widget.orchestrator,
@@ -2315,6 +2433,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 _handleSubtitleTrackSelected,
                             onSearchOnlineSubtitles: _canSearchOnlineSubtitles
                                 ? _showOnlineSubtitlePicker
+                                : null,
+                            audioSyncOffset: _syncOffsets.audio,
+                            subtitleSyncOffset: _syncOffsets.subtitle,
+                            onAdjustAudioSync: _supportsSyncOffsets
+                                ? () => _adjustSync(SyncOffsetKind.audio)
+                                : null,
+                            onAdjustSubtitleSync: _supportsSyncOffsets
+                                ? () => _adjustSync(SyncOffsetKind.subtitle)
                                 : null,
                             supportsHdrToggle: _supportsHdrToggle,
                             hdrEnabled: _hdrEnabled,

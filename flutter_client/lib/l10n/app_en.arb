@@ -1409,5 +1409,38 @@
   "dvrLoadPartial": "Some older recordings couldn't be loaded.",
   "dvrLoadRefreshFailed": "Couldn't refresh your recordings. Showing the last list loaded.",
   "dvrRetry": "Try again",
-  "requestsProviderHeading": "Request from"
+  "requestsProviderHeading": "Request from",
+  "playerAudioSync": "Audio sync",
+  "playerSubtitleSync": "Subtitle sync",
+  "playerSyncRow": "{label}: {value}",
+  "@playerSyncRow": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "playerSyncMilliseconds": "{value} ms",
+  "@playerSyncMilliseconds": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "playerSyncSeconds": "{value} s",
+  "@playerSyncSeconds": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "playerSyncReset": "Reset",
+  "playerSyncDone": "Done",
+  "playerAudioSyncHint": "Plus delays the audio, minus plays it earlier. Saved for this channel or title.",
+  "playerSubtitleSyncHint": "Plus delays the subtitles, minus shows them earlier. Saved for this channel or title."
 }

@@ -854,6 +854,17 @@ int64_t IntArg(const flutter::EncodableMap* args, const char* key) {
   return 0;
 }
 
+// "-1.250" for -1250: formatted by hand, not with std::to_string, so the
+// decimal separator can't follow the locale (mpv only parses a dot).
+std::string FormatMillisecondsAsSeconds(int64_t milliseconds) {
+  const bool negative = milliseconds < 0;
+  const uint64_t magnitude =
+      negative ? static_cast<uint64_t>(-(milliseconds + 1)) + 1 : static_cast<uint64_t>(milliseconds);
+  std::string fraction = std::to_string(magnitude % 1000);
+  fraction.insert(0, 3 - fraction.size(), '0');
+  return (negative ? "-" : "") + std::to_string(magnitude / 1000) + "." + fraction;
+}
+
 bool BoolArg(const flutter::EncodableMap* args, const char* key, bool fallback) {
   if (args == nullptr) return fallback;
   auto it = args->find(flutter::EncodableValue(key));
@@ -1902,6 +1913,14 @@ void Control(const std::string& method, const flutter::EncodableMap* args) {
     const std::string speed = std::to_string(DoubleArg(args, "speed", 1.0));
     const char* command[] = {"set", "speed", speed.c_str(), nullptr};
     player->api->command(player->handle, command);
+  } else if (method == "setSyncOffset") {
+    // Audio or subtitle sync offset in whole milliseconds; mpv takes seconds.
+    const std::string property = StringArg(args, "property");
+    if (property == "audio-delay" || property == "sub-delay") {
+      const std::string seconds = FormatMillisecondsAsSeconds(IntArg(args, "milliseconds"));
+      const char* command[] = {"set", property.c_str(), seconds.c_str(), nullptr};
+      player->api->command(player->handle, command);
+    }
   } else if (method == "setVolume") {
     const std::string volume = std::to_string(DoubleArg(args, "volume", 100.0));
     const char* command[] = {"set", "volume", volume.c_str(), nullptr};

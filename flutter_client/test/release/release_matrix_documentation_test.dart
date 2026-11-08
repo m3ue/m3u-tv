@@ -7,12 +7,19 @@ void main() {
   const releaseWorkflowPath = '../.github/workflows/release.yml';
   const releaseMatrixPath = '../docs/release/platform-release-matrix.md';
   const readmePath = 'README.md';
+  const tvosActionPath = '../.github/actions/tvos-build/action.yml';
 
   String readFile(String path) => File(path).readAsStringSync();
 
-  String workflowStep(String workflow, String name) {
+  // Workflow job steps sit under six spaces, composite action steps under
+  // four.
+  String workflowStep(
+    String workflow,
+    String name, {
+    String indent = '      ',
+  }) {
     final lines = workflow.split('\n');
-    final header = '      - name: $name';
+    final header = '$indent- name: $name';
     final starts = <int>[
       for (var index = 0; index < lines.length; index++)
         if (lines[index] == header) index,
@@ -20,7 +27,7 @@ void main() {
     expect(starts, hasLength(1));
     final start = starts.single;
     final end = lines.indexWhere(
-      (line) => line.startsWith('      - '),
+      (line) => line.startsWith('$indent- '),
       start + 1,
     );
     expect(end, greaterThan(start));
@@ -56,16 +63,26 @@ void main() {
 
   test('release builds rely on the built-in public Trakt client id', () {
     final releaseWorkflow = readFile(releaseWorkflowPath);
+    // The release tvOS build runs from this composite action.
+    final tvosAction = readFile(tvosActionPath);
+    expect(releaseWorkflow, contains('uses: ./.github/actions/tvos-build'));
 
-    expect(releaseWorkflow, isNot(contains('TRAKT_CLIENT_SECRET')));
-    expect(releaseWorkflow, isNot(contains('secrets.TRAKT_CLIENT_SECRET')));
-    expect(releaseWorkflow, isNot(contains('TRAKT_CLIENT_ID')));
+    for (final file in [releaseWorkflow, tvosAction]) {
+      expect(file, isNot(contains('TRAKT_CLIENT_SECRET')));
+      expect(file, isNot(contains('TRAKT_CLIENT_ID')));
+    }
+
+    for (final stepName in <String>[
+      'Stage tvOS Flutter artifacts',
+      'Archive tvOS (unsigned)',
+    ]) {
+      final step = workflowStep(tvosAction, stepName, indent: '    ');
+      expect(step, isNot(contains('TRAKT_CLIENT')), reason: stepName);
+    }
 
     for (final stepName in <String>[
       'Build APK',
       'Build iOS IPA (unsigned)',
-      'Stage tvOS Flutter artifacts',
-      'Archive tvOS (unsigned)',
       'Build macOS app (unsigned)',
       'Build Linux app',
       'Build Windows app',

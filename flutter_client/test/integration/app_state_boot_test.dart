@@ -2158,6 +2158,9 @@ void main() {
           catalogRepository: repo,
         );
         addTearDown(restarted.dispose);
+        // Disposed only at teardown (it closes the shared repo), but before
+        // the repo closes, so its background guide sweep can't outlive it.
+        addTearDown(first.dispose);
         await restarted.boot();
 
         expect(restarted.sourceType, AppSourceType.xtream);

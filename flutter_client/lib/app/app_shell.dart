@@ -1927,6 +1927,7 @@ class AppShellState extends ConsumerState<AppShell>
                     epgService: _appState.epgService,
                     xtreamService: _appState.xtreamService,
                     comskipSettings: _appState.comskipSettings,
+                    syncOffsetStore: _appState.syncOffsetStore,
                     introDbSettings: _appState.introDbSettings,
                     hasDvrFeature: _appState.hasDvrFeature,
                     viewerId: viewerId,

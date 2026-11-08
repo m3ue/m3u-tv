@@ -9,10 +9,12 @@ Future<T?> showAppDialog<T>({
   required BuildContext context,
   required WidgetBuilder builder,
   bool barrierDismissible = true,
+  Color? barrierColor,
 }) => showDialog<T>(
   context: context,
   builder: builder,
   barrierDismissible: barrierDismissible,
+  barrierColor: barrierColor,
 );
 
 /// Opens a modal bottom sheet. Every sheet in the app goes through this

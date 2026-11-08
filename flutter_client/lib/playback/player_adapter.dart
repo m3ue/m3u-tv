@@ -100,6 +100,14 @@ abstract class HdrToggleProvider {
   );
 }
 
+/// A [PlayerAdapter] that can shift audio or subtitles against the picture
+/// while playing (mpv's `audio-delay`/`sub-delay`, and the same on
+/// ExoPlayer). A positive delay plays them later, a negative one earlier.
+abstract class SyncOffsetProvider {
+  Future<void> setAudioDelay(Duration delay);
+  Future<void> setSubtitleDelay(Duration delay);
+}
+
 /// A [PlayerAdapter] that can load a subtitle file during playback, without
 /// restarting the stream. [ExternalSubtitle.uri] must be a local file: mpv's
 /// `sub-add` runs on the UI thread on Linux and Windows.

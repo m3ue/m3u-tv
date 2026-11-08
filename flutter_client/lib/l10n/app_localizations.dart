@@ -4441,6 +4441,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Request from'**
   String get requestsProviderHeading;
+
+  /// No description provided for @playerAudioSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio sync'**
+  String get playerAudioSync;
+
+  /// No description provided for @playerSubtitleSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle sync'**
+  String get playerSubtitleSync;
+
+  /// No description provided for @playerSyncRow.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}: {value}'**
+  String playerSyncRow(String label, String value);
+
+  /// No description provided for @playerSyncMilliseconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} ms'**
+  String playerSyncMilliseconds(String value);
+
+  /// No description provided for @playerSyncSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} s'**
+  String playerSyncSeconds(String value);
+
+  /// No description provided for @playerSyncReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get playerSyncReset;
+
+  /// No description provided for @playerSyncDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get playerSyncDone;
+
+  /// No description provided for @playerAudioSyncHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Plus delays the audio, minus plays it earlier. Saved for this channel or title.'**
+  String get playerAudioSyncHint;
+
+  /// No description provided for @playerSubtitleSyncHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Plus delays the subtitles, minus shows them earlier. Saved for this channel or title.'**
+  String get playerSubtitleSyncHint;
 }
 
 class _AppLocalizationsDelegate

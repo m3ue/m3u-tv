@@ -2528,4 +2528,39 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get requestsProviderHeading => 'Request from';
+
+  @override
+  String get playerAudioSync => 'Audio sync';
+
+  @override
+  String get playerSubtitleSync => 'Subtitle sync';
+
+  @override
+  String playerSyncRow(String label, String value) {
+    return '$label: $value';
+  }
+
+  @override
+  String playerSyncMilliseconds(String value) {
+    return '$value ms';
+  }
+
+  @override
+  String playerSyncSeconds(String value) {
+    return '$value s';
+  }
+
+  @override
+  String get playerSyncReset => 'Reset';
+
+  @override
+  String get playerSyncDone => 'Done';
+
+  @override
+  String get playerAudioSyncHint =>
+      'Plus delays the audio, minus plays it earlier. Saved for this channel or title.';
+
+  @override
+  String get playerSubtitleSyncHint =>
+      'Plus delays the subtitles, minus shows them earlier. Saved for this channel or title.';
 }

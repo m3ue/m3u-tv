@@ -2559,4 +2559,39 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get requestsProviderHeading => 'Demander à';
+
+  @override
+  String get playerAudioSync => 'Synchro audio';
+
+  @override
+  String get playerSubtitleSync => 'Synchro des sous-titres';
+
+  @override
+  String playerSyncRow(String label, String value) {
+    return '$label : $value';
+  }
+
+  @override
+  String playerSyncMilliseconds(String value) {
+    return '$value ms';
+  }
+
+  @override
+  String playerSyncSeconds(String value) {
+    return '$value s';
+  }
+
+  @override
+  String get playerSyncReset => 'Réinitialiser';
+
+  @override
+  String get playerSyncDone => 'Terminé';
+
+  @override
+  String get playerAudioSyncHint =>
+      'Plus retarde le son, moins l\'avance. Enregistré pour cette chaîne ou ce titre.';
+
+  @override
+  String get playerSubtitleSyncHint =>
+      'Plus retarde les sous-titres, moins les avance. Enregistré pour cette chaîne ou ce titre.';
 }

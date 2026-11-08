@@ -294,6 +294,18 @@ final class MpvPlayerCore {
     }
   }
 
+  /// Audio or subtitle sync offset: `audio-delay` or `sub-delay`, in
+  /// seconds (positive plays them later). Any other property is ignored.
+  func setSyncOffset(_ property: String, seconds: Double) {
+    guard property == "audio-delay" || property == "sub-delay",
+      seconds.isFinite
+    else { return }
+    queue.async { [weak self] in
+      guard let self, let handle = self.mpv else { return }
+      mpv_set_property_string(handle, property, String(seconds))
+    }
+  }
+
   /// `completion` fires only once `mpv_terminate_destroy` has actually
   /// finished -- that call blocks until mpv's internal render thread has
   /// stopped touching the `AVSampleBufferDisplayLayer` handed to it via

@@ -572,6 +572,12 @@ class _FakeAndroidMedia3Host implements AndroidMedia3Host {
       commands.add('setPlaybackSpeed:$speed');
 
   @override
+  Future<void> setSyncOffset({
+    required String property,
+    required int milliseconds,
+  }) async => commands.add('setSyncOffset:$property:$milliseconds');
+
+  @override
   Future<void> setVolume(double volume) async =>
       commands.add('setVolume:$volume');
 

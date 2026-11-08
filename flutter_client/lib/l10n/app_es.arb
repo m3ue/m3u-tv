@@ -1145,5 +1145,14 @@
   "dvrLoadPartial": "No se pudieron cargar algunas grabaciones antiguas.",
   "dvrLoadRefreshFailed": "No se pudieron actualizar tus grabaciones. Se muestra la última lista cargada.",
   "dvrRetry": "Reintentar",
-  "requestsProviderHeading": "Solicitar a"
+  "requestsProviderHeading": "Solicitar a",
+  "playerAudioSync": "Sincronización de audio",
+  "playerSubtitleSync": "Sincronización de subtítulos",
+  "playerSyncRow": "{label}: {value}",
+  "playerSyncMilliseconds": "{value} ms",
+  "playerSyncSeconds": "{value} s",
+  "playerSyncReset": "Restablecer",
+  "playerSyncDone": "Listo",
+  "playerAudioSyncHint": "Más retrasa el audio, menos lo adelanta. Se guarda para este canal o título.",
+  "playerSubtitleSyncHint": "Más retrasa los subtítulos, menos los adelanta. Se guarda para este canal o título."
 }

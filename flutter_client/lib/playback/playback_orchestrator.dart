@@ -227,6 +227,41 @@ class PlaybackOrchestrator {
     return adapter! as RuntimeSubtitleProvider;
   }
 
+  SyncOffsetProvider? get activeSyncOffsetProvider {
+    final adapter = _activeAdapter;
+    if (adapter is! SyncOffsetProvider) return null;
+    return adapter! as SyncOffsetProvider;
+  }
+
+  /// The audio and subtitle offsets for what's playing, applied to the
+  /// active backend now and to any backend that loads after it (a fallback
+  /// mid-stream), so a switch doesn't lose them. Set before [open] for a new
+  /// item; null leaves that offset as it is.
+  Future<void> setSyncOffsets({Duration? audio, Duration? subtitle}) async {
+    if (audio != null) _audioDelay = audio;
+    if (subtitle != null) _subtitleDelay = subtitle;
+    final provider = activeSyncOffsetProvider;
+    if (provider == null) return;
+    if (audio != null) await provider.setAudioDelay(audio);
+    if (subtitle != null) await provider.setSubtitleDelay(subtitle);
+  }
+
+  Duration _audioDelay = Duration.zero;
+  Duration _subtitleDelay = Duration.zero;
+
+  void _applySyncOffsetsTo(PlayerAdapter adapter) {
+    if (adapter is! SyncOffsetProvider) return;
+    final provider = adapter as SyncOffsetProvider;
+    void report(Object error) =>
+        _diagnostics.add('sync-offset:apply-failed:$error');
+    if (_audioDelay != Duration.zero) {
+      unawaited(provider.setAudioDelay(_audioDelay).catchError(report));
+    }
+    if (_subtitleDelay != Duration.zero) {
+      unawaited(provider.setSubtitleDelay(_subtitleDelay).catchError(report));
+    }
+  }
+
   HdrToggleProvider? get activeHdrToggleProvider {
     final adapter = _activeAdapter;
     if (adapter is! HdrToggleProvider) return null;
@@ -508,6 +543,7 @@ class PlaybackOrchestrator {
       try {
         await _loadWithDisplayModePolicy(adapter, source);
         _syncNativePlaneComposition();
+        _applySyncOffsetsTo(adapter);
         break;
       } on PlaybackException catch (error) {
         var effectiveError = error;

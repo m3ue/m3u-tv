@@ -106,6 +106,11 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
       let speed = (args["speed"] as? NSNumber)?.doubleValue ?? 1.0
       core(for: viewId)?.setPlaybackSpeed(speed)
       result(nil)
+    case "setSyncOffset":
+      let property = args["property"] as? String ?? ""
+      let milliseconds = (args["milliseconds"] as? NSNumber)?.intValue ?? 0
+      core(for: viewId)?.setSyncOffset(property, seconds: Double(milliseconds) / 1000)
+      result(nil)
     case "dispose":
       guard let existingCore = core(for: viewId) else {
         result(nil)

@@ -22,7 +22,8 @@ abstract class MpvNativeBackendBase
         PlayerAdapter,
         SeekWindowProvider,
         DisplayModeController,
-        RuntimeSubtitleProvider {
+        RuntimeSubtitleProvider,
+        SyncOffsetProvider {
   MpvNativeBackendBase({
     required this.viewId,
     required this._channel,
@@ -265,6 +266,24 @@ abstract class MpvNativeBackendBase
   Future<void> setPlaybackSpeed(double speed) async {
     await _invokeControl('setPlaybackSpeed', <String, Object?>{'speed': speed});
   }
+
+  @override
+  Future<void> setAudioDelay(Duration delay) => _invokeControl(
+    'setSyncOffset',
+    <String, Object?>{
+      'property': 'audio-delay',
+      'milliseconds': delay.inMilliseconds,
+    },
+  );
+
+  @override
+  Future<void> setSubtitleDelay(Duration delay) => _invokeControl(
+    'setSyncOffset',
+    <String, Object?>{
+      'property': 'sub-delay',
+      'milliseconds': delay.inMilliseconds,
+    },
+  );
 
   /// Tears down the native mpv core without closing [onState]/[onError], so
   /// this adapter is still safe to [load] again later. See

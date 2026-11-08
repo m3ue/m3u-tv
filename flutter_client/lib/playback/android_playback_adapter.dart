@@ -55,7 +55,8 @@ class AndroidPlaybackAdapter
         RuntimeSubtitleProvider,
         PlatformViewProvider,
         MultiviewBackend,
-        DisplayModeController {
+        DisplayModeController,
+        SyncOffsetProvider {
   AndroidPlaybackAdapter({
     required AndroidPlaybackProbe probe,
     this.playerId = defaultPlayerId,
@@ -254,6 +255,26 @@ class AndroidPlaybackAdapter
   }
 
   @override
+  Future<void> setAudioDelay(Duration delay) async {
+    if (_activeBackend == PlaybackBackend.androidExoPlayer) {
+      await _media3Host.setSyncOffset(
+        property: 'audio-delay',
+        milliseconds: delay.inMilliseconds,
+      );
+    }
+  }
+
+  @override
+  Future<void> setSubtitleDelay(Duration delay) async {
+    if (_activeBackend == PlaybackBackend.androidExoPlayer) {
+      await _media3Host.setSyncOffset(
+        property: 'sub-delay',
+        milliseconds: delay.inMilliseconds,
+      );
+    }
+  }
+
+  @override
   Future<void> setPlaybackSpeed(double speed) async {
     if (!speed.isFinite || speed <= 0) {
       throw ArgumentError.value(
@@ -403,6 +424,12 @@ abstract class AndroidMedia3Host {
   Future<void> setSubtitleTrack(String? trackId);
   Future<void> addExternalSubtitle(ExternalSubtitle subtitle);
   Future<void> setPlaybackSpeed(double speed);
+
+  /// `audio-delay` or `sub-delay`, as mpv names them; positive plays later.
+  Future<void> setSyncOffset({
+    required String property,
+    required int milliseconds,
+  });
   Future<void> setVolume(double volume);
 
   /// See [DisplayModeController].
@@ -544,6 +571,16 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
         'playerId': playerId,
         'speed': speed,
       });
+
+  @override
+  Future<void> setSyncOffset({
+    required String property,
+    required int milliseconds,
+  }) => _method.invokeMethod<void>('setSyncOffset', <String, Object?>{
+    'playerId': playerId,
+    'property': property,
+    'milliseconds': milliseconds,
+  });
 
   @override
   Future<void> setVolume(double volume) =>

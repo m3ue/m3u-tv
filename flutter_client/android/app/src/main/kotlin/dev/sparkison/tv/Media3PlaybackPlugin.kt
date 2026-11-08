@@ -235,6 +235,15 @@ class Media3PlaybackPlugin(
                     requirePlayer(playerId).playbackParameters = playbackParameters
                     result.success(null)
                 }
+                "setSyncOffset" -> {
+                    val factory = states[playerId]?.renderersFactory
+                    val delayUs = (call.argument<Number>("milliseconds")?.toLong() ?: 0L) * 1_000L
+                    when (call.argument<String>("property")) {
+                        "audio-delay" -> factory?.audioDelayUs?.set(delayUs)
+                        "sub-delay" -> factory?.subtitleDelayUs?.set(delayUs)
+                    }
+                    result.success(null)
+                }
                 "setAllowDisplayModeChanges" -> {
                     setAllowDisplayModeChanges(playerId, call.argument<Boolean>("allowed") ?: true)
                     result.success(null)
@@ -341,7 +350,9 @@ class Media3PlaybackPlugin(
                 .setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true)
                 .build(),
         )
-        val player = ExoPlayer.Builder(context)
+        // DefaultRenderersFactory plus live audio/subtitle sync offsets.
+        val renderersFactory = SyncOffsetRenderersFactory(context)
+        val player = ExoPlayer.Builder(context, renderersFactory)
             .setTrackSelector(trackSelector)
             .setMediaSourceFactory(
                 // DefaultDataSource passes web URLs to the HTTP factory and also reads
@@ -355,6 +366,7 @@ class Media3PlaybackPlugin(
         val state = PlayerState(
             playerId = playerId,
             player = player,
+            renderersFactory = renderersFactory,
             uri = uri,
             subtitleConfigurations = subtitleConfigurations,
             matchDisplayRefreshRate = matchDisplayRefreshRate,
@@ -842,6 +854,7 @@ class Media3PlaybackPlugin(
     private data class PlayerState(
         val playerId: String,
         val player: ExoPlayer,
+        val renderersFactory: SyncOffsetRenderersFactory,
         val uri: String,
         var subtitleConfigurations: List<MediaItem.SubtitleConfiguration> = emptyList(),
         var mediaSession: MediaSession? = null,

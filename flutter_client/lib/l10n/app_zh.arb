@@ -1145,5 +1145,14 @@
   "dvrLoadPartial": "部分较早的录像未能加载。",
   "dvrLoadRefreshFailed": "无法刷新你的录像，当前显示的是上次加载的列表。",
   "dvrRetry": "重试",
-  "requestsProviderHeading": "请求来源"
+  "requestsProviderHeading": "请求来源",
+  "playerAudioSync": "音频同步",
+  "playerSubtitleSync": "字幕同步",
+  "playerSyncRow": "{label}：{value}",
+  "playerSyncMilliseconds": "{value} 毫秒",
+  "playerSyncSeconds": "{value} 秒",
+  "playerSyncReset": "重置",
+  "playerSyncDone": "完成",
+  "playerAudioSyncHint": "加号延后音频，减号提前音频。会为此频道或节目保存。",
+  "playerSubtitleSyncHint": "加号延后字幕，减号提前字幕。会为此频道或节目保存。"
 }

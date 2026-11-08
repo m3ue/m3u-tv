@@ -2438,4 +2438,37 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get requestsProviderHeading => '请求来源';
+
+  @override
+  String get playerAudioSync => '音频同步';
+
+  @override
+  String get playerSubtitleSync => '字幕同步';
+
+  @override
+  String playerSyncRow(String label, String value) {
+    return '$label：$value';
+  }
+
+  @override
+  String playerSyncMilliseconds(String value) {
+    return '$value 毫秒';
+  }
+
+  @override
+  String playerSyncSeconds(String value) {
+    return '$value 秒';
+  }
+
+  @override
+  String get playerSyncReset => '重置';
+
+  @override
+  String get playerSyncDone => '完成';
+
+  @override
+  String get playerAudioSyncHint => '加号延后音频，减号提前音频。会为此频道或节目保存。';
+
+  @override
+  String get playerSubtitleSyncHint => '加号延后字幕，减号提前字幕。会为此频道或节目保存。';
 }

@@ -183,6 +183,13 @@ class MpvPlayerPlugin(
                 core(viewId)?.setPlaybackSpeed((args["speed"] as? Number)?.toDouble() ?: 1.0)
                 result.success(null)
             }
+            "setSyncOffset" -> {
+                core(viewId)?.setSyncOffset(
+                    args["property"] as? String ?: "",
+                    ((args["milliseconds"] as? Number)?.toLong() ?: 0L) / 1000.0,
+                )
+                result.success(null)
+            }
             "dispose" -> {
                 val existing = core(viewId)
                 if (existing == null) {
