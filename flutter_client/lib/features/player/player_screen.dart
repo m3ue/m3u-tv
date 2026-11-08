@@ -1074,6 +1074,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _adjustSync(SyncOffsetKind kind) {
     _handleTrackDialogVisibilityChanged(true);
+    // The bar replaces the OSD while it's open, so the picture stays clear
+    // to judge the sync against. No focus request here: the bar's route
+    // takes focus, and moving it behind the bar would steal it.
+    if (_overlayVisible) setState(() => _overlayVisible = false);
     unawaited(
       showSyncOffsetBar(
         context,
@@ -1085,6 +1089,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       ).whenComplete(() {
         _handleTrackDialogVisibilityChanged(false);
         _persistSyncOffsets();
+        // Back to the OSD it was opened from, with focus on its controls
+        // (the button that opened the bar was unmounted with the OSD).
+        if (!_disposed && mounted) _showOverlay();
       }),
     );
   }
