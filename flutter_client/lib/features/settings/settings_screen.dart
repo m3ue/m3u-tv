@@ -166,6 +166,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           deviceType: widget.deviceType,
           savedPlaylists:
               widget.playlists?.service.playlists ?? const <SavedPlaylist>[],
+          onPaired: widget.playlists?.service.adoptPaired,
         ),
       );
     }

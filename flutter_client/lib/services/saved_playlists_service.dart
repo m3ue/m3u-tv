@@ -5,6 +5,8 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
+import 'package:m3u_tv/services/device_pairing_service.dart'
+    show PairedPlaylist;
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/notification_coordinator.dart'
     show sameCredentials;
@@ -277,6 +279,53 @@ class SavedPlaylistsService extends ChangeNotifier {
     notifyListeners();
     await _persist();
     return playlist;
+  }
+
+  /// Saves the playlists an admin granted in one pairing, in their order, at
+  /// the top of the list; other saved playlists keep their order below. One
+  /// already saved keeps its id and state, and its name unless it has none,
+  /// in which case it takes the editor's. Nothing is marked used: connecting
+  /// to the primary does that through [remember].
+  Future<void> adoptPaired(List<PairedPlaylist> paired) async {
+    await load();
+    final adopted = <SavedPlaylist>[];
+    for (final entry in paired) {
+      if (adopted.any(
+        (playlist) => sameCredentials(playlist.credentials, entry.credentials),
+      )) {
+        continue;
+      }
+      final existing = find(entry.credentials);
+      if (existing != null) {
+        adopted.add(
+          existing.name == null && entry.name != null
+              ? existing.withName(entry.name)
+              : existing,
+        );
+        continue;
+      }
+      final pendingId = _pendingIds.remove(_identity(entry.credentials));
+      adopted.add(
+        SavedPlaylist(
+          id: pendingId ?? _newId(),
+          credentials: entry.credentials,
+          name: entry.name,
+          // Same rule as [remember]: the first playlist on a device keeps
+          // the unscoped keys.
+          usesBaseKeys:
+              pendingId == null && _playlists.isEmpty && adopted.isEmpty,
+        ),
+      );
+    }
+    if (adopted.isEmpty) return;
+    final adoptedIds = {for (final playlist in adopted) playlist.id};
+    _playlists = List<SavedPlaylist>.unmodifiable(<SavedPlaylist>[
+      ...adopted,
+      for (final playlist in _playlists)
+        if (!adoptedIds.contains(playlist.id)) playlist,
+    ]);
+    notifyListeners();
+    await _persist();
   }
 
   /// Records that [id]'s state has moved off the unscoped keys.

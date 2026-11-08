@@ -40,6 +40,62 @@ void main() {
       },
     );
 
+    test('approved poll lists every granted playlist, primary first', () async {
+      final transport = _FakeTransport([
+        _codeResponse(interval: 3600),
+        _statusResponse(
+          'approved',
+          extra: {
+            'username': 'kids',
+            'password': 'k-pass',
+            'playlists': [
+              {'name': 'Kids', 'username': 'kids', 'password': 'k-pass'},
+              {
+                'name': 'Living Room',
+                'username': 'living',
+                'password': 'l-pass',
+              },
+            ],
+          },
+        ),
+      ]);
+      final service = DevicePairingService(transport: transport.call);
+      addTearDown(service.dispose);
+
+      await service.start('http://example.com');
+      await service.pollForTesting('http://example.com');
+
+      expect(service.result?.username, 'kids');
+      expect(service.pairedPlaylists.map((p) => p.name), [
+        'Kids',
+        'Living Room',
+      ]);
+      expect(
+        service.pairedPlaylists.map((p) => p.credentials.username),
+        ['kids', 'living'],
+      );
+      expect(
+        service.pairedPlaylists.last.credentials.server,
+        'http://example.com',
+      );
+    });
+
+    test('an editor without playlists yields the single credential', () async {
+      final transport = _FakeTransport([
+        _codeResponse(interval: 3600),
+        _approvedResponse(username: 'tv-user', password: 'tv-pass'),
+      ]);
+      final service = DevicePairingService(transport: transport.call);
+      addTearDown(service.dispose);
+
+      await service.start('http://example.com');
+      await service.pollForTesting('http://example.com');
+
+      final paired = service.pairedPlaylists.single;
+      expect(paired.credentials.username, 'tv-user');
+      expect(paired.name, isNull);
+    });
+
     test('pending poll response keeps polling state', () async {
       final transport = _FakeTransport([
         _codeResponse(interval: 3600),
