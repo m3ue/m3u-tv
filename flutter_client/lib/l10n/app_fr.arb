@@ -1144,5 +1144,6 @@
   "dvrLoadOffline": "Impossible de joindre votre serveur. Vérifiez votre connexion et réessayez.",
   "dvrLoadPartial": "Certains enregistrements plus anciens n'ont pas pu être chargés.",
   "dvrLoadRefreshFailed": "Impossible d'actualiser vos enregistrements. La dernière liste chargée est affichée.",
-  "dvrRetry": "Réessayer"
+  "dvrRetry": "Réessayer",
+  "requestsProviderHeading": "Demander à"
 }

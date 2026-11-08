@@ -4435,6 +4435,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Try again'**
   String get dvrRetry;
+
+  /// No description provided for @requestsProviderHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Request from'**
+  String get requestsProviderHeading;
 }
 
 class _AppLocalizationsDelegate

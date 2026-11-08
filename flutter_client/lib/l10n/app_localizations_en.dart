@@ -2525,4 +2525,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dvrRetry => 'Try again';
+
+  @override
+  String get requestsProviderHeading => 'Request from';
 }

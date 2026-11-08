@@ -1408,5 +1408,6 @@
   "dvrLoadOffline": "Can't reach your server. Check your connection and try again.",
   "dvrLoadPartial": "Some older recordings couldn't be loaded.",
   "dvrLoadRefreshFailed": "Couldn't refresh your recordings. Showing the last list loaded.",
-  "dvrRetry": "Try again"
+  "dvrRetry": "Try again",
+  "requestsProviderHeading": "Request from"
 }

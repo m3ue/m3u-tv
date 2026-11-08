@@ -144,16 +144,18 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
     if (_query.trim().length >= 2) unawaited(_search(_query));
   }
 
-  bool _isAlreadyRequested(
+  static const Set<MediaRequestStatus> _activeStatuses = <MediaRequestStatus>{
+    MediaRequestStatus.pendingApproval,
+    MediaRequestStatus.approved,
+  };
+
+  /// Flagged (available or requested) only when no integration is left that
+  /// could still take a request, so one integration having or being asked
+  /// for the title doesn't hide another that could (#137).
+  bool _nothingLeftToRequest(
     ContentRequestSearchResult result,
     List<MediaRequestSummary> myRequests,
-  ) => myRequests.any(
-    (request) =>
-        request.type == result.type &&
-        request.externalId == result.externalId &&
-        (request.status == MediaRequestStatus.pendingApproval ||
-            request.status == MediaRequestStatus.approved),
-  );
+  ) => result.requestableProviders(myRequests, _activeStatuses).isEmpty;
 
   Future<void> _dismiss(MediaRequestSummary request) async {
     final l = AppLocalizations.of(context);
@@ -338,9 +340,7 @@ class _RequestScreenState extends ConsumerState<RequestScreen>
               itemCount: _results.length,
               itemBuilder: (context, index) {
                 final result = _results[index];
-                final flagged =
-                    result.alreadyAvailable ||
-                    _isAlreadyRequested(result, myRequests);
+                final flagged = _nothingLeftToRequest(result, myRequests);
                 return MediaPreviewCard(
                   posterStyle: true,
                   keepAlive: false,

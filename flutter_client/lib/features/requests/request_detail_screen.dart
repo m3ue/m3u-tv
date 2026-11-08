@@ -13,6 +13,7 @@ import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/movie_detail_body.dart';
+import 'package:m3u_tv/shared/selectable_chip.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Detail screen for a single `request_search` result — built directly on
@@ -47,18 +48,61 @@ class RequestDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
+  /// Statuses that mean this guest already asked an integration for the
+  /// title (the button shows the status instead of Request).
+  static const Set<MediaRequestStatus> _requestedStatuses =
+      <MediaRequestStatus>{
+        MediaRequestStatus.pendingApproval,
+        MediaRequestStatus.approved,
+        MediaRequestStatus.completed,
+      };
+
   bool _isSubmitting = false;
 
-  /// Seasons the guest wants to request, initialized to every season the
-  /// library doesn't already have a file for — matching Sonarr's own
-  /// "monitor missing" default so a plain tap of Request just fills gaps.
-  /// Season 0 ("Specials") is excluded from that default, same as the
-  /// m3u-editor web UI (ArrSearch::openDetail) — guests can still opt in
-  /// via its chip.
-  late final Set<int> _selectedSeasons = widget.result.seasons
+  /// The integration to request from. Starts on the first one that can
+  /// still take the request, so one that already has the title doesn't
+  /// hide another that could (#137).
+  late int _providerId = _initialProviderId();
+
+  /// Seasons the guest wants to request from the selected integration,
+  /// initialized to every season it doesn't already have a file for —
+  /// matching Sonarr's own "monitor missing" default so a plain tap of
+  /// Request just fills gaps. Season 0 ("Specials") is excluded from that
+  /// default, same as the m3u-editor web UI (ArrSearch::openDetail) — guests
+  /// can still opt in via its chip.
+  late Set<int> _selectedSeasons = _defaultSeasons(_provider);
+
+  int _initialProviderId() {
+    final requestable = widget.result.requestableProviders(
+      ref.read(mediaRequestsProvider),
+      _requestedStatuses,
+    );
+    return requestable.isNotEmpty
+        ? requestable.first.integrationId
+        : widget.result.integrationId;
+  }
+
+  ContentRequestProvider get _provider {
+    final providers = widget.result.providers;
+    for (final provider in providers) {
+      if (provider.integrationId == _providerId) return provider;
+    }
+    return providers.first;
+  }
+
+  static Set<int> _defaultSeasons(ContentRequestProvider provider) => provider
+      .seasons
       .where((season) => !season.hasFile && season.seasonNumber != 0)
       .map((season) => season.seasonNumber)
       .toSet();
+
+  void _selectProvider(ContentRequestProvider provider) {
+    if (provider.integrationId == _providerId) return;
+    setState(() {
+      _providerId = provider.integrationId;
+      _selectedSeasons = _defaultSeasons(provider);
+    });
+  }
 
   Color? _dominantColor;
 
@@ -98,7 +142,7 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
     setState(() {
       _selectedSeasons
         ..clear()
-        ..addAll(widget.result.seasons.map((season) => season.seasonNumber));
+        ..addAll(_provider.seasons.map((season) => season.seasonNumber));
     });
   }
 
@@ -114,7 +158,7 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
     try {
       final request = await widget.onSubmit(
         type: result.type,
-        integrationId: result.integrationId,
+        integrationId: _provider.integrationId,
         externalId: result.externalId,
         seasons: result.type == 'series'
             ? (_selectedSeasons.toList()..sort())
@@ -147,22 +191,20 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
     final l = AppLocalizations.of(context);
     final result = widget.result;
     final myRequests = ref.watch(mediaRequestsProvider);
-    final existing = myRequests
-        .where(
-          (request) =>
-              request.type == result.type &&
-              request.externalId == result.externalId &&
-              (request.status == MediaRequestStatus.pendingApproval ||
-                  request.status == MediaRequestStatus.approved ||
-                  request.status == MediaRequestStatus.completed),
-        )
-        .firstOrNull;
+    final provider = _provider;
+    final existing = result.requestFor(
+      provider,
+      myRequests,
+      _requestedStatuses,
+    );
+    final available = provider.alreadyAvailable;
+    final providers = result.providers;
 
     final showSeasonPicker =
         result.type == 'series' &&
-        result.seasons.isNotEmpty &&
+        provider.seasons.isNotEmpty &&
         existing == null &&
-        !result.alreadyAvailable;
+        !available;
     final rating = result.rating;
     final chips = [
       if (result.year != null) result.year!,
@@ -192,45 +234,73 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
         ],
         richCast: result.castList,
         castSemanticLabel: l.vodCast,
-        primaryButtonLabel: _primaryLabel(l, existing),
-        primaryIcon: _primaryIcon(existing),
+        primaryButtonLabel: _primaryLabel(l, existing, available: available),
+        primaryIcon: _primaryIcon(existing, available: available),
         onPrimary: _primaryAction(
           existing: existing,
+          available: available,
           showSeasonPicker: showSeasonPicker,
         ),
         isLoading: _isSubmitting,
         dominantColor: _dominantColor,
         colorMatchReady: _colorMatchResolved,
-        extraContent: !showSeasonPicker
+        extraContent: providers.length < 2 && !showSeasonPicker
             ? null
-            : _SeasonsSection(
-                seasons: result.seasons,
-                selectedSeasons: _selectedSeasons,
-                onToggleSeason: _toggleSeason,
-                onSelectAll: _selectAllSeasons,
-                onClear: _clearAllSeasons,
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (providers.length > 1)
+                    _ProviderPicker(
+                      providers: providers,
+                      selectedId: provider.integrationId,
+                      onSelect: _selectProvider,
+                    ),
+                  if (providers.length > 1 && showSeasonPicker)
+                    const SizedBox(
+                      height: MediaBrowsingMetrics.contentPadding,
+                    ),
+                  if (showSeasonPicker)
+                    _SeasonsSection(
+                      // Keyed so switching integration rebuilds the toggles
+                      // for that integration's own season list.
+                      key: ValueKey<int>(provider.integrationId),
+                      seasons: provider.seasons,
+                      selectedSeasons: _selectedSeasons,
+                      onToggleSeason: _toggleSeason,
+                      onSelectAll: _selectAllSeasons,
+                      onClear: _clearAllSeasons,
+                    ),
+                ],
               ),
       ),
     );
   }
 
-  String _primaryLabel(AppLocalizations l, MediaRequestSummary? existing) {
-    if (widget.result.alreadyAvailable) return l.requestsAlreadyAvailable;
+  String _primaryLabel(
+    AppLocalizations l,
+    MediaRequestSummary? existing, {
+    required bool available,
+  }) {
+    if (available) return l.requestsAlreadyAvailable;
     if (existing != null) return _statusLabel(l, existing.status);
     return l.requestsRequestButton;
   }
 
-  IconData _primaryIcon(MediaRequestSummary? existing) {
-    if (widget.result.alreadyAvailable) return Icons.check_circle_outline;
+  IconData _primaryIcon(
+    MediaRequestSummary? existing, {
+    required bool available,
+  }) {
+    if (available) return Icons.check_circle_outline;
     if (existing != null) return Icons.check;
     return Icons.add;
   }
 
   VoidCallback? _primaryAction({
     required MediaRequestSummary? existing,
+    required bool available,
     required bool showSeasonPicker,
   }) {
-    if (widget.result.alreadyAvailable || existing != null) return null;
+    if (available || existing != null) return null;
     final noSeasonsSelected = showSeasonPicker && _selectedSeasons.isEmpty;
     if (noSeasonsSelected) return null;
     return () => unawaited(_submit());
@@ -246,8 +316,46 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
       };
 }
 
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
+/// "Request from" chips, one per integration that returned the title. Only
+/// shown when there is more than one; the button above reflects the selected
+/// integration's own state (available, requested, or Request).
+class _ProviderPicker extends StatelessWidget {
+  const _ProviderPicker({
+    required this.providers,
+    required this.selectedId,
+    required this.onSelect,
+  });
+
+  final List<ContentRequestProvider> providers;
+  final int selectedId;
+  final ValueChanged<ContentRequestProvider> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l.requestsProviderHeading,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: MediaBrowsingMetrics.chipGap),
+        Wrap(
+          spacing: MediaBrowsingMetrics.chipGap,
+          runSpacing: MediaBrowsingMetrics.chipGap,
+          children: [
+            for (final provider in providers)
+              SelectableChip(
+                label: provider.integrationName,
+                selected: provider.integrationId == selectedId,
+                onTap: () => onSelect(provider),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -261,6 +369,7 @@ extension _FirstOrNull<T> on Iterable<T> {
 
 class _SeasonsSection extends StatelessWidget {
   const _SeasonsSection({
+    super.key,
     required this.seasons,
     required this.selectedSeasons,
     required this.onToggleSeason,

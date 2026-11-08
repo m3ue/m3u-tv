@@ -2556,4 +2556,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get dvrRetry => 'Réessayer';
+
+  @override
+  String get requestsProviderHeading => 'Demander à';
 }

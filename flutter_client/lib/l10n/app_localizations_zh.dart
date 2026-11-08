@@ -2435,4 +2435,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get dvrRetry => '重试';
+
+  @override
+  String get requestsProviderHeading => '请求来源';
 }

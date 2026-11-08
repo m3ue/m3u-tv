@@ -1144,5 +1144,6 @@
   "dvrLoadOffline": "Dein Server ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut.",
   "dvrLoadPartial": "Einige ältere Aufnahmen konnten nicht geladen werden.",
   "dvrLoadRefreshFailed": "Deine Aufnahmen konnten nicht aktualisiert werden. Angezeigt wird die zuletzt geladene Liste.",
-  "dvrRetry": "Erneut versuchen"
+  "dvrRetry": "Erneut versuchen",
+  "requestsProviderHeading": "Anfragen bei"
 }
