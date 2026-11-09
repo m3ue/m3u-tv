@@ -846,6 +846,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get settingsAppUpdateNoticeTitle => 'App update available';
+
+  @override
+  String settingsAppUpdateNoticeBody(String version) {
+    return 'Version $version is ready to install.';
+  }
+
+  @override
   String get settingsAppViewRelease => 'View release';
 
   @override

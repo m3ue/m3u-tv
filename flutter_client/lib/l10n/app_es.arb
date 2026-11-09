@@ -309,6 +309,15 @@
       }
     }
   },
+  "settingsAppUpdateNoticeTitle": "Actualización de la app disponible",
+  "settingsAppUpdateNoticeBody": "La versión {version} está lista para instalar.",
+  "@settingsAppUpdateNoticeBody": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "settingsAppViewRelease": "Ver versión",
   "settingsAppScanQr": "Escanear para abrir en tu teléfono",
   "settingsReleaseNotesTab": "Novedades",

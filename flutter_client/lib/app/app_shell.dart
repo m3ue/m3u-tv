@@ -277,6 +277,28 @@ class AppShellState extends ConsumerState<AppShell>
     }
     _visibleRoutes = _mainRoutes;
     _initSidebarFocusNodes();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(_announceAppUpdate()),
+    );
+  }
+
+  // Settings > General already shows the update status, but only to someone
+  // who goes looking; this pins a newer release in Notifications (with an
+  // unread badge on the bell) and toasts it once per version. Tapping the
+  // toast opens Notifications like any other.
+  Future<void> _announceAppUpdate() async {
+    final version = await _appState.checkForAppUpdate();
+    if (version == null || !mounted) return;
+    final l = AppLocalizations.of(context);
+    _enqueueNotificationToast(
+      TvNotificationItem(
+        id: 'app-update-$version',
+        channel: 'app_update',
+        title: l.settingsAppUpdateNoticeTitle,
+        body: l.settingsAppUpdateNoticeBody(version),
+        status: 'info',
+      ),
+    );
   }
 
   @override
@@ -1744,6 +1766,7 @@ class AppShellState extends ConsumerState<AppShell>
       RouteNames.notifications => NotificationsScreen(
         onMarkRead: _appState.markNotificationRead,
         onMarkAllRead: _appState.markAllNotificationsRead,
+        onMarkAppUpdateRead: _appState.markAppUpdateRead,
         onSetChannels: _appState.setNotificationChannels,
       ),
       RouteNames.settings => ListenableBuilder(

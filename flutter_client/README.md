@@ -335,9 +335,7 @@ These compile-time flags are for local development and debugging. Pass them via 
 Example enabling diagnostics on a debug run:
 
 ```bash
-flutter run \
-  --dart-define=M3U_TV_SHOW_PLAYBACK_DIAGNOSTICS=true \
-  -d <device-id>
+flutter run -d <device-id>
 ```
 
 ## Project structure

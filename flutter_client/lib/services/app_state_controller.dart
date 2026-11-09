@@ -7,6 +7,7 @@ import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/app_log_buffer.dart';
+import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
@@ -371,11 +372,22 @@ class AppStateController extends ChangeNotifier {
   Stream<TvNotificationDestination> get notificationActivations =>
       _notifications.activations;
 
-  int get unreadNotificationCount => _notifications.unreadCount;
+  int get unreadNotificationCount =>
+      _notifications.unreadCount +
+      (_appUpdateNotice != null && !_appUpdateNotice!.isRead ? 1 : 0);
+
+  /// A newer app release, shown pinned at the top of Notifications. Kept
+  /// apart from the notification store, which mirrors the server's list.
+  AppUpdateNotice? get appUpdateNotice => _appUpdateNotice;
+  AppUpdateNotice? _appUpdateNotice;
+  final AppVersionService _appVersionService = AppVersionService();
 
   Future<void> markNotificationRead(String id) => _notifications.markRead(id);
 
-  Future<void> markAllNotificationsRead() => _notifications.markAllRead();
+  Future<void> markAllNotificationsRead() async {
+    await markAppUpdateRead();
+    await _notifications.markAllRead();
+  }
 
   Future<void> setNotificationChannels(Set<String> channels) =>
       _notifications.setChannels(channels);
@@ -1899,6 +1911,31 @@ class AppStateController extends ChangeNotifier {
       '${interval.inMinutes}',
     );
     notifyListeners();
+  }
+
+  /// Checks for a newer app release and, if there is one, surfaces it in
+  /// Notifications (and the bell's unread count). Returns the version when
+  /// it was seen for the first time on this install, so the caller can toast
+  /// it once. Best-effort: any failure just skips the notice this launch.
+  Future<String?> checkForAppUpdate() async {
+    final AppUpdateNotice? notice;
+    try {
+      notice = await _appVersionService.updateNotice(secureStorage);
+    } on Object {
+      return null;
+    }
+    if (notice == null) return null;
+    _appUpdateNotice = notice;
+    notifyListeners();
+    return notice.isNew ? notice.version : null;
+  }
+
+  Future<void> markAppUpdateRead() async {
+    final notice = _appUpdateNotice;
+    if (notice == null || notice.isRead) return;
+    _appUpdateNotice = notice.markedRead();
+    notifyListeners();
+    await _appVersionService.markNoticeRead(secureStorage, notice.version);
   }
 
   Future<void> setLocale(Locale? locale) async {

@@ -817,6 +817,14 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get settingsAppUpdateNoticeTitle => '应用有可用更新';
+
+  @override
+  String settingsAppUpdateNoticeBody(String version) {
+    return '版本 $version 已可安装。';
+  }
+
+  @override
   String get settingsAppViewRelease => '查看版本';
 
   @override

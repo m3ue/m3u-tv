@@ -472,6 +472,15 @@
       }
     }
   },
+  "settingsAppUpdateNoticeTitle": "App update available",
+  "settingsAppUpdateNoticeBody": "Version {version} is ready to install.",
+  "@settingsAppUpdateNoticeBody": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "settingsAppViewRelease": "View release",
   "settingsAppScanQr": "Scan to open on your phone",
   "settingsReleaseNotesTab": "What's New",

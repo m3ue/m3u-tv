@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
+import 'package:m3u_tv/services/app_version_service.dart' show AppUpdateNotice;
 import 'package:m3u_tv/services/tv_notification_store.dart'
     show StoredTvNotification, TvNotificationChannel, TvNotificationStore;
 import 'package:m3u_tv/shared/app_button.dart';
@@ -21,11 +22,13 @@ class NotificationsScreen extends ConsumerStatefulWidget {
     required this.onMarkRead,
     required this.onMarkAllRead,
     required this.onSetChannels,
+    this.onMarkAppUpdateRead,
   });
 
   final Future<void> Function(String id) onMarkRead;
   final Future<void> Function() onMarkAllRead;
   final Future<void> Function(Set<String> channels) onSetChannels;
+  final Future<void> Function()? onMarkAppUpdateRead;
 
   @override
   ConsumerState<NotificationsScreen> createState() =>
@@ -160,7 +163,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
         : _notifications
               .where((n) => _subscribed.contains(n.item.channel))
               .toList(growable: false);
-    final hasUnread = filtered.any((n) => !n.isRead);
+    final appUpdate = ref.watch(appUpdateNoticeProvider);
+    final hasUnread =
+        filtered.any((n) => !n.isRead) ||
+        (appUpdate != null && !appUpdate.isRead);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,12 +181,19 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
             ),
           ),
         if (hasUnread) const SizedBox(height: 12),
+        if (appUpdate != null) ...[
+          _AppUpdateTile(
+            notice: appUpdate,
+            onTap: () => widget.onMarkAppUpdateRead?.call(),
+          ),
+          const SizedBox(height: 8),
+        ],
         if (!_loaded)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 48),
             child: Center(child: AppLoadingIndicator()),
           )
-        else if (filtered.isEmpty)
+        else if (filtered.isEmpty && appUpdate == null)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 48),
             child: Center(
@@ -312,6 +325,48 @@ class _ChannelFilterChip extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── App update tile ──────────────────────────────────────────────────────────
+
+/// A newer app release, pinned above the server notifications while it stays
+/// uninstalled. Selecting it marks it read, clearing the bell badge.
+class _AppUpdateTile extends StatelessWidget {
+  const _AppUpdateTile({required this.notice, required this.onTap});
+
+  final AppUpdateNotice notice;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
+    return DpadInkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: notice.isRead
+              ? theme.colorScheme.surfaceContainerHigh
+              : theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: ListTile(
+          leading: Icon(Icons.system_update, color: theme.colorScheme.primary),
+          title: Text(
+            l.settingsAppUpdateNoticeTitle,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: notice.isRead ? FontWeight.normal : FontWeight.w700,
+            ),
+          ),
+          subtitle: Text(l.settingsAppUpdateNoticeBody(notice.version)),
+          trailing: notice.isRead
+              ? null
+              : Icon(Icons.circle, size: 10, color: theme.colorScheme.primary),
         ),
       ),
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:m3u_tv/services/api_client.dart';
+import 'package:m3u_tv/services/secure_storage.dart';
 
 /// Result of comparing the installed app version against the latest
 /// version published in `pubspec.yaml` on the repo's master branch.
@@ -13,6 +14,25 @@ class AppVersionCheck {
   final String currentVersion;
   final String? latestVersion;
   final bool updateAvailable;
+}
+
+/// A newer release surfaced in Notifications (see
+/// [AppVersionService.updateNotice]).
+class AppUpdateNotice {
+  const AppUpdateNotice({
+    required this.version,
+    required this.isRead,
+    this.isNew = false,
+  });
+
+  final String version;
+  final bool isRead;
+
+  /// First time this version was seen on this install.
+  final bool isNew;
+
+  AppUpdateNotice markedRead() =>
+      AppUpdateNotice(version: version, isRead: true);
 }
 
 /// Fetches the app's own version and checks it against the version
@@ -59,6 +79,30 @@ class AppVersionService {
       updateAvailable: _isNewer(latest, current),
     );
   }
+
+  static const _announcedVersionKey = 'm3ue_tv_announced_update_version';
+  static const _readVersionKey = 'm3ue_tv_read_update_version';
+
+  /// The in-app notice for a release newer than the installed one, or null
+  /// when up to date (or the check failed). Records the version as announced,
+  /// so [AppUpdateNotice.isNew] (the toast) is true once per release while
+  /// [AppUpdateNotice.isRead] (the bell badge) stays false until
+  /// [markNoticeRead].
+  Future<AppUpdateNotice?> updateNotice(SecureStorage storage) async {
+    final check = await this.check();
+    final latest = check.latestVersion;
+    if (!check.updateAvailable || latest == null) return null;
+    final isNew = await storage.read(_announcedVersionKey) != latest;
+    if (isNew) await storage.write(_announcedVersionKey, latest);
+    return AppUpdateNotice(
+      version: latest,
+      isRead: await storage.read(_readVersionKey) == latest,
+      isNew: isNew,
+    );
+  }
+
+  Future<void> markNoticeRead(SecureStorage storage, String version) =>
+      storage.write(_readVersionKey, version);
 
   Future<String?> _fetchLatestVersion() async {
     try {

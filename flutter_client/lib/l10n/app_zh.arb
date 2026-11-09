@@ -309,6 +309,15 @@
       }
     }
   },
+  "settingsAppUpdateNoticeTitle": "应用有可用更新",
+  "settingsAppUpdateNoticeBody": "版本 {version} 已可安装。",
+  "@settingsAppUpdateNoticeBody": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "settingsAppViewRelease": "查看版本",
   "settingsAppScanQr": "扫描以在手机上打开",
   "settingsReleaseNotesTab": "最近更新",

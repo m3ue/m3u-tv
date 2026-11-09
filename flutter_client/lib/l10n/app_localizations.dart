@@ -1568,6 +1568,18 @@ abstract class AppLocalizations {
   /// **'Update available: {version}'**
   String settingsAppUpdateAvailable(String version);
 
+  /// No description provided for @settingsAppUpdateNoticeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App update available'**
+  String get settingsAppUpdateNoticeTitle;
+
+  /// No description provided for @settingsAppUpdateNoticeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} is ready to install.'**
+  String settingsAppUpdateNoticeBody(String version);
+
   /// No description provided for @settingsAppViewRelease.
   ///
   /// In en, this message translates to:
