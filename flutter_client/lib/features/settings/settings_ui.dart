@@ -130,11 +130,16 @@ class SettingsRow extends StatelessWidget {
     this.onTap,
     this.destructive = false,
     this.autofocus = false,
+    this.locked = false,
   });
 
   final String title;
   final String? subtitle;
   final IconData? icon;
+
+  /// The server enforces this setting (M3U TV Profile): the row shows a lock,
+  /// drops its chevron, and selecting it explains why it can't change.
+  final bool locked;
 
   /// Custom leading visual (e.g. a service logo) shown in place of [icon].
   final Widget? leading;
@@ -151,6 +156,17 @@ class SettingsRow extends StatelessWidget {
     final theme = Theme.of(context);
     final scale = FontSizeScope.scaleOf(context);
     final titleColor = destructive ? theme.colorScheme.error : null;
+    final titleTrailing = locked
+        ? Icon(
+            Icons.lock_outline,
+            size: 16 * scale,
+            color: theme.colorScheme.onSurfaceVariant,
+          )
+        : this.titleTrailing;
+    final trailing = locked && this.trailing is SettingsChevron
+        ? null
+        : this.trailing;
+    final onTap = locked ? () => _explainLocked(context) : this.onTap;
     final titleText = Text(
       title,
       style: theme.textTheme.bodyLarge?.copyWith(
@@ -188,7 +204,7 @@ class SettingsRow extends StatelessWidget {
                     children: [
                       Flexible(child: titleText),
                       SizedBox(width: 8 * scale),
-                      titleTrailing!,
+                      titleTrailing,
                     ],
                   ),
                 if (subtitle != null) ...[
@@ -205,7 +221,7 @@ class SettingsRow extends StatelessWidget {
               ],
             ),
           ),
-          if (trailing != null) ...[SizedBox(width: 12 * scale), trailing!],
+          if (trailing != null) ...[SizedBox(width: 12 * scale), trailing],
         ],
       ),
     );
@@ -220,6 +236,18 @@ class SettingsRow extends StatelessWidget {
       borderRadius: borderRadius,
       child: content,
     );
+  }
+
+  static void _explainLocked(BuildContext context) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).settingsManagedByServer),
+        ),
+      );
   }
 }
 
@@ -248,6 +276,7 @@ class SettingsSwitchRow extends StatelessWidget {
     this.leading,
     required this.value,
     required this.onChanged,
+    this.locked = false,
   });
 
   final String title;
@@ -257,6 +286,9 @@ class SettingsSwitchRow extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
 
+  /// See [SettingsRow.locked]; the switch shows the enforced value, disabled.
+  final bool locked;
+
   @override
   Widget build(BuildContext context) {
     return SettingsRow(
@@ -264,7 +296,8 @@ class SettingsSwitchRow extends StatelessWidget {
       subtitle: subtitle,
       icon: icon,
       leading: leading,
-      trailing: AppSwitch(value: value, onChanged: onChanged),
+      locked: locked,
+      trailing: AppSwitch(value: value, onChanged: locked ? null : onChanged),
       onTap: () => onChanged(!value),
     );
   }

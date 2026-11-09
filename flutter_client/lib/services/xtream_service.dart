@@ -7,6 +7,7 @@ import 'dart:typed_data';
 
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/cache_service.dart';
+import 'package:m3u_tv/services/client_config.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/json_isolate.dart';
 import 'package:m3u_tv/services/sports_models.dart';
@@ -402,6 +403,7 @@ class XtreamAuthResponse {
     this.requests,
     this.sports,
     this.watchHistory = const <ServerWatchHistoryAccount>[],
+    this.clientConfig,
   });
 
   final bool isAuthenticated;
@@ -413,6 +415,10 @@ class XtreamAuthResponse {
   final RequestsCapability? requests;
   final SportsCapability? sports;
   final List<ServerWatchHistoryAccount> watchHistory;
+
+  /// Settings the editor manages for this login; null on editors without
+  /// M3U TV Profiles.
+  final ClientConfigCapability? clientConfig;
 
   bool hasFeature(String feature) => features.contains(feature);
 
@@ -572,6 +578,10 @@ class XtreamService {
         .map(ServerWatchHistoryAccount.fromJson)
         .where((account) => account.provider.isNotEmpty)
         .toList(growable: false);
+    final clientConfigJson = m3uEditor['client_config'];
+    final clientConfig = clientConfigJson is Map<String, dynamic>
+        ? ClientConfigCapability.tryFromJson(clientConfigJson)
+        : null;
     final authResponse = XtreamAuthResponse(
       isAuthenticated: true,
       status: status,
@@ -582,6 +592,7 @@ class XtreamService {
       requests: requests,
       sports: sports,
       watchHistory: watchHistory,
+      clientConfig: clientConfig,
     );
     if (!_authenticationGeneration.isStale(authenticationGeneration)) {
       _credentials = normalized;
@@ -1776,6 +1787,18 @@ class XtreamService {
       'to': '${to.millisecondsSinceEpoch ~/ 1000}',
     },
   );
+
+  /// The settings the editor manages for this login
+  /// ([ClientConfigCapability.action]).
+  Future<ClientConfig> getClientConfig(
+    ClientConfigCapability capability,
+  ) async {
+    final json = await _request(capability.action);
+    if (json is! Map) {
+      throw const FormatException('Unexpected client config response');
+    }
+    return ClientConfig.fromJson(Map<String, dynamic>.from(json));
+  }
 
   /// One game's details ([SportsCapability.detailsAction]), raw.
   Future<Object?> getSportsFixtureDetails(

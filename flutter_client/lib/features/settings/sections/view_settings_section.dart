@@ -112,6 +112,9 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
           children: [
             SettingsRow(
               title: l.settingsDefaultStartPage,
+              locked: widget.service.isEnforced(
+                ViewSettingsService.defaultStartPageKey,
+              ),
               subtitle: _startPageLabel(l, _defaultStartPage),
               icon: Icons.home_outlined,
               trailing: const SettingsChevron(),
@@ -138,6 +141,9 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
             if (_showNavigationSoundToggle)
               SettingsRow(
                 title: l.settingsHomeScreenStyle,
+                locked: widget.service.isEnforced(
+                  ViewSettingsService.homeScreenStyleKey,
+                ),
                 subtitle: _homeScreenStyleLabel(l, _homeScreenStyle),
                 icon: Icons.dashboard_outlined,
                 trailing: const SettingsChevron(),
@@ -179,6 +185,9 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
             ),
             SettingsRow(
               title: l.settingsLiveTvLayout,
+              locked: widget.service.isEnforced(
+                ViewSettingsService.liveTvLayoutKey,
+              ),
               subtitle: _liveTvLayoutLabel(l, _liveTvLayout),
               icon: Icons.view_list_outlined,
               trailing: const SettingsChevron(),
@@ -209,6 +218,9 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
             ),
             SettingsRow(
               title: l.settingsLiveTvChannelColumn,
+              locked: widget.service.isEnforced(
+                ViewSettingsService.channelColumnLayoutKey,
+              ),
               subtitle: _channelColumnLabel(l, _channelColumnLayout),
               icon: Icons.view_column_outlined,
               trailing: const SettingsChevron(),
@@ -240,6 +252,9 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
             ),
             SettingsRow(
               title: l.settingsEpgStartView,
+              locked: widget.service.isEnforced(
+                ViewSettingsService.epgStartViewKey,
+              ),
               subtitle: _epgStartViewLabel(l, _epgStartView),
               icon: Icons.calendar_view_day_outlined,
               trailing: const SettingsChevron(),
@@ -267,6 +282,9 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
             if (_showEpgPreviewPlayback)
               SettingsRow(
                 title: l.settingsEpgPreviewPlayback,
+                locked: widget.service.isEnforced(
+                  ViewSettingsService.epgPreviewPlaybackKey,
+                ),
                 subtitle: _epgPreviewPlaybackLabel(l, _epgPreviewPlayback),
                 icon: Icons.smart_display_outlined,
                 trailing: const SettingsChevron(),
@@ -292,6 +310,9 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
                 _epgPreviewPlayback == EpgPreviewPlayback.pauseToPlay)
               SettingsRow(
                 title: l.settingsEpgPreviewDelay,
+                locked: widget.service.isEnforced(
+                  ViewSettingsService.epgPreviewDelayKey,
+                ),
                 subtitle: l.settingsEpgPreviewDelaySeconds(
                   _epgPreviewDelay.inSeconds,
                 ),
@@ -329,6 +350,9 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
             if (_showNavigationSoundToggle)
               SettingsSwitchRow(
                 title: l.settingsNavigationSound,
+                locked: widget.service.isEnforced(
+                  ViewSettingsService.navigationSoundEnabledKey,
+                ),
                 subtitle: l.settingsNavigationSoundHint,
                 icon: Icons.volume_up_outlined,
                 value: _navigationSoundEnabled,
@@ -408,6 +432,9 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
           children: [
             SettingsSwitchRow(
               title: l.settingsFilterPersistence,
+              locked: widget.service.isEnforced(
+                ViewSettingsService.rememberMediaSortKey,
+              ),
               subtitle: _rememberMediaSort
                   ? l.settingsFilterPersistenceRemember
                   : l.settingsFilterPersistenceReset,

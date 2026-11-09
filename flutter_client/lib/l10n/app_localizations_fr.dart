@@ -2514,6 +2514,10 @@ class AppLocalizationsFr extends AppLocalizations {
       'Réorganiser ou masquer des sections dans la navigation et sur l\'Accueil';
 
   @override
+  String get settingsManagedByServer =>
+      'Géré par votre serveur. Demandez à votre administrateur de le modifier.';
+
+  @override
   String get settingsNavLayoutHintRemote =>
       'Appuyez sur OK sur une ligne pour la saisir, déplacez-la avec Haut et Bas, puis appuyez sur OK pour la déposer. Retour annule.';
 

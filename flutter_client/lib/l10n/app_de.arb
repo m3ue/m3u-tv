@@ -1137,6 +1137,7 @@
   "homeRequestsBrowse": "Filme und Serien suchen und anfragen",
   "settingsNavLayout": "Navigation & Startseite",
   "settingsNavLayoutSubtitle": "Bereiche in der Navigation und auf der Startseite anordnen oder ausblenden",
+  "settingsManagedByServer": "Von deinem Server verwaltet. Bitte deinen Admin, es zu ändern.",
   "settingsNavLayoutHintRemote": "Drücke OK auf einer Zeile, um sie aufzunehmen, verschiebe sie mit Hoch und Runter und drücke zum Ablegen erneut OK. Zurück bricht ab.",
   "settingsNavLayoutHintTouch": "Ziehe eine Zeile am Griff, um sie zu verschieben.",
   "settingsNavLayoutPinned": "Startseite und Suche bleiben oben, Mitteilungen und Einstellungen bleiben unten, und Weiterschauen bleibt auf der Startseite an erster Stelle.",

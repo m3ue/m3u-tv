@@ -4346,6 +4346,12 @@ abstract class AppLocalizations {
   /// **'Reorder or hide sections in the nav and on Home'**
   String get settingsNavLayoutSubtitle;
 
+  /// No description provided for @settingsManagedByServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Managed by your server. Ask your admin to change it.'**
+  String get settingsManagedByServer;
+
   /// No description provided for @settingsNavLayoutHintRemote.
   ///
   /// In en, this message translates to:

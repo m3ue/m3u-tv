@@ -1422,6 +1422,7 @@
   "homeRequestsBrowse": "Search for and request movies and shows",
   "settingsNavLayout": "Navigation & Home",
   "settingsNavLayoutSubtitle": "Reorder or hide sections in the nav and on Home",
+  "settingsManagedByServer": "Managed by your server. Ask your admin to change it.",
   "settingsNavLayoutHintRemote": "Press OK on a row to pick it up, move it with Up and Down, then press OK to drop it. Back cancels.",
   "settingsNavLayoutHintTouch": "Drag a row by its handle to move it.",
   "settingsNavLayoutPinned": "Home and Search stay at the top, Notifications and Settings stay at the bottom, and Continue Watching stays first on Home.",

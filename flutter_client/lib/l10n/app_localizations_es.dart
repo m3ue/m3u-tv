@@ -2508,6 +2508,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Reordena u oculta secciones en la navegación y en Inicio';
 
   @override
+  String get settingsManagedByServer =>
+      'Gestionado por tu servidor. Pide a tu administrador que lo cambie.';
+
+  @override
   String get settingsNavLayoutHintRemote =>
       'Pulsa OK en una fila para seleccionarla, muévela con Arriba y Abajo, y pulsa OK para soltarla. Atrás cancela.';
 

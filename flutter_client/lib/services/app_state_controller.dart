@@ -14,6 +14,7 @@ import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
+import 'package:m3u_tv/services/client_config.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/device_identity_service.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
@@ -178,6 +179,7 @@ class AppStateController extends ChangeNotifier {
           pushNotificationService ?? PushNotificationService(),
       viewSettingsService:
           viewSettingsService ?? ViewSettingsService(store: store),
+      clientConfigStore: ClientConfigStore(store: store),
       savedPlaylists:
           savedPlaylistsService ??
           SavedPlaylistsService(storage: resolvedSecureStorage),
@@ -215,8 +217,11 @@ class AppStateController extends ChangeNotifier {
     required this.introDbSettings,
     required this._pushNotificationService,
     required this.viewSettingsService,
+    required this.clientConfigStore,
     required this.savedPlaylists,
   }) {
+    _reverbService.onClientConfigUpdated = () =>
+        _runBackgroundPersistence(_syncClientConfig(refetch: true));
     epgService
       ..cacheTtl = cacheService.refreshInterval
       // SQLite is the guide's store of record; memory keeps now/next for
@@ -290,11 +295,80 @@ class AppStateController extends ChangeNotifier {
     } else if (!proxyPlaybackSettings.isLoadedFor(scope)) {
       unawaited(proxyPlaybackSettings.load());
     }
+    _showStoredClientConfig(credentials == null ? null : scope);
     if (scope == previousScope) return;
     favoritesService.notifyPlaylistChanged();
     vodFavoritesService.notifyPlaylistChanged();
     seriesFavoritesService.notifyPlaylistChanged();
     aioFavoritesService.notifyPlaylistChanged();
+  }
+
+  /// The scope whose stored [ClientConfig] is applied ([_noClientConfig]:
+  /// none, signed out). Unset until the first publish: until then the config
+  /// [ViewSettingsService.loadManagedSettings] restored at launch stands.
+  Object? _clientConfigScope = _clientConfigUnset;
+  static const _clientConfigUnset = Object();
+  static const _noClientConfig = Object();
+
+  /// Puts the shown playlist's stored config in place (none when signed
+  /// out), ahead of [_syncClientConfig] checking it with the server.
+  void _showStoredClientConfig(String? scope) {
+    final target = _publishedLogin == null ? _noClientConfig : scope;
+    if (target == _clientConfigScope) return;
+    final firstPublish = _clientConfigScope == _clientConfigUnset;
+    _clientConfigScope = target;
+    if (target == _noClientConfig) {
+      unawaited(viewSettingsService.applyClientConfig(null));
+      return;
+    }
+    // The launch config is this playlist's: keep it unless the playlist has
+    // its own stored (it always has, once a sync has run).
+    unawaited(() async {
+      final stored = await clientConfigStore.readFor(scope);
+      if (_clientConfigScope != target) return;
+      if (stored == null && firstPublish) return;
+      await viewSettingsService.applyClientConfig(stored);
+    }());
+  }
+
+  /// Brings the shown playlist's managed settings in line with the editor:
+  /// fetches them when the handshake's revision differs from the stored one
+  /// (or [refetch], on a push), and drops them when the editor no longer
+  /// advertises any. A failed fetch keeps the last known config.
+  Future<void> _syncClientConfig({bool refetch = false}) async {
+    final login = _publishedLogin;
+    final response = authNotifier.authResponse;
+    if (_disposed || login == null || response == null) return;
+    if (!sameCredentials(authNotifier.credentials, login)) return;
+    final scope = _playlistScope();
+    bool isCurrent() =>
+        !_disposed &&
+        sameCredentials(_publishedLogin, login) &&
+        _clientConfigScope == scope;
+
+    final capability = response.clientConfig;
+    if (capability == null) {
+      if (await clientConfigStore.readFor(scope) != null) {
+        await clientConfigStore.clearPlaylistState(scope);
+      }
+      if (isCurrent()) await viewSettingsService.applyClientConfig(null);
+      return;
+    }
+    final stored = await clientConfigStore.readFor(scope);
+    if (!refetch && stored != null && stored.revision == capability.revision) {
+      if (isCurrent()) await viewSettingsService.applyClientConfig(stored);
+      return;
+    }
+    final ClientConfig config;
+    try {
+      config = await xtreamService.getClientConfig(capability);
+    } on Object catch (error) {
+      debugPrint('Client config fetch failed: $error');
+      return;
+    }
+    if (!isCurrent()) return;
+    await clientConfigStore.writeFor(scope, config);
+    if (isCurrent()) await viewSettingsService.applyClientConfig(config);
   }
 
   /// Scrubs the active username/password from every captured log line, on
@@ -350,6 +424,9 @@ class AppStateController extends ChangeNotifier {
   final ResumeService resumeService;
   final AIOStreamsFavoritesService aioFavoritesService;
   final ProxyPlaybackSettings proxyPlaybackSettings;
+
+  /// Each saved playlist's managed settings (M3U TV Profile).
+  final ClientConfigStore clientConfigStore;
   final ComskipSettings comskipSettings;
   final SyncOffsetStore syncOffsetStore;
   final SportsSettings sportsSettings;
@@ -1775,6 +1852,7 @@ class AppStateController extends ChangeNotifier {
       seriesFavoritesService.clearPlaylistState(scope),
       aioFavoritesService.clearPlaylistState(scope),
       proxyPlaybackSettings.clearPlaylistState(scope),
+      clientConfigStore.clearPlaylistState(scope),
       viewerService.forgetActiveViewer(
         loginKey: _loginKeyFor(credentials, scope),
       ),
@@ -2393,6 +2471,7 @@ class AppStateController extends ChangeNotifier {
           if (clearCache) aiostreamsApiService.clearCache();
           notifyListeners();
           unawaited(refreshDvrStorage());
+          _runBackgroundPersistence(_syncClientConfig());
           if (activeViewer != null) {
             if (!replacingXtreamSource) {
               _runBackgroundPersistence(

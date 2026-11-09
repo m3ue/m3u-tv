@@ -1137,6 +1137,7 @@
   "homeRequestsBrowse": "Rechercher et demander des films et des séries",
   "settingsNavLayout": "Navigation et Accueil",
   "settingsNavLayoutSubtitle": "Réorganiser ou masquer des sections dans la navigation et sur l'Accueil",
+  "settingsManagedByServer": "Géré par votre serveur. Demandez à votre administrateur de le modifier.",
   "settingsNavLayoutHintRemote": "Appuyez sur OK sur une ligne pour la saisir, déplacez-la avec Haut et Bas, puis appuyez sur OK pour la déposer. Retour annule.",
   "settingsNavLayoutHintTouch": "Faites glisser une ligne par sa poignée pour la déplacer.",
   "settingsNavLayoutPinned": "Accueil et Rechercher restent en haut, Notifications et Paramètres restent en bas, et Reprendre reste en premier sur l'Accueil.",

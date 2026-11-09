@@ -1137,6 +1137,7 @@
   "homeRequestsBrowse": "搜索并请求电影和剧集",
   "settingsNavLayout": "导航和主页",
   "settingsNavLayoutSubtitle": "重新排序或隐藏导航和主页中的栏目",
+  "settingsManagedByServer": "由你的服务器管理。请联系管理员更改。",
   "settingsNavLayoutHintRemote": "在某一行按确定键将其选中,用上下键移动,再按确定键放下。按返回键取消。",
   "settingsNavLayoutHintTouch": "拖动行的手柄即可移动。",
   "settingsNavLayoutPinned": "主页和搜索固定在顶部,通知和设置固定在底部,继续观看始终位于主页首位。",

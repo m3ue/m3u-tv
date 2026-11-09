@@ -424,6 +424,9 @@ class _ConnectedViewState extends State<ConnectedView> {
                   listenable: viewSettings,
                   builder: (context, _) => SettingsSwitchRow(
                     title: l.settingsPlaybackDiagnostics,
+                    locked: viewSettings.isEnforced(
+                      ViewSettingsService.showPlaybackDiagnosticsKey,
+                    ),
                     subtitle: l.settingsPlaybackDiagnosticsHint,
                     icon: Icons.monitor_heart_outlined,
                     value: viewSettings.showPlaybackDiagnosticsSync,

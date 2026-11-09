@@ -1137,6 +1137,7 @@
   "homeRequestsBrowse": "Busca y solicita películas y series",
   "settingsNavLayout": "Navegación e Inicio",
   "settingsNavLayoutSubtitle": "Reordena u oculta secciones en la navegación y en Inicio",
+  "settingsManagedByServer": "Gestionado por tu servidor. Pide a tu administrador que lo cambie.",
   "settingsNavLayoutHintRemote": "Pulsa OK en una fila para seleccionarla, muévela con Arriba y Abajo, y pulsa OK para soltarla. Atrás cancela.",
   "settingsNavLayoutHintTouch": "Arrastra una fila por su asa para moverla.",
   "settingsNavLayoutPinned": "Inicio y Buscar permanecen arriba, Notificaciones y Ajustes permanecen abajo, y Continuar viendo permanece primero en Inicio.",

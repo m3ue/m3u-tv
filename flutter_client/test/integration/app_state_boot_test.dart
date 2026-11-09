@@ -22,12 +22,108 @@ import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/resume_service.dart';
+import 'package:m3u_tv/services/reverb_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:material_ui/material_ui.dart';
 
 void main() {
+  group('client config (M3U TV Profiles)', () {
+    const credentials = UserCredentials(
+      server: 'https://fixture.example',
+      username: 'fixture-user',
+      password: 'fixture-password',
+    );
+
+    Future<void> until(bool Function() condition) async {
+      for (var attempt = 0; attempt < 200 && !condition(); attempt += 1) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    }
+
+    test(
+      'applies the editor config, skips an unchanged revision, refetches on a push and drops it when no longer advertised',
+      () async {
+        var advertise = true;
+        var revision = 'rev-1';
+        var startPage = 'movies';
+        var fetches = 0;
+        final fixtures = _FakeXtreamTransport.success();
+        Future<Object?> transport(XtreamRequest request) async {
+          switch (request.action ?? 'auth') {
+            case 'auth':
+              return <String, Object?>{
+                'user_info': <String, Object?>{'auth': 1, 'status': 'Active'},
+                'm3u_editor': <String, Object?>{
+                  'version': '0.14.0',
+                  if (advertise)
+                    'client_config': <String, Object?>{
+                      'api_version': 1,
+                      'revision': revision,
+                      'action': 'get_client_config',
+                    },
+                },
+              };
+            case 'get_client_config':
+              fetches += 1;
+              return <String, Object?>{
+                'revision': revision,
+                'profile': 'Kids',
+                'settings': <String, Object?>{
+                  'default_start_page': <String, Object?>{
+                    'mode': 'enforced',
+                    'value': startPage,
+                  },
+                },
+              };
+          }
+          return fixtures.call(request);
+        }
+
+        final reverb = ReverbService();
+        final controller = _controller(
+          storage: InMemorySecureStorage(),
+          transport: transport,
+          reverbService: reverb,
+        );
+        addTearDown(controller.dispose);
+        final settings = controller.viewSettingsService;
+        bool startPageIs(DefaultStartPage page) =>
+            settings.defaultStartPageSync == page;
+
+        expect(await controller.connectXtream(credentials), isTrue);
+        await until(() => startPageIs(DefaultStartPage.movies));
+        expect(fetches, 1);
+        expect(
+          settings.isEnforced(ViewSettingsService.defaultStartPageKey),
+          isTrue,
+        );
+        expect(settings.managedProfileName, 'Kids');
+
+        expect(await controller.connectXtream(credentials), isTrue);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(fetches, 1, reason: 'same revision: the stored config stands');
+
+        revision = 'rev-2';
+        startPage = 'liveTv';
+        reverb.onClientConfigUpdated!();
+        await until(() => startPageIs(DefaultStartPage.liveTv));
+        expect(fetches, 2);
+
+        advertise = false;
+        expect(await controller.connectXtream(credentials), isTrue);
+        await until(() => settings.managedProfileName == null);
+        expect(
+          settings.isEnforced(ViewSettingsService.defaultStartPageKey),
+          isFalse,
+        );
+        expect(settings.defaultStartPageSync, DefaultStartPage.home);
+      },
+    );
+  });
+
   group('app state boot', () {
     test('runtime EPG interval changes update EPG freshness', () async {
       var now = DateTime.utc(2026, 7, 30, 12);
@@ -2563,6 +2659,7 @@ AppStateController _controller({
   Map<String, Object?>? localMemory,
   EpgService? epgService,
   CatalogRepository? catalogRepository,
+  ReverbService? reverbService,
 }) {
   final sharedLocalMemory = localMemory ?? <String, Object?>{};
   // Catalog keys live in SQLite; the two CacheService instances below must
@@ -2601,6 +2698,7 @@ AppStateController _controller({
     proxyPlaybackSettings: ProxyPlaybackSettings(),
     resumeService: ResumeService(memory: sharedLocalMemory),
     viewerService: ViewerService(memory: sharedLocalMemory),
+    reverbService: reverbService,
   );
 }
 

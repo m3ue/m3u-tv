@@ -2484,6 +2484,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Reorder or hide sections in the nav and on Home';
 
   @override
+  String get settingsManagedByServer =>
+      'Managed by your server. Ask your admin to change it.';
+
+  @override
   String get settingsNavLayoutHintRemote =>
       'Press OK on a row to pick it up, move it with Up and Down, then press OK to drop it. Back cancels.';
 

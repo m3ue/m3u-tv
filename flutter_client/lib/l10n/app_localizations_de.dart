@@ -2503,6 +2503,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Bereiche in der Navigation und auf der Startseite anordnen oder ausblenden';
 
   @override
+  String get settingsManagedByServer =>
+      'Von deinem Server verwaltet. Bitte deinen Admin, es zu ändern.';
+
+  @override
   String get settingsNavLayoutHintRemote =>
       'Drücke OK auf einer Zeile, um sie aufzunehmen, verschiebe sie mit Hoch und Runter und drücke zum Ablegen erneut OK. Zurück bricht ab.';
 

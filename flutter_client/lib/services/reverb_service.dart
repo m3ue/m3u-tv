@@ -34,6 +34,10 @@ class ReverbService {
   void Function(MediaRequestSummary)? _onRequestStatus;
   void Function(FavoriteToggleEvent)? _onFavoriteToggled;
   void Function(String deviceId)? _onDeviceDeregister;
+
+  /// Called when the editor says this login's M3U TV Profile changed. Set
+  /// once by the owner rather than per [connect], since it outlives sessions.
+  void Function()? onClientConfigUpdated;
   void Function()? _onConnected;
 
   WebSocketChannel? _ws;
@@ -258,6 +262,10 @@ class ReverbService {
         final deviceId = '${payload['device_id'] ?? ''}';
         if (deviceId.isEmpty) return;
         _onDeviceDeregister?.call(deviceId);
+
+      case 'client_config.updated':
+        if (!_connected) return;
+        onClientConfigUpdated?.call();
     }
   }
 

@@ -107,6 +107,9 @@ class PlaybackSettingsPage extends StatelessWidget {
               children: [
                 SettingsSwitchRow(
                   title: l.settingsPrebufferLive,
+                  locked: viewSettings.isEnforced(
+                    ViewSettingsService.prebufferLiveKey,
+                  ),
                   subtitle: l.settingsPrebufferLiveHint,
                   icon: Icons.hourglass_bottom,
                   value: viewSettings.prebufferLiveSync,
@@ -266,6 +269,7 @@ class PlayerSettingsGroup extends StatelessWidget {
         if (showVodPlayer)
           SettingsRow(
             title: l.settingsVodPlayer,
+            locked: service.isEnforced(ViewSettingsService.vodPlayerKey),
             subtitle: _vodPlayerLabel(l, service.vodPlayerSync),
             icon: Icons.smart_display_outlined,
             trailing: const SettingsChevron(),
@@ -290,6 +294,7 @@ class PlayerSettingsGroup extends StatelessWidget {
         if (showHdr)
           SettingsSwitchRow(
             title: l.settingsHdrMode,
+            locked: service.isEnforced(ViewSettingsService.hdrEnabledKey),
             subtitle: l.settingsHdrModeHint,
             icon: Icons.hdr_on_outlined,
             value: service.hdrEnabledSync,
@@ -298,6 +303,7 @@ class PlayerSettingsGroup extends StatelessWidget {
         if (showRefreshRate)
           SettingsSwitchRow(
             title: l.settingsMatchRefreshRate,
+            locked: service.isEnforced(ViewSettingsService.matchRefreshRateKey),
             subtitle: l.settingsMatchRefreshRateHint,
             icon: Icons.speed_outlined,
             value: service.matchRefreshRateSync,
@@ -306,6 +312,7 @@ class PlayerSettingsGroup extends StatelessWidget {
         if (showDeinterlace)
           SettingsSwitchRow(
             title: l.settingsDeinterlace,
+            locked: service.isEnforced(ViewSettingsService.deinterlaceKey),
             subtitle: l.settingsDeinterlaceHint,
             icon: Icons.reorder,
             value: service.deinterlaceSync,

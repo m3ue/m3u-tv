@@ -104,6 +104,9 @@ Future<void> main() async {
   // Android/Windows user's Auto Frame Rate stayed off (and a tvOS user's
   // opt-out, or anyone's HDR opt-out, was undone) after every cold start
   // until Settings was opened (issue #314).
+  // Settings the editor manages (M3U TV Profile) as last fetched, so the
+  // reads below and the start page already reflect them.
+  await appState.viewSettingsService.loadManagedSettings();
   await appState.viewSettingsService.fontSize();
   await Future.wait([
     appState.viewSettingsService.rememberMediaSort(),

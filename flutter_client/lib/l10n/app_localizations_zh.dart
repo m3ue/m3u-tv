@@ -2400,6 +2400,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsNavLayoutSubtitle => '重新排序或隐藏导航和主页中的栏目';
 
   @override
+  String get settingsManagedByServer => '由你的服务器管理。请联系管理员更改。';
+
+  @override
   String get settingsNavLayoutHintRemote =>
       '在某一行按确定键将其选中,用上下键移动,再按确定键放下。按返回键取消。';
 
