@@ -20,6 +20,7 @@ import 'package:material_ui/material_ui.dart';
 /// the same macOS traffic-light clearance.
 bool get _isMacDesktopWindow => HostPlatform.isMacOS;
 const double _kMacTrafficLightInset = 72;
+const double _kSubpagePadding = 24;
 
 /// tvOS reports its overscan-safe area as real MediaQuery padding on every
 /// edge. Settings sub-pages are pushed on the root Navigator, outside
@@ -494,6 +495,7 @@ Widget _settingsSubpageScaffold(
   BuildContext context, {
   required String Function(BuildContext) title,
   required Widget body,
+  bool padBody = true,
 }) {
   final scale = FontSizeScope.scaleOf(context);
   final macInset =
@@ -507,7 +509,9 @@ Widget _settingsSubpageScaffold(
       leadingInset: macInset,
       onBack: () => Navigator.of(context, rootNavigator: true).pop(),
     ),
-    body: Padding(padding: const EdgeInsets.all(24), child: body),
+    body: padBody
+        ? Padding(padding: const EdgeInsets.all(_kSubpagePadding), child: body)
+        : body,
   );
 }
 
@@ -556,7 +560,14 @@ Future<T?> pushSettingsSubpage<T>(
     content: (context) => _settingsSubpageScaffold(
       context,
       title: title,
-      body: SettingsScrollView(child: builder(context)),
+      // Padding goes inside the scroll view, not around it, so rows scroll
+      // all the way to the top bar and the window bottom instead of clipping
+      // 24px short of both edges.
+      padBody: false,
+      body: SettingsScrollView(
+        padding: const EdgeInsets.all(_kSubpagePadding),
+        child: builder(context),
+      ),
     ),
   );
 }
