@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
@@ -8,35 +10,55 @@ import 'package:url_launcher/url_launcher.dart';
 /// The "go to this URL and enter this code" step of a device login, shared by
 /// the watch-history integrations. [qrUrl] is what the QR code and the browser
 /// button open, which may already carry the code.
-class DeviceAuthPendingView extends StatelessWidget {
+///
+/// [onLeave] runs when the view goes away, so leaving the screen mid sign-in
+/// can stop polling. It also runs when the sign-in finishes and the view is
+/// replaced, so it must only cancel an attempt that is still pending.
+class DeviceAuthPendingView extends StatefulWidget {
   const DeviceAuthPendingView({
     super.key,
     required this.url,
     required this.qrUrl,
     required this.userCode,
     required this.onCancel,
+    this.onLeave,
   });
 
   final String url;
   final String qrUrl;
   final String userCode;
   final VoidCallback onCancel;
+  final VoidCallback? onLeave;
+
+  @override
+  State<DeviceAuthPendingView> createState() => _DeviceAuthPendingViewState();
+}
+
+class _DeviceAuthPendingViewState extends State<DeviceAuthPendingView> {
+  @override
+  void dispose() {
+    // Deferred: cancelling notifies listeners, which mustn't happen while the
+    // tree is being torn down.
+    final onLeave = widget.onLeave;
+    if (onLeave != null) scheduleMicrotask(onLeave);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) => constraints.maxWidth >= 600
           ? _PendingWide(
-              url: url,
-              qrUrl: qrUrl,
-              userCode: userCode,
-              onCancel: onCancel,
+              url: widget.url,
+              qrUrl: widget.qrUrl,
+              userCode: widget.userCode,
+              onCancel: widget.onCancel,
             )
           : _PendingNarrow(
-              url: url,
-              qrUrl: qrUrl,
-              userCode: userCode,
-              onCancel: onCancel,
+              url: widget.url,
+              qrUrl: widget.qrUrl,
+              userCode: widget.userCode,
+              onCancel: widget.onCancel,
             ),
     );
   }

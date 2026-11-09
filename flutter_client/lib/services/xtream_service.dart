@@ -374,6 +374,23 @@ class RequestsCapability {
   bool supports(String type) => contentTypes.contains(type);
 }
 
+/// A Trakt or SIMKL account M3U Editor already sends this login's watch
+/// progress to (Integrations > Trakt & SIMKL). [account] is the account's
+/// display name, when the server knows it.
+class ServerWatchHistoryAccount {
+  const ServerWatchHistoryAccount({required this.provider, this.account});
+
+  factory ServerWatchHistoryAccount.fromJson(Map<String, dynamic> json) =>
+      ServerWatchHistoryAccount(
+        provider: '${json['provider'] ?? ''}',
+        account: _stringOrNull(json['account']),
+      );
+
+  /// `trakt` or `simkl`.
+  final String provider;
+  final String? account;
+}
+
 class XtreamAuthResponse {
   const XtreamAuthResponse({
     required this.isAuthenticated,
@@ -384,6 +401,7 @@ class XtreamAuthResponse {
     this.proxy,
     this.requests,
     this.sports,
+    this.watchHistory = const <ServerWatchHistoryAccount>[],
   });
 
   final bool isAuthenticated;
@@ -394,8 +412,18 @@ class XtreamAuthResponse {
   final ProxyCapability? proxy;
   final RequestsCapability? requests;
   final SportsCapability? sports;
+  final List<ServerWatchHistoryAccount> watchHistory;
 
   bool hasFeature(String feature) => features.contains(feature);
+
+  /// The server-side account for [provider] (`trakt` or `simkl`), if any.
+  ServerWatchHistoryAccount? serverWatchHistory(String provider) {
+    for (final account in watchHistory) {
+      if (account.provider == provider) return account;
+    }
+    return null;
+  }
+
   bool get hasAioStreams =>
       hasFeature('aiostreams') && aiostreamsIntegrations.isNotEmpty;
   bool get hasProxy => hasFeature('proxy') && proxy != null;
@@ -539,6 +567,11 @@ class XtreamService {
     final sports = sportsJson is Map<String, dynamic>
         ? SportsCapability.fromJson(sportsJson)
         : null;
+    final watchHistory = _asList(m3uEditor['watch_history'])
+        .whereType<Map<String, dynamic>>()
+        .map(ServerWatchHistoryAccount.fromJson)
+        .where((account) => account.provider.isNotEmpty)
+        .toList(growable: false);
     final authResponse = XtreamAuthResponse(
       isAuthenticated: true,
       status: status,
@@ -548,6 +581,7 @@ class XtreamService {
       proxy: proxy,
       requests: requests,
       sports: sports,
+      watchHistory: watchHistory,
     );
     if (!_authenticationGeneration.isStale(authenticationGeneration)) {
       _credentials = normalized;
@@ -1220,11 +1254,20 @@ class XtreamService {
     return Progress.fromJson(_asMap(response), viewerId: viewerId);
   }
 
+  /// The watch-history providers (`trakt`, `simkl`) this device scrobbles to
+  /// itself. Sent with every progress save so the server skips sending the
+  /// same playback to its own account for that provider.
+  List<String> Function()? clientScrobblers;
+
   Future<void> updateProgress(Progress progress) async {
+    final scrobblers = clientScrobblers?.call() ?? const <String>[];
     await _request(
       'update_progress',
       method: 'POST',
-      body: progress.toJson().map((key, value) => MapEntry(key, '$value')),
+      body: {
+        ...progress.toJson().map((key, value) => MapEntry(key, '$value')),
+        if (scrobblers.isNotEmpty) 'client_scrobblers': scrobblers.join(','),
+      },
     );
   }
 

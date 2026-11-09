@@ -449,7 +449,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsIntegrations => '集成';
 
   @override
-  String get settingsIntegrationsSubtitle => 'Trakt 等';
+  String get settingsIntegrationsSubtitle => 'SIMKL、TheIntroDB 等';
 
   @override
   String get settingsAppearance => '外观';
@@ -1189,6 +1189,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get traktConnected => '已连接到 Trakt';
 
   @override
+  String traktConnectedAs(String account) {
+    return '已以 $account 身份连接到 Trakt';
+  }
+
+  @override
   String get traktDisconnectButton => '断开 Trakt';
 
   @override
@@ -1198,6 +1203,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get simklName => 'Simkl';
 
   @override
+  String serverWatchHistoryActive(String service) {
+    return 'M3U Editor 会将此登录的观看进度发送到 $service。';
+  }
+
+  @override
+  String serverWatchHistoryActiveAs(String service, String account) {
+    return 'M3U Editor 会以 $account 的身份将此登录的观看进度发送到 $service。';
+  }
+
+  @override
+  String serverWatchHistoryOverrideHint(String service) {
+    return '在此连接即可在本设备上改用您自己的 $service 账户。';
+  }
+
+  @override
+  String get serverWatchHistoryOverridden =>
+      '本设备会将播放记录发送到此处连接的账户。断开连接即可改用服务器账户。';
+
+  @override
   String get simklConnectPrompt => '连接你的 Simkl 账户，自动记录你观看的内容。';
 
   @override
@@ -1205,6 +1229,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get simklConnected => '已连接到 Simkl';
+
+  @override
+  String simklConnectedAs(String account) {
+    return '已以 $account 身份连接到 Simkl';
+  }
 
   @override
   String get simklDisconnectButton => '断开 Simkl';

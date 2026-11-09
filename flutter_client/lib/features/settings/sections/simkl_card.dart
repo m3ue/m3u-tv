@@ -1,15 +1,20 @@
 import 'package:m3u_tv/features/settings/sections/device_auth_pending.dart';
+import 'package:m3u_tv/features/settings/sections/server_watch_history_notice.dart';
 import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/simkl_service.dart';
+import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
 class SimklCard extends StatelessWidget {
-  const SimklCard({super.key, required this.simklService});
+  const SimklCard({super.key, required this.simklService, this.serverAccount});
 
   final SimklService simklService;
+
+  /// M3U Editor's own SIMKL account for this login, when one is set up.
+  final ServerWatchHistoryAccount? serverAccount;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +46,11 @@ class SimklCard extends StatelessWidget {
               qrUrl: pending?.completeUrl ?? 'https://simkl.com/pin',
               userCode: pending?.userCode ?? '------',
               onCancel: simklService.cancelAuth,
+              onLeave: () {
+                if (simklService.status == SimklAuthStatus.pending) {
+                  simklService.cancelAuth();
+                }
+              },
             ),
             SimklAuthStatus.connected => _SimklConnected(
               simklService: simklService,
@@ -64,6 +74,14 @@ class SimklCard extends StatelessWidget {
           title: l.simklName,
         ),
         const SizedBox(height: 16),
+        if (serverAccount case final account?) ...[
+          ServerWatchHistoryNotice(
+            account: account,
+            serviceName: l.simklName,
+            connectedHere: simklService.isConnected,
+          ),
+          const SizedBox(height: 16),
+        ],
         body,
       ],
     );
@@ -116,7 +134,10 @@ class _SimklConnected extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            l.simklConnected,
+            switch (simklService.accountName) {
+              final name? => l.simklConnectedAs(name),
+              null => l.simklConnected,
+            },
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w500,
             ),

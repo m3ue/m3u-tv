@@ -229,6 +229,12 @@ class AppStateController extends ChangeNotifier {
     seriesFavoritesService.onChanged = (streamId, {required favorited}) =>
         _pushFavoriteChange('series', streamId, favorited: favorited);
     sportsSettings.onFollowChanged = _pushSportsFollow;
+    // A tracker signed in on this device takes over from M3U Editor's own
+    // account for that provider: the server skips what the device scrobbles.
+    xtreamService.clientScrobblers = () => [
+      if (traktService.isConnected) 'trakt',
+      if (simklService.isConnected) 'simkl',
+    ];
     favoritesService.captureMutationOwnership =
         _captureFavoriteMutationOwnership;
     vodFavoritesService.captureMutationOwnership =

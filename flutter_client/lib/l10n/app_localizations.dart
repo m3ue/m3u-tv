@@ -911,7 +911,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsIntegrationsSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Trakt and more'**
+  /// **'SIMKL, TheIntroDB, and more'**
   String get settingsIntegrationsSubtitle;
 
   /// No description provided for @settingsAppearance.
@@ -2204,6 +2204,12 @@ abstract class AppLocalizations {
   /// **'Connected to Trakt'**
   String get traktConnected;
 
+  /// No description provided for @traktConnectedAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to Trakt as {account}'**
+  String traktConnectedAs(String account);
+
   /// No description provided for @traktDisconnectButton.
   ///
   /// In en, this message translates to:
@@ -2222,6 +2228,30 @@ abstract class AppLocalizations {
   /// **'Simkl'**
   String get simklName;
 
+  /// No description provided for @serverWatchHistoryActive.
+  ///
+  /// In en, this message translates to:
+  /// **'M3U Editor sends this login\'s watch progress to {service}.'**
+  String serverWatchHistoryActive(String service);
+
+  /// No description provided for @serverWatchHistoryActiveAs.
+  ///
+  /// In en, this message translates to:
+  /// **'M3U Editor sends this login\'s watch progress to {service} as {account}.'**
+  String serverWatchHistoryActiveAs(String service, String account);
+
+  /// No description provided for @serverWatchHistoryOverrideHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect here to use your own {service} account on this device instead.'**
+  String serverWatchHistoryOverrideHint(String service);
+
+  /// No description provided for @serverWatchHistoryOverridden.
+  ///
+  /// In en, this message translates to:
+  /// **'This device sends its playback to the account connected here instead. Disconnect to use the server account instead.'**
+  String get serverWatchHistoryOverridden;
+
   /// No description provided for @simklConnectPrompt.
   ///
   /// In en, this message translates to:
@@ -2239,6 +2269,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Connected to Simkl'**
   String get simklConnected;
+
+  /// No description provided for @simklConnectedAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to Simkl as {account}'**
+  String simklConnectedAs(String account);
 
   /// No description provided for @simklDisconnectButton.
   ///

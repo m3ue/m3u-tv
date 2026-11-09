@@ -250,6 +250,7 @@ class _ConnectedViewState extends State<ConnectedView> {
                           builder: (context, _) => SettingsCard(
                             child: SimklCard(
                               simklService: widget.simklService,
+                              serverAccount: auth?.serverWatchHistory('simkl'),
                             ),
                           ),
                         ),
@@ -259,6 +260,7 @@ class _ConnectedViewState extends State<ConnectedView> {
                           builder: (context, _) => SettingsCard(
                             child: TraktCard(
                               traktService: widget.traktService,
+                              serverAccount: auth?.serverWatchHistory('trakt'),
                             ),
                           ),
                         ),

@@ -290,7 +290,7 @@
   "settingsGeneral": "General",
   "settingsGeneralSubtitle": "Language, connection, and account",
   "settingsIntegrations": "Integrations",
-  "settingsIntegrationsSubtitle": "Trakt and more",
+  "settingsIntegrationsSubtitle": "SIMKL, TheIntroDB, and more",
   "settingsAppearance": "Appearance",
   "settingsAppearanceSubtitle": "Layout, EPG, and display",
   "settingsPlayback": "Playback",
@@ -713,12 +713,56 @@
   "traktPendingEnterCode": "Then enter this code:",
   "traktPendingWaiting": "Waiting for authorization…",
   "traktConnected": "Connected to Trakt",
+  "traktConnectedAs": "Connected to Trakt as {account}",
+  "@traktConnectedAs": {
+    "placeholders": {
+      "account": {
+        "type": "String"
+      }
+    }
+  },
   "traktDisconnectButton": "Disconnect Trakt",
   "traktName": "Trakt",
   "simklName": "Simkl",
+  "serverWatchHistoryActive": "M3U Editor sends this login's watch progress to {service}.",
+  "@serverWatchHistoryActive": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "serverWatchHistoryActiveAs": "M3U Editor sends this login's watch progress to {service} as {account}.",
+  "@serverWatchHistoryActiveAs": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      },
+      "account": {
+        "type": "String"
+      }
+    }
+  },
+  "serverWatchHistoryOverrideHint": "Connect here to use your own {service} account on this device instead.",
+  "@serverWatchHistoryOverrideHint": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "serverWatchHistoryOverridden": "This device sends its playback to the account connected here instead. Disconnect to use the server account instead.",
   "simklConnectPrompt": "Connect your Simkl account to automatically track what you watch.",
   "simklConnectButton": "Connect with Simkl",
   "simklConnected": "Connected to Simkl",
+  "simklConnectedAs": "Connected to Simkl as {account}",
+  "@simklConnectedAs": {
+    "placeholders": {
+      "account": {
+        "type": "String"
+      }
+    }
+  },
   "simklDisconnectButton": "Disconnect Simkl",
   "simklNotConfigured": "Simkl client ID is not configured.",
   "simklNotConfiguredHint": "Register an app at simkl.com/settings/developer and set the client ID via --dart-define=SIMKL_CLIENT_ID.",

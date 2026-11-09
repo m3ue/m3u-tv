@@ -1,8 +1,10 @@
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:m3u_tv/features/settings/sections/device_auth_pending.dart';
+import 'package:m3u_tv/features/settings/sections/server_watch_history_notice.dart';
 import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
+import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
@@ -12,9 +14,12 @@ import 'package:material_ui/material_ui.dart';
 // ---------------------------------------------------------------------------
 
 class TraktCard extends StatelessWidget {
-  const TraktCard({super.key, required this.traktService});
+  const TraktCard({super.key, required this.traktService, this.serverAccount});
 
   final TraktService traktService;
+
+  /// M3U Editor's own Trakt account for this login, when one is set up.
+  final ServerWatchHistoryAccount? serverAccount;
 
   @override
   Widget build(BuildContext context) {
@@ -59,6 +64,14 @@ class TraktCard extends StatelessWidget {
       children: [
         IntegrationCardHeader(logo: logo, title: l.traktName),
         const SizedBox(height: 16),
+        if (serverAccount case final account?) ...[
+          ServerWatchHistoryNotice(
+            account: account,
+            serviceName: l.traktName,
+            connectedHere: traktService.isConnected,
+          ),
+          const SizedBox(height: 16),
+        ],
         body,
       ],
     );
@@ -111,6 +124,11 @@ class _TraktPending extends StatelessWidget {
       qrUrl: url,
       userCode: pending?.userCode ?? '------',
       onCancel: traktService.cancelAuth,
+      onLeave: () {
+        if (traktService.status == TraktAuthStatus.pending) {
+          traktService.cancelAuth();
+        }
+      },
     );
   }
 }
@@ -129,7 +147,12 @@ class _TraktConnected extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            AppLocalizations.of(context).traktConnected,
+            switch (traktService.accountName) {
+              final name? => AppLocalizations.of(
+                context,
+              ).traktConnectedAs(name),
+              null => AppLocalizations.of(context).traktConnected,
+            },
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w500,
             ),

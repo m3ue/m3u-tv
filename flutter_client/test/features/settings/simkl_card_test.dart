@@ -104,6 +104,39 @@ void main() {
     expect(find.text(l.simklConnectButton), findsOneWidget);
   });
 
+  testWidgets('leaving the screen mid sign-in cancels it', (tester) async {
+    final simkl = service(transport: deviceCode);
+    await simkl.startDeviceAuth();
+    await pump(tester, simkl);
+    expect(simkl.status, SimklAuthStatus.pending);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+
+    expect(simkl.status, SimklAuthStatus.disconnected);
+    expect(simkl.pending, isNull);
+  });
+
+  testWidgets('finishing the sign-in does not cancel it', (tester) async {
+    final simkl = service(
+      transport: (request) async => request.path == '/oauth2/device'
+          ? deviceCode(request)
+          : const SimklResponse(200, {
+              'access_token': 'at',
+              'refresh_token': 'rt',
+              'expires_in': 604800,
+            }),
+    );
+    await simkl.startDeviceAuth();
+    await pump(tester, simkl);
+
+    await simkl.pollForTesting();
+    await tester.pump();
+    await tester.pump();
+
+    expect(simkl.status, SimklAuthStatus.connected);
+  });
+
   testWidgets('connected shows the account state and disconnects', (
     tester,
   ) async {

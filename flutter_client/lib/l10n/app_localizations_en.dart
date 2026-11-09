@@ -456,7 +456,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsIntegrations => 'Integrations';
 
   @override
-  String get settingsIntegrationsSubtitle => 'Trakt and more';
+  String get settingsIntegrationsSubtitle => 'SIMKL, TheIntroDB, and more';
 
   @override
   String get settingsAppearance => 'Appearance';
@@ -1239,6 +1239,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get traktConnected => 'Connected to Trakt';
 
   @override
+  String traktConnectedAs(String account) {
+    return 'Connected to Trakt as $account';
+  }
+
+  @override
   String get traktDisconnectButton => 'Disconnect Trakt';
 
   @override
@@ -1246,6 +1251,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get simklName => 'Simkl';
+
+  @override
+  String serverWatchHistoryActive(String service) {
+    return 'M3U Editor sends this login\'s watch progress to $service.';
+  }
+
+  @override
+  String serverWatchHistoryActiveAs(String service, String account) {
+    return 'M3U Editor sends this login\'s watch progress to $service as $account.';
+  }
+
+  @override
+  String serverWatchHistoryOverrideHint(String service) {
+    return 'Connect here to use your own $service account on this device instead.';
+  }
+
+  @override
+  String get serverWatchHistoryOverridden =>
+      'This device sends its playback to the account connected here instead. Disconnect to use the server account instead.';
 
   @override
   String get simklConnectPrompt =>
@@ -1256,6 +1280,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get simklConnected => 'Connected to Simkl';
+
+  @override
+  String simklConnectedAs(String account) {
+    return 'Connected to Simkl as $account';
+  }
 
   @override
   String get simklDisconnectButton => 'Disconnect Simkl';

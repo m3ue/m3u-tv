@@ -27,6 +27,7 @@ const _kScope = 'media:read media:write';
 const _kKeyAccess = 'simkl_access_token';
 const _kKeyRefresh = 'simkl_refresh_token';
 const _kKeyExpiry = 'simkl_token_expiry';
+const _kKeyAccount = 'simkl_account_name';
 
 /// Access tokens last 7 days; used when a token response omits `expires_in`.
 const int _kDefaultTokenLifetimeSeconds = 7 * 24 * 60 * 60;
@@ -74,6 +75,9 @@ class SimklResponse {
 
 typedef SimklTransport = Future<SimklResponse> Function(SimklRequest request);
 
+/// Looks up the signed-in account's display name for an access token.
+typedef SimklAccountNameLookup = Future<String?> Function(String accessToken);
+
 /// Manages Simkl sign-in via the OAuth device flow, and scrobbling.
 ///
 /// Call [init] once after construction to restore a persisted session.
@@ -87,7 +91,9 @@ class SimklService extends ChangeNotifier implements WatchHistoryService {
     String Function()? codeVerifierFactory,
     Duration writeLockRetryDelay = const Duration(seconds: 21),
     Future<String?> Function()? appVersionResolver,
+    SimklAccountNameLookup? accountNameLookup,
   }) : _storage = storage,
+       _accountNameLookup = accountNameLookup,
        _clientId = clientId,
        _transport = transport,
        _codeVerifierFactory = codeVerifierFactory ?? generatePkceVerifier,
@@ -101,6 +107,7 @@ class SimklService extends ChangeNotifier implements WatchHistoryService {
   final String Function() _codeVerifierFactory;
   final Duration _writeLockRetryDelay;
   final Future<String?> Function() _appVersionResolver;
+  final SimklAccountNameLookup? _accountNameLookup;
   Future<String>? _appVersion;
   ApiClient? _apiInstance;
   ApiClient get _api => _apiInstance ??= ApiClient();
@@ -109,6 +116,7 @@ class SimklService extends ChangeNotifier implements WatchHistoryService {
   SimklPendingAuth? _pending;
   Timer? _pollTimer;
   String? _accessToken;
+  String? _accountName;
   String? _codeVerifier;
   Duration _pollInterval = Duration.zero;
   DateTime? _deviceCodeExpiresAt;
@@ -118,6 +126,10 @@ class SimklService extends ChangeNotifier implements WatchHistoryService {
 
   SimklAuthStatus get status => _status;
   SimklPendingAuth? get pending => _pending;
+
+  /// The signed-in account's name, once known. Sign-ins from before it was
+  /// stored look it up on the next start, so no reconnect is needed.
+  String? get accountName => _accountName;
 
   bool get isConfigured => _clientId.isNotEmpty;
 
@@ -141,7 +153,10 @@ class SimklService extends ChangeNotifier implements WatchHistoryService {
     _status = SimklAuthStatus.connected;
     if (await _accessTokenExpired()) await _refresh();
     if (_disposed || attempt != _authAttempt) return;
+    _accountName ??= await _storage.read(_kKeyAccount);
+    if (_disposed || attempt != _authAttempt) return;
     notifyListeners();
+    if (isConnected && _accountName == null) unawaited(_loadAccountName());
   }
 
   Future<void> startDeviceAuth() async {
@@ -249,6 +264,7 @@ class SimklService extends ChangeNotifier implements WatchHistoryService {
         _clearPendingAttempt();
         _status = SimklAuthStatus.connected;
         notifyListeners();
+        unawaited(_loadAccountName());
         return;
       }
       switch (response.error) {
@@ -371,9 +387,55 @@ class SimklService extends ChangeNotifier implements WatchHistoryService {
   }
 
   Future<void> _clearStorage() async {
+    _accountName = null;
     await _storage.delete(_kKeyAccess);
     await _storage.delete(_kKeyRefresh);
     await _storage.delete(_kKeyExpiry);
+    await _storage.delete(_kKeyAccount);
+  }
+
+  /// Best effort: a failure leaves the name unknown until the next start.
+  Future<void> _loadAccountName() async {
+    final token = _accessToken;
+    if (token == null) return;
+    final lookup =
+        _accountNameLookup ?? (_transport == null ? _fetchAccountName : null);
+    if (lookup == null) return;
+    try {
+      final name = await lookup(token);
+      if (_disposed || token != _accessToken || name == null || name.isEmpty) {
+        return;
+      }
+      _accountName = name;
+      await _storage.write(_kKeyAccount, name);
+      if (!_disposed) notifyListeners();
+    } on Object catch (_) {
+      debugPrint('[Simkl] account lookup failed');
+    }
+  }
+
+  Future<String?> _fetchAccountName(String accessToken) async {
+    final version = await (_appVersion ??= _resolveAppVersion());
+    final response = await _api.send(
+      'GET',
+      Uri.parse('$_kApi/users/settings').replace(
+        queryParameters: {
+          'client_id': _clientId,
+          'app-name': _kAppName,
+          'app-version': version,
+        },
+      ),
+      headers: {
+        'user-agent': '$_kAppName/$version',
+        'authorization': 'Bearer $accessToken',
+      },
+    );
+    if (response.statusCode >= 400 || response.bytes.isEmpty) return null;
+    final body = await response.json();
+    final user = body is Map<String, Object?> ? body['user'] : null;
+    if (user is! Map<String, Object?>) return null;
+    final name = user['name'];
+    return name is String ? name : null;
   }
 
   /// Runs one at a time: Simkl holds a short per-user lock after each write.
