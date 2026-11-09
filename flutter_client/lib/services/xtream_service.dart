@@ -2100,7 +2100,11 @@ EpgProgram? _epgProgramFromMap(
     subtitle: _decodedSubtitle(json['subtitle']),
     iconUrl: nullIfBlank(_stringOrNull(json['icon'])),
     posterUrl: nullIfBlank(_stringOrNull(json['poster_url'])),
-    backdropUrl: nullIfBlank(_stringOrNull(json['backdrop_url'])),
+    // Newer editors no longer reuse an episode still as the backdrop; fall
+    // back to `still_url` so the guide keeps landscape art for those rows.
+    backdropUrl:
+        nullIfBlank(_stringOrNull(json['backdrop_url'])) ??
+        nullIfBlank(_stringOrNull(json['still_url'])),
     category: nullIfBlank(_stringOrNull(json['category'])),
     rating: nullIfBlank(_stringOrNull(json['rating'])),
     season: _positiveIntOrNull(json['season']),
