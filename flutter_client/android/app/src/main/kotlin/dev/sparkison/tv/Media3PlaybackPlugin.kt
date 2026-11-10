@@ -83,6 +83,7 @@ class Media3PlaybackPlugin(
     private val methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
     private val eventChannel = EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL)
     private val nowPlayingChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NOW_PLAYING_CHANNEL)
+    private val artworkLoader = LogoFramingBitmapLoader(context)
     private val mainHandler = Handler(Looper.getMainLooper())
     private var events: EventChannel.EventSink? = null
     private val states = mutableMapOf<String, PlayerState>()
@@ -407,6 +408,7 @@ class Media3PlaybackPlugin(
             ?: MediaSession.Builder(context, sessionPlayer)
                 .setId(playerId)
                 .setSessionActivity(appLaunchIntent())
+                .setBitmapLoader(artworkLoader)
                 .build()
         states[playerId] = state
 
@@ -499,11 +501,16 @@ class Media3PlaybackPlugin(
         target.keepPlayingInBackground = true
         target.sessionPlayer?.canChangeChannel = arguments["canChangeChannel"] as? Boolean ?: false
 
-        val artworkUrl = arguments["artworkUrl"] as? String
+        val artworkUri = (arguments["artworkUrl"] as? String)?.let(Uri::parse)
+        // Registered before the metadata goes out, so the first load of it
+        // is already framed.
+        if (artworkUri != null && arguments["artworkIsLogo"] == true) {
+            artworkLoader.markLogo(artworkUri)
+        }
         val metadata = MediaMetadata.Builder()
             .setTitle(arguments["title"] as? String)
             .setArtist(arguments["subtitle"] as? String)
-            .setArtworkUri(artworkUrl?.let(Uri::parse))
+            .setArtworkUri(artworkUri)
             .build()
         if (metadata != target.nowPlayingMetadata) {
             target.nowPlayingMetadata = metadata
