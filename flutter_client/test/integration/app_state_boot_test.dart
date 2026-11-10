@@ -30,7 +30,7 @@ import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:material_ui/material_ui.dart';
 
 void main() {
-  group('client config (M3U TV Profiles)', () {
+  group('client config (Settings Profiles)', () {
     const credentials = UserCredentials(
       server: 'https://fixture.example',
       username: 'fixture-user',

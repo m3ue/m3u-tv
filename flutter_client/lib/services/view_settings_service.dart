@@ -293,7 +293,7 @@ class ViewSettingsService extends ChangeNotifier {
   /// server answers.
   static const managedSettingsKey = 'm3ue_tv_managed_settings';
 
-  /// The settings an M3U TV Profile can manage: the editor's key, the key
+  /// The settings a Settings Profile can manage: the editor's key, the key
   /// it's stored under here, and the values this version accepts. A key or
   /// value this version doesn't know is ignored.
   static final Map<String, ({String storageKey, bool Function(Object) accepts})>
@@ -375,7 +375,7 @@ class ViewSettingsService extends ChangeNotifier {
   Map<String, ManagedSetting> _managed = const {};
   String? _managedProfileName;
 
-  /// The M3U TV Profile's name while it manages at least one setting.
+  /// The Settings Profile's name while it manages at least one setting.
   String? get managedProfileName =>
       _managed.isEmpty ? null : _managedProfileName;
 

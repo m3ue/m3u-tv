@@ -35,7 +35,7 @@ class ReverbService {
   void Function(FavoriteToggleEvent)? _onFavoriteToggled;
   void Function(String deviceId)? _onDeviceDeregister;
 
-  /// Called when the editor says this login's M3U TV Profile changed. Set
+  /// Called when the editor says this login's Settings Profile changed. Set
   /// once by the owner rather than per [connect], since it outlives sessions.
   void Function()? onClientConfigUpdated;
   void Function()? _onConnected;

@@ -137,7 +137,7 @@ class SettingsRow extends StatelessWidget {
   final String? subtitle;
   final IconData? icon;
 
-  /// The server enforces this setting (M3U TV Profile): the row shows a lock,
+  /// The server enforces this setting (Settings Profile): the row shows a lock,
   /// drops its chevron, and selecting it explains why it can't change.
   final bool locked;
 

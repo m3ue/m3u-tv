@@ -418,7 +418,7 @@ class XtreamAuthResponse {
   final List<ServerWatchHistoryAccount> watchHistory;
 
   /// Settings the editor manages for this login; null on editors without
-  /// M3U TV Profiles.
+  /// Settings Profiles.
   final ClientConfigCapability? clientConfig;
 
   bool hasFeature(String feature) => features.contains(feature);

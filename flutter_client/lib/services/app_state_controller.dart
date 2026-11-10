@@ -425,7 +425,7 @@ class AppStateController extends ChangeNotifier {
   final AIOStreamsFavoritesService aioFavoritesService;
   final ProxyPlaybackSettings proxyPlaybackSettings;
 
-  /// Each saved playlist's managed settings (M3U TV Profile).
+  /// Each saved playlist's managed settings (Settings Profile).
   final ClientConfigStore clientConfigStore;
   final ComskipSettings comskipSettings;
   final SyncOffsetStore syncOffsetStore;

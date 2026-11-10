@@ -6,7 +6,7 @@ import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 
 /// The editor's `m3u_editor.client_config` handshake block: settings an
-/// admin manages for this login from an M3U TV Profile.
+/// admin manages for this login from a Settings Profile.
 @immutable
 class ClientConfigCapability {
   const ClientConfigCapability({
@@ -60,7 +60,7 @@ class ManagedSetting {
   int get hashCode => Object.hash(value, enforced);
 }
 
-/// The settings an M3U TV Profile manages, keyed by the editor's setting
+/// The settings a Settings Profile manages, keyed by the editor's setting
 /// key (see `TvClientSettings` in m3u-editor).
 @immutable
 class ClientConfig {
