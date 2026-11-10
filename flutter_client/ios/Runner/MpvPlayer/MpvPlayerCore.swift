@@ -45,11 +45,24 @@ final class MpvPlayerCore {
   private weak var videoLayer: AVSampleBufferDisplayLayer?
   private var videoOutputWasConfigured = false
 
-  // Background audio: iOS doesn't let a backgrounded app draw, so video
-  // decoding is switched off (`vid=no`) while the app is in the background
-  // and back on when it returns, leaving only the audio running.
+  // Background audio: iOS doesn't let a backgrounded app draw, so while
+  // audio keeps playing in the background, video decoding is switched off
+  // (`vid=no`) and back on when the app returns. Only then: turning video
+  // back on makes a live stream wait for its next keyframe (seconds of
+  // black), so a player that's paused in the background (Background audio
+  // off) keeps its video. Both flags are only touched on `queue`.
   private var lifecycleObservers: [NSObjectProtocol] = []
+  private var inBackground = false
+  private var sourceIsLive = false
+  private var sourceUri: String?
+  // Set while a live stream is reopened on the way back to the foreground;
+  // hides that swap's stop/start from Dart, which sees playback carry on.
+  private var reopeningLiveStream = false
   private var videoSuspendedForBackground = false
+
+  // Leaving the app with Background audio off pauses from Dart a moment
+  // after iOS reports the move; wait that out before deciding.
+  private static let backgroundSettleDelay: TimeInterval = 1.0
 
   init(viewId: Int) {
     self.viewId = viewId
@@ -57,32 +70,90 @@ final class MpvPlayerCore {
     observeAppLifecycle()
   }
 
+  // Follows the phone's window scene rather than the app: once CarPlay is
+  // connected, the app stays active in its car scene while the phone screen
+  // is off, so app-wide background notifications never arrive.
   private func observeAppLifecycle() {
     let center = NotificationCenter.default
     lifecycleObservers = [
       center.addObserver(
-        forName: UIApplication.didEnterBackgroundNotification,
+        forName: UIScene.didEnterBackgroundNotification,
         object: nil,
-        queue: nil
-      ) { [weak self] _ in
-        self?.setVideoSuspendedForBackground(true)
+        queue: .main
+      ) { [weak self] notification in
+        guard let self, Self.isPhoneScene(notification) else { return }
+        self.queue.async { self.inBackground = true }
+        self.queue.asyncAfter(deadline: .now() + Self.backgroundSettleDelay) { [weak self] in
+          self?.suspendVideoIfPlayingInBackground()
+        }
       },
       center.addObserver(
-        forName: UIApplication.willEnterForegroundNotification,
+        forName: UIScene.willEnterForegroundNotification,
         object: nil,
-        queue: nil
-      ) { [weak self] _ in
-        self?.setVideoSuspendedForBackground(false)
+        queue: .main
+      ) { [weak self] notification in
+        guard let self, Self.isPhoneScene(notification) else { return }
+        self.flushVideoLayerIfInterrupted()
+        self.queue.async { self.resumeVideoForForeground() }
       },
     ]
   }
 
-  private func setVideoSuspendedForBackground(_ suspended: Bool) {
-    queue.async { [weak self] in
-      guard let self, let handle = self.mpv, !self.disposed,
-            self.videoSuspendedForBackground != suspended else { return }
-      self.videoSuspendedForBackground = suspended
-      mpv_set_property_string(handle, "vid", suspended ? "no" : "auto")
+  private static func isPhoneScene(_ notification: Notification) -> Bool {
+    (notification.object as? UIScene)?.session.role == .windowApplication
+  }
+
+  /// iOS interrupts the display layer's decoder while the app is in the
+  /// background, and the layer then ignores every new frame (the picture
+  /// freezes) until it's flushed. Runs on the way back to the foreground,
+  /// while mpv isn't feeding the layer (video off, or paused): flushing under
+  /// a running video output stalls mpv until the next pause/play.
+  /// Must run on main.
+  private func flushVideoLayerIfInterrupted() {
+    guard let videoLayer,
+          videoLayer.requiresFlushToResumeDecoding || videoLayer.status == .failed else { return }
+    videoLayer.flush()
+  }
+
+  /// On `queue`. Also called when playback starts while in the background
+  /// (Play from the lock screen).
+  private func suspendVideoIfPlayingInBackground() {
+    guard inBackground, !videoSuspendedForBackground, let handle = mpv, !disposed else { return }
+    var paused: Int32 = 0
+    _ = mpv_get_property(handle, "pause", MPV_FORMAT_FLAG, &paused)
+    guard paused == 0 else { return }
+    videoSuspendedForBackground = true
+    mpv_set_property_string(handle, "vid", "no")
+  }
+
+  /// On `queue`.
+  private func resumeVideoForForeground() {
+    inBackground = false
+    guard let handle = mpv, !disposed else { return }
+    if videoSuspendedForBackground {
+      videoSuspendedForBackground = false
+      mpv_set_property_string(handle, "vid", "auto")
+      // On demand, mpv refills the video it skipped by seeking. Live can't:
+      // its buffer was read ahead with audio only, so the video restarts
+      // that far ahead of playback and sits on one frame for as long as the
+      // buffer is (10s+ on IPTV). Dropping that buffer isn't enough either:
+      // the open connection only delivers in real time, so playback runs dry
+      // a second later and waits out the live rebuffer. A fresh connection
+      // gets the server's initial burst, so reopening starts like a channel
+      // change does.
+      if sourceIsLive, let uri = sourceUri {
+        reopeningLiveStream = true
+        command(handle, ["loadfile", uri, "replace"])
+      }
+      return
+    }
+    // A paused player kept its video, but the flush on the way back cleared
+    // the frame on screen: redraw it rather than show black until play
+    // (Plezy's `forceDraw`). Turning video back on above redraws by itself.
+    var paused: Int32 = 0
+    _ = mpv_get_property(handle, "pause", MPV_FORMAT_FLAG, &paused)
+    if paused != 0 {
+      command(handle, ["seek", "0", "relative+exact"])
     }
   }
 
@@ -191,6 +262,9 @@ final class MpvPlayerCore {
     queue.async { [weak self] in
       guard let self, let handle = self.mpv else { return }
       self.readyEmitted = false
+      self.sourceIsLive = isLive
+      self.sourceUri = uri
+      self.reopeningLiveStream = false
 
       // Set on every load, like the options below: this handle persists across loads, so
       // a stream without its own headers or user agent must not inherit the previous
@@ -395,13 +469,18 @@ final class MpvPlayerCore {
   private func handle_(event: mpv_event) {
     switch event.event_id {
     case MPV_EVENT_START_FILE:
+      if reopeningLiveStream { return }
       emit(kind: "START_FILE", extra: [:])
     case MPV_EVENT_FILE_LOADED:
+      reopeningLiveStream = false
       readyEmitted = true
       emit(kind: "FILE_LOADED", extra: snapshot(includeTracks: true))
     case MPV_EVENT_PLAYBACK_RESTART:
       emit(kind: "PLAYBACK_RESTART", extra: snapshot(includeTracks: true))
     case MPV_EVENT_PROPERTY_CHANGE:
+      if event.reply_userdata == Self.pausePropertyIndex {
+        suspendVideoIfPlayingInBackground()
+      }
       if event.reply_userdata == Self.voConfiguredPropertyIndex {
         var configured: Int32 = 0
         if let handle = mpv { _ = mpv_get_property(handle, "vo-configured", MPV_FORMAT_FLAG, &configured) }
@@ -427,7 +506,11 @@ final class MpvPlayerCore {
     case MPV_EVENT_END_FILE:
       if let data = event.data {
         let endFile = data.assumingMemoryBound(to: mpv_event_end_file.self).pointee
+        if endFile.reason == MPV_END_FILE_REASON_STOP && reopeningLiveStream {
+          return
+        }
         if endFile.reason == MPV_END_FILE_REASON_ERROR {
+          reopeningLiveStream = false
           let message = String(cString: mpv_error_string(endFile.error))
           emitError(message: message, code: "apple-mpv-error")
           return
@@ -458,6 +541,7 @@ final class MpvPlayerCore {
   private static let trackRelatedPropertyIndices: Set<UInt64> = [6, 7, 8]
 
   /// Index of `video-params/sig-peak` in the `observed` array in `attach(to:)`.
+  private static let pausePropertyIndex: UInt64 = 2
   private static let sigPeakPropertyIndex: UInt64 = 10
 
   /// Index of `vo-configured` in the `observed` array in `attach(to:)`.

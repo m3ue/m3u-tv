@@ -18,6 +18,7 @@ final class NowPlayingPlugin {
   private var commandsRegistered = false
   private var nowPlayingInfo: [String: Any] = [:]
   private var artworkUrl: String?
+  private var artworkIsLogo = false
   private var artwork: MPMediaItemArtwork?
   private var artworkTask: URLSessionDataTask?
 
@@ -62,8 +63,10 @@ final class NowPlayingPlugin {
     }
 
     let requestedArtwork = args["artworkUrl"] as? String
-    if requestedArtwork != artworkUrl {
+    let requestedIsLogo = args["artworkIsLogo"] as? Bool ?? false
+    if requestedArtwork != artworkUrl || requestedIsLogo != artworkIsLogo {
       artworkUrl = requestedArtwork
+      artworkIsLogo = requestedIsLogo
       artwork = nil
       artworkTask?.cancel()
       artworkTask = nil
@@ -98,11 +101,12 @@ final class NowPlayingPlugin {
 
   private func loadArtwork(_ urlString: String?) {
     guard let urlString, let url = URL(string: urlString) else { return }
+    let isLogo = artworkIsLogo
     let task = URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
       guard let data, let image = UIImage(data: data) else { return }
       DispatchQueue.main.async {
         guard let self, self.artworkUrl == urlString else { return }
-        let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+        let artwork = Self.artwork(for: image, isLogo: isLogo)
         self.artwork = artwork
         guard !self.nowPlayingInfo.isEmpty else { return }
         self.nowPlayingInfo[MPMediaItemPropertyArtwork] = artwork
@@ -111,6 +115,52 @@ final class NowPlayingPlugin {
     }
     artworkTask = task
     task.resume()
+  }
+
+  // The system asks for artwork at its own (square) sizes and crops whatever
+  // it gets back, which cut a wide channel logo down to a sliver. Render to
+  // the requested size instead: a logo is fitted with a margin around it, a
+  // poster fills the frame. Logos sit on a dark tile: most are white on a
+  // transparent background, made for a dark UI, and vanished on the light
+  // notification background.
+  private static let artworkBounds = CGSize(width: 600, height: 600)
+  private static let logoInset: CGFloat = 0.12
+  private static let logoBackground = UIColor(red: 0x1C / 255, green: 0x1C / 255, blue: 0x1E / 255, alpha: 1)
+
+  private static func artwork(for image: UIImage, isLogo: Bool) -> MPMediaItemArtwork {
+    MPMediaItemArtwork(boundsSize: artworkBounds) { size in
+      render(image, size: size, isLogo: isLogo)
+    }
+  }
+
+  private static func render(_ image: UIImage, size: CGSize, isLogo: Bool) -> UIImage {
+    guard size.width > 0, size.height > 0,
+          image.size.width > 0, image.size.height > 0 else { return image }
+    let frame = isLogo
+      ? CGRect(origin: .zero, size: size).insetBy(
+          dx: size.width * logoInset,
+          dy: size.height * logoInset
+        )
+      : CGRect(origin: .zero, size: size)
+    let widthScale = frame.width / image.size.width
+    let heightScale = frame.height / image.size.height
+    let scale = isLogo ? min(widthScale, heightScale) : max(widthScale, heightScale)
+    let drawSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+    let drawRect = CGRect(
+      x: frame.midX - drawSize.width / 2,
+      y: frame.midY - drawSize.height / 2,
+      width: drawSize.width,
+      height: drawSize.height
+    )
+    let format = UIGraphicsImageRendererFormat.default()
+    format.opaque = isLogo
+    return UIGraphicsImageRenderer(size: size, format: format).image { context in
+      if isLogo {
+        logoBackground.setFill()
+        context.fill(CGRect(origin: .zero, size: size))
+      }
+      image.draw(in: drawRect)
+    }
   }
 
   private static func allCommands() -> [MPRemoteCommand] {
