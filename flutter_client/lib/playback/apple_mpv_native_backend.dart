@@ -4,6 +4,7 @@ import 'package:m3u_tv/playback/mpv_native_backend_base.dart';
 import 'package:m3u_tv/playback/mpv_native_event.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 // Shared broadcast event stream, same rationale as desktop_libmpv_backend.dart
 // and mac_mpv_native_backend.dart: receiveBroadcastStream() must be listened
@@ -41,7 +42,7 @@ int _nextViewId = 0;
 /// with `MacMpvNativeBackend` via `MpvNativeBackendBase` -- the two backends
 /// differ only in channel names, capabilities, and error codes.
 class AppleMpvNativeBackend extends MpvNativeBackendBase
-    implements PlatformViewProvider {
+    implements PlatformViewProvider, PictureInPictureProvider {
   AppleMpvNativeBackend({MethodChannel? channel, EventChannel? eventChannel})
     : super(
         viewId: _nextViewId++,
@@ -74,4 +75,17 @@ class AppleMpvNativeBackend extends MpvNativeBackendBase
 
   @override
   String get endedBeforeReadyCode => 'apple-mpv-ended-before-ready';
+
+  /// iPhone and iPad only: tvOS has no picture-in-picture here.
+  @override
+  Future<void> setAutoPictureInPicture({required bool enabled}) async {
+    if (!HostPlatform.isIOS) return;
+    try {
+      await invokeControl('setAutoPictureInPicture', <String, Object?>{
+        'enabled': enabled,
+      });
+    } on MissingPluginException {
+      // Older native builds.
+    }
+  }
 }

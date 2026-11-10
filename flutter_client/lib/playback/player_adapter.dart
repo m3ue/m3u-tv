@@ -92,6 +92,15 @@ abstract class HtmlViewProvider {
 /// Implemented by `DesktopLibmpvBackend` (Linux/Windows) only -- Apple's mpv
 /// backends and ExoPlayer decide HDR automatically from the source and
 /// display, with no equivalent override.
+/// A backend whose video can move into the system's picture-in-picture
+/// window when the viewer leaves the app (iOS mpv; Android's PiP is the
+/// whole activity instead, see MainActivity).
+// ignore: one_member_abstracts
+abstract class PictureInPictureProvider {
+  /// Only the full-screen player turns this on.
+  Future<void> setAutoPictureInPicture({required bool enabled});
+}
+
 // ignore: one_member_abstracts
 abstract class HdrToggleProvider {
   Future<void> setHdrEnabled(

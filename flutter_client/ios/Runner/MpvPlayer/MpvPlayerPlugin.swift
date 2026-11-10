@@ -19,6 +19,12 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
   private var eventSink: FlutterEventSink?
   private let lock = NSLock()
 
+  /// `m3u_tv/system_ui`, the channel Android reports picture-in-picture on
+  /// (`pipModeChanged`), so PlayerScreen handles both the same way. Also
+  /// carries `pipDismissed` (closed without returning to the app) and the
+  /// PiP window's buttons (`pipSetPlaying`, `pipSkip`).
+  var systemUiChannel: FlutterMethodChannel?
+
   func attachCore(viewId: Int, to displayLayer: AVSampleBufferDisplayLayer) {
     lock.lock()
     let staleCore = cores[viewId]
@@ -106,6 +112,9 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
       let speed = (args["speed"] as? NSNumber)?.doubleValue ?? 1.0
       core(for: viewId)?.setPlaybackSpeed(speed)
       result(nil)
+    case "setAutoPictureInPicture":
+      core(for: viewId)?.setAutoPictureInPicture(args["enabled"] as? Bool ?? false)
+      result(nil)
     case "setSyncOffset":
       let property = args["property"] as? String ?? ""
       let milliseconds = (args["milliseconds"] as? NSNumber)?.intValue ?? 0
@@ -134,6 +143,27 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
   func mpvPlayerCore(_ core: MpvPlayerCore, didEmit event: [String: Any]) {
     DispatchQueue.main.async { [weak self] in
       self?.eventSink?(event)
+    }
+  }
+
+  func mpvPlayerCore(_ core: MpvPlayerCore, pictureInPictureActive active: Bool, restored: Bool) {
+    invokeSystemUi("pipModeChanged", active)
+    if !active && !restored {
+      invokeSystemUi("pipDismissed", nil)
+    }
+  }
+
+  func mpvPlayerCore(_ core: MpvPlayerCore, pictureInPictureSetPlaying playing: Bool) {
+    invokeSystemUi("pipSetPlaying", playing)
+  }
+
+  func mpvPlayerCore(_ core: MpvPlayerCore, pictureInPictureSkip seconds: Double) {
+    invokeSystemUi("pipSkip", seconds)
+  }
+
+  private func invokeSystemUi(_ method: String, _ arguments: Any?) {
+    DispatchQueue.main.async { [weak self] in
+      self?.systemUiChannel?.invokeMethod(method, arguments: arguments)
     }
   }
 

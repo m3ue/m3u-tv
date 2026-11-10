@@ -37,6 +37,7 @@ import UIKit
         let messenger = registrar.messenger()
 
         let plugin = MpvPlayerPlugin()
+        plugin.systemUiChannel = FlutterMethodChannel(name: "m3u_tv/system_ui", binaryMessenger: messenger)
         mpvPlugin = plugin
 
         FlutterMethodChannel(

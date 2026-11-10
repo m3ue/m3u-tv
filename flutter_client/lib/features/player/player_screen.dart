@@ -428,7 +428,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     widget.backController?._handler = _handleBack;
     HardwareKeyboard.instance.addHandler(_handleTransportKey);
     DesktopFullscreenService.instance?.deferEscape = _defersFullscreenEscape;
-    if (HostPlatform.isAndroid) {
+    if (HostPlatform.isAndroid || HostPlatform.isIOS) {
       _pipChannel.setMethodCallHandler(_handlePipChannelCall);
     }
     if (widget.adoptsPlayingSession) {
@@ -955,7 +955,10 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (fullscreen?.deferEscape == _defersFullscreenEscape) {
       fullscreen!.deferEscape = null;
     }
-    if (HostPlatform.isAndroid) {
+    // Back to the EPG preview (or gone): only the full-screen player PiPs.
+    unawaited(_autoPictureInPicture?.setAutoPictureInPicture(enabled: false));
+    _autoPictureInPicture = null;
+    if (HostPlatform.isAndroid || HostPlatform.isIOS) {
       _pipChannel.setMethodCallHandler(null);
     }
     if (widget.isHandheld) {
@@ -1361,6 +1364,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     _skips.check();
     _checkUpNext();
     _trackLivePause(state.status);
+    _syncAutoPictureInPicture();
     _publishNowPlaying();
 
     // Only re-evaluate the hide timer on an actual play/pause transition:
@@ -1607,16 +1611,10 @@ class _PlayerScreenState extends State<PlayerScreen>
     // .onStop) unless Background audio handed the player to PlaybackService.
     if (!HostPlatform.isIOS) return;
     if (state == AppLifecycleState.paused) {
-      final keepsPlaying =
-          widget.viewSettingsService?.backgroundAudioSync ?? false;
-      if (keepsPlaying) return;
-      // iOS suspends the app shortly after, so the lock screen controls
-      // couldn't resume it: take them down until the app is back.
-      _nowPlaying.suspend(this);
-      if (_isPlaying) {
-        _pausedForBackground = true;
-        unawaited(widget.orchestrator.pause());
-      }
+      // PiP keeps playing whatever the setting; closing it without coming
+      // back applies this then (`pipDismissed`).
+      if (_isInPictureInPicture) return;
+      _enterBackground();
     } else if (state == AppLifecycleState.resumed) {
       _nowPlaying.resume(this);
       _publishNowPlaying();
@@ -1624,6 +1622,20 @@ class _PlayerScreenState extends State<PlayerScreen>
         _pausedForBackground = false;
         _resume();
       }
+    }
+  }
+
+  /// iOS, leaving the app (or closing PiP without returning to it).
+  void _enterBackground() {
+    final keepsPlaying =
+        widget.viewSettingsService?.backgroundAudioSync ?? false;
+    if (keepsPlaying) return;
+    // iOS suspends the app shortly after, so the lock screen controls
+    // couldn't resume it: take them down until the app is back.
+    _nowPlaying.suspend(this);
+    if (_isPlaying) {
+      _pausedForBackground = true;
+      unawaited(widget.orchestrator.pause());
     }
   }
 
@@ -2171,15 +2183,55 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   Future<void> _handlePipChannelCall(MethodCall call) async {
-    if (call.method != 'pipModeChanged') return;
-    final isInPip = call.arguments as bool;
-    if (!mounted) return;
-    setState(() => _isInPictureInPicture = isInPip);
-    if (isInPip) {
-      _hideOverlay();
-    } else {
-      _showOverlay();
+    if (!mounted || _disposed) return;
+    switch (call.method) {
+      case 'pipModeChanged':
+        final isInPip = call.arguments as bool;
+        setState(() => _isInPictureInPicture = isInPip);
+        if (isInPip) {
+          _hideOverlay();
+        } else {
+          _showOverlay();
+        }
+      // iOS only from here: the PiP window and its buttons belong to the
+      // mpv player there (MpvPipController), not to the whole app.
+      case 'pipDismissed':
+        // Closed without coming back: the app is now simply in the
+        // background, which `paused` skipped while PiP was up.
+        if (WidgetsBinding.instance.lifecycleState !=
+            AppLifecycleState.resumed) {
+          _enterBackground();
+        }
+      case 'pipSetPlaying':
+        // Same rules as the lock screen's Play and Pause.
+        final playing = call.arguments as bool;
+        _handleNowPlayingCommand(
+          NowPlayingCommandEvent(
+            playing ? NowPlayingCommand.play : NowPlayingCommand.pause,
+          ),
+        );
+      case 'pipSkip':
+        final seconds = (call.arguments as num).toDouble();
+        _seekTo(
+          _currentPosition + Duration(milliseconds: (seconds * 1000).round()),
+        );
     }
+  }
+
+  // iOS: the PiP-capable backend the full-screen player has turned automatic
+  // PiP on for (see PictureInPictureProvider).
+  PictureInPictureProvider? _autoPictureInPicture;
+
+  void _syncAutoPictureInPicture() {
+    if (!HostPlatform.isIOS) return;
+    final provider = widget.orchestrator.activePlatformViewProvider;
+    final next = provider is PictureInPictureProvider
+        ? provider! as PictureInPictureProvider
+        : null;
+    if (identical(next, _autoPictureInPicture)) return;
+    unawaited(_autoPictureInPicture?.setAutoPictureInPicture(enabled: false));
+    _autoPictureInPicture = next;
+    unawaited(next?.setAutoPictureInPicture(enabled: true));
   }
 
   void _showOverlay() {

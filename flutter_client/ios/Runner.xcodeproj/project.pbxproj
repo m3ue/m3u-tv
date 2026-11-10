@@ -23,6 +23,7 @@
 		D17A76EB10D7D3ADD29933F5 /* NowPlayingPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51310D57336683734456B7FB /* NowPlayingPlugin.swift */; };
 		DC316874FE0795E73C699B7F /* MpvPlayerCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 653AE75DDD416A3862E61BD6 /* MpvPlayerCore.swift */; };
 		E6CE57DDB609B3130EE41F8B /* MPVKit in Frameworks */ = {isa = PBXBuildFile; productRef = B30106EF70AE0E4B1D478305 /* MPVKit */; };
+		F310FE5546C2235636093819 /* MpvPipController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72870D771977F78807563193 /* MpvPipController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +60,7 @@
 		51310D57336683734456B7FB /* NowPlayingPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NowPlayingPlugin.swift; sourceTree = "<group>"; };
 		653AE75DDD416A3862E61BD6 /* MpvPlayerCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MpvPlayerCore.swift; sourceTree = "<group>"; };
 		727C5A47C1C50038F32B8E3D /* MpvPlayerPlatformView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MpvPlayerPlatformView.swift; sourceTree = "<group>"; };
+		72870D771977F78807563193 /* MpvPipController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MpvPipController.swift; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -101,6 +103,7 @@
 				653AE75DDD416A3862E61BD6 /* MpvPlayerCore.swift */,
 				727C5A47C1C50038F32B8E3D /* MpvPlayerPlatformView.swift */,
 				A36E6DB8E4A59C98D93CAEAC /* MpvPlayerPlugin.swift */,
+				72870D771977F78807563193 /* MpvPipController.swift */,
 			);
 			name = MpvPlayer;
 			path = MpvPlayer;
@@ -331,6 +334,7 @@
 				65893F8DF1B7A666E49369C3 /* MpvPlayerPlatformView.swift in Sources */,
 				BC9C5BDAF0AF4715988BE7E5 /* MpvPlayerPlugin.swift in Sources */,
 				D17A76EB10D7D3ADD29933F5 /* NowPlayingPlugin.swift in Sources */,
+				F310FE5546C2235636093819 /* MpvPipController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
