@@ -96,6 +96,7 @@ LIVE TV AND GUIDE
 • Guide previews carry into full screen without restarting the stream.
 • Catchup playback with seeking on channels that support it.
 • Multiview: watch several channels at once.
+• Pause live TV, and pick back up at the live point after a longer break.
 • Custom channel sorting, favorites-first ordering and grid or list layouts.
 
 SPORTS
@@ -213,6 +214,7 @@ LIVE TV AND GUIDE
 • Guide previews carry into full screen without restarting the stream.
 • Catchup playback with seeking on channels that support it.
 • Multiview: watch several channels at once.
+• Pause live TV, and pick back up at the live point after a longer break.
 • Custom channel sorting, favorites-first ordering and grid or list layouts.
 
 SPORTS
@@ -241,6 +243,7 @@ SEARCH
 PLAYBACK
 • Native mpv playback with an automatic AVKit fallback.
 • Audio and subtitle track selection, plus multichannel audio on iPhone and iPad.
+• Optional background audio: keep listening after leaving the app or locking your device, with playback controls on the Lock Screen and in Control Center.
 • A built-in Logs and Diagnostics screen for troubleshooting.
 
 MADE FOR YOUR HOUSEHOLD
@@ -289,6 +292,7 @@ LIVE TV AND GUIDE
 • Guide previews carry into full screen without restarting the stream.
 • Catchup playback with seeking on channels that support it.
 • Multiview: watch several channels at once.
+• Pause live TV, and pick back up at the live point after a longer break.
 • Custom channel sorting, favorites-first ordering and grid or list layouts.
 • Works with Xtream API and standard M3U playlists served by M3U Editor.
 
@@ -322,6 +326,7 @@ SEARCH
 PLAYBACK
 • ExoPlayer (Media3) with an automatic mpv fallback for streams ExoPlayer can't play.
 • True HDR playback on supported TVs and devices, and picture-in-picture on phones and tablets.
+• Background audio on phones and tablets, with notification and lock screen controls, including channel skipping for live TV.
 • Audio and subtitle track selection, plus multichannel audio.
 • Optional automatic frame rate matching on Android TV.
 • A built-in Logs and Diagnostics screen for troubleshooting.
@@ -342,6 +347,35 @@ PLATFORMS
 OPEN SOURCE
 M3U TV and M3U Editor are open source. Bring your own server, your own playlists and your own sources.
 ```
+
+### App content > Foreground service permissions
+
+Required since v1.3.0, which declares `FOREGROUND_SERVICE_MEDIA_PLAYBACK` for background audio (`PlaybackService`). Play Console blocks the release until this is filled in. It covers the whole listing, Android TV included, even though TVs never start the service. Redo it only if the app starts using another foreground service type.
+
+- **Permission:** Media playback
+- **Video:** an unlisted YouTube or shared Google Drive link to a 30 to 60 second phone recording (see the script below).
+
+**Describe the feature:**
+
+```
+M3U TV plays live TV and on-demand video from the user's own media server. With the Background audio setting on (the default on phones and tablets, and changeable in Settings > Playback), playback continues after the user leaves the app, locks the screen, or closes the picture-in-picture window. The media playback foreground service keeps that playback running and shows the system media notification with play, pause, seek and channel controls.
+```
+
+**What happens if the task is interrupted or deferred:**
+
+```
+Audio the user started would stop as soon as they leave the app, and they would lose the stream and its media controls. The playback is started by the user and is expected to keep going.
+```
+
+**Is it started by the user:** Yes. It only runs while media the user started is playing, and stops when they stop playback or close the player.
+
+**Video script:**
+
+1. Start a live channel on the phone.
+2. Press Home: the player drops into picture-in-picture. Close the picture-in-picture window.
+3. Audio keeps playing. Pull down the notification shade to show the media notification.
+4. Pause and play from the notification, then skip to the next channel.
+5. Open Settings > Playback, turn Background audio off, and show that leaving the player now stops playback.
 
 ---
 
@@ -372,6 +406,7 @@ LIVE TV AND GUIDE
 • Guide previews carry into full screen without restarting the stream.
 • Catchup playback with seeking on channels that support it.
 • Multiview: watch several channels at once.
+• Pause live TV, and pick back up at the live point after a longer break.
 • Custom channel sorting, favorites-first ordering and grid or list layouts.
 • Works with Xtream API and standard M3U playlists served by M3U Editor.
 
@@ -535,6 +570,9 @@ To sign in:
 5. Select Connect.
 
 Connecting usually takes a few seconds. If a server does not respond, the app now shows "Server is currently unavailable." after 30 seconds instead of loading indefinitely, and Connect can be selected again.
+
+BACKGROUND AUDIO (iPhone and iPad)
+Background audio is an optional setting and is off by default. To test it, open Settings > Playback and turn on Background audio, then start any channel or movie and leave the app or lock the device: audio keeps playing, with controls on the Lock Screen and in Control Center.
 
 Third-party services used via their public APIs: Trakt (optional watch history sync), TheIntroDB (optional skip intro timestamps), YouTube (trailer links open externally).
 
