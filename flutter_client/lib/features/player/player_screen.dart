@@ -23,6 +23,7 @@ import 'package:m3u_tv/features/series/episode_player_args.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/playback/native_video_surface.dart';
+import 'package:m3u_tv/playback/now_playing_bridge.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
@@ -110,6 +111,7 @@ class PlayerScreen extends StatefulWidget {
     this.adoptsPlayingSession = false,
     this.surfaceKey,
     this.releasesOrchestratorOnDispose,
+    this.nowPlayingBridge,
     super.key,
   });
 
@@ -127,6 +129,10 @@ class PlayerScreen extends StatefulWidget {
   /// Asked on dispose whether to stop [orchestrator]; false when it went
   /// back to the EPG preview, which keeps playing it. Null stops it.
   final bool Function()? releasesOrchestratorOnDispose;
+
+  /// The system Now Playing surfaces (lock screen, Control Center). Null
+  /// uses [NowPlayingBridge.instance].
+  final NowPlayingBridge? nowPlayingBridge;
   final EpgService epgService;
   final XtreamService? xtreamService;
   final ComskipSettings? comskipSettings;
@@ -184,7 +190,8 @@ class PlayerScreen extends StatefulWidget {
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends State<PlayerScreen> {
+class _PlayerScreenState extends State<PlayerScreen>
+    with WidgetsBindingObserver {
   static const Duration _loadingTimeout = Duration(seconds: 20);
   static const Duration _progressInterval = Duration(seconds: 10);
   static const double _kCompletedFraction = 0.9;
@@ -461,6 +468,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }
     });
     _skips.addListener(_onSkipSegmentsChanged);
+    _nowPlaying.attach(this, _handleNowPlayingCommand);
+    WidgetsBinding.instance.addObserver(this);
     _stateSubscription = widget.orchestrator.onState.listen(_handleState);
     _errorSubscription = widget.orchestrator.onError.listen(_handleError);
     // `_isNativePlaneActive` reads the orchestrator directly rather than
@@ -931,6 +940,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void dispose() {
     _disposed = true;
     HardwareKeyboard.instance.removeHandler(_handleTransportKey);
+    WidgetsBinding.instance.removeObserver(this);
+    _nowPlaying.detach(this);
     // A new session's player can mount before this one unmounts, so only
     // detach what is still ours.
     final backController = widget.backController;
@@ -1345,6 +1356,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
     _skips.check();
     _checkUpNext();
+    _publishNowPlaying();
 
     // Only re-evaluate the hide timer on an actual play/pause transition:
     // pausing cancels it (keeping the overlay up), resuming restarts the
@@ -1481,7 +1493,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (!_isLive || widget.args.epgChannelId == null) return;
     final channelId = widget.args.epgChannelId!;
     final result = widget.epgService.lookup(channelId);
-    if (mounted) setState(() => _epgData = result);
+    if (mounted) {
+      setState(() => _epgData = result);
+      _publishNowPlaying();
+    }
 
     final streamId = widget.args.streamId;
     final xtreamService = widget.xtreamService;
@@ -1517,6 +1532,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       final refreshed = widget.epgService.lookup(channelId);
       if (mounted) {
         setState(() => _epgData = refreshed);
+        _publishNowPlaying();
       }
     } on Object catch (_) {
       widget.epgService.markFetchFailed(
@@ -1570,6 +1586,84 @@ class _PlayerScreenState extends State<PlayerScreen> {
       widget.onClose!();
     } else {
       Navigator.of(context).pop();
+    }
+  }
+
+  NowPlayingBridge get _nowPlaying =>
+      widget.nowPlayingBridge ?? NowPlayingBridge.instance;
+
+  // Set when leaving the app paused playback (background audio off), so
+  // returning resumes it. Cleared by any remote command in between.
+  bool _pausedForBackground = false;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_nowPlaying.enabled) return;
+    if (state == AppLifecycleState.paused) {
+      final keepsPlaying =
+          widget.viewSettingsService?.backgroundAudioSync ?? false;
+      if (_isPlaying && !keepsPlaying) {
+        _pausedForBackground = true;
+        unawaited(widget.orchestrator.pause());
+      }
+    } else if (state == AppLifecycleState.resumed && _pausedForBackground) {
+      _pausedForBackground = false;
+      unawaited(widget.orchestrator.play());
+    }
+  }
+
+  void _publishNowPlaying() {
+    if (!_nowPlaying.enabled || _disposed || !mounted) return;
+    if (!_hasStartedPlayback) return;
+    final metadata = widget.args.metadata;
+    final String? subtitle;
+    final String? artworkUrl;
+    if (_isLive || widget.args.type == 'catchup') {
+      subtitle = _isLive ? _epgData?.current.title : null;
+      artworkUrl = widget.args.logoUrl;
+    } else {
+      subtitle = _nowPlayingSubtitle(context);
+      artworkUrl =
+          (metadata['poster_url'] as String?) ??
+          (metadata['backdrop_url'] as String?);
+    }
+    _nowPlaying.update(
+      this,
+      NowPlayingInfo(
+        title: _nowPlayingTitle(),
+        subtitle: subtitle,
+        artworkUrl: artworkUrl,
+        isLive: _isLive,
+        isPlaying: _isPlaying,
+        position: _currentPosition,
+        duration: _duration,
+        canSeek: _canSeek,
+        canChangeChannel: _isLive && widget.onNextChannel != null,
+      ),
+    );
+  }
+
+  void _handleNowPlayingCommand(NowPlayingCommandEvent event) {
+    if (_disposed || widget.orchestrator.activeBackend == null) return;
+    _pausedForBackground = false;
+    switch (event.command) {
+      case NowPlayingCommand.play:
+        unawaited(widget.orchestrator.play());
+      case NowPlayingCommand.pause:
+        unawaited(widget.orchestrator.pause());
+      case NowPlayingCommand.toggle:
+        _togglePlayPause();
+      case NowPlayingCommand.seek:
+        final position = event.position;
+        if (position != null) _seekTo(position);
+      case NowPlayingCommand.skipForward:
+        _seekTo(_currentPosition + _skipStep);
+      case NowPlayingCommand.skipBackward:
+        _seekTo(_currentPosition - _skipStep);
+      case NowPlayingCommand.next:
+        if (_isLive) _handleNextChannel();
+      case NowPlayingCommand.previous:
+        if (_isLive) _handlePreviousChannel();
     }
   }
 

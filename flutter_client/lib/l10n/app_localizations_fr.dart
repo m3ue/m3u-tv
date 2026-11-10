@@ -2015,6 +2015,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Atténue les lignes en peigne des chaînes entrelacées (comme 1080i et 576i). Utilise davantage le processeur.';
 
   @override
+  String get settingsBackgroundAudio => 'Audio en arrière-plan';
+
+  @override
+  String get settingsBackgroundAudioHint =>
+      'Continue la lecture audio lorsque vous quittez l\'app ou verrouillez l\'écran. Les commandes de l\'écran verrouillé fonctionnent dans les deux cas.';
+
+  @override
   String get settingsPrebufferLive =>
       'Mettre en mémoire tampon les flux en direct avant la lecture';
 

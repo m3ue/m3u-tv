@@ -45,9 +45,45 @@ final class MpvPlayerCore {
   private weak var videoLayer: AVSampleBufferDisplayLayer?
   private var videoOutputWasConfigured = false
 
+  // Background audio: iOS doesn't let a backgrounded app draw, so video
+  // decoding is switched off (`vid=no`) while the app is in the background
+  // and back on when it returns, leaving only the audio running.
+  private var lifecycleObservers: [NSObjectProtocol] = []
+  private var videoSuspendedForBackground = false
+
   init(viewId: Int) {
     self.viewId = viewId
     self.queue = DispatchQueue(label: "m3u_tv.apple_mpv.\(viewId)")
+    observeAppLifecycle()
+  }
+
+  private func observeAppLifecycle() {
+    let center = NotificationCenter.default
+    lifecycleObservers = [
+      center.addObserver(
+        forName: UIApplication.didEnterBackgroundNotification,
+        object: nil,
+        queue: nil
+      ) { [weak self] _ in
+        self?.setVideoSuspendedForBackground(true)
+      },
+      center.addObserver(
+        forName: UIApplication.willEnterForegroundNotification,
+        object: nil,
+        queue: nil
+      ) { [weak self] _ in
+        self?.setVideoSuspendedForBackground(false)
+      },
+    ]
+  }
+
+  private func setVideoSuspendedForBackground(_ suspended: Bool) {
+    queue.async { [weak self] in
+      guard let self, let handle = self.mpv, !self.disposed,
+            self.videoSuspendedForBackground != suspended else { return }
+      self.videoSuspendedForBackground = suspended
+      mpv_set_property_string(handle, "vid", suspended ? "no" : "auto")
+    }
   }
 
   /// Creates and initializes the mpv handle, targeting `displayLayer` as the
@@ -318,6 +354,10 @@ final class MpvPlayerCore {
   /// `dispose(completion:)`, which macOS/iOS shared this exact crash class
   /// with before being fixed.
   func dispose(completion: @escaping () -> Void) {
+    for observer in lifecycleObservers {
+      NotificationCenter.default.removeObserver(observer)
+    }
+    lifecycleObservers = []
     // Captures `self` strongly, deliberately -- not `[weak self]`. mpv holds
     // an *unretained* raw pointer to this instance (`wid`, and the wakeup
     // callback below via `Unmanaged.passUnretained`) for as long as the mpv

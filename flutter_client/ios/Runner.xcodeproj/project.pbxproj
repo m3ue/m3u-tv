@@ -20,6 +20,7 @@
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* AvKitPlaybackPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F3 /* AvKitPlaybackPlugin.swift */; };
 		BC9C5BDAF0AF4715988BE7E5 /* MpvPlayerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A36E6DB8E4A59C98D93CAEAC /* MpvPlayerPlugin.swift */; };
+		D17A76EB10D7D3ADD29933F5 /* NowPlayingPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51310D57336683734456B7FB /* NowPlayingPlugin.swift */; };
 		DC316874FE0795E73C699B7F /* MpvPlayerCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 653AE75DDD416A3862E61BD6 /* MpvPlayerCore.swift */; };
 		E6CE57DDB609B3130EE41F8B /* MPVKit in Frameworks */ = {isa = PBXBuildFile; productRef = B30106EF70AE0E4B1D478305 /* MPVKit */; };
 /* End PBXBuildFile section */
@@ -55,6 +56,7 @@
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
+		51310D57336683734456B7FB /* NowPlayingPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NowPlayingPlugin.swift; sourceTree = "<group>"; };
 		653AE75DDD416A3862E61BD6 /* MpvPlayerCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MpvPlayerCore.swift; sourceTree = "<group>"; };
 		727C5A47C1C50038F32B8E3D /* MpvPlayerPlatformView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MpvPlayerPlatformView.swift; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -159,6 +161,7 @@
 				A1B2C3D4E5F6A7B8C9D0E1F3 /* AvKitPlaybackPlugin.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				2B0C7BB8F93BEF3613D588E3 /* MpvPlayer */,
+				51310D57336683734456B7FB /* NowPlayingPlugin.swift */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -327,6 +330,7 @@
 				DC316874FE0795E73C699B7F /* MpvPlayerCore.swift in Sources */,
 				65893F8DF1B7A666E49369C3 /* MpvPlayerPlatformView.swift in Sources */,
 				BC9C5BDAF0AF4715988BE7E5 /* MpvPlayerPlugin.swift in Sources */,
+				D17A76EB10D7D3ADD29933F5 /* NowPlayingPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

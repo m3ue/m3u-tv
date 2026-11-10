@@ -120,6 +120,7 @@ Future<void> main() async {
     appState.viewSettingsService.matchRefreshRate(),
     appState.viewSettingsService.deinterlace(),
     appState.viewSettingsService.prebufferLive(),
+    appState.viewSettingsService.backgroundAudio(),
     appState.viewSettingsService.vodPlayer(),
     appState.viewSettingsService.showPlaybackDiagnostics(),
     appState.viewSettingsService.navigationSoundEnabled(),

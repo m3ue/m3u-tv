@@ -1993,6 +1993,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.';
 
   @override
+  String get settingsBackgroundAudio => 'Background audio';
+
+  @override
+  String get settingsBackgroundAudioHint =>
+      'Keep playing audio when you leave the app or lock the screen. Lock screen controls work either way.';
+
+  @override
   String get settingsPrebufferLive => 'Buffer live streams before playing';
 
   @override

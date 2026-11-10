@@ -2011,6 +2011,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'Suaviza las líneas de peine en los canales entrelazados (como 1080i y 576i). Usa más CPU.';
 
   @override
+  String get settingsBackgroundAudio => 'Audio en segundo plano';
+
+  @override
+  String get settingsBackgroundAudioHint =>
+      'Sigue reproduciendo el audio al salir de la app o bloquear la pantalla. Los controles de la pantalla de bloqueo funcionan en ambos casos.';
+
+  @override
   String get settingsPrebufferLive =>
       'Almacenar en búfer las transmisiones en vivo antes de reproducir';
 

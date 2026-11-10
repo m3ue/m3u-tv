@@ -1169,6 +1169,8 @@
   "settingsMatchRefreshRateHint": "Switch the display to the video's frame rate when playback starts. Can briefly flash or blank the screen.",
   "settingsDeinterlace": "Deinterlace video",
   "settingsDeinterlaceHint": "Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.",
+  "settingsBackgroundAudio": "Background audio",
+  "settingsBackgroundAudioHint": "Keep playing audio when you leave the app or lock the screen. Lock screen controls work either way.",
   "settingsPrebufferLive": "Buffer live streams before playing",
   "settingsPrebufferLiveHint": "Wait for a few seconds of video before a channel starts moving, so streams that arrive unevenly stop pausing to buffer. Channel changes take a few seconds longer.",
   "settingsNavigationSound": "Navigation sound",

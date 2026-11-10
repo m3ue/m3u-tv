@@ -54,6 +54,9 @@ class PlaybackSettingsPage extends StatelessWidget {
   // has no filter chain (mpv there is only a fallback), so hide it there.
   static final bool _showDeinterlaceToggle = !HostPlatform.isAndroid;
 
+  // Only iOS keeps a player running in the background so far.
+  static final bool _showBackgroundAudioToggle = HostPlatform.isIOS;
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -66,7 +69,8 @@ class PlaybackSettingsPage extends StatelessWidget {
             (_showVodPlayer ||
                 _showHdrToggle ||
                 _showRefreshRateToggle ||
-                _showDeinterlaceToggle)) ...[
+                _showDeinterlaceToggle ||
+                _showBackgroundAudioToggle)) ...[
           SettingsSectionHeader(l.settingsSectionPlayer),
           ListenableBuilder(
             listenable: viewSettings,
@@ -76,6 +80,7 @@ class PlaybackSettingsPage extends StatelessWidget {
               showHdr: _showHdrToggle,
               showRefreshRate: _showRefreshRateToggle,
               showDeinterlace: _showDeinterlaceToggle,
+              showBackgroundAudio: _showBackgroundAudioToggle,
               onHandleTopLevelBack: onHandleTopLevelBack,
             ),
           ),
@@ -251,6 +256,7 @@ class PlayerSettingsGroup extends StatelessWidget {
     required this.showHdr,
     required this.showRefreshRate,
     required this.showDeinterlace,
+    this.showBackgroundAudio = false,
     this.onHandleTopLevelBack,
   });
 
@@ -259,6 +265,7 @@ class PlayerSettingsGroup extends StatelessWidget {
   final bool showHdr;
   final bool showRefreshRate;
   final bool showDeinterlace;
+  final bool showBackgroundAudio;
   final bool Function()? onHandleTopLevelBack;
 
   @override
@@ -317,6 +324,14 @@ class PlayerSettingsGroup extends StatelessWidget {
             icon: Icons.reorder,
             value: service.deinterlaceSync,
             onChanged: service.setDeinterlace,
+          ),
+        if (showBackgroundAudio)
+          SettingsSwitchRow(
+            title: l.settingsBackgroundAudio,
+            subtitle: l.settingsBackgroundAudioHint,
+            icon: Icons.headphones_outlined,
+            value: service.backgroundAudioSync,
+            onChanged: service.setBackgroundAudio,
           ),
       ],
     );

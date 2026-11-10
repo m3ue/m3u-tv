@@ -1930,6 +1930,12 @@ class AppLocalizationsZh extends AppLocalizations {
       '消除隔行扫描频道（如 1080i 和 576i）的梳状条纹。会占用更多 CPU。';
 
   @override
+  String get settingsBackgroundAudio => '后台音频';
+
+  @override
+  String get settingsBackgroundAudioHint => '离开应用或锁定屏幕时继续播放音频。无论是否开启，锁屏控制均可使用。';
+
+  @override
   String get settingsPrebufferLive => '播放前缓冲直播流';
 
   @override

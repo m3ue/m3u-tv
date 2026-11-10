@@ -2007,6 +2007,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Glättet die Kammlinien bei Interlaced-Sendern (z. B. 1080i und 576i). Benötigt mehr CPU-Leistung.';
 
   @override
+  String get settingsBackgroundAudio => 'Audio im Hintergrund';
+
+  @override
+  String get settingsBackgroundAudioHint =>
+      'Audio läuft weiter, wenn du die App verlässt oder den Bildschirm sperrst. Die Steuerung auf dem Sperrbildschirm funktioniert in beiden Fällen.';
+
+  @override
   String get settingsPrebufferLive => 'Live-Streams vor der Wiedergabe puffern';
 
   @override

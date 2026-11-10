@@ -6,6 +6,7 @@ import UIKit
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
     private var avKitPlugin: AvKitPlaybackPlugin?
     private var mpvPlugin: MpvPlayerPlugin?
+    private var nowPlayingPlugin: NowPlayingPlugin?
 
     override func application(
         _ application: UIApplication,
@@ -26,6 +27,9 @@ import UIKit
         GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
         registerAvKitPlugin(engineBridge: engineBridge)
         registerMpvPlugin(engineBridge: engineBridge)
+        if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "NowPlayingPlugin") {
+            nowPlayingPlugin = NowPlayingPlugin(messenger: registrar.messenger())
+        }
     }
 
     private func registerMpvPlugin(engineBridge: FlutterImplicitEngineBridge) {

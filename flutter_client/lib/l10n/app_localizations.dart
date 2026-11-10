@@ -3476,6 +3476,18 @@ abstract class AppLocalizations {
   /// **'Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.'**
   String get settingsDeinterlaceHint;
 
+  /// No description provided for @settingsBackgroundAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Background audio'**
+  String get settingsBackgroundAudio;
+
+  /// No description provided for @settingsBackgroundAudioHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep playing audio when you leave the app or lock the screen. Lock screen controls work either way.'**
+  String get settingsBackgroundAudioHint;
+
   /// No description provided for @settingsPrebufferLive.
   ///
   /// In en, this message translates to:
