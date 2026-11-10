@@ -953,16 +953,21 @@ class ViewSettingsService extends ChangeNotifier {
   }
 
   /// Whether the player keeps playing audio after the app goes to the
-  /// background (lock screen, home screen, CarPlay). Defaults off, so leaving
-  /// the app pauses playback until the user comes back.
+  /// background (lock screen, home screen, CarPlay). Defaults on for Android,
+  /// where leaving the player already drops into picture-in-picture and this
+  /// adds the media notification controls alongside it; off elsewhere, so
+  /// leaving the app pauses playback until the user comes back. Only phones
+  /// and tablets act on it (see PlayerScreen).
   Future<bool> backgroundAudio() async {
     final raw = await _readResolved(backgroundAudioKey);
-    return raw as bool? ?? false;
+    return raw as bool? ?? _defaultBackgroundAudio;
   }
 
   /// Synchronous access to the in-memory cached background audio setting.
   bool get backgroundAudioSync =>
-      (_cached(backgroundAudioKey) as bool?) ?? false;
+      (_cached(backgroundAudioKey) as bool?) ?? _defaultBackgroundAudio;
+
+  static bool get _defaultBackgroundAudio => HostPlatform.isAndroid;
 
   Future<void> setBackgroundAudio(
     // ignore: avoid_positional_boolean_parameters

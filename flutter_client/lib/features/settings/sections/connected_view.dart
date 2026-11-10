@@ -207,6 +207,7 @@ class _ConnectedViewState extends State<ConnectedView> {
                       comskipSettings: widget.comskipSettings,
                       viewSettingsService: widget.viewSettingsService,
                       onHandleTopLevelBack: widget.onHandleTopLevelBack,
+                      isTv: widget.deviceType == DeviceType.tv,
                     ),
                   ),
                 ),

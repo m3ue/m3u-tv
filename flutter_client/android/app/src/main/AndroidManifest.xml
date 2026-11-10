@@ -5,6 +5,10 @@
          runtime via FirebaseMessaging.instance.requestPermission(), mobile
          only (see PushNotificationService). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Background audio (opt-in, phones/tablets): PlaybackService keeps the
+         player's media session running in the foreground after leaving the app. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <uses-feature android:name="android.software.leanback" android:required="false"/>
     <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
     <uses-feature android:name="android.software.picture_in_picture" android:required="false"/>
@@ -55,6 +59,14 @@
                 <data android:scheme="m3utv"/>
             </intent-filter>
         </activity>
+        <service
+            android:name=".PlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService"/>
+            </intent-filter>
+        </service>
         <!-- Notification icon shown in the status bar for FCM pushes (see
              PushNotificationService). Must be a flat white silhouette on a
              transparent background - regenerated via scripts/setup-icons.sh. -->

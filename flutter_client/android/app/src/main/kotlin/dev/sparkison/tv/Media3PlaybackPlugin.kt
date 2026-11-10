@@ -1,6 +1,8 @@
 package dev.sparkison.tv
 
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.media.MediaFormat
 import android.net.Uri
 import android.os.Handler
@@ -13,8 +15,10 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
@@ -78,6 +82,7 @@ class Media3PlaybackPlugin(
 ) : MethodChannel.MethodCallHandler, EventChannel.StreamHandler, DefaultLifecycleObserver {
     private val methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
     private val eventChannel = EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL)
+    private val nowPlayingChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NOW_PLAYING_CHANNEL)
     private val mainHandler = Handler(Looper.getMainLooper())
     private var events: EventChannel.EventSink? = null
     private val states = mutableMapOf<String, PlayerState>()
@@ -89,6 +94,19 @@ class Media3PlaybackPlugin(
     init {
         methodChannel.setMethodCallHandler(this)
         eventChannel.setStreamHandler(this)
+        nowPlayingChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "update" -> {
+                    updateNowPlaying(call.arguments as? Map<*, *> ?: emptyMap<String, Any?>())
+                    result.success(null)
+                }
+                "clear" -> {
+                    clearNowPlaying()
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
     }
 
@@ -282,7 +300,7 @@ class Media3PlaybackPlugin(
 
     override fun onStop(owner: LifecycleOwner) {
         for (state in states.values) {
-            state.player.pause()
+            if (!state.keepPlayingInBackground) state.player.pause()
         }
     }
 
@@ -295,6 +313,7 @@ class Media3PlaybackPlugin(
     fun dispose() {
         ProcessLifecycleOwner.get().lifecycle.removeObserver(this)
         methodChannel.setMethodCallHandler(null)
+        nowPlayingChannel.setMethodCallHandler(null)
         eventChannel.setStreamHandler(null)
         for (playerId in states.keys.toList()) {
             releasePlayer(playerId)
@@ -372,7 +391,17 @@ class Media3PlaybackPlugin(
             matchDisplayRefreshRate = matchDisplayRefreshRate,
             allowDisplayModeChanges = allowDisplayModeChanges,
         )
-        state.mediaSession = MediaSession.Builder(context, player).setId(playerId).build()
+        val sessionPlayer = ChannelSkipPlayer(player) { forward ->
+            nowPlayingChannel.invokeMethod(
+                "command",
+                mapOf("name" to if (forward) "next" else "previous"),
+            )
+        }
+        state.sessionPlayer = sessionPlayer
+        state.mediaSession = MediaSession.Builder(context, sessionPlayer)
+            .setId(playerId)
+            .setSessionActivity(appLaunchIntent())
+            .build()
         states[playerId] = state
 
         player.setVideoSurfaceView(surfaceView)
@@ -405,7 +434,10 @@ class Media3PlaybackPlugin(
     private fun releasePlayer(playerId: String, preserveDisplayMode: Boolean = false) {
         val state = states.remove(playerId) ?: return
         state.resumeStallRunnable?.let { mainHandler.removeCallbacks(it) }
-        state.mediaSession?.release()
+        state.mediaSession?.let { session ->
+            PlaybackService.detach(session)
+            session.release()
+        }
         // Detach the surface before release() instead of letting release()
         // discover and tear it down itself: ACodec's disconnectFromSurface
         // then folds into the same synchronous call as decoder/renderer
@@ -420,6 +452,66 @@ class Media3PlaybackPlugin(
             frameRateManager.restore()
         }
         emit(playerId, "disposed")
+    }
+
+    private fun appLaunchIntent(): PendingIntent = PendingIntent.getActivity(
+        context,
+        0,
+        Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
+    /**
+     * Dart's Now Playing update for the full-screen player (see
+     * `now_playing_bridge.dart`). Only acts while Background audio is on:
+     * then the player's session moves into [PlaybackService] (notification,
+     * lock screen controls, keeps playing after leaving the app) and carries
+     * the title/artwork. Otherwise nothing changes from plain playback.
+     */
+    private fun updateNowPlaying(arguments: Map<*, *>) {
+        val target = (arguments["playerId"] as? String)?.let { states[it] }
+        for (state in states.values) {
+            if (state !== target) stopBackgroundPlayback(state)
+        }
+        if (target == null) return
+        val keepPlaying = arguments["keepPlayingInBackground"] as? Boolean ?: false
+        if (!keepPlaying) {
+            stopBackgroundPlayback(target)
+            return
+        }
+        target.keepPlayingInBackground = true
+        target.sessionPlayer?.canChangeChannel = arguments["canChangeChannel"] as? Boolean ?: false
+
+        val artworkUrl = arguments["artworkUrl"] as? String
+        val metadata = MediaMetadata.Builder()
+            .setTitle(arguments["title"] as? String)
+            .setArtist(arguments["subtitle"] as? String)
+            .setArtworkUri(artworkUrl?.let(Uri::parse))
+            .build()
+        if (metadata != target.nowPlayingMetadata) {
+            target.nowPlayingMetadata = metadata
+            val player = target.player
+            // Same URI, so ExoPlayer swaps the metadata in place without
+            // re-preparing the stream.
+            player.currentMediaItem?.let { item ->
+                player.replaceMediaItem(
+                    player.currentMediaItemIndex,
+                    item.buildUpon().setMediaMetadata(metadata).build(),
+                )
+            }
+        }
+        target.mediaSession?.let { PlaybackService.attach(context.applicationContext, it) }
+    }
+
+    private fun clearNowPlaying() {
+        for (state in states.values) stopBackgroundPlayback(state)
+    }
+
+    private fun stopBackgroundPlayback(state: PlayerState) {
+        if (!state.keepPlayingInBackground) return
+        state.keepPlayingInBackground = false
+        state.sessionPlayer?.canChangeChannel = false
+        state.mediaSession?.let(PlaybackService::detach)
     }
 
     private fun emit(
@@ -858,6 +950,11 @@ class Media3PlaybackPlugin(
         val uri: String,
         var subtitleConfigurations: List<MediaItem.SubtitleConfiguration> = emptyList(),
         var mediaSession: MediaSession? = null,
+        var sessionPlayer: ChannelSkipPlayer? = null,
+        // Set from Dart's Now Playing updates while Background audio is on:
+        // this player keeps going in the background, hosted by PlaybackService.
+        var keepPlayingInBackground: Boolean = false,
+        var nowPlayingMetadata: MediaMetadata? = null,
         var retriedHlsAsProgressive: Boolean = false,
         var lastVideoWidth: Int = 0,
         var lastVideoHeight: Int = 0,
@@ -882,6 +979,7 @@ class Media3PlaybackPlugin(
             if (subtitleConfigurations.isNotEmpty()) {
                 builder.setSubtitleConfigurations(subtitleConfigurations)
             }
+            nowPlayingMetadata?.let { builder.setMediaMetadata(it) }
             player.setMediaItem(builder.build(), player.currentPosition)
             return true
         }
@@ -960,9 +1058,43 @@ class Media3PlaybackPlugin(
     companion object {
         const val METHOD_CHANNEL = "m3u_tv/android_media3"
         const val EVENT_CHANNEL = "m3u_tv/android_media3/events"
+        const val NOW_PLAYING_CHANNEL = "m3u_tv/now_playing"
 
         /** See `looksLikeAudioTimingFailure` in decoder_failure.dart. */
         const val AUDIO_DISCONTINUITY_ERROR_CODE = "AUDIO_TIMESTAMP_DISCONTINUITY"
+    }
+}
+
+/**
+ * The player a [MediaSession] drives. Passes everything through to ExoPlayer,
+ * except that while [canChangeChannel] is set, the notification and lock
+ * screen next/previous buttons change channel (via Dart) instead of seeking
+ * within the single live item.
+ */
+@OptIn(UnstableApi::class)
+private class ChannelSkipPlayer(
+    player: ExoPlayer,
+    private val onChangeChannel: (forward: Boolean) -> Unit,
+) : ForwardingPlayer(player) {
+    var canChangeChannel = false
+
+    override fun getAvailableCommands(): Player.Commands {
+        val commands = super.getAvailableCommands()
+        if (!canChangeChannel) return commands
+        return commands.buildUpon()
+            .add(Player.COMMAND_SEEK_TO_NEXT)
+            .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+            .build()
+    }
+
+    override fun isCommandAvailable(command: Int): Boolean = availableCommands.contains(command)
+
+    override fun seekToNext() {
+        if (canChangeChannel) onChangeChannel(true) else super.seekToNext()
+    }
+
+    override fun seekToPrevious() {
+        if (canChangeChannel) onChangeChannel(false) else super.seekToPrevious()
     }
 }
 

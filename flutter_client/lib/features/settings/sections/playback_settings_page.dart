@@ -21,6 +21,7 @@ class PlaybackSettingsPage extends StatelessWidget {
     required this.comskipSettings,
     this.viewSettingsService,
     this.onHandleTopLevelBack,
+    this.isTv = false,
   });
 
   final ProxyCapability? proxyCapability;
@@ -28,6 +29,7 @@ class PlaybackSettingsPage extends StatelessWidget {
   final ComskipSettings? comskipSettings;
   final ViewSettingsService? viewSettingsService;
   final bool Function()? onHandleTopLevelBack;
+  final bool isTv;
 
   // Pre-buffering is an mpv option. Android plays through ExoPlayer, which
   // already buffers before it starts (mpv there is only a fallback), so hide
@@ -54,8 +56,9 @@ class PlaybackSettingsPage extends StatelessWidget {
   // has no filter chain (mpv there is only a fallback), so hide it there.
   static final bool _showDeinterlaceToggle = !HostPlatform.isAndroid;
 
-  // Only iOS keeps a player running in the background so far.
-  static final bool _showBackgroundAudioToggle = HostPlatform.isIOS;
+  // Phones and tablets only: a TV has nothing to keep playing behind.
+  bool get _showBackgroundAudioToggle =>
+      HostPlatform.isIOS || (HostPlatform.isAndroid && !isTv);
 
   @override
   Widget build(BuildContext context) {
