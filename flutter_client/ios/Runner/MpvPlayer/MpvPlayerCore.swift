@@ -77,7 +77,19 @@ final class MpvPlayerCore {
   init(viewId: Int) {
     self.viewId = viewId
     self.queue = DispatchQueue(label: "m3u_tv.apple_mpv.\(viewId)")
+    // A player created in the background (a channel change from the lock
+    // screen or CarPlay) missed the notification below. Thinking it's in
+    // the foreground, it kept video on, so the layer's decoder was
+    // interrupted under a running video output and the picture stalled on
+    // return. Created on main, before `queue` has any work.
+    inBackground = Self.phoneSceneIsInBackground()
     observeAppLifecycle()
+  }
+
+  private static func phoneSceneIsInBackground() -> Bool {
+    UIApplication.shared.connectedScenes.contains {
+      $0.session.role == .windowApplication && $0.activationState == .background
+    }
   }
 
   // Follows the phone's window scene rather than the app: once CarPlay is
