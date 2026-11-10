@@ -12,6 +12,7 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
+import 'package:m3u_tv/services/client_config.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
@@ -446,6 +447,61 @@ void main() {
 
       expect(rowTop(tester, 'Live TV'), lessThan(rowTop(tester, 'Movies')));
       expect(rowTop(tester, 'Series'), lessThan(rowTop(tester, 'Live TV')));
+    });
+
+    testWidgets('a server category row shows just its category, in place', (
+      tester,
+    ) async {
+      final settings = _rowsOnlySettings();
+      await settings.applyClientConfig(
+        ClientConfig.fromJson(const {
+          'revision': 'rev',
+          'home_screen': {
+            'mode': 'default',
+            'sections': [
+              {
+                'section': 'movies',
+                'nav': true,
+                'home': true,
+                'rows': [
+                  {
+                    'id': 'shorts',
+                    'kind': 'category',
+                    'title': 'Animal Shorts',
+                    'params': {'category_id': '40'},
+                  },
+                  {'id': 'default', 'kind': 'default'},
+                ],
+              },
+            ],
+          },
+        }),
+      );
+      await pumpHome(
+        tester,
+        const _Catalog(movies: [..._movies, ..._otherMovies]),
+        viewSettings: settings,
+      );
+      await _settle(tester);
+
+      final shorts = _section('Animal Shorts');
+      expect(
+        find.descendant(of: shorts, matching: find.text('Elephants Dream')),
+        findsWidgets,
+      );
+      expect(
+        find.descendant(of: shorts, matching: find.text('Big Buck Bunny')),
+        findsNothing,
+      );
+      expect(
+        rowTop(tester, 'Animal Shorts'),
+        lessThan(rowTop(tester, 'Movies')),
+      );
+
+      await settings.setHomeRowShown('shorts', shown: false);
+      await _settle(tester);
+      expect(find.text('Animal Shorts'), findsNothing);
+      expect(find.text('Movies'), findsWidgets);
     });
 
     testWidgets('a row turned off is gone, and its siblings stay', (

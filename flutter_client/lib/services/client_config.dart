@@ -1,6 +1,7 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'package:flutter/foundation.dart';
+import 'package:m3u_tv/services/home_screen_config.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 
@@ -67,6 +68,7 @@ class ClientConfig {
     required this.revision,
     this.profileName,
     this.settings = const {},
+    this.homeScreen,
   });
 
   factory ClientConfig.fromJson(Map<String, dynamic> json) {
@@ -85,12 +87,16 @@ class ClientConfig {
                   enforced: value['mode'] == 'enforced',
                 ),
       }),
+      homeScreen: HomeScreenConfig.tryFromJson(json['home_screen']),
     );
   }
 
   final String revision;
   final String? profileName;
   final Map<String, ManagedSetting> settings;
+
+  /// This login's Home screen, when the editor has one for it.
+  final HomeScreenConfig? homeScreen;
 
   Map<String, Object?> toJson() => {
     'revision': revision,
@@ -102,6 +108,7 @@ class ClientConfig {
           'value': value.value,
         },
     },
+    if (homeScreen != null) 'home_screen': homeScreen!.toJson(),
   };
 }
 

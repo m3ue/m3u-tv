@@ -9,6 +9,7 @@ import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/client_config.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/home_screen_config.dart';
 import 'package:m3u_tv/services/json_isolate.dart';
 import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/services/xtream_http_transport_stub.dart'
@@ -1793,7 +1794,10 @@ class XtreamService {
   Future<ClientConfig> getClientConfig(
     ClientConfigCapability capability,
   ) async {
-    final json = await _request(capability.action);
+    final json = await _request(
+      capability.action,
+      params: {'row_kinds': HomeScreenConfig.supportedRowKinds.join(',')},
+    );
     if (json is! Map) {
       throw const FormatException('Unexpected client config response');
     }

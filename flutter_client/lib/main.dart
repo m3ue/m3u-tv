@@ -130,6 +130,7 @@ Future<void> main() async {
     appState.viewSettingsService.homeScreenStyle(),
     // Same for the nav and Home row order, read synchronously from here on.
     appState.viewSettingsService.navLayout(),
+    appState.viewSettingsService.loadHiddenHomeRows(),
   ]);
   // Resolve the user's preferred start page before the router is built so a
   // cold launch opens there instead of always on Home.

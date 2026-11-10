@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/navigation/nav_layout.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/services/client_config.dart';
+import 'package:m3u_tv/services/home_screen_config.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 
@@ -282,6 +283,9 @@ class ViewSettingsService extends ChangeNotifier {
   static const navigationSoundEnabledKey = 'm3ue_tv_navigation_sound_enabled';
   static const volumeKey = 'm3ue_tv_volume';
 
+  /// Home rows from the server's Home screen the user turned off here.
+  static const hiddenHomeRowsKey = 'm3ue_tv_hidden_home_rows';
+
   final Map<String, Object?> _memory;
   final PersistentJsonStore? store;
 
@@ -407,12 +411,87 @@ class ViewSettingsService extends ChangeNotifier {
             when known.accepts(value.value))
           known.storageKey: value,
     };
+    final homeScreen = config?.homeScreen;
     final changed =
         !mapEquals(next, _managed) ||
-        config?.profileName != _managedProfileName;
+        config?.profileName != _managedProfileName ||
+        homeScreen != _homeScreen;
     _managed = Map.unmodifiable(next);
     _managedProfileName = config?.profileName;
+    _homeScreen = homeScreen;
     return changed;
+  }
+
+  HomeScreenConfig? _homeScreen;
+
+  /// Whether the server locks Navigation & Home.
+  bool get isNavLayoutEnforced => _homeScreen?.enforced ?? false;
+
+  /// Whether the server lays out Navigation & Home for this login.
+  bool get hasManagedHomeScreen => _homeScreen != null;
+
+  /// The server's layout when it's enforced or the user never arranged
+  /// their own, else the user's.
+  Object? _resolveNavLayout(Object? stored) {
+    final homeScreen = _homeScreen;
+    if (homeScreen == null) return stored;
+    if (homeScreen.enforced || stored == null) {
+      return homeScreen.navLayoutJson();
+    }
+    return stored;
+  }
+
+  /// The rows Home shows for [route], in order: the built-in row alone
+  /// without a server Home screen. A custom row shows inside its yearly
+  /// window, unless the user turned it off (when they're allowed to).
+  List<HomeRowSpec> homeRowsFor(String route, {DateTime? now}) {
+    final section = _homeScreen?.sectionFor(route);
+    if (section == null) return const [HomeRowSpec.builtIn];
+    final date = now ?? DateTime.now();
+    final hidden = isNavLayoutEnforced ? const <String>{} : hiddenHomeRowIds;
+    return [
+      for (final row in section.rows)
+        if (row.isBuiltIn || (row.isShownOn(date) && !hidden.contains(row.id)))
+          row,
+    ];
+  }
+
+  /// Every custom row the server put in [route], for Navigation & Home.
+  List<HomeRowSpec> customHomeRowsFor(String route) => [
+    for (final row
+        in _homeScreen?.sectionFor(route)?.rows ?? const <HomeRowSpec>[])
+      if (!row.isBuiltIn) row,
+  ];
+
+  Set<String> get hiddenHomeRowIds {
+    final raw = _memory[hiddenHomeRowsKey];
+    return {
+      if (raw is List)
+        for (final id in raw)
+          if (id is String) id,
+    };
+  }
+
+  Future<void> loadHiddenHomeRows() => _read(hiddenHomeRowsKey);
+
+  Future<void> setHomeRowShown(
+    String rowId, {
+    required bool shown,
+  }) async {
+    final hidden = hiddenHomeRowIds;
+    if (shown ? !hidden.remove(rowId) : !hidden.add(rowId)) return;
+    await _write(hiddenHomeRowsKey, hidden.toList()..sort());
+    notifyListeners();
+  }
+
+  /// Back to the default layout: the server's when it has one, and every
+  /// server row shown again.
+  Future<void> resetNavLayout() async {
+    _memory.remove(navLayoutKey);
+    _memory.remove(hiddenHomeRowsKey);
+    await store?.delete(navLayoutKey);
+    await store?.delete(hiddenHomeRowsKey);
+    notifyListeners();
   }
 
   /// What a setting reads as: an enforced value always, else the user's own
@@ -462,11 +541,12 @@ class ViewSettingsService extends ChangeNotifier {
   }
 
   Future<NavLayout> navLayout() async =>
-      NavLayout.fromJson(await _read(navLayoutKey));
+      NavLayout.fromJson(_resolveNavLayout(await _read(navLayoutKey)));
 
   /// The layout from the in-memory cache. `main()` reads [navLayout] before
   /// the first frame, so the nav and Home never paint the default order first.
-  NavLayout get navLayoutSync => NavLayout.fromJson(_memory[navLayoutKey]);
+  NavLayout get navLayoutSync =>
+      NavLayout.fromJson(_resolveNavLayout(_memory[navLayoutKey]));
 
   Future<void> setNavLayout(NavLayout layout) async {
     await _write(navLayoutKey, layout.toJson());
