@@ -89,3 +89,39 @@ class AppleMpvNativeBackend extends MpvNativeBackendBase
     }
   }
 }
+
+/// The iPhone mpv player with no video: for CarPlay, which can start
+/// playback with no phone screen for a platform view to live in. The native
+/// core is created by `load` itself, decodes audio only, and sets up the
+/// playback audio session. Not a [PlatformViewProvider], so nothing tries to
+/// show it.
+class AppleMpvAudioBackend extends MpvNativeBackendBase {
+  AppleMpvAudioBackend({MethodChannel? channel, EventChannel? eventChannel})
+    : super(
+        viewId: _nextViewId++,
+        channel:
+            channel ??
+            const MethodChannel(AppleMpvNativeBackend._methodChannelName),
+        events: _mpvEvents(
+          eventChannel ??
+              const EventChannel(AppleMpvNativeBackend._eventChannelName),
+        ),
+      );
+
+  @override
+  Map<String, Object?> get extraLoadArguments => const <String, Object?>{
+    'audioOnly': true,
+  };
+
+  @override
+  PlaybackCapabilities get capabilities => PlaybackCapabilities.appleMpvNative;
+
+  @override
+  String get loadFailedCode => 'apple-mpv-load-failed';
+
+  @override
+  String get defaultErrorCode => 'apple-mpv-error';
+
+  @override
+  String get endedBeforeReadyCode => 'apple-mpv-ended-before-ready';
+}

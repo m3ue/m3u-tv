@@ -67,6 +67,10 @@ abstract class MpvNativeBackendBase
 
   bool get disposed => _disposed;
 
+  /// Platform-specific `load` arguments a subclass adds.
+  @protected
+  Map<String, Object?> get extraLoadArguments => const <String, Object?>{};
+
   @override
   PlaybackCapabilities get capabilities;
 
@@ -117,6 +121,7 @@ abstract class MpvNativeBackendBase
         'deinterlace': source.deinterlace,
         // Read by the Apple mpv cores; the Android core ignores it.
         'prebufferLive': source.prebufferLive,
+        ...extraLoadArguments,
         'externalSubtitles': source.externalSubtitles
             .map(
               (subtitle) => <String, Object?>{

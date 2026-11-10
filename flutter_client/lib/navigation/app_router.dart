@@ -263,6 +263,22 @@ PlaybackOrchestrator buildPlaybackOrchestrator({
   );
 }
 
+/// CarPlay's player (iPhone): mpv decoding audio only, which needs no phone
+/// screen to play.
+PlaybackOrchestrator buildCarPlayAudioOrchestrator({
+  PlaybackStreamSessionGateway? streamSessionGateway,
+}) {
+  return PlaybackOrchestrator(
+    platform: PlaybackPlatform.apple,
+    adapters: <PlaybackBackend, PlayerAdapter>{
+      PlaybackBackend.appleMpvNative: AppleMpvAudioBackend(),
+    },
+    transcodeGateway: const _UnavailableTranscodeGateway(),
+    streamSessionGateway: streamSessionGateway,
+    retryDelay: Duration.zero,
+  );
+}
+
 /// Builds one Multiview grid tile's player: an isolated [MultiviewBackend]
 /// instance wrapped in its own orchestrator, so each tile gets independent
 /// retry/error handling for free. Only offered on platforms whose native

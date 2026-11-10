@@ -25,7 +25,9 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
   /// PiP window's buttons (`pipSetPlaying`, `pipSkip`).
   var systemUiChannel: FlutterMethodChannel?
 
-  func attachCore(viewId: Int, to displayLayer: AVSampleBufferDisplayLayer) {
+  /// `displayLayer` nil: an audio-only core, created by `load` itself since
+  /// no platform view will ever create one (CarPlay with no phone screen).
+  func attachCore(viewId: Int, to displayLayer: AVSampleBufferDisplayLayer?) {
     lock.lock()
     let staleCore = cores[viewId]
     lock.unlock()
@@ -53,6 +55,10 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
 
     switch call.method {
     case "load":
+      if args["audioOnly"] as? Bool == true, core(for: viewId) == nil {
+        Self.activatePlaybackAudioSession()
+        attachCore(viewId: viewId, to: nil)
+      }
       waitForCore(viewId: viewId, attemptsRemaining: 100) { core in
         guard let core else {
           result(["ok": false, "error": "mpv core not attached", "code": "backend_unavailable"])
@@ -180,6 +186,19 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
   }
 
   // MARK: - Helpers
+
+  /// With the phone's screen never opened (the car started the app), no
+  /// player has set up the audio session yet, and without the playback
+  /// category audio stops when the phone locks.
+  private static func activatePlaybackAudioSession() {
+    let session = AVAudioSession.sharedInstance()
+    do {
+      try session.setCategory(.playback, mode: .default)
+      try session.setActive(true)
+    } catch {
+      NSLog("[MpvPlayerPlugin] Audio session setup failed: %@", error.localizedDescription)
+    }
+  }
 
   private func core(for viewId: Int) -> MpvPlayerCore? {
     lock.lock()

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_carplay/flutter_carplay.dart';
+import 'package:m3u_tv/features/carplay/carplay_audio_player.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
@@ -20,11 +22,17 @@ typedef CarPlayChannelHandler =
 /// app with no phone window, and then no widget is ever built (Flutter only
 /// builds for a view). For the same reason it boots the app state itself.
 ///
+/// A channel picked in the car plays in the phone's full-screen player while
+/// the phone's window is up (the app in the background included), and in an
+/// audio-only player otherwise, which hands over to the full-screen player
+/// once the phone's screen opens.
+///
 /// The root template is set once; afterwards each tab's list is updated in
 /// place, so a refresh never throws the driver out of the category they're
 /// browsing.
 class CarPlayController {
-  CarPlayController(this._appState);
+  CarPlayController(this._appState, {CarPlayAudioPlayer? audioPlayer})
+    : _audioPlayer = audioPlayer ?? CarPlayAudioPlayer.forApp(_appState);
 
   /// The running controller (iPhone only), set by `main()`.
   static CarPlayController? instance;
@@ -32,9 +40,22 @@ class CarPlayController {
   final AppStateController _appState;
   final FlutterCarplay _carplay = FlutterCarplay();
 
+  final CarPlayAudioPlayer _audioPlayer;
+
+  static const _scenesChannel = MethodChannel('m3u_tv/app_scenes');
+
+  CarPlayChannelHandler? _onPlayChannel;
+
   /// Set by the phone's shell while it's up: plays a channel picked in the
   /// car. Null with no phone window.
-  CarPlayChannelHandler? onPlayChannel;
+  CarPlayChannelHandler? get onPlayChannel => _onPlayChannel;
+
+  /// Setting it while the audio-only player is going (the phone's screen
+  /// has just opened) moves that channel to the full-screen player.
+  set onPlayChannel(CarPlayChannelHandler? handler) {
+    _onPlayChannel = handler;
+    if (handler != null) unawaited(_handOverToPhone(handler));
+  }
 
   static const _favoritesTemplateId = 'carplay-favorites';
   static const _liveTemplateId = 'carplay-live';
@@ -63,6 +84,7 @@ class CarPlayController {
   }
 
   void dispose() {
+    unawaited(_audioPlayer.stop());
     _refreshTimer?.cancel();
     _appState.removeListener(_scheduleRefresh);
     _appState.favoritesService.removeListener(_scheduleRefresh);
@@ -181,6 +203,36 @@ class CarPlayController {
     }
   }
 
+  Future<void> _play(Channel channel, ChannelContext context) async {
+    final handler = _onPlayChannel;
+    if (handler != null && await _phoneWindowConnected()) {
+      await _audioPlayer.stop();
+      handler(channel, context);
+    } else {
+      await _audioPlayer.play(channel, context);
+    }
+  }
+
+  Future<void> _handOverToPhone(CarPlayChannelHandler handler) async {
+    final channel = _audioPlayer.channel;
+    if (channel == null) return;
+    final context = _audioPlayer.context;
+    // One player at a time: the stream is let go of before the full-screen
+    // player asks for it again.
+    await _audioPlayer.stop();
+    if (_onPlayChannel != handler) return;
+    handler(channel, context);
+  }
+
+  Future<bool> _phoneWindowConnected() async {
+    try {
+      return await _scenesChannel.invokeMethod<bool>('phoneWindowConnected') ??
+          true;
+    } on MissingPluginException {
+      return true;
+    }
+  }
+
   Future<List<Channel>> _favoriteChannels() async {
     if (!_appState.isConfigured) return const [];
     final ids = await _appState.favoritesService.all();
@@ -237,9 +289,7 @@ class CarPlayController {
       image: channel.logoUrl,
       onPress: (complete, self) async {
         try {
-          final handler = onPlayChannel;
-          if (handler == null) return;
-          handler(channel, context);
+          await _play(channel, context);
           await FlutterCarplay.showSharedNowPlaying();
         } finally {
           complete();

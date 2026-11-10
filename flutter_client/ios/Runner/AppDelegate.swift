@@ -42,6 +42,21 @@ import UIKit
         if let registrar = registry.registrar(forPlugin: "NowPlayingPlugin") {
             nowPlayingPlugin = NowPlayingPlugin(messenger: registrar.messenger())
         }
+        if let registrar = registry.registrar(forPlugin: "AppScenesChannel") {
+            // Whether the phone's window is up for the full-screen player.
+            // CarPlay plays through its own audio-only player otherwise: iOS
+            // can drop a background window while the car keeps the app running.
+            FlutterMethodChannel(
+                name: "m3u_tv/app_scenes",
+                binaryMessenger: registrar.messenger()
+            ).setMethodCallHandler { call, result in
+                guard call.method == "phoneWindowConnected" else {
+                    result(FlutterMethodNotImplemented)
+                    return
+                }
+                result(AppDelegate.sharedEngine.viewController != nil)
+            }
+        }
     }
 
     private func registerMpvPlugin(registry: FlutterPluginRegistry) {

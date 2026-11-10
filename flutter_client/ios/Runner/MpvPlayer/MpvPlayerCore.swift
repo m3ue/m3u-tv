@@ -64,6 +64,8 @@ final class MpvPlayerCore {
   // hides that swap's stop/start from Dart, which sees playback carry on.
   private var reopeningLiveStream = false
   private var videoSuspendedForBackground = false
+  // Set once in `attach`, before `queue` has any work: no display layer.
+  private var audioOnly = false
   // Main thread only; created in `attach`. While PiP shows the video, the
   // background handling below keeps it on. `pictureInPictureActive` is the
   // `queue` copy of its state.
@@ -140,7 +142,7 @@ final class MpvPlayerCore {
   /// On `queue`. Also called when playback starts while in the background
   /// (Play from the lock screen).
   private func suspendVideoIfPlayingInBackground() {
-    guard inBackground, !pictureInPictureActive, !videoSuspendedForBackground,
+    guard !audioOnly, inBackground, !pictureInPictureActive, !videoSuspendedForBackground,
           let handle = mpv, !disposed else { return }
     var paused: Int32 = 0
     _ = mpv_get_property(handle, "pause", MPV_FORMAT_FLAG, &paused)
@@ -152,7 +154,7 @@ final class MpvPlayerCore {
   /// On `queue`.
   private func resumeVideoForForeground() {
     inBackground = false
-    guard let handle = mpv, !disposed else { return }
+    guard !audioOnly, let handle = mpv, !disposed else { return }
     if videoSuspendedForBackground {
       videoSuspendedForBackground = false
       mpv_set_property_string(handle, "vid", "auto")
@@ -181,10 +183,15 @@ final class MpvPlayerCore {
   }
 
   /// Creates and initializes the mpv handle, targeting `displayLayer` as the
-  /// render surface. Must be called once, before `load`.
-  func attach(to displayLayer: AVSampleBufferDisplayLayer) {
-    self.videoLayer = displayLayer
-    setUpPictureInPicture(on: displayLayer)
+  /// render surface, or with no video at all when it's nil (CarPlay, which
+  /// plays audio with no phone screen to draw on). Must be called once,
+  /// before `load`.
+  func attach(to displayLayer: AVSampleBufferDisplayLayer?) {
+    audioOnly = displayLayer == nil
+    if let displayLayer {
+      self.videoLayer = displayLayer
+      setUpPictureInPicture(on: displayLayer)
+    }
     queue.async { [weak self] in
       guard let self, self.mpv == nil else { return }
 
@@ -194,10 +201,16 @@ final class MpvPlayerCore {
       }
       self.mpv = handle
 
-      var layerPointer = Int64(
-        bitPattern: UInt64(UInt(bitPattern: Unmanaged.passUnretained(displayLayer).toOpaque()))
-      )
-      mpv_set_option(handle, "wid", MPV_FORMAT_INT64, &layerPointer)
+      if let displayLayer {
+        var layerPointer = Int64(
+          bitPattern: UInt64(UInt(bitPattern: Unmanaged.passUnretained(displayLayer).toOpaque()))
+        )
+        mpv_set_option(handle, "wid", MPV_FORMAT_INT64, &layerPointer)
+      } else {
+        // Video is never decoded, so the live keyframe wait and the
+        // background handling above don't apply.
+        mpv_set_option_string(handle, "vid", "no")
+      }
 
       // Must be set before mpv_initialize -- Plezy's tvOS core notes this
       // ordering avoids a freeze on player exit specific to this VO; iOS
