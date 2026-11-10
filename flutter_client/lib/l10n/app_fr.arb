@@ -993,7 +993,7 @@
   "settingsDeinterlace": "Désentrelacer la vidéo",
   "settingsDeinterlaceHint": "Atténue les lignes en peigne des chaînes entrelacées (comme 1080i et 576i). Utilise davantage le processeur.",
   "settingsBackgroundAudio": "Audio en arrière-plan",
-  "settingsBackgroundAudioHint": "Continue la lecture audio lorsque vous quittez l'app ou verrouillez l'écran. Les commandes de l'écran verrouillé fonctionnent dans les deux cas.",
+  "settingsBackgroundAudioHint": "Continue la lecture audio, avec les commandes sur l'écran verrouillé et dans les notifications, lorsque vous quittez l'app ou verrouillez l'écran.",
   "settingsPrebufferLive": "Mettre en mémoire tampon les flux en direct avant la lecture",
   "settingsPrebufferLiveHint": "Attend quelques secondes de vidéo avant qu'une chaîne ne démarre, pour que les flux irréguliers cessent de s'interrompre pour charger. Les changements de chaîne prennent quelques secondes de plus.",
   "settingsNavigationSound": "Son de navigation",

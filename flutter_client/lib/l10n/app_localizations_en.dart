@@ -1997,7 +1997,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsBackgroundAudioHint =>
-      'Keep playing audio when you leave the app or lock the screen. Lock screen controls work either way.';
+      'Keep playing audio, with playback controls on the lock screen and in notifications, when you leave the app or lock the screen.';
 
   @override
   String get settingsPrebufferLive => 'Buffer live streams before playing';

@@ -1170,7 +1170,7 @@
   "settingsDeinterlace": "Deinterlace video",
   "settingsDeinterlaceHint": "Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.",
   "settingsBackgroundAudio": "Background audio",
-  "settingsBackgroundAudioHint": "Keep playing audio when you leave the app or lock the screen. Lock screen controls work either way.",
+  "settingsBackgroundAudioHint": "Keep playing audio, with playback controls on the lock screen and in notifications, when you leave the app or lock the screen.",
   "settingsPrebufferLive": "Buffer live streams before playing",
   "settingsPrebufferLiveHint": "Wait for a few seconds of video before a channel starts moving, so streams that arrive unevenly stop pausing to buffer. Channel changes take a few seconds longer.",
   "settingsNavigationSound": "Navigation sound",

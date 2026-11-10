@@ -993,7 +993,7 @@
   "settingsDeinterlace": "视频去隔行",
   "settingsDeinterlaceHint": "消除隔行扫描频道（如 1080i 和 576i）的梳状条纹。会占用更多 CPU。",
   "settingsBackgroundAudio": "后台音频",
-  "settingsBackgroundAudioHint": "离开应用或锁定屏幕时继续播放音频。无论是否开启，锁屏控制均可使用。",
+  "settingsBackgroundAudioHint": "离开应用或锁定屏幕时继续播放音频，并在锁屏和通知中显示播放控制。",
   "settingsPrebufferLive": "播放前缓冲直播流",
   "settingsPrebufferLiveHint": "频道开始播放前先缓冲几秒视频，让到达不稳定的直播流不再频繁暂停缓冲。切换频道会多花几秒。",
   "settingsNavigationSound": "导航音效",

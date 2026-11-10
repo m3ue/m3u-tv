@@ -3485,7 +3485,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsBackgroundAudioHint.
   ///
   /// In en, this message translates to:
-  /// **'Keep playing audio when you leave the app or lock the screen. Lock screen controls work either way.'**
+  /// **'Keep playing audio, with playback controls on the lock screen and in notifications, when you leave the app or lock the screen.'**
   String get settingsBackgroundAudioHint;
 
   /// No description provided for @settingsPrebufferLive.

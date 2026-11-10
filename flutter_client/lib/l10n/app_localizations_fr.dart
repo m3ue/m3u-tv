@@ -2019,7 +2019,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsBackgroundAudioHint =>
-      'Continue la lecture audio lorsque vous quittez l\'app ou verrouillez l\'écran. Les commandes de l\'écran verrouillé fonctionnent dans les deux cas.';
+      'Continue la lecture audio, avec les commandes sur l\'écran verrouillé et dans les notifications, lorsque vous quittez l\'app ou verrouillez l\'écran.';
 
   @override
   String get settingsPrebufferLive =>

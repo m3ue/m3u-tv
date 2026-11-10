@@ -2015,7 +2015,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsBackgroundAudioHint =>
-      'Sigue reproduciendo el audio al salir de la app o bloquear la pantalla. Los controles de la pantalla de bloqueo funcionan en ambos casos.';
+      'Sigue reproduciendo el audio, con controles en la pantalla de bloqueo y en las notificaciones, al salir de la app o bloquear la pantalla.';
 
   @override
   String get settingsPrebufferLive =>

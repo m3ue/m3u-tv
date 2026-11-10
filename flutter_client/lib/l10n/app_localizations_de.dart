@@ -2011,7 +2011,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsBackgroundAudioHint =>
-      'Audio läuft weiter, wenn du die App verlässt oder den Bildschirm sperrst. Die Steuerung auf dem Sperrbildschirm funktioniert in beiden Fällen.';
+      'Audio läuft weiter, mit Wiedergabesteuerung auf dem Sperrbildschirm und in den Mitteilungen, wenn du die App verlässt oder den Bildschirm sperrst.';
 
   @override
   String get settingsPrebufferLive => 'Live-Streams vor der Wiedergabe puffern';

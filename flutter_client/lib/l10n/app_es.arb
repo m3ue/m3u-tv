@@ -993,7 +993,7 @@
   "settingsDeinterlace": "Desentrelazar vídeo",
   "settingsDeinterlaceHint": "Suaviza las líneas de peine en los canales entrelazados (como 1080i y 576i). Usa más CPU.",
   "settingsBackgroundAudio": "Audio en segundo plano",
-  "settingsBackgroundAudioHint": "Sigue reproduciendo el audio al salir de la app o bloquear la pantalla. Los controles de la pantalla de bloqueo funcionan en ambos casos.",
+  "settingsBackgroundAudioHint": "Sigue reproduciendo el audio, con controles en la pantalla de bloqueo y en las notificaciones, al salir de la app o bloquear la pantalla.",
   "settingsPrebufferLive": "Almacenar en búfer las transmisiones en vivo antes de reproducir",
   "settingsPrebufferLiveHint": "Espera unos segundos de vídeo antes de que un canal empiece a moverse, para que las transmisiones que llegan de forma irregular dejen de pausarse para cargar. Los cambios de canal tardan unos segundos más.",
   "settingsNavigationSound": "Sonido de navegación",

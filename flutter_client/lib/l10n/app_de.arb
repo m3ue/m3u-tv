@@ -993,7 +993,7 @@
   "settingsDeinterlace": "Video deinterlacen",
   "settingsDeinterlaceHint": "Glättet die Kammlinien bei Interlaced-Sendern (z. B. 1080i und 576i). Benötigt mehr CPU-Leistung.",
   "settingsBackgroundAudio": "Audio im Hintergrund",
-  "settingsBackgroundAudioHint": "Audio läuft weiter, wenn du die App verlässt oder den Bildschirm sperrst. Die Steuerung auf dem Sperrbildschirm funktioniert in beiden Fällen.",
+  "settingsBackgroundAudioHint": "Audio läuft weiter, mit Wiedergabesteuerung auf dem Sperrbildschirm und in den Mitteilungen, wenn du die App verlässt oder den Bildschirm sperrst.",
   "settingsPrebufferLive": "Live-Streams vor der Wiedergabe puffern",
   "settingsPrebufferLiveHint": "Wartet einige Sekunden Video ab, bevor ein Sender losläuft, damit ungleichmäßig ankommende Streams nicht ständig zum Puffern anhalten. Senderwechsel dauern dadurch einige Sekunden länger.",
   "settingsNavigationSound": "Navigationston",

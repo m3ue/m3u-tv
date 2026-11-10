@@ -322,7 +322,12 @@ class Media3PlaybackPlugin(
 
     @OptIn(UnstableApi::class)
     private fun load(playerId: String, arguments: Map<String, Any?>, surfaceView: SurfaceView) {
-        releasePlayer(playerId)
+        // The media session outlives the player it wraps: a reload (channel
+        // change, possibly from the notification with the app in the
+        // background) swaps the new player in, so PlaybackService and the
+        // notification carry on instead of stopping and having to restart
+        // from the background, which Android 12+ doesn't allow.
+        val keptSession = releasePlayer(playerId, keepSession = true)
 
         val source = arguments["source"] as? Map<*, *> ?: emptyMap<String, Any?>()
         val uri = source["uri"] as? String ?: throw IllegalStateException("Missing playback source uri")
@@ -398,10 +403,11 @@ class Media3PlaybackPlugin(
             )
         }
         state.sessionPlayer = sessionPlayer
-        state.mediaSession = MediaSession.Builder(context, sessionPlayer)
-            .setId(playerId)
-            .setSessionActivity(appLaunchIntent())
-            .build()
+        state.mediaSession = keptSession?.also { it.player = sessionPlayer }
+            ?: MediaSession.Builder(context, sessionPlayer)
+                .setId(playerId)
+                .setSessionActivity(appLaunchIntent())
+                .build()
         states[playerId] = state
 
         player.setVideoSurfaceView(surfaceView)
@@ -431,12 +437,22 @@ class Media3PlaybackPlugin(
      * hands off to doesn't immediately reapply it, avoiding a visible
      * restore-then-reswitch flicker. See [FrameRateManager]'s class doc.
      */
-    private fun releasePlayer(playerId: String, preserveDisplayMode: Boolean = false) {
-        val state = states.remove(playerId) ?: return
+    /**
+     * [keepSession]: hand the player's media session back instead of
+     * releasing it, for [load] to put its new player into. Returns it.
+     */
+    private fun releasePlayer(
+        playerId: String,
+        preserveDisplayMode: Boolean = false,
+        keepSession: Boolean = false,
+    ): MediaSession? {
+        val state = states.remove(playerId) ?: return null
         state.resumeStallRunnable?.let { mainHandler.removeCallbacks(it) }
-        state.mediaSession?.let { session ->
-            PlaybackService.detach(session)
-            session.release()
+        if (!keepSession) {
+            state.mediaSession?.let { session ->
+                PlaybackService.detach(session)
+                session.release()
+            }
         }
         // Detach the surface before release() instead of letting release()
         // discover and tear it down itself: ACodec's disconnectFromSurface
@@ -452,6 +468,7 @@ class Media3PlaybackPlugin(
             frameRateManager.restore()
         }
         emit(playerId, "disposed")
+        return if (keepSession) state.mediaSession else null
     }
 
     private fun appLaunchIntent(): PendingIntent = PendingIntent.getActivity(

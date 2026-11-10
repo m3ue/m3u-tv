@@ -1933,7 +1933,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsBackgroundAudio => '后台音频';
 
   @override
-  String get settingsBackgroundAudioHint => '离开应用或锁定屏幕时继续播放音频。无论是否开启，锁屏控制均可使用。';
+  String get settingsBackgroundAudioHint => '离开应用或锁定屏幕时继续播放音频，并在锁屏和通知中显示播放控制。';
 
   @override
   String get settingsPrebufferLive => '播放前缓冲直播流';

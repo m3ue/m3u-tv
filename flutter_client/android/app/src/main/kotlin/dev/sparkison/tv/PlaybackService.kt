@@ -2,6 +2,7 @@ package dev.sparkison.tv
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.DefaultMediaNotificationProvider
@@ -45,6 +46,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     companion object {
+        private const val TAG = "PlaybackService"
         private var instance: PlaybackService? = null
         private var activeSession: MediaSession? = null
 
@@ -57,9 +59,15 @@ class PlaybackService : MediaSessionService() {
             if (service != null) {
                 service.addSession(session)
             } else {
-                // Called while the player is on screen, so the app is in the
-                // foreground and may start the service.
-                context.startService(Intent(context, PlaybackService::class.java))
+                // Normally called while the player is on screen, where the
+                // app may start the service. From the background Android 8+
+                // refuses; the session then stays outside the service (no
+                // notification) rather than taking the player down.
+                try {
+                    context.startService(Intent(context, PlaybackService::class.java))
+                } catch (error: IllegalStateException) {
+                    Log.w(TAG, "PlaybackService not started from the background", error)
+                }
             }
         }
 
