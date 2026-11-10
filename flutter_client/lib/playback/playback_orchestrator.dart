@@ -488,7 +488,17 @@ class PlaybackOrchestrator {
       unawaited(subscription.cancel());
     }
     for (final adapter in _adapters.values.toSet()) {
-      await adapter.dispose();
+      // One adapter failing to dispose (its native player already gone:
+      // Android, the activity closed while Android Auto kept the app
+      // running) must not leave the others undisposed, still listening to
+      // their plugin's events: a new plugin then never gets Dart's listen.
+      try {
+        await adapter.dispose();
+      } on Object catch (error) {
+        _diagnostics.add(
+          'dispose:failed:${adapter.capabilities.backend.name}:$error',
+        );
+      }
     }
     await _stateController.close();
     await _errorController.close();
@@ -892,7 +902,14 @@ class PlaybackOrchestrator {
     final adapter = _activeAdapter;
     if (adapter == null) return;
     _clearActiveAdapter();
-    await adapter.stop();
+    try {
+      await adapter.stop();
+    } on Object catch (error) {
+      // The native player can already be gone (Android: the activity that
+      // owned it closed while Android Auto kept the app running). The
+      // stream session must still be released after this.
+      _diagnostics.add('stop:failed:$error');
+    }
   }
 
   int _beginGeneration() => _playbackGeneration += 1;
