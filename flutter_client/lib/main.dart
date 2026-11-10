@@ -13,6 +13,8 @@ import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/app/launch_splash.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/app/text_input_reporting_binding.dart';
+import 'package:m3u_tv/features/android_auto/android_auto_bridge.dart';
+import 'package:m3u_tv/features/carplay/car_catalog.dart';
 import 'package:m3u_tv/features/carplay/carplay_controller.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
@@ -82,6 +84,12 @@ Future<void> main() async {
     final carPlay = CarPlayController(appState);
     CarPlayController.instance = carPlay;
     unawaited(carPlay.start());
+  } else if (HostPlatform.isAndroid) {
+    // Before the UI, likewise: Android Auto can start the app with no
+    // activity (CarMediaService.kt).
+    final androidAuto = AndroidAutoBridge(CarCatalog(appState));
+    AndroidAutoBridge.instance = androidAuto;
+    androidAuto.start();
   }
   _configureImageCache(await appState.viewSettingsService.optimizeFor());
   DesktopFullscreenService? desktopFullscreen;

@@ -24,13 +24,19 @@ import io.flutter.plugin.platform.PlatformViewFactory
  * (github.com/edde746/plezy, GPL-3.0)'s `PlayerSurfaceHost`/`ExoPlayerCore`,
  * which renders its primary ExoPlayer path the same way.
  */
-class Media3PlatformViewFactory(private val plugin: Media3PlaybackPlugin) :
+/**
+ * Registered once per engine, which outlives the activity while Android Auto
+ * is connected (see AppFlutterEngine), so it asks for the current activity's
+ * plugin each time rather than keeping the first one.
+ */
+class Media3PlatformViewFactory(private val plugin: () -> Media3PlaybackPlugin?) :
     PlatformViewFactory(StandardMessageCodec.INSTANCE) {
     override fun create(context: Context, androidViewId: Int, args: Any?): PlatformView {
         @Suppress("UNCHECKED_CAST")
         val params = args as? Map<String, Any?>
         val playerId = (params?.get("playerId") as? String) ?: "default"
-        return Media3PlatformView(context, playerId, plugin)
+        val current = checkNotNull(plugin()) { "No player plugin: the activity is gone" }
+        return Media3PlatformView(context, playerId, current)
     }
 }
 

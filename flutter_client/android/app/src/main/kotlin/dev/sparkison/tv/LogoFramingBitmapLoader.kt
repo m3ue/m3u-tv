@@ -28,8 +28,8 @@ import java.util.Collections
 @OptIn(UnstableApi::class)
 internal class LogoFramingBitmapLoader(context: Context) : BitmapLoader {
     private val delegate = DataSourceBitmapLoader(context)
-    private val logoUris: MutableSet<Uri> = Collections.synchronizedSet(mutableSetOf())
-
+    // Shared: Android Auto's session shows the phone's player with its own
+    // loader (see CarMediaService).
     fun markLogo(uri: Uri) {
         logoUris.add(uri)
     }
@@ -45,6 +45,8 @@ internal class LogoFramingBitmapLoader(context: Context) : BitmapLoader {
     }
 
     companion object {
+        private val logoUris: MutableSet<Uri> = Collections.synchronizedSet(mutableSetOf())
+
         private const val CANVAS_WIDTH = 1024
         private const val CANVAS_HEIGHT = 576
 

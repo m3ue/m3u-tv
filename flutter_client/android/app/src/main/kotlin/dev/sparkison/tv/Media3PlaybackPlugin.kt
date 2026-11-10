@@ -328,6 +328,7 @@ class Media3PlaybackPlugin(
         // background) swaps the new player in, so PlaybackService and the
         // notification carry on instead of stopping and having to restart
         // from the background, which Android 12+ doesn't allow.
+        val previousSessionPlayer = states[playerId]?.sessionPlayer
         val keptSession = releasePlayer(playerId, keepSession = true)
 
         val source = arguments["source"] as? Map<*, *> ?: emptyMap<String, Any?>()
@@ -404,6 +405,9 @@ class Media3PlaybackPlugin(
             )
         }
         state.sessionPlayer = sessionPlayer
+        // Android Auto's own player gives way, and follows a channel change
+        // here if it was showing this one.
+        CarMediaService.phonePlaybackStarted(previousSessionPlayer, sessionPlayer)
         state.mediaSession = keptSession?.also { it.player = sessionPlayer }
             ?: MediaSession.Builder(context, sessionPlayer)
                 .setId(playerId)
@@ -451,6 +455,7 @@ class Media3PlaybackPlugin(
         val state = states.remove(playerId) ?: return null
         state.resumeStallRunnable?.let { mainHandler.removeCallbacks(it) }
         if (!keepSession) {
+            state.sessionPlayer?.let(CarMediaService::phonePlaybackStopped)
             state.mediaSession?.let { session ->
                 PlaybackService.detach(session)
                 session.release()
@@ -482,10 +487,10 @@ class Media3PlaybackPlugin(
 
     /**
      * Dart's Now Playing update for the full-screen player (see
-     * `now_playing_bridge.dart`). Only acts while Background audio is on:
-     * then the player's session moves into [PlaybackService] (notification,
-     * lock screen controls, keeps playing after leaving the app) and carries
-     * the title/artwork. Otherwise nothing changes from plain playback.
+     * `now_playing_bridge.dart`): the title, artwork and channel buttons, for
+     * Android Auto (see [CarMediaService]) and, while Background audio is on,
+     * for [PlaybackService] (notification, lock screen controls, keeps playing
+     * after leaving the app).
      */
     private fun updateNowPlaying(arguments: Map<*, *>) {
         val target = (arguments["playerId"] as? String)?.let { states[it] }
@@ -493,14 +498,9 @@ class Media3PlaybackPlugin(
             if (state !== target) stopBackgroundPlayback(state)
         }
         if (target == null) return
-        val keepPlaying = arguments["keepPlayingInBackground"] as? Boolean ?: false
-        if (!keepPlaying) {
-            stopBackgroundPlayback(target)
-            return
-        }
-        target.keepPlayingInBackground = true
+        // Kept up to date whatever the Background audio setting: Android
+        // Auto shows and controls this player too (see CarMediaService).
         target.sessionPlayer?.canChangeChannel = arguments["canChangeChannel"] as? Boolean ?: false
-
         val artworkUri = (arguments["artworkUrl"] as? String)?.let(Uri::parse)
         // Registered before the metadata goes out, so the first load of it
         // is already framed.
@@ -524,6 +524,14 @@ class Media3PlaybackPlugin(
                 )
             }
         }
+        target.sessionPlayer?.let(CarMediaService::showPhonePlayer)
+
+        val keepPlaying = arguments["keepPlayingInBackground"] as? Boolean ?: false
+        if (!keepPlaying) {
+            stopBackgroundPlayback(target)
+            return
+        }
+        target.keepPlayingInBackground = true
         target.mediaSession?.let { PlaybackService.attach(context.applicationContext, it) }
     }
 
@@ -534,7 +542,6 @@ class Media3PlaybackPlugin(
     private fun stopBackgroundPlayback(state: PlayerState) {
         if (!state.keepPlayingInBackground) return
         state.keepPlayingInBackground = false
-        state.sessionPlayer?.canChangeChannel = false
         state.mediaSession?.let(PlaybackService::detach)
     }
 
@@ -1120,9 +1127,27 @@ private class ChannelSkipPlayer(
     override fun seekToPrevious() {
         if (canChangeChannel) onChangeChannel(false) else super.seekToPrevious()
     }
+
+    // A channel picked in Android Auto while this player is up arrives here
+    // as an item without a stream: Dart opens it (see CarMediaService).
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>, resetPosition: Boolean) {
+        if (!mediaItems.isCarPick()) super.setMediaItems(mediaItems, resetPosition)
+    }
+
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>, startIndex: Int, startPositionMs: Long) {
+        if (!mediaItems.isCarPick()) super.setMediaItems(mediaItems, startIndex, startPositionMs)
+    }
+
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>) {
+        if (!mediaItems.isCarPick()) super.setMediaItems(mediaItems)
+    }
 }
 
-private fun PlaybackException.looksLikeFormatMismatch(): Boolean {
+/** Items Android Auto set that Dart plays elsewhere: no stream URI. */
+internal fun List<MediaItem>.isCarPick(): Boolean =
+    isNotEmpty() && all { it.localConfiguration == null }
+
+internal fun PlaybackException.looksLikeFormatMismatch(): Boolean {
     if (cause is UnrecognizedInputFormatException) return true
     val text = listOfNotNull(message, cause?.message).joinToString("\n")
     return text.contains("Input does not start with the #EXTM3U header") ||

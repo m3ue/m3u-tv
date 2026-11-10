@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_carplay/flutter_carplay.dart';
+import 'package:m3u_tv/features/carplay/car_catalog.dart';
 import 'package:m3u_tv/features/carplay/carplay_audio_player.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
-import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 
@@ -32,7 +31,9 @@ typedef CarPlayChannelHandler =
 /// browsing.
 class CarPlayController {
   CarPlayController(this._appState, {CarPlayAudioPlayer? audioPlayer})
-    : _audioPlayer = audioPlayer ?? CarPlayAudioPlayer.forApp(_appState);
+    : _catalog = CarCatalog(_appState) {
+    _audioPlayer = audioPlayer ?? CarPlayAudioPlayer.forApp(_catalog);
+  }
 
   /// The running controller (iPhone only), set by `main()`.
   static CarPlayController? instance;
@@ -40,7 +41,8 @@ class CarPlayController {
   final AppStateController _appState;
   final FlutterCarplay _carplay = FlutterCarplay();
 
-  final CarPlayAudioPlayer _audioPlayer;
+  final CarCatalog _catalog;
+  late final CarPlayAudioPlayer _audioPlayer;
 
   static const _scenesChannel = MethodChannel('m3u_tv/app_scenes');
 
@@ -105,21 +107,12 @@ class CarPlayController {
     _refreshTimer = Timer(_refreshDelay, () => unawaited(_refresh()));
   }
 
-  AppLocalizations get _l10n {
-    final languageCode =
-        (_appState.locale ?? PlatformDispatcher.instance.locale).languageCode;
-    final supported = AppLocalizations.supportedLocales.any(
-      (locale) => locale.languageCode == languageCode,
-    );
-    return lookupAppLocalizations(Locale(supported ? languageCode : 'en'));
-  }
+  AppLocalizations get _l10n => _catalog.l10n;
 
   Future<void> _refresh() async {
     final l10n = _l10n;
-    final favorites = await _favoriteChannels();
-    final categories = _appState.liveCategories
-        .take(_maxItems)
-        .toList(growable: false);
+    final favorites = await _catalog.favoriteChannels(_maxItems);
+    final categories = _catalog.liveCategories(_maxItems);
 
     final favoritesSignature = favorites
         .map((channel) => '${channel.id}:${channel.name}')
@@ -233,33 +226,15 @@ class CarPlayController {
     }
   }
 
-  Future<List<Channel>> _favoriteChannels() async {
-    if (!_appState.isConfigured) return const [];
-    final ids = await _appState.favoritesService.all();
-    if (ids.isEmpty) return const [];
-    final channels = await _appState.catalogRepository
-        .activeItemsByIds<Channel>(kind: kCatalogKindLive, ids: ids);
-    final sorted = [...channels]
-      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    return sorted.take(_maxItems).toList(growable: false);
-  }
-
   CPListItem _categoryItem(Category category, AppLocalizations l10n) {
     return CPListItem(
       text: category.name,
       accessoryType: CPListItemAccessoryType.disclosureIndicator,
       onPress: (complete, self) async {
         try {
-          final query = LiveChannelQuery(categoryId: category.id);
-          final channels = await query.page(
-            _appState.catalogRepository,
-            0,
+          final (:channels, :context) = await _catalog.categoryChannels(
+            category.id,
             _maxItems,
-          );
-          final context = CatalogChannelContext(
-            repository: _appState.catalogRepository,
-            query: query,
-            length: await query.count(_appState.catalogRepository),
           );
           await FlutterCarplay.push(
             template: CPListTemplate(
@@ -285,7 +260,7 @@ class CarPlayController {
   CPListItem _channelItem(Channel channel, ChannelContext context) {
     return CPListItem(
       text: channel.name,
-      detailText: _appState.epgService.lookupForChannel(channel)?.current.title,
+      detailText: _catalog.currentProgramme(channel),
       image: channel.logoUrl,
       onPress: (complete, self) async {
         try {

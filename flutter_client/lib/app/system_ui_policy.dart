@@ -20,7 +20,14 @@ class SystemUiPolicy {
 
   static Future<void> _applyAndroidSystemUiRouteMode(
     SystemUiRouteMode mode,
-  ) => _channel.invokeMethod<void>(mode.name);
+  ) async {
+    try {
+      await _channel.invokeMethod<void>(mode.name);
+    } on MissingPluginException {
+      // No activity: Android Auto started the app, and there are no system
+      // bars to set until the phone's screen opens.
+    }
+  }
 
   Future<void> applyBrowsing() async {
     if (_isAndroid) {

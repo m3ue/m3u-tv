@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/navigation_sidebar.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_catalog_screen.dart';
+import 'package:m3u_tv/features/android_auto/android_auto_bridge.dart';
 import 'package:m3u_tv/features/carplay/carplay_controller.dart';
 import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
 import 'package:m3u_tv/features/epg/epg_preview_player.dart';
@@ -276,6 +277,7 @@ class AppShellState extends ConsumerState<AppShell>
     );
     unawaited(_appState.ensureBooted());
     CarPlayController.instance?.onPlayChannel = _playCarPlayChannel;
+    AndroidAutoBridge.instance?.onPlayChannel = _playCarPlayChannel;
     _visibleRoutes = _mainRoutes;
     _initSidebarFocusNodes();
     WidgetsBinding.instance.addPostFrameCallback(
@@ -590,6 +592,10 @@ class AppShellState extends ConsumerState<AppShell>
     if (carPlay?.onPlayChannel == _playCarPlayChannel) {
       carPlay!.onPlayChannel = null;
     }
+    final androidAuto = AndroidAutoBridge.instance;
+    if (androidAuto?.onPlayChannel == _playCarPlayChannel) {
+      androidAuto!.onPlayChannel = null;
+    }
     _appState.removeListener(_onAppStateChanged);
     _appState.viewSettingsService.removeListener(_onAppStateChanged);
     if (_ownsAppState) _appState.dispose();
@@ -610,6 +616,14 @@ class AppShellState extends ConsumerState<AppShell>
             (state == AppLifecycleState.hidden ||
                 state == AppLifecycleState.inactive))) {
       _awayFromForeground = true;
+    }
+    if (state == AppLifecycleState.detached && _playerArgs != null) {
+      // Android: the activity closed but the app keeps running (Android
+      // Auto is connected, see AppFlutterEngine.kt). Its native players went
+      // with it, so close the full-screen player now: that releases its
+      // stream, and the app doesn't reopen onto a player with no video.
+      unawaited(_closePlayer());
+      return;
     }
     if (state == AppLifecycleState.paused) {
       _backgroundedAt = clock.now();
@@ -981,6 +995,10 @@ class AppShellState extends ConsumerState<AppShell>
     } on TimeoutException {
       // Fall through and close anyway -- better to leak a not-fully-disposed
       // adapter than leave the user stuck on a dead player screen.
+    } on Object catch (error) {
+      // Likewise when the native player is already gone (the activity
+      // closed under Android Auto, see didChangeAppLifecycleState).
+      debugPrint('Player dispose failed: $error');
     }
     _finishClosePlayer(nativePlaneSub: nativePlaneSub, savedFocus: savedFocus);
   }
@@ -1093,10 +1111,14 @@ class AppShellState extends ConsumerState<AppShell>
   // Stable tearoffs passed to PlayerScreen so PlaybackControls can offer
   // channel-up/channel-down without PlayerScreen needing to know about the
   // channel catalog itself.
-  /// A channel picked on the CarPlay screen. It may arrive with the app in
+  /// A channel picked on the CarPlay or Android Auto screen. It may arrive with the app in
   /// the background, where nothing builds until a frame is run.
   void _playCarPlayChannel(Channel channel, ChannelContext context) {
     _setChannelContext(context);
+    // Already playing or opening it: Android hands the car's channel over
+    // on every resume, and a resume can come twice in a row. A second open
+    // while the first is still starting would replace that player.
+    if (_playerLiveChannel?.id == channel.id && !_playerHasFailed) return;
     _openChannel(channel);
     runFrameIfBackgrounded();
   }

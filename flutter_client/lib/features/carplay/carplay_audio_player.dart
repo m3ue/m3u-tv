@@ -2,13 +2,11 @@ import 'dart:async';
 
 import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
-import 'package:m3u_tv/features/player/player_source_settings.dart';
+import 'package:m3u_tv/features/carplay/car_catalog.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
-import 'package:m3u_tv/playback/editor_stream_session_gateway.dart';
 import 'package:m3u_tv/playback/now_playing_bridge.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
-import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 
@@ -31,34 +29,14 @@ class CarPlayAudioPlayer {
 
   /// Plays the way the full-screen player does: the same stream request
   /// (proxy and playback settings applied) and stream session handling.
-  factory CarPlayAudioPlayer.forApp(AppStateController appState) {
+  factory CarPlayAudioPlayer.forApp(CarCatalog catalog) {
     return CarPlayAudioPlayer(
       buildPlayer: () => buildCarPlayAudioOrchestrator(
-        streamSessionGateway: EditorStreamSessionGateway(
-          serverBase: () => appState.xtreamService.credentials?.server,
-          stopPlayerStream: appState.stopPlayerStream,
-        ),
+        streamSessionGateway: catalog.streamSessions(),
       ),
-      sourceFor: (channel) {
-        final args = PlayerArgs.liveChannel(channel);
-        return applyPlayerSourceSettings(
-          args
-              .copyWith(
-                streamUrl: appState.applyProxyPlayback(
-                  args.streamUrl,
-                  type: 'live',
-                ),
-              )
-              .toPlaybackSource(),
-          appState.viewSettingsService,
-        );
-      },
-      allChannels: () => CatalogChannelContext(
-        repository: appState.catalogRepository,
-        length: 0,
-      ),
-      currentProgramme: (channel) =>
-          appState.epgService.lookupForChannel(channel)?.current.title,
+      sourceFor: catalog.sourceFor,
+      allChannels: catalog.allChannels,
+      currentProgramme: catalog.currentProgramme,
     );
   }
 

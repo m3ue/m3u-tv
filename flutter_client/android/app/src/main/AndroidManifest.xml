@@ -9,6 +9,8 @@
          player's media session running in the foreground after leaving the app. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+    <!-- Keeps the Android Auto player's stream going with the screen off. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-feature android:name="android.software.leanback" android:required="false"/>
     <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
     <uses-feature android:name="android.software.picture_in_picture" android:required="false"/>
@@ -67,6 +69,25 @@
                 <action android:name="androidx.media3.session.MediaSessionService"/>
             </intent-filter>
         </service>
+        <!-- Android Auto: browsing and audio-only playback (CarMediaService). -->
+        <service
+            android:name=".CarMediaService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaLibraryService"/>
+                <action android:name="android.media.browse.MediaBrowserService"/>
+            </intent-filter>
+        </service>
+        <!-- Square channel logos for Android Auto's lists. Exported so the
+             car can read them; serves only logos the car service has listed. -->
+        <provider
+            android:name=".LogoArtworkProvider"
+            android:authorities="${applicationId}.logos"
+            android:exported="true" />
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
         <!-- Notification icon shown in the status bar for FCM pushes (see
              PushNotificationService). Must be a flat white silhouette on a
              transparent background - regenerated via scripts/setup-icons.sh. -->

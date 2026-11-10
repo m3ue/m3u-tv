@@ -3,6 +3,7 @@ package dev.sparkison.tv.mpv
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import dev.sparkison.tv.CarMediaService
 import dev.sparkison.tv.FrameRateManager
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -59,6 +60,9 @@ class MpvPlayerPlugin(
      * internal mutex until it's ready.
      */
     fun attachCore(viewId: Int, viewContext: Context): MpvPlayerCore {
+        // Android Auto's own player gives way. The car can't show this one:
+        // it isn't a Media3 player.
+        CarMediaService.phonePlaybackStarted(previous = null, replacement = null)
         val core = MpvPlayerCore(viewId, viewContext, this, frameRateManager)
         scope.launch {
             mutex.withLock {

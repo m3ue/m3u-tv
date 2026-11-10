@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lists M3U TV as an Android Auto media app (see CarMediaService). -->
+<automotiveApp>
+    <uses name="media" />
+</automotiveApp>
