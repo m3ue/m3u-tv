@@ -243,7 +243,7 @@ SEARCH
 PLAYBACK
 • Native mpv playback with an automatic AVKit fallback.
 • Audio and subtitle track selection, plus multichannel audio on iPhone and iPad.
-• Optional background audio: keep listening after leaving the app or locking your device, with playback controls on the Lock Screen and in Control Center.
+• Picture in Picture, and background audio: keep listening after leaving the app or locking your device, with playback controls on the Lock Screen and in Control Center.
 • A built-in Logs and Diagnostics screen for troubleshooting.
 
 MADE FOR YOUR HOUSEHOLD
@@ -572,7 +572,7 @@ To sign in:
 Connecting usually takes a few seconds. If a server does not respond, the app now shows "Server is currently unavailable." after 30 seconds instead of loading indefinitely, and Connect can be selected again.
 
 BACKGROUND AUDIO (iPhone and iPad)
-Background audio is an optional setting and is off by default. To test it, open Settings > Playback and turn on Background audio, then start any channel or movie and leave the app or lock the device: audio keeps playing, with controls on the Lock Screen and in Control Center.
+Background audio is on by default (Settings > Playback > Background audio). Start any channel or movie, then leave the app: the video moves into Picture in Picture. Close it or lock the device and audio keeps playing, with controls on the Lock Screen and in Control Center.
 
 Third-party services used via their public APIs: Trakt (optional watch history sync), TheIntroDB (optional skip intro timestamps), YouTube (trailer links open externally).
 
