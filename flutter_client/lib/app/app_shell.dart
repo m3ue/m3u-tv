@@ -44,6 +44,7 @@ import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/shared/app_background.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/app_modal.dart';
+import 'package:m3u_tv/shared/background_frame.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/desktop_back_key.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
@@ -1125,6 +1126,9 @@ class AppShellState extends ConsumerState<AppShell>
       return;
     }
     _openChannel(next);
+    // Lock screen/notification skips arrive with the app in the background,
+    // where the player would only pick the new channel up on return.
+    runFrameIfBackgrounded();
   }
 
   Future<void> _handleRecordButtonTap(EpgProgram program) async {

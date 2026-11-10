@@ -83,6 +83,29 @@ void main() {
       );
     });
 
+    test('resends when background audio is turned on', () {
+      final next = NowPlayingInfo(
+        title: vod.title,
+        isLive: false,
+        isPlaying: true,
+        position: vod.position,
+        duration: vod.duration,
+        canSeek: true,
+        playerId: 'primary',
+        keepPlayingInBackground: true,
+      );
+      expect(
+        NowPlayingBridge.needsUpdate(
+          previous: vod,
+          sincePrevious: Duration.zero,
+          next: next,
+        ),
+        isTrue,
+      );
+      expect(next.toMap()['keepPlayingInBackground'], isTrue);
+      expect(next.toMap()['playerId'], 'primary');
+    });
+
     test('ignores position on live streams', () {
       const live = NowPlayingInfo(title: 'News', isLive: true, isPlaying: true);
       const later = NowPlayingInfo(
@@ -159,6 +182,24 @@ void main() {
       bridge.detach(newPlayer);
       await pumpEventQueue();
       expect(calls.last.method, 'clear');
+    });
+
+    test('suspend clears and holds updates until resume', () async {
+      final bridge = NowPlayingBridge(channel: channel, enabled: true);
+      final player = Object();
+      bridge
+        ..attach(player, (_) {})
+        ..update(player, vod)
+        ..suspend(player)
+        ..update(player, vod);
+      await pumpEventQueue();
+      expect(calls.map((call) => call.method), ['update', 'clear']);
+
+      bridge
+        ..resume(player)
+        ..update(player, vod);
+      await pumpEventQueue();
+      expect(calls.map((call) => call.method), ['update', 'clear', 'update']);
     });
 
     test('routes native commands to the owner', () async {

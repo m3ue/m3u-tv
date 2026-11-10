@@ -40,6 +40,9 @@ class NowPlayingInfo {
     this.duration = Duration.zero,
     this.canSeek = false,
     this.canChangeChannel = false,
+    this.playerId,
+    this.keepPlayingInBackground = false,
+    this.artworkIsLogo = false,
   });
 
   final String title;
@@ -52,6 +55,19 @@ class NowPlayingInfo {
   final bool canSeek;
   final bool canChangeChannel;
 
+  /// Android: the native ExoPlayer the player screen is driving, whose media
+  /// session the system surfaces attach to. Null on iOS, and while another
+  /// backend (mpv) is playing.
+  final String? playerId;
+
+  /// Android: Background audio is on, so the player keeps going after
+  /// leaving the app, with a media notification. iOS handles this in Dart.
+  final bool keepPlayingInBackground;
+
+  /// [artworkUrl] is a channel logo, fitted inside the artwork frame with a
+  /// margin, rather than a poster that fills it.
+  final bool artworkIsLogo;
+
   /// Equal apart from [position], which the system extrapolates itself.
   bool sameApartFromPosition(NowPlayingInfo other) =>
       title == other.title &&
@@ -61,7 +77,10 @@ class NowPlayingInfo {
       isPlaying == other.isPlaying &&
       duration == other.duration &&
       canSeek == other.canSeek &&
-      canChangeChannel == other.canChangeChannel;
+      canChangeChannel == other.canChangeChannel &&
+      playerId == other.playerId &&
+      keepPlayingInBackground == other.keepPlayingInBackground &&
+      artworkIsLogo == other.artworkIsLogo;
 
   Map<String, Object?> toMap() => <String, Object?>{
     'title': title,
@@ -73,18 +92,21 @@ class NowPlayingInfo {
     'durationMs': duration.inMilliseconds,
     'canSeek': canSeek,
     'canChangeChannel': canChangeChannel,
+    'playerId': playerId,
+    'keepPlayingInBackground': keepPlayingInBackground,
+    'artworkIsLogo': artworkIsLogo,
   };
 }
 
 /// Feeds the open player to the platform's Now Playing info and routes its
-/// remote commands back. iOS only for now; a no-op elsewhere.
+/// remote commands back. iOS and Android; a no-op elsewhere.
 ///
 /// One player owns it at a time: a new player screen can mount before the
 /// old one unmounts, so [detach] only clears what the caller still owns.
 class NowPlayingBridge {
   NowPlayingBridge({MethodChannel? channel, bool? enabled})
     : _channel = channel ?? const MethodChannel(channelName),
-      enabled = enabled ?? HostPlatform.isIOS;
+      enabled = enabled ?? (HostPlatform.isIOS || HostPlatform.isAndroid);
 
   static const channelName = 'm3u_tv/now_playing';
 
@@ -102,6 +124,7 @@ class NowPlayingBridge {
   ValueChanged<NowPlayingCommandEvent>? _onCommand;
   NowPlayingInfo? _lastSent;
   DateTime? _lastSentAt;
+  bool _suspended = false;
 
   void attach(Object owner, ValueChanged<NowPlayingCommandEvent> onCommand) {
     if (!enabled) return;
@@ -109,7 +132,26 @@ class NowPlayingBridge {
     _onCommand = onCommand;
     _lastSent = null;
     _lastSentAt = null;
+    _suspended = false;
     _channel.setMethodCallHandler(_handleCall);
+  }
+
+  /// Takes the player off the system surfaces while it can't be controlled
+  /// from there (iOS, app in the background without Background audio: the
+  /// app is suspended, so a lock screen Play would fail). Updates are held
+  /// until [resume].
+  void suspend(Object owner) {
+    if (!enabled || !identical(_owner, owner) || _suspended) return;
+    _suspended = true;
+    _lastSent = null;
+    _lastSentAt = null;
+    unawaited(_invoke('clear'));
+  }
+
+  /// Lets [update] publish again after [suspend].
+  void resume(Object owner) {
+    if (!enabled || !identical(_owner, owner)) return;
+    _suspended = false;
   }
 
   void detach(Object owner) {
@@ -118,12 +160,13 @@ class NowPlayingBridge {
     _onCommand = null;
     _lastSent = null;
     _lastSentAt = null;
+    _suspended = false;
     _channel.setMethodCallHandler(null);
     unawaited(_invoke('clear'));
   }
 
   void update(Object owner, NowPlayingInfo info) {
-    if (!enabled || !identical(_owner, owner)) return;
+    if (!enabled || !identical(_owner, owner) || _suspended) return;
     final now = clock.now();
     final lastSentAt = _lastSentAt;
     if (!needsUpdate(
