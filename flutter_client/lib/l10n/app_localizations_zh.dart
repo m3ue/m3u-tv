@@ -2517,4 +2517,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get playerSubtitleSyncHint => '加号延后字幕，减号提前字幕。会为此频道或节目保存。';
+
+  @override
+  String get carPlayFavorites => '收藏';
+
+  @override
+  String get carPlayNoFavorites => '还没有收藏的频道';
+
+  @override
+  String get carPlayNoFavoritesHint => '在 iPhone 上的 M3U TV 中收藏频道，即可在此处查看。';
+
+  @override
+  String get carPlaySignInHint => '在 iPhone 上打开 M3U TV 进行登录。';
 }

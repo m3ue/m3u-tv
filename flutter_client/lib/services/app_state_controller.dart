@@ -752,6 +752,18 @@ class AppStateController extends ChangeNotifier {
   String? get serverTimezone =>
       _sourceType == AppSourceType.xtream ? xtreamService.serverTimezone : null;
 
+  Future<void>? _ensureBootFuture;
+
+  /// Boots once if no source is configured yet, sharing an in-flight boot
+  /// between callers: the phone's shell and the CarPlay screens (which can
+  /// start the app with no phone window, where the shell never builds).
+  Future<void> ensureBooted() {
+    if (isConfigured) return Future<void>.value();
+    return _ensureBootFuture ??= boot().whenComplete(
+      () => _ensureBootFuture = null,
+    );
+  }
+
   Future<void> boot() async {
     final sourceGeneration = _sourceOperationGeneration.advance();
     _isBootstrapping = true;

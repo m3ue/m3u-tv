@@ -1172,5 +1172,9 @@
   "playerSyncReset": "重置",
   "playerSyncDone": "完成",
   "playerAudioSyncHint": "加号延后音频，减号提前音频。会为此频道或节目保存。",
-  "playerSubtitleSyncHint": "加号延后字幕，减号提前字幕。会为此频道或节目保存。"
+  "playerSubtitleSyncHint": "加号延后字幕，减号提前字幕。会为此频道或节目保存。",
+  "carPlayFavorites": "收藏",
+  "carPlayNoFavorites": "还没有收藏的频道",
+  "carPlayNoFavoritesHint": "在 iPhone 上的 M3U TV 中收藏频道，即可在此处查看。",
+  "carPlaySignInHint": "在 iPhone 上打开 M3U TV 进行登录。"
 }

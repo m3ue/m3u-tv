@@ -1172,5 +1172,9 @@
   "playerSyncReset": "Restablecer",
   "playerSyncDone": "Listo",
   "playerAudioSyncHint": "Más retrasa el audio, menos lo adelanta. Se guarda para este canal o título.",
-  "playerSubtitleSyncHint": "Más retrasa los subtítulos, menos los adelanta. Se guarda para este canal o título."
+  "playerSubtitleSyncHint": "Más retrasa los subtítulos, menos los adelanta. Se guarda para este canal o título.",
+  "carPlayFavorites": "Favoritos",
+  "carPlayNoFavorites": "Aún no hay canales favoritos",
+  "carPlayNoFavoritesHint": "Marca canales como favoritos en M3U TV en tu iPhone para verlos aquí.",
+  "carPlaySignInHint": "Abre M3U TV en tu iPhone para iniciar sesión."
 }

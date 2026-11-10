@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/navigation_sidebar.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_catalog_screen.dart';
+import 'package:m3u_tv/features/carplay/carplay_controller.dart';
 import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
 import 'package:m3u_tv/features/epg/epg_preview_player.dart';
 import 'package:m3u_tv/features/home/home_screen.dart';
@@ -273,9 +274,8 @@ class AppShellState extends ConsumerState<AppShell>
     _notificationActivationSub = _appState.notificationActivations.listen(
       _onNotificationActivation,
     );
-    if (!_appState.isConfigured) {
-      unawaited(_appState.boot());
-    }
+    unawaited(_appState.ensureBooted());
+    CarPlayController.instance?.onPlayChannel = _playCarPlayChannel;
     _visibleRoutes = _mainRoutes;
     _initSidebarFocusNodes();
     WidgetsBinding.instance.addPostFrameCallback(
@@ -586,6 +586,10 @@ class AppShellState extends ConsumerState<AppShell>
     }
     _contentFocusNode.dispose();
     _sidebarScopeNode.dispose();
+    final carPlay = CarPlayController.instance;
+    if (carPlay?.onPlayChannel == _playCarPlayChannel) {
+      carPlay!.onPlayChannel = null;
+    }
     _appState.removeListener(_onAppStateChanged);
     _appState.viewSettingsService.removeListener(_onAppStateChanged);
     if (_ownsAppState) _appState.dispose();
@@ -1089,6 +1093,14 @@ class AppShellState extends ConsumerState<AppShell>
   // Stable tearoffs passed to PlayerScreen so PlaybackControls can offer
   // channel-up/channel-down without PlayerScreen needing to know about the
   // channel catalog itself.
+  /// A channel picked on the CarPlay screen. It may arrive with the app in
+  /// the background, where nothing builds until a frame is run.
+  void _playCarPlayChannel(Channel channel, ChannelContext context) {
+    _setChannelContext(context);
+    _openChannel(channel);
+    runFrameIfBackgrounded();
+  }
+
   void _openNextChannel() => unawaited(_switchChannel(1));
   void _openPreviousChannel() => unawaited(_switchChannel(-1));
 

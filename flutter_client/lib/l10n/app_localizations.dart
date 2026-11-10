@@ -4561,6 +4561,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Plus delays the subtitles, minus shows them earlier. Saved for this channel or title.'**
   String get playerSubtitleSyncHint;
+
+  /// No description provided for @carPlayFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get carPlayFavorites;
+
+  /// No description provided for @carPlayNoFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'No favorite channels yet'**
+  String get carPlayNoFavorites;
+
+  /// No description provided for @carPlayNoFavoritesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite channels in M3U TV on your iPhone to see them here.'**
+  String get carPlayNoFavoritesHint;
+
+  /// No description provided for @carPlaySignInHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Open M3U TV on your iPhone to sign in.'**
+  String get carPlaySignInHint;
 }
 
 class _AppLocalizationsDelegate

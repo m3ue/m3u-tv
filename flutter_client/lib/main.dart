@@ -13,6 +13,7 @@ import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/app/launch_splash.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/app/text_input_reporting_binding.dart';
+import 'package:m3u_tv/features/carplay/carplay_controller.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
@@ -76,6 +77,12 @@ Future<void> main() async {
   final systemUiPolicy = SystemUiPolicy();
   await systemUiPolicy.applyBrowsing();
   final appState = await _buildAppState();
+  if (HostPlatform.isIOS) {
+    // Before the UI: the car can open the app without a phone window.
+    final carPlay = CarPlayController(appState);
+    CarPlayController.instance = carPlay;
+    unawaited(carPlay.start());
+  }
   _configureImageCache(await appState.viewSettingsService.optimizeFor());
   DesktopFullscreenService? desktopFullscreen;
   if (_isDesktop) {

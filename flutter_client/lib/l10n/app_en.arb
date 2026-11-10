@@ -1498,5 +1498,9 @@
   "playerSyncReset": "Reset",
   "playerSyncDone": "Done",
   "playerAudioSyncHint": "Plus delays the audio, minus plays it earlier. Saved for this channel or title.",
-  "playerSubtitleSyncHint": "Plus delays the subtitles, minus shows them earlier. Saved for this channel or title."
+  "playerSubtitleSyncHint": "Plus delays the subtitles, minus shows them earlier. Saved for this channel or title.",
+  "carPlayFavorites": "Favorites",
+  "carPlayNoFavorites": "No favorite channels yet",
+  "carPlayNoFavoritesHint": "Favorite channels in M3U TV on your iPhone to see them here.",
+  "carPlaySignInHint": "Open M3U TV on your iPhone to sign in."
 }

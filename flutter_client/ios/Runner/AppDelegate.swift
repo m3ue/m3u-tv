@@ -3,7 +3,19 @@ import Flutter
 import UIKit
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+@objc class AppDelegate: FlutterAppDelegate {
+    /// The one Flutter engine, shared by the phone's window (SceneDelegate)
+    /// and the CarPlay screen (CarPlaySceneDelegate). Whichever connects
+    /// first starts it: the car can open the app without the phone's window,
+    /// so the implicit engine Flutter would create for that window isn't
+    /// enough. Created on main, on first use.
+    static let sharedEngine: FlutterEngine = {
+        let engine = FlutterEngine(name: "m3u_tv", project: nil, allowHeadlessExecution: true)
+        engine.run()
+        (UIApplication.shared.delegate as? AppDelegate)?.registerPlugins(with: engine)
+        return engine
+    }()
+
     private var avKitPlugin: AvKitPlaybackPlugin?
     private var mpvPlugin: MpvPlayerPlugin?
     private var nowPlayingPlugin: NowPlayingPlugin?
@@ -23,17 +35,17 @@ import UIKit
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
 
-    func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
-        GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-        registerAvKitPlugin(engineBridge: engineBridge)
-        registerMpvPlugin(engineBridge: engineBridge)
-        if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "NowPlayingPlugin") {
+    private func registerPlugins(with registry: FlutterPluginRegistry) {
+        GeneratedPluginRegistrant.register(with: registry)
+        registerAvKitPlugin(registry: registry)
+        registerMpvPlugin(registry: registry)
+        if let registrar = registry.registrar(forPlugin: "NowPlayingPlugin") {
             nowPlayingPlugin = NowPlayingPlugin(messenger: registrar.messenger())
         }
     }
 
-    private func registerMpvPlugin(engineBridge: FlutterImplicitEngineBridge) {
-        guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "MpvPlayerPlugin") else { return }
+    private func registerMpvPlugin(registry: FlutterPluginRegistry) {
+        guard let registrar = registry.registrar(forPlugin: "MpvPlayerPlugin") else { return }
         let messenger = registrar.messenger()
 
         let plugin = MpvPlayerPlugin()
@@ -58,8 +70,8 @@ import UIKit
         )
     }
 
-    private func registerAvKitPlugin(engineBridge: FlutterImplicitEngineBridge) {
-        guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AvKitPlaybackPlugin") else { return }
+    private func registerAvKitPlugin(registry: FlutterPluginRegistry) {
+        guard let registrar = registry.registrar(forPlugin: "AvKitPlaybackPlugin") else { return }
         let messenger = registrar.messenger()
         let textureRegistry = registrar.textures()
 

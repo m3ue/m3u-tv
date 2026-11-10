@@ -2611,4 +2611,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get playerSubtitleSyncHint =>
       'Plus delays the subtitles, minus shows them earlier. Saved for this channel or title.';
+
+  @override
+  String get carPlayFavorites => 'Favorites';
+
+  @override
+  String get carPlayNoFavorites => 'No favorite channels yet';
+
+  @override
+  String get carPlayNoFavoritesHint =>
+      'Favorite channels in M3U TV on your iPhone to see them here.';
+
+  @override
+  String get carPlaySignInHint => 'Open M3U TV on your iPhone to sign in.';
 }

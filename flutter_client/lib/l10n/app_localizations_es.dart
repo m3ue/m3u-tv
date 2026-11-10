@@ -2636,4 +2636,18 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get playerSubtitleSyncHint =>
       'Más retrasa los subtítulos, menos los adelanta. Se guarda para este canal o título.';
+
+  @override
+  String get carPlayFavorites => 'Favoritos';
+
+  @override
+  String get carPlayNoFavorites => 'Aún no hay canales favoritos';
+
+  @override
+  String get carPlayNoFavoritesHint =>
+      'Marca canales como favoritos en M3U TV en tu iPhone para verlos aquí.';
+
+  @override
+  String get carPlaySignInHint =>
+      'Abre M3U TV en tu iPhone para iniciar sesión.';
 }

@@ -1172,5 +1172,9 @@
   "playerSyncReset": "Zurücksetzen",
   "playerSyncDone": "Fertig",
   "playerAudioSyncHint": "Plus verzögert den Ton, Minus spielt ihn früher ab. Wird für diesen Sender oder Titel gespeichert.",
-  "playerSubtitleSyncHint": "Plus verzögert die Untertitel, Minus zeigt sie früher an. Wird für diesen Sender oder Titel gespeichert."
+  "playerSubtitleSyncHint": "Plus verzögert die Untertitel, Minus zeigt sie früher an. Wird für diesen Sender oder Titel gespeichert.",
+  "carPlayFavorites": "Favoriten",
+  "carPlayNoFavorites": "Noch keine Lieblingssender",
+  "carPlayNoFavoritesHint": "Markiere Sender in M3U TV auf deinem iPhone als Favoriten, um sie hier zu sehen.",
+  "carPlaySignInHint": "Öffne M3U TV auf deinem iPhone, um dich anzumelden."
 }
