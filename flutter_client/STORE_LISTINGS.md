@@ -13,7 +13,7 @@ Last reviewed against: **v1.3.0** (2026-11-10). Store artwork is generated separ
   - Never mention other platforms (Android, Google TV, Windows, Linux). Guideline 2.3.10 forbids it, and the old copy did it.
   - Say "Xtream API", never "Xtream Codes" (the name of a service that was shut down for piracy).
   - Leave "IPTV" and "Xtream" out of the keywords field. Both are fine in context in the description.
-  - Screenshots, previews and header art come only from the demo server (Blender open movies, public-domain films, generated test channels): the `tvos*`, `ios*` and `ipados*` sets in `screenshots/app-screenshots/`. Never real studio posters, network logos or provider channel names. Apple rejected v1.2.3 under 5.2.1 for exactly this.
+  - Screenshots, previews and header art come only from the demo server (Blender open movies, public-domain films, generated test channels): the `tvos*`, `ios*`, `ipados*` and `macos*` sets in `screenshots/app-screenshots/`. Never real studio posters, network logos or provider channel names. Apple rejected v1.2.3 under 5.2.1 for exactly this.
   - The Support URL must be a real support page, not an issue tracker (rejected under 1.5).
 - **Trakt:** the app syncs **watch history** only. Don't claim watchlist or collection sync.
 - **CarPlay and Android Auto:** write them exactly so (Apple's and Google's names), and keep each to its own store: CarPlay only in the iOS listing and Apple notes, Android Auto only on Google Play.
@@ -50,7 +50,7 @@ Last reviewed against: **v1.3.0** (2026-11-10). Store artwork is generated separ
 
 ## Apple App Store
 
-Name and subtitle are set once for the whole app. Promotional text, keywords and description are set per platform (tvOS and iOS/iPadOS).
+Name and subtitle are set once for the whole app. Promotional text, keywords and description are set per platform (tvOS, iOS/iPadOS and macOS). macOS shares the bundle ID with iOS and tvOS, so it is a platform added to the same App Store Connect app (Universal Purchase), not a separate listing.
 
 ### Name (30)
 
@@ -206,7 +206,7 @@ epg,playlist,guide,live,player,dvr,carplay,catchup,multiview,trakt,movies,series
 #### Description (4000)
 
 ```
-M3U TV is the iPhone, iPad and Apple TV app for M3U Editor, the open-source, self-hosted platform for managing your IPTV playlists, guides and media. Connect it to your own M3U Editor server and your live channels, movies and series come together in one fast, touch-friendly app. It's also available on Apple TV, built around the Siri Remote.
+M3U TV is the iPhone and iPad app for M3U Editor, the open-source, self-hosted platform for managing your IPTV playlists, guides and media. Connect it to your own M3U Editor server and your live channels, movies and series come together in one fast, touch-friendly app. It's also available on Apple TV, built around the Siri Remote.
 
 M3U TV does not include any channels, playlists or content. You need your own M3U Editor server and your own lawful sources.
 
@@ -269,6 +269,87 @@ MADE FOR YOUR HOUSEHOLD
 • Settings and Home layouts your server can set up for every device, as defaults or locked.
 • A notification center for alerts from your server, with per-channel subscriptions.
 • Adjustable display scale.
+
+OPEN SOURCE
+M3U TV and M3U Editor are open source. Bring your own server, your own playlists and your own sources.
+```
+
+### macOS
+
+Same Apple rules as above: no AIOStreams, no other platforms beyond Apple's own, and screenshots only from the demo server (`macos*` set). Mac-only notes: there is no CarPlay, Picture in Picture or background audio on Mac, so leave those out; and never mention the GitHub DMG or link to GitHub releases anywhere in the Mac listing.
+
+#### Promotional text (170)
+
+```
+Your own M3U Editor server on your Mac: live TV with a multi-day guide, DVR, movies and series, with native mpv playback and full keyboard navigation.
+```
+
+#### Keywords (100)
+
+```
+epg,playlist,guide,live,player,dvr,simkl,catchup,multiview,trakt,movies,series,selfhosted,sports
+```
+
+#### Description (4000)
+
+```
+M3U TV is the Mac app for M3U Editor, the open-source, self-hosted platform for managing your IPTV playlists, guides and media. Connect it to your own M3U Editor server and your live channels, movies and series come together in one fast app that works with a mouse, trackpad or keyboard. It's also available on iPhone, iPad and Apple TV.
+
+M3U TV does not include any channels, playlists or content. You need your own M3U Editor server and your own lawful sources.
+
+HOME
+• Continue Watching with Up Next episodes, so you can pick up right where you left off.
+• Optional Spotlight home: a full-screen hero with artwork and title logos above your rows.
+• Favorites and quick rows for Live TV, movies and series. Choose which screen the app opens on.
+• Reorder the nav and Home rows, and hide the sections you don't use.
+
+LIVE TV AND GUIDE
+• A multi-day timeline guide with arrow-key navigation and an optional live preview player.
+• On Now and Upcoming views with station logos.
+• Guide previews carry into full screen without restarting the stream.
+• Catchup playback with seeking on channels that support it.
+• Multiview: watch several channels at once.
+• Pause live TV, and pick back up at the live point after a longer break.
+• Custom channel sorting, favorites-first ordering and grid or list layouts.
+
+SPORTS
+• See each day's games with live scores, for the leagues your server is set up for.
+• Find which of your own channels is showing a game, and start it in one click.
+• Game details with the score by period, key moments and team stats.
+• Follow your teams, with My Teams and a Sports row on Home.
+• Needs M3U Editor 0.14.1 or later with Sports turned on.
+
+DVR
+• Record a single airing or a whole series straight from the guide or search.
+• Watch, cancel and delete recordings, and see storage usage at a glance.
+• Your whole recordings library, with status filters and sorting.
+• Automatic commercial skipping on recordings that support it.
+
+MOVIES AND SERIES
+• Detail pages with cast, filmographies, trailers, ratings and related titles.
+• A season and episode browser with Up Next, plus an episode picker right in the player.
+• Artwork while movies and episodes load.
+• Skip Intro and Skip Credits prompts powered by TheIntroDB (optional).
+• Sort by recently added, recently updated, title and more.
+• Request new movies and shows through your server, and pick which service handles it when there's more than one.
+
+SEARCH
+• One search across channels, guide listings, movies and series.
+
+PLAYBACK
+• Native mpv playback that handles a wide range of formats and codecs.
+• Audio and subtitle track selection, plus multichannel audio.
+• Full screen with F11, and volume control in the player.
+• Audio and subtitle sync, saved for each channel, movie or series.
+• Search for subtitles online for movies and episodes.
+• A built-in Logs and Diagnostics screen for troubleshooting.
+
+MADE FOR YOUR HOUSEHOLD
+• Multiple viewers, each with their own history and favorites.
+• Keep several playlists on one device, from one server or more, each with its own favorites and guide.
+• Trakt and SIMKL watch history sync, from the device or from your server.
+• Settings and Home layouts your server can set up for every device, as defaults or locked.
+• Adjustable display scale and navigation sounds.
 
 OPEN SOURCE
 M3U TV and M3U Editor are open source. Bring your own server, your own playlists and your own sources.
@@ -585,6 +666,8 @@ Instructions for each store's reviewers. All stores use the same demo server, wh
 
 Also fill in the separate "Sign-in required" username and password fields with the credentials above.
 
+App Review Information is set per platform. For **macOS**, paste the same notes but drop the BACKGROUND AUDIO and CARPLAY sections, which don't apply on Mac.
+
 ```
 M3U TV is a client for M3U Editor, an open-source, self-hosted media server (https://github.com/m3ue/m3u-editor). The app includes no content, playlists or streams. Users connect it to their own server and play only media they supply.
 
@@ -655,6 +738,8 @@ Add a new subsection at the top for each release, built from the GitHub release 
 | Microsoft Store | What's new in this version | 1500 |
 
 The Apple notes follow the Apple rules above (no AIOStreams, no other platforms). Leave out desktop-only items such as fullscreen shortcuts.
+
+macOS: the first Mac App Store version has no What's New field. From the next release on, add an `#### Apple (macOS)` block: the Apple notes minus iPhone and iPad items (CarPlay, Picture in Picture, background audio), plus any desktop items such as fullscreen.
 
 ### v1.3.0
 

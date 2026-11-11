@@ -172,15 +172,70 @@ export DEVELOPMENT_TEAM=5AMT94T836   # this project's team ID
 
 > **Run `flutter-tvos run -d <simulator-id>` at least once before opening Xcode for simulator debugging.** `flutter-tvos` swaps the entire `Flutter.xcframework` per build mode/environment (debug/release × device/simulator); a stale one left over from a prior release build breaks simulator runs in Xcode with a "no library for this platform" error. `flutter-tvos build tvos --release` (used above to bake in dart-defines) doesn't fix this itself - its own `xcodebuild` step always fails against this project's Manual-signing config, so it never gets to regenerate the simulator slice. If you need to go back to simulator debugging afterward, run `flutter-tvos run -d <simulator-id>` again to restore it. See the [tvOS setup section in the root README](../README.md#apple-tv-tvos) for one-time install instructions. Likewise, never run `pod install` by hand in `tvos/` - it reads the plugin list from `.flutter-plugins-dependencies`, which is only populated correctly as a side effect of `flutter-tvos build`/`run`; running `pod install` standalone (before that list is populated) silently strips tvOS-only pods like `sqflite_tvos` from `Podfile.lock`. If pods look wrong, re-run `flutter-tvos build tvos`/`run` - don't call `pod install` directly.
 
-### macOS (via GitHub Actions - not the Mac App Store)
+### macOS
 
-Unlike iOS/tvOS/Android, macOS release builds are never submitted to an app store by hand. Every `v*.*.*` tag push runs the `build-macos` job in `.github/workflows/release.yml` end-to-end: release build, code-sign with the Developer ID Application certificate, notarize via `notarytool`, staple the ticket, and publish the DMG straight to the GitHub Release - the same all-desktop-via-CI path Linux and Windows use below. There is no separate manual macOS release step.
+macOS ships two ways: a notarized DMG on the GitHub Release, and the Mac App Store. Apple allows both for the same app. They are separate builds, signed with different certificates, so never upload the DMG build to App Store Connect and never attach the App Store build to a GitHub Release.
+
+| | GitHub DMG | Mac App Store |
+|---|---|---|
+| Built by | CI (`build-macos` job) | You, locally |
+| Certificate | Developer ID Application | Apple Distribution + Mac Installer Distribution |
+| Output | notarized, stapled `.dmg` | signed `.pkg` |
+
+#### GitHub DMG (CI)
+
+Every `v*.*.*` tag push runs the `build-macos` job in `.github/workflows/release.yml` end-to-end: release build, code-sign with the Developer ID Application certificate, notarize via `notarytool`, staple the ticket, and publish the DMG to the GitHub Release. Nothing to do by hand.
 
 To build a local macOS release for testing only (not signed or notarized, so not distributable):
 
 ```bash
 flutter build macos --release
 ```
+
+#### Mac App Store (manual App Store submission)
+
+One-time setup:
+
+- macOS uses the same bundle ID as iOS and tvOS (`dev.sparkison.tv`), so it is not a new app. In App Store Connect, open the existing M3U TV app and add the **macOS** platform. It becomes a Universal Purchase alongside iOS/tvOS, with its own macOS version, screenshots and review.
+- Be signed into Xcode with the team account (Xcode > Settings > Accounts). The first export with `-allowProvisioningUpdates` creates the Apple Distribution and Mac Installer Distribution certificates and the Mac App Store provisioning profile for you.
+
+Build, archive and export:
+
+1. Compile Dart. This writes any --dart-define values into
+```bash
+flutter build macos --release
+```
+
+2. Archive (signs with the project's Automatic Release signing)
+```bash
+xcodebuild archive \
+  -workspace macos/Runner.xcworkspace -scheme Runner \
+  -configuration Release \
+  -archivePath build/macos/Runner.xcarchive \
+  -allowProvisioningUpdates
+```
+
+3. Export a signed installer package for App Store Connect
+```bash
+xcodebuild -exportArchive \
+  -archivePath build/macos/Runner.xcarchive \
+  -exportOptionsPlist macos/ExportOptions.plist \
+  -exportPath build/macos/export \
+  -allowProvisioningUpdates
+```
+
+This produces `build/macos/export/M3U TV.pkg` - upload it with [Transporter](https://apps.apple.com/app/transporter/id1450874784), same as the iOS `.ipa`.
+
+Prefer Xcode's Organizer instead? Run steps 1 and 2, then open `build/macos/Runner.xcarchive` in Xcode and **Distribute App > App Store Connect**. As with iOS, don't archive from a bare Xcode session that skipped step 1, or the archive ships with whatever `--dart-define` values were last written to `macos/Flutter/ephemeral/` (possibly none).
+
+`macos/ExportOptions.plist` (method `app-store-connect`, your Team ID) is checked into the repo alongside the iOS and tvOS ones.
+
+Things to know before submitting:
+
+- **Build number:** App Store Connect rejects an upload whose build number isn't higher than the last macOS upload. It comes from the `+N` in `pubspec.yaml`'s `version:`, same as iOS/tvOS.
+- **Sandbox:** the App Store requires the App Sandbox. `macos/Runner/Release.entitlements` already enables it (the DMG ships sandboxed too), so a sandbox problem would already show up in the DMG.
+- **Entitlements review:** `Release.entitlements` also carries `com.apple.security.cs.allow-jit` and `com.apple.security.cs.disable-executable-page-protection`. If review asks why, they are there for the bundled libmpv. If a store build plays fine without `disable-executable-page-protection`, dropping it removes a likely review question.
+- **No GitHub mentions:** keep the macOS App Store description, What's New text and screenshots free of links to GitHub or the DMG.
 
 ### Linux
 
@@ -197,7 +252,7 @@ flutter build windows --release
 Two Windows artifacts are published per release, with different trust models (see issue #118):
 
 - **`m3u-tv-vX.Y.Z-windows.zip`** - a portable, unsigned build (the same one produced by the command above, from `build-windows` in `.github/workflows/release.yml`). Windows SmartScreen will show an "unrecognized publisher" warning on first run since there's no Authenticode signature - this is expected, not a bug. No code-signing certificate is purchased or held for this artifact.
-- **`m3u-tv-vX.Y.Z-windows.msix`** (same job, via `dart run msix:create`) - the Microsoft Store submission package. Microsoft Partner Center signs this package at ingestion using its own certificate (`store: true` in `msix_config` in `pubspec.yaml` - see the comment there), so an app installed from the Store gets a trusted, SmartScreen-clean install with none of the above warning. This is the recommended install path for users who want a signed build; the `.msix` in the GitHub Release itself is not independently trusted until it goes through the Store (it can be sideloaded for testing with Developer Mode, but that doesn't carry Partner Center's signature).
+- **`m3u-tv-vX.Y.Z-windows.msix`** (built locally with `dart run msix:create`) - the Microsoft Store submission package. Microsoft Partner Center signs this package at ingestion using its own certificate (`store: true` in `msix_config` in `pubspec.yaml` - see the comment there), so an app installed from the Store gets a trusted, SmartScreen-clean install with none of the above warning. This is the recommended install path for users who want a signed build; the `.msix` in the GitHub Release itself is not independently trusted until it goes through the Store (it can be sideloaded for testing with Developer Mode, but that doesn't carry Partner Center's signature).
 
 We deliberately do not Authenticode-sign the raw `.zip`/`.exe` - that would require purchasing and rotating a separate code-signing certificate (traditional Authenticode cert or Azure Trusted Signing) for an artifact that duplicates what the Store MSIX already covers. If that changes, update this section and the CI job together.
 
@@ -278,12 +333,13 @@ Apple listings use their own source sets, so Apple-specific screenshots stay out
 | `tvos*.png` | tvOS screenshots (source: 1920 × 1080 or 3840 × 2160) |
 | `ios*.png` | iPhone screenshots (source: 1206 × 2622) |
 | `ipados*.png` | iPad screenshots (source: 1668 × 2420) |
+| `macos*.png` | Mac App Store screenshots (source: a Cmd+Shift+5 window capture, window sized close to 16:10) |
 | `tv*.png` | Android TV screenshots (source: 1920 × 1080 or 3840 × 2160) |
 | `mobile*.png` | Android Phone screenshots (source: 1206 × 2622) |
 | `tablet*.png` | Android Tablet screenshots (source: 1668 × 2420) |
-| `desktop*.png` | macOS screenshots (source: 1712 × 1115) |
+| `desktop*.png` | Generic desktop set for the docs (source: 1712 × 1115); macOS falls back to it |
 
-Only `<prefix><number>.png` matches, so `tv*` never picks up `tvos*` files. If an Apple set has no files, the generator falls back to its generic set (`tvos` → `tv`, `ios` → `mobile`, `ipados` → `tablet`). Each run clears the PNGs it previously generated in its output folders, so renamed or removed sources don't linger.
+Only `<prefix><number>.png` matches, so `tv*` never picks up `tvos*` files. If an Apple set has no files, the generator falls back to its generic set (`tvos` → `tv`, `ios` → `mobile`, `ipados` → `tablet`, `macos` → `desktop`). Each run clears the PNGs it previously generated in its output folders, so renamed or removed sources don't linger. Mac screenshots (`macos*`, or `desktop*` as the fallback) are expected to be window captures: the generator crops off the transparent drop-shadow margin and the 1px window outline, fills the rounded corners with the window's edge colour, and writes an opaque PNG with no alpha channel, which App Store Connect requires.
 
 ## Trakt setup
 
