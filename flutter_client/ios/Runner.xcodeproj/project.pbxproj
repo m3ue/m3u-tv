@@ -77,7 +77,6 @@
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F3 /* AvKitPlaybackPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvKitPlaybackPlugin.swift; sourceTree = "<group>"; };
 		A36E6DB8E4A59C98D93CAEAC /* MpvPlayerPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MpvPlayerPlugin.swift; sourceTree = "<group>"; };
-		EC4A146DD0DB9AC0F2AD6005 /* RunnerSimulator.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = RunnerSimulator.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -169,7 +168,6 @@
 				2B0C7BB8F93BEF3613D588E3 /* MpvPlayer */,
 				51310D57336683734456B7FB /* NowPlayingPlugin.swift */,
 				12153C9FF63CA6E2C78727D8 /* CarPlaySceneDelegate.swift */,
-				EC4A146DD0DB9AC0F2AD6005 /* RunnerSimulator.entitlements */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -433,7 +431,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
-				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = Runner/RunnerSimulator.entitlements;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 5AMT94T836;
 				ENABLE_BITCODE = NO;
@@ -615,7 +612,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
-				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = Runner/RunnerSimulator.entitlements;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 5AMT94T836;
 				ENABLE_BITCODE = NO;
@@ -640,7 +636,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
-				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = Runner/RunnerSimulator.entitlements;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 5AMT94T836;
 				ENABLE_BITCODE = NO;

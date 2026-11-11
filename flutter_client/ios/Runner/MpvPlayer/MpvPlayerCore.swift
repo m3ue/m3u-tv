@@ -188,6 +188,9 @@ final class MpvPlayerCore {
   /// before `load`.
   func attach(to displayLayer: AVSampleBufferDisplayLayer?) {
     audioOnly = displayLayer == nil
+    let carConnected = UIApplication.shared.connectedScenes.contains {
+      $0.session.role == .carTemplateApplication
+    }
     if let displayLayer {
       self.videoLayer = displayLayer
       setUpPictureInPicture(on: displayLayer)
@@ -233,7 +236,17 @@ final class MpvPlayerCore {
       // AVSampleBufferAudioRenderer takes the decoder's full layout, which
       // the system spatializes. audiounit stays as the fallback if it fails
       // to open (Plezy f1708dd6e).
-      mpv_set_option_string(handle, "ao", "avfoundation,audiounit")
+      // audiounit while CarPlay is connected (and for CarPlay's audio-only
+      // core): the AVFoundation output stalled every second or so playing to
+      // the car (playback kept flipping between buffering and playing), and
+      // the car has no use for Spatial Audio. Chosen when the player is
+      // created, so a car connecting mid-stream applies from the next one.
+      mpv_set_option_string(handle, "ao", audioOnly || carConnected ? "audiounit" : "avfoundation,audiounit")
+      // Without it ao_audiounit sets the audio session to mix with other
+      // apps, and a mixing app can't be the Now Playing app: CarPlay and the
+      // lock screen showed nothing and stopped passing on their buttons.
+      // ao_avfoundation never mixes; this keeps its audiounit fallback the same.
+      mpv_set_option_string(handle, "audio-exclusive", "yes")
       // `fuzzy` auto-loads sidecar subtitle files (`.srt`/`.vtt`) next to a
       // local/network URI whose filename fuzzily matches, in addition to
       // whatever `sub-add` calls `load(subtitles:)` issues explicitly below.
@@ -280,6 +293,11 @@ final class MpvPlayerCore {
         mpv_terminate_destroy(handle)
         self.mpv = nil
         return
+      }
+      // CarPlay's player has no screen to show what went wrong: mpv's own
+      // warnings go to the device log.
+      if displayLayer == nil {
+        mpv_request_log_messages(handle, "warn")
       }
     }
   }
@@ -664,6 +682,12 @@ final class MpvPlayerCore {
         }
       }
       emit(kind: "END_FILE", extra: [:])
+    case MPV_EVENT_LOG_MESSAGE:
+      if let message = event.data?.assumingMemoryBound(to: mpv_event_log_message.self).pointee {
+        let prefix = message.prefix.map { String(cString: $0) } ?? "mpv"
+        let text = message.text.map { String(cString: $0) } ?? ""
+        NSLog("[mpv/%@] %@", prefix, text.trimmingCharacters(in: .newlines))
+      }
     case MPV_EVENT_IDLE, MPV_EVENT_SHUTDOWN:
       emit(kind: "SHUTDOWN", extra: [:])
     default:

@@ -21,12 +21,38 @@ final class NowPlayingPlugin {
   private var artworkIsLogo = false
   private var artwork: MPMediaItemArtwork?
   private var artworkTask: URLSessionDataTask?
+  private var sceneObservers: [NSObjectProtocol] = []
 
   init(messenger: FlutterBinaryMessenger) {
     channel = FlutterMethodChannel(name: Self.channelName, binaryMessenger: messenger)
     channel.setMethodCallHandler { [weak self] call, result in
       self?.handle(call, result: result)
     }
+    // The media type follows whether CarPlay is connected (see mediaType),
+    // so a car connecting or leaving mid-stream re-publishes it.
+    let center = NotificationCenter.default
+    sceneObservers = [UIScene.willConnectNotification, UIScene.didDisconnectNotification].map { name in
+      center.addObserver(forName: name, object: nil, queue: .main) { [weak self] notification in
+        guard (notification.object as? UIScene)?.session.role == .carTemplateApplication else { return }
+        self?.republishMediaType()
+      }
+    }
+  }
+
+  /// CarPlay shows audio only, and showed a video item as "Not Playing"
+  /// even while its sound came through the car. The lock screen keeps the
+  /// video type when no car is connected.
+  private static var mediaType: MPNowPlayingInfoMediaType {
+    let carConnected = UIApplication.shared.connectedScenes.contains {
+      $0.session.role == .carTemplateApplication
+    }
+    return carConnected ? .audio : .video
+  }
+
+  private func republishMediaType() {
+    guard !nowPlayingInfo.isEmpty else { return }
+    nowPlayingInfo[MPNowPlayingInfoPropertyMediaType] = Self.mediaType.rawValue
+    MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
   }
 
   private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -49,7 +75,7 @@ final class NowPlayingPlugin {
     var info: [String: Any] = [
       MPMediaItemPropertyTitle: args["title"] as? String ?? "",
       MPNowPlayingInfoPropertyIsLiveStream: isLive,
-      MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.video.rawValue,
+      MPNowPlayingInfoPropertyMediaType: Self.mediaType.rawValue,
       MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
       MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
     ]
