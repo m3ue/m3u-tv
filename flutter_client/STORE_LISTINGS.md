@@ -206,7 +206,7 @@ epg,playlist,guide,live,player,dvr,carplay,catchup,multiview,trakt,movies,series
 #### Description (4000)
 
 ```
-M3U TV is the iPhone and iPad app for M3U Editor, the open-source, self-hosted platform for managing your IPTV playlists, guides and media. Connect it to your own M3U Editor server and your live channels, movies and series come together in one fast, touch-friendly app. It's also available on Apple TV, built around the Siri Remote.
+M3U TV is the iPhone, iPad and Apple TV app for M3U Editor, the open-source, self-hosted platform for managing your IPTV playlists, guides and media. Connect it to your own M3U Editor server and your live channels, movies and series come together in one fast, touch-friendly app. It's also available on Apple TV, built around the Siri Remote.
 
 M3U TV does not include any channels, playlists or content. You need your own M3U Editor server and your own lawful sources.
 
