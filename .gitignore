@@ -17,6 +17,7 @@
 .github/actions/*
 !.github/actions/android-ndk/
 !.github/actions/tvos-build/
+!.github/actions/security-scan/
 !.github/workflows/
 .github/workflows/*
 !.github/workflows/ci.yml
