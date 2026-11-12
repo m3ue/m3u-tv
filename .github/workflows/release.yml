@@ -939,9 +939,14 @@ jobs:
           set -euo pipefail
           TAG="v${{ needs.validate.outputs.version }}"
           V="${{ needs.validate.outputs.version }}"
+          # Version-less copy so releases/latest/download/m3u-tv-android.apk
+          # is a permanent link (the Downloader code and the /tv/android docs
+          # page point at it)
+          cp "artifacts/android-apks/m3u-tv-v${V}-android.apk" artifacts/android-apks/m3u-tv-android.apk
           ASSETS=(
             "artifacts/android-apks/m3u-tv-v${V}-android.apk"
             "artifacts/android-apks/m3u-tv-v${V}-android.apk.sha256"
+            "artifacts/android-apks/m3u-tv-android.apk"
             "artifacts/linux-zips/m3u-tv-v${V}-linux.zip"
             "artifacts/linux-zips/m3u-tv-v${V}-linux.zip.sha256"
             "artifacts/windows-zips/m3u-tv-v${V}-windows.zip"
