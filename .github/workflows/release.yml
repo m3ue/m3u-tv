@@ -74,6 +74,11 @@ jobs:
       - name: Test
         run: flutter test
 
+      # Same scan as ci.yml, run again at release time: a vulnerability can be
+      # published after the last CI run, and it must stop the release.
+      - name: Scan dependencies
+        uses: ./.github/actions/security-scan
+
   # ── Android phone + Android TV (single APK, leanback optional) ────────────
   build-android:
     name: Build Android APK

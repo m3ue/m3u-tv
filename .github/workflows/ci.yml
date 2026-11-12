@@ -52,6 +52,15 @@ jobs:
               - '.github/workflows/ci.yml'
               - '.github/workflows/release.yml'
 
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Scan dependencies
+        uses: ./.github/actions/security-scan
+
   flutter-gates:
     name: Flutter analyze and test
     runs-on: ubuntu-latest
