@@ -1,3 +1,5 @@
+import 'package:dpad/dpad.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +11,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -432,6 +435,104 @@ void main() {
 
     // --- EPG show search wiring (#227) ---
 
+    group('D-pad', () {
+      Future<void> focusCard(WidgetTester tester, String title) async {
+        final card = find
+            .ancestor(
+              of: find.text(title),
+              matching: find.byType(DpadFocusable),
+            )
+            .first;
+        tester
+            .widget<Focus>(
+              find.descendant(of: card, matching: find.byType(Focus)).first,
+            )
+            .focusNode!
+            .requestFocus();
+        await tester.pump();
+      }
+
+      String? focusedLabel() => FocusManager.instance.primaryFocus?.debugLabel;
+
+      for (final (tabLabel, tabIndex, title) in [
+        ('All', 0, 'The Matrix'),
+        ('Movies', 2, 'The Matrix'),
+      ]) {
+        testWidgets('Up from the top row of $tabLabel reaches the tab bar', (
+          tester,
+        ) async {
+          await tester.pumpWidget(
+            _TestApp(catalogRepository: testRepo, dpad: true),
+          );
+          await tester.pumpAndSettle();
+          await tester.enterText(find.byType(TextField), 'matrix');
+          await tester.pumpAndSettle();
+          if (tabIndex != 0) {
+            await tester.tap(
+              find.descendant(
+                of: find.byType(DpadTabBar),
+                matching: find.text(tabLabel),
+              ),
+            );
+            await tester.pumpAndSettle();
+          }
+
+          await focusCard(tester, title);
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+          await tester.pumpAndSettle();
+
+          expect(focusedLabel(), 'DpadTabBar tab $tabIndex');
+        });
+      }
+
+      testWidgets('Down from the tab bar enters the All rows', (tester) async {
+        await tester.pumpWidget(
+          _TestApp(catalogRepository: testRepo, dpad: true),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'matrix');
+        await tester.pumpAndSettle();
+
+        tester.state<DpadTabBarState>(find.byType(DpadTabBar)).requestFocus();
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        await tester.pumpAndSettle();
+
+        expect(
+          FocusManager.instance.primaryFocus?.context
+              ?.findAncestorWidgetOfExactType<MediaPreviewCard>(),
+          isNotNull,
+        );
+      });
+
+      testWidgets('Right at the end of a row does not page to the next tab', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          _TestApp(catalogRepository: testRepo, dpad: true),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'matrix');
+        await tester.pumpAndSettle();
+
+        await focusCard(tester, 'Matrix Reloaded');
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pumpAndSettle();
+
+        // No swipeable page above the results for a focused card's reveal
+        // to nudge toward the next tab.
+        expect(
+          find.ancestor(
+            of: find.text('Matrix Reloaded'),
+            matching: find.byType(PageView),
+          ),
+          findsNothing,
+        );
+        expect(find.text('Matrix Reloaded'), findsOneWidget);
+      });
+    });
+
     group('EPG show search', () {
       // Now/future-relative fixtures: `airingNow` must be within [start,
       // end]; `recentEpisodes` for the Upcoming row must be in the future.
@@ -755,6 +856,8 @@ void main() {
           subtitle: 'Kyle & Karisma',
           status: DvrRecordingStatus.completed,
           channelName: 'MTV',
+          channelIconUrl: 'http://example.com/mtv.png',
+          posterUrl: 'http://example.com/catfish-poster.jpg',
           seasonNumber: 6,
           episodeNumber: 7,
           streamUrl: 'http://example.com/dvr/done-1.ts',
@@ -770,6 +873,7 @@ void main() {
           title: 'Evening Report',
           status: DvrRecordingStatus.completed,
           channelName: 'Catfish Network',
+          channelIconUrl: 'http://example.com/catfish-network.png',
           streamUrl: 'http://example.com/dvr/done-2.ts',
         ),
       ];
@@ -827,6 +931,108 @@ void main() {
         },
       );
 
+      testWidgets(
+        'recordings show their library poster, or the channel logo before one exists',
+        (tester) async {
+          await tester.pumpWidget(
+            _TestApp(
+              catalogRepository: testRepo,
+              hasDvrFeature: true,
+              dvrRecordings: recordings,
+              onRecordingPlay: (_) {},
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.enterText(find.byType(TextField), 'catfish');
+          await tester.pumpAndSettle();
+
+          MediaPreviewItem itemFor(String title) => tester
+              .widget<MediaPreviewCard>(
+                find.ancestor(
+                  of: find.text(title),
+                  matching: find.byType(MediaPreviewCard),
+                ),
+              )
+              .item;
+
+          final poster = itemFor('Catfish: The TV Show');
+          expect(poster.imageUrl, 'http://example.com/catfish-poster.jpg');
+          expect(poster.imageFit, BoxFit.cover);
+          final logo = itemFor('Evening Report');
+          expect(logo.imageUrl, 'http://example.com/catfish-network.png');
+          expect(logo.imageFit, BoxFit.contain);
+        },
+      );
+
+      testWidgets(
+        'Up climbs back through All rows scrolled out of view, then to the tabs',
+        (tester) async {
+          // Short enough that the top rows leave the list's cache on the way
+          // down, so Up has to scroll them back in.
+          tester.view.physicalSize = const Size(1280, 520);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+
+          await tester.pumpWidget(
+            _TestApp(
+              catalogRepository: testRepo,
+              hasDvrFeature: true,
+              dvrRecordings: recordings,
+              onRecordingPlay: (_) {},
+              dpad: true,
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.enterText(find.byType(TextField), 'a');
+          await tester.pumpAndSettle();
+
+          final firstCard = find
+              .ancestor(
+                of: find.text('Catfish: The TV Show'),
+                matching: find.byType(DpadFocusable),
+              )
+              .first;
+          tester
+              .widget<Focus>(
+                find
+                    .descendant(of: firstCard, matching: find.byType(Focus))
+                    .first,
+              )
+              .focusNode!
+              .requestFocus();
+          await tester.pumpAndSettle();
+
+          // Recordings -> Live TV -> Movies -> Series.
+          for (var i = 0; i < 3; i++) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+            await tester.pumpAndSettle();
+          }
+          expect(find.text('Catfish: The TV Show'), findsNothing);
+
+          for (var i = 0; i < 3; i++) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+            await tester.pumpAndSettle();
+          }
+          final focused = FocusManager.instance.primaryFocus!.context!;
+          expect(
+            find.descendant(
+              of: find.byWidget(
+                focused.findAncestorWidgetOfExactType<MediaPreviewCard>()!,
+              ),
+              matching: find.text('Catfish: The TV Show'),
+            ),
+            findsOneWidget,
+          );
+
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+          await tester.pumpAndSettle();
+          expect(
+            FocusManager.instance.primaryFocus?.debugLabel,
+            'DpadTabBar tab 0',
+          );
+        },
+      );
+
       testWidgets('Recordings tab plays the selected recording', (
         tester,
       ) async {
@@ -875,6 +1081,7 @@ class _TestApp extends StatelessWidget {
     this.hasDvrFeature = false,
     this.dvrRecordings = const <DvrRecording>[],
     this.onRecordingPlay,
+    this.dpad = false,
   });
 
   final CatalogRepository catalogRepository;
@@ -897,6 +1104,9 @@ class _TestApp extends StatelessWidget {
   final List<DvrRecording> dvrRecordings;
   final void Function(PlayerArgs)? onRecordingPlay;
 
+  /// Wraps the app in [Dpad] so arrow keys use its directional traversal.
+  final bool dpad;
+
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
@@ -916,10 +1126,13 @@ class _TestApp extends StatelessWidget {
         ),
         hasDvrFeatureProvider.overrideWith((_) => hasDvrFeature),
         dvrRecordingsProvider.overrideWith((_) => dvrRecordings),
+        epgServiceProvider.overrideWith((_) => EpgService()),
+        recordingChannelIdsProvider.overrideWith((_) => const <int>{}),
       ],
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         theme: ThemeData.dark(useMaterial3: true),
+        builder: dpad ? (context, child) => Dpad(child: child!) : null,
         home: SearchScreen(
           onChannelSelect: onChannelSelect ?? (_) {},
           onChannelContextChanged: onChannelContextChanged == null

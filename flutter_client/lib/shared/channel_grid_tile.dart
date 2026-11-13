@@ -18,7 +18,7 @@ class ChannelGridTile extends StatelessWidget {
     required this.isRecording,
     required this.autofocus,
     required this.onTap,
-    required this.onLongPress,
+    this.onLongPress,
     super.key,
   });
 
@@ -32,7 +32,7 @@ class ChannelGridTile extends StatelessWidget {
   final bool isRecording;
   final bool autofocus;
   final VoidCallback onTap;
-  final VoidCallback onLongPress;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {

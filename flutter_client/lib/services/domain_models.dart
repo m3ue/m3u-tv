@@ -891,6 +891,7 @@ class DvrRecording {
     this.channelId,
     this.channelName,
     this.channelIconUrl,
+    this.posterUrl,
     this.scheduledStart,
     this.scheduledEnd,
     this.actualStart,
@@ -913,6 +914,10 @@ class DvrRecording {
   final int? channelId;
   final String? channelName;
   final String? channelIconUrl;
+
+  /// The library item's poster (the movie poster, or the series cover for
+  /// an episode). Null until the recording is added to the library.
+  final String? posterUrl;
   final DateTime? scheduledStart;
   final DateTime? scheduledEnd;
   final DateTime? actualStart;
@@ -962,6 +967,7 @@ class DvrRecording {
       channelIconUrl: _asNullableString(
         pick(['channel_icon', 'channel_logo', 'stream_icon']),
       ),
+      posterUrl: _asNullableString(pick(['poster', 'cover'])),
       scheduledStart: _asDateTimeOrNull(
         pick(['scheduled_start', 'start_time', 'starts_at']),
       ),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dpad/dpad.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:m3u_tv/features/epg/timeline_epg_view.dart' show EnsureEpg;
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
@@ -11,10 +12,12 @@ import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
+import 'package:m3u_tv/shared/channel_grid_tile.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/epg_show_results.dart';
 import 'package:m3u_tv/shared/epg_show_search_controller.dart';
 import 'package:m3u_tv/shared/formatters.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/show_search_results_view.dart';
 import 'package:material_ui/material_ui.dart';
@@ -26,12 +29,12 @@ import 'package:material_ui/material_ui.dart';
 /// a 100k-item library, not the expected case.
 const _searchResultLimit = 500;
 
-/// Search screen with client-side filtering across Live TV, Movies, and Series.
+/// Search across Live TV, Movies, Series and DVR recordings.
 ///
-/// Mirrors the RN SearchScreen behavior:
-/// - Case-insensitive name.includes(query) filtering
-/// - All / Live TV / Movies / Series tabs
-/// - Real-time filtering as user types
+/// - Case-insensitive name matching, re-run as the user types
+/// - All tab: Home-style rows of each kind's first matches
+/// - Live TV / Movies / Series / Recordings tabs: the same grids those
+///   screens use
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({
     super.key,
@@ -43,6 +46,8 @@ class SearchScreen extends ConsumerStatefulWidget {
     this.onSearchShows,
     this.onShowSelect,
     this.onRecordingPlay,
+    this.onEnsureEpg,
+    this.useSidebarLayout = false,
   });
 
   final void Function(Channel) onChannelSelect;
@@ -73,6 +78,14 @@ class SearchScreen extends ConsumerStatefulWidget {
   /// section in the All tab and in their own Recordings tab.
   final void Function(PlayerArgs)? onRecordingPlay;
 
+  /// Asks for EPG for channel results as their cards build, so the Live TV
+  /// cards can show what's on.
+  final EnsureEpg? onEnsureEpg;
+
+  /// Whether the screen sits beside `AppShell`'s sidebar rail, which the
+  /// All tab's rows size their cards around.
+  final bool useSidebarLayout;
+
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
@@ -86,6 +99,7 @@ const _searchDebounce = Duration(milliseconds: 200);
 class _SearchScreenState extends ConsumerState<SearchScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
+  final _tabBarKey = GlobalKey<DpadTabBarState>();
   String _query = '';
   String _appliedQuery = '';
   Timer? _debounce;
@@ -308,10 +322,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         if (mounted) setState(() {});
       },
     );
-    // Computed once per build and threaded through to both the All tab and
-    // the Live TV tab's ShowSearchResultsView - both are built eagerly by
-    // TabBarView on every keystroke, so without sharing this the On-Now/
-    // Upcoming grouping work ran twice per build.
+    // Shared by the All tab and the Live TV tab's ShowSearchResultsView, so
+    // the On Now/Upcoming grouping runs once per build whichever is showing.
     final showResult = _showSearchActive
         ? buildShowResultEntries(_showSearchController.results, channelsById)
         : null;
@@ -328,9 +340,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
             ),
           ),
           DpadTabBar(
+            key: _tabBarKey,
             controller: _tabController,
             tabs: [
-              'All',
+              AppLocalizations.of(context).liveTvSearchFilterAll,
               AppLocalizations.of(context).searchSectionLiveTv,
               AppLocalizations.of(context).searchSectionMovies,
               AppLocalizations.of(context).searchSectionSeries,
@@ -338,23 +351,34 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                 AppLocalizations.of(context).searchSectionRecordings,
             ],
           ),
+          // Only the selected tab, not a TabBarView: D-pad focus reveals a
+          // card in every scrollable above it, so a card near the side edge
+          // nudged TabBarView's PageView toward the next tab and it bounced
+          // back. Tabs switch from the tab bar alone.
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildAllTab(
-                  filteredChannels,
-                  filteredVodItems,
-                  filteredSeries,
-                  recordingResults,
-                  channelsById,
-                  showResult,
-                ),
-                _buildLiveTvTab(filteredChannels, channelsById, showResult),
-                _buildMoviesTab(filteredVodItems),
-                _buildSeriesTab(filteredSeries),
-                if (showRecordings) _buildRecordingsTab(recordingResults),
-              ],
+            child: AnimatedBuilder(
+              animation: _tabController,
+              builder: (context, _) => KeyedSubtree(
+                key: ValueKey(_tabController.index),
+                child: switch (_tabController.index) {
+                  0 => _buildAllTab(
+                    filteredChannels,
+                    filteredVodItems,
+                    filteredSeries,
+                    recordingResults,
+                    channelsById,
+                    showResult,
+                  ),
+                  _liveTvTabIndex => _buildLiveTvTab(
+                    filteredChannels,
+                    channelsById,
+                    showResult,
+                  ),
+                  _moviesTabIndex => _buildMoviesTab(filteredVodItems),
+                  _seriesTabIndex => _buildSeriesTab(filteredSeries),
+                  _ => _buildRecordingsTab(recordingResults),
+                },
+              ),
             ),
           ),
         ],
@@ -362,6 +386,40 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     );
   }
 
+  /// Left opens the sidebar; Up from the top of a tab's content goes to the
+  /// selected tab, which sits outside the content's D-pad regions.
+  void _handleContentEdge(TraversalDirection direction) {
+    if (direction == TraversalDirection.left) {
+      widget.onSidebarActivate?.call();
+    } else if (direction == TraversalDirection.up) {
+      _tabBarKey.currentState?.requestFocusFromContent();
+    }
+  }
+
+  /// Up from the All tab's first row. Not [_handleContentEdge]: that pages
+  /// the focused card's scrollable up first, which for a row is the row's
+  /// own horizontal list.
+  void _focusSelectedTab() => _tabBarKey.currentState?.requestFocus();
+
+  void _selectChannel(List<Channel> channels, Channel channel) {
+    widget.onChannelContextChanged?.call(ListChannelContext(channels));
+    widget.onChannelSelect(channel);
+  }
+
+  /// A row's last card, opening its tab, when the row can't show every
+  /// match.
+  MediaPreviewItem? _viewAllItem(int matchCount, int tabIndex) {
+    if (matchCount <= MediaPreviewSection.maxVisibleItems) return null;
+    return MediaPreviewItem(
+      title: AppLocalizations.of(context).homeViewAll,
+      fallbackIcon: Icons.arrow_forward,
+      onTap: () => _tabController.animateTo(tabIndex),
+    );
+  }
+
+  /// The All tab: one Home-style row per kind of match, each showing its
+  /// first [MediaPreviewSection.maxVisibleItems] and ending in a View All
+  /// card that opens that kind's tab.
   Widget _buildAllTab(
     List<Channel> channels,
     List<VodItem> vodItems,
@@ -371,7 +429,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     ShowResultEntries? showResult,
   ) {
     if (!_hasQuery) return _buildPromptState();
-    final languageTag = Localizations.localeOf(context).toLanguageTag();
     final onNowEntries = showResult?.onNow ?? const <ShowResultEntry>[];
     final upcomingEntries = showResult?.upcoming ?? const <ShowResultEntry>[];
     final onNowChannels = showResult?.onNowChannels ?? const <Channel>[];
@@ -389,84 +446,130 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     }
 
     final l = AppLocalizations.of(context);
-    // Flatten every section into one addressable row list so the whole tab
-    // scrolls through a single lazy ListView.builder. The previous
-    // `ListView(children: [...maps])` mounted every match at once - hundreds
-    // of ListTiles, each firing a network image request - the instant a
-    // broad query landed. Entries are either a section-title String or a
-    // domain object; the builder switches on the runtime type.
-    final rows = <Object>[
-      if (onNowEntries.isNotEmpty) ...[l.liveTvOnNow, ...onNowEntries],
-      if (upcomingEntries.isNotEmpty) ...[
-        l.liveTvUpcomingAirings,
-        ...upcomingEntries,
-      ],
-      if (recordings.isNotEmpty) ...[
-        l.searchSectionRecordings,
-        ...recordings,
-      ],
-      if (channels.isNotEmpty) ...[l.searchSectionLiveTv, ...channels],
-      if (vodItems.isNotEmpty) ...[l.searchSectionMovies, ...vodItems],
-      if (seriesList.isNotEmpty) ...[l.searchSectionSeries, ...seriesList],
-    ];
+    final languageTag = Localizations.localeOf(context).toLanguageTag();
+    final useSidebarLayout = widget.useSidebarLayout;
+    final onSidebarActivate = widget.onSidebarActivate;
+    const visible = MediaPreviewSection.maxVisibleItems;
 
-    return DpadRegion(
-      memoryKey: 'search/all',
-      horizontalEdge: DpadEdgeBehavior.stop,
-      onEdge: (direction) {
-        if (direction == TraversalDirection.left) {
-          widget.onSidebarActivate?.call();
-        }
-      },
-      child: ListView.builder(
-        itemCount: rows.length,
-        itemBuilder: (context, index) {
-          final row = rows[index];
-          if (row is String) return _SectionHeader(title: row);
-          if (row is ShowResultEntry) {
-            return ShowResultRow(
-              entry: row,
-              channel: channelsById[row.channelId],
-              onNowChannels: onNowChannels,
-              onChannelSelect: widget.onChannelSelect,
-              onChannelContextChanged: widget.onChannelContextChanged,
-              onShowSelect: widget.onShowSelect,
-              languageTag: languageTag,
-            );
-          }
-          if (row is DvrRecording) {
-            return _RecordingListTile(
-              recording: row,
-              onTap: () =>
-                  widget.onRecordingPlay?.call(PlayerArgs.dvrRecording(row)),
-            );
-          }
-          if (row is Channel) {
-            return _ChannelListTile(
-              channel: row,
-              onTap: () {
-                widget.onChannelContextChanged?.call(
-                  ListChannelContext(channels),
-                );
-                widget.onChannelSelect(row);
-              },
-            );
-          }
-          if (row is VodItem) {
-            return _VodListTile(
-              item: row,
-              onTap: () => widget.onVodSelect(row),
-            );
-          }
-          if (row is Series) {
-            return _SeriesListTile(
-              item: row,
-              onTap: () => widget.onSeriesSelect(row),
-            );
-          }
-          assert(false, 'Unhandled search row type: ${row.runtimeType}');
-          return const SizedBox.shrink();
-        },
+    // On Now rows play their channel, so ones whose channel isn't in the
+    // catalog have nothing to open and are left out.
+    final onNowItems = <MediaPreviewItem>[];
+    var onNowCount = 0;
+    for (final entry in onNowEntries) {
+      final channel = channelsById[entry.channelId];
+      if (channel == null) continue;
+      onNowCount += 1;
+      if (onNowItems.length < visible) {
+        onNowItems.add(
+          _showResultItem(
+            entry,
+            channel,
+            languageTag,
+            onTap: () => _selectChannel(onNowChannels, channel),
+          ),
+        );
+      }
+    }
+
+    // The first row takes Up to the selected tab; later rows move focus to
+    // the row above.
+    final rows = <Widget Function(VoidCallback? onTopEdge)>[
+      if (onNowItems.isNotEmpty)
+        (onTopEdge) => MediaPreviewSection(
+          title: l.liveTvOnNow,
+          titleIcon: Icons.play_circle_outline,
+          emptyLabel: l.searchNoResults,
+          items: onNowItems,
+          viewAll: _viewAllItem(onNowCount, _liveTvTabIndex),
+          useSidebarLayout: useSidebarLayout,
+          onSidebarActivate: onSidebarActivate,
+          onTopEdge: onTopEdge,
+        ),
+      if (upcomingEntries.isNotEmpty)
+        (onTopEdge) => MediaPreviewSection(
+          title: l.liveTvUpcomingAirings,
+          titleIcon: Icons.schedule,
+          emptyLabel: l.searchNoResults,
+          items: [
+            for (final entry in upcomingEntries.take(visible))
+              _showResultItem(
+                entry,
+                channelsById[entry.channelId],
+                languageTag,
+                onTap: () => widget.onShowSelect?.call(entry.show),
+              ),
+          ],
+          viewAll: _viewAllItem(upcomingEntries.length, _liveTvTabIndex),
+          useSidebarLayout: useSidebarLayout,
+          onSidebarActivate: onSidebarActivate,
+          onTopEdge: onTopEdge,
+        ),
+      if (recordings.isNotEmpty)
+        (onTopEdge) => MediaPreviewSection(
+          title: l.searchSectionRecordings,
+          titleIcon: Icons.video_library,
+          emptyLabel: l.searchNoResults,
+          posterStyle: true,
+          items: [
+            for (final recording in recordings.take(visible))
+              _recordingItem(recording),
+          ],
+          viewAll: _viewAllItem(recordings.length, _recordingsTabIndex),
+          useSidebarLayout: useSidebarLayout,
+          onSidebarActivate: onSidebarActivate,
+          onTopEdge: onTopEdge,
+        ),
+      if (channels.isNotEmpty)
+        (onTopEdge) => _ChannelResultsRow(
+          title: l.searchSectionLiveTv,
+          channels: channels,
+          viewAll: _viewAllItem(channels.length, _liveTvTabIndex),
+          onChannelTap: (channel) => _selectChannel(channels, channel),
+          onEnsureEpg: widget.onEnsureEpg,
+          useSidebarLayout: useSidebarLayout,
+          onSidebarActivate: onSidebarActivate,
+          onTopEdge: onTopEdge,
+        ),
+      if (vodItems.isNotEmpty)
+        (onTopEdge) => MediaPreviewSection(
+          title: l.searchSectionMovies,
+          titleIcon: Icons.movie,
+          emptyLabel: l.searchNoResults,
+          posterStyle: true,
+          items: [
+            for (final item in vodItems.take(visible)) _vodItem(item),
+          ],
+          viewAll: _viewAllItem(vodItems.length, _moviesTabIndex),
+          useSidebarLayout: useSidebarLayout,
+          onSidebarActivate: onSidebarActivate,
+          onTopEdge: onTopEdge,
+        ),
+      if (seriesList.isNotEmpty)
+        (onTopEdge) => MediaPreviewSection(
+          title: l.searchSectionSeries,
+          titleIcon: Icons.tv,
+          emptyLabel: l.searchNoResults,
+          posterStyle: true,
+          items: [
+            for (final series in seriesList.take(visible)) _seriesItem(series),
+          ],
+          viewAll: _viewAllItem(seriesList.length, _seriesTabIndex),
+          useSidebarLayout: useSidebarLayout,
+          onSidebarActivate: onSidebarActivate,
+          onTopEdge: onTopEdge,
+        ),
+    ];
+    // Its own focus scope keeps the tab bar out of reach of Up between rows:
+    // with the row above scrolled out of the list's cache, the tabs were the
+    // nearest thing above, so Up jumped there instead of scrolling the row
+    // back in. Inside the scope dpad scrolls up and retries instead.
+    return FocusScope(
+      child: ListView(
+        padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
+        children: [
+          for (var index = 0; index < rows.length; index++)
+            rows[index](index == 0 ? _focusSelectedTab : null),
+        ],
       ),
     );
   }
@@ -477,10 +580,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     ShowResultEntries? showResult,
   ) {
     if (!_hasQuery) return _buildPromptState();
-    // When the EPG show search is active, fully replace the channel-tile
-    // list with the same All/On-Now/Upcoming sub-tab view LiveTvScreen
-    // uses - mirrors LiveTvScreen exactly because (like Live TV) this tab
-    // has nothing else to show once a show search fires.
+    // When the EPG show search is active, fully replace the channel grid
+    // with the same All/On-Now/Upcoming sub-tab view LiveTvScreen uses -
+    // mirrors LiveTvScreen exactly because (like Live TV) this tab has
+    // nothing else to show once a show search fires.
     if (_showSearchActive) {
       return ShowSearchResultsView(
         shows: _showSearchController.results,
@@ -491,11 +594,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         onChannelContextChanged: widget.onChannelContextChanged,
         onShowSelect: widget.onShowSelect,
         memoryKeyPrefix: 'search/live-tv/search-results',
-        onEdge: (direction) {
-          if (direction == TraversalDirection.left) {
-            widget.onSidebarActivate?.call();
-          }
-        },
+        onEdge: _handleContentEdge,
         resetTabsToken: _showSearchController.searchSessionId,
         precomputedResult: showResult,
       );
@@ -503,25 +602,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     if (channels.isEmpty) {
       return _buildEmptyState(AppLocalizations.of(context).searchNoResults);
     }
-    return DpadRegion(
-      memoryKey: 'search/live-tv',
-      horizontalEdge: DpadEdgeBehavior.stop,
-      onEdge: (direction) {
-        if (direction == TraversalDirection.left) {
-          widget.onSidebarActivate?.call();
-        }
-      },
-      child: ListView.builder(
-        itemCount: channels.length,
-        itemBuilder: (context, index) => _ChannelListTile(
-          channel: channels[index],
-          autofocus: index == 0,
-          onTap: () {
-            widget.onChannelContextChanged?.call(ListChannelContext(channels));
-            widget.onChannelSelect(channels[index]);
-          },
-        ),
-      ),
+    return _ChannelResultsGrid(
+      channels: channels,
+      onChannelTap: (channel) => _selectChannel(channels, channel),
+      onEnsureEpg: widget.onEnsureEpg,
+      onEdge: _handleContentEdge,
     );
   }
 
@@ -530,22 +615,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     if (vodItems.isEmpty) {
       return _buildEmptyState(AppLocalizations.of(context).searchNoResults);
     }
-    return DpadRegion(
+    return _buildPosterGrid(
       memoryKey: 'search/movies',
-      horizontalEdge: DpadEdgeBehavior.stop,
-      onEdge: (direction) {
-        if (direction == TraversalDirection.left) {
-          widget.onSidebarActivate?.call();
-        }
-      },
-      child: ListView.builder(
-        itemCount: vodItems.length,
-        itemBuilder: (context, index) => _VodListTile(
-          item: vodItems[index],
-          autofocus: index == 0,
-          onTap: () => widget.onVodSelect(vodItems[index]),
-        ),
-      ),
+      itemCount: vodItems.length,
+      itemAt: (index) => _vodItem(vodItems[index]),
     );
   }
 
@@ -554,22 +627,47 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     if (seriesList.isEmpty) {
       return _buildEmptyState(AppLocalizations.of(context).searchNoResults);
     }
-    return DpadRegion(
+    return _buildPosterGrid(
       memoryKey: 'search/series',
-      horizontalEdge: DpadEdgeBehavior.stop,
-      onEdge: (direction) {
-        if (direction == TraversalDirection.left) {
-          widget.onSidebarActivate?.call();
-        }
+      itemCount: seriesList.length,
+      itemAt: (index) => _seriesItem(seriesList[index]),
+    );
+  }
+
+  /// The Movies and Series pages' poster grid.
+  Widget _buildPosterGrid({
+    required String memoryKey,
+    required int itemCount,
+    required MediaPreviewItem Function(int index) itemAt,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columnCount = posterGridColumnCount(
+          constraints.maxWidth - MediaBrowsingMetrics.contentPadding * 2,
+          FontSizeScope.scaleOf(context),
+        );
+        return DpadRegion(
+          memoryKey: memoryKey,
+          horizontalEdge: DpadEdgeBehavior.stop,
+          upEdge: DpadEdgeBehavior.stop,
+          onEdge: _handleContentEdge,
+          child: ScrollbarGridView(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columnCount,
+              childAspectRatio: 0.6,
+              mainAxisSpacing: MediaBrowsingMetrics.itemGap,
+              crossAxisSpacing: MediaBrowsingMetrics.itemGap,
+            ),
+            itemCount: itemCount,
+            itemBuilder: (context, index) => MediaPreviewCard(
+              item: itemAt(index),
+              posterStyle: true,
+              keepAlive: false,
+              autofocus: index == 0,
+            ),
+          ),
+        );
       },
-      child: ListView.builder(
-        itemCount: seriesList.length,
-        itemBuilder: (context, index) => _SeriesListTile(
-          item: seriesList[index],
-          autofocus: index == 0,
-          onTap: () => widget.onSeriesSelect(seriesList[index]),
-        ),
-      ),
     );
   }
 
@@ -578,24 +676,96 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     if (recordings.isEmpty) {
       return _buildEmptyState(AppLocalizations.of(context).searchNoResults);
     }
-    return DpadRegion(
+    return _buildPosterGrid(
       memoryKey: 'search/recordings',
-      horizontalEdge: DpadEdgeBehavior.stop,
-      onEdge: (direction) {
-        if (direction == TraversalDirection.left) {
-          widget.onSidebarActivate?.call();
-        }
-      },
-      child: ListView.builder(
-        itemCount: recordings.length,
-        itemBuilder: (context, index) => _RecordingListTile(
-          recording: recordings[index],
-          autofocus: index == 0,
-          onTap: () => widget.onRecordingPlay?.call(
-            PlayerArgs.dvrRecording(recordings[index]),
-          ),
-        ),
-      ),
+      itemCount: recordings.length,
+      itemAt: (index) => _recordingItem(recordings[index]),
+    );
+  }
+
+  MediaPreviewItem _vodItem(VodItem item) {
+    final rating = item.rating;
+    return MediaPreviewItem(
+      title: item.name,
+      imageUrl: item.logoUrl,
+      subtitle: item.year,
+      ratingLabel: rating == null ? null : formatRating(rating),
+      fallbackIcon: Icons.movie,
+      onTap: () => widget.onVodSelect(item),
+    );
+  }
+
+  MediaPreviewItem _seriesItem(Series series) {
+    final rating = series.rating;
+    return MediaPreviewItem(
+      title: series.name,
+      imageUrl: series.coverUrl,
+      subtitle: series.year,
+      ratingLabel: rating == null ? null : formatRating(rating),
+      fallbackIcon: Icons.tv,
+      onTap: () => widget.onSeriesSelect(series),
+    );
+  }
+
+  MediaPreviewItem _recordingItem(DvrRecording recording) {
+    final season = recording.seasonNumber;
+    final episode = recording.episodeNumber;
+    final details = [
+      if (season != null && episode != null)
+        'S${season.toString().padLeft(2, '0')}E${episode.toString().padLeft(2, '0')}',
+      ?nullIfBlank(recording.subtitle),
+      ?nullIfBlank(recording.channelName),
+    ];
+    // Library recordings have a poster (the movie's, or the series cover);
+    // ones still recording or not yet added show their channel's logo.
+    final posterUrl = recording.posterUrl;
+    return MediaPreviewItem(
+      title: recording.title,
+      subtitle: details.isEmpty ? null : details.join(' · '),
+      imageUrl: posterUrl ?? recording.channelIconUrl,
+      imageFit: posterUrl == null ? BoxFit.contain : BoxFit.cover,
+      fallbackIcon: Icons.video_library,
+      // Same corner badge the poster cards use for favorites, in red while
+      // the recording is still in progress.
+      cornerBadgeIcon: recording.isInProgress
+          ? Icons.fiber_manual_record
+          : null,
+      cornerBadgeColor: recording.isInProgress
+          ? Theme.of(context).colorScheme.error
+          : null,
+      onTap: () =>
+          widget.onRecordingPlay?.call(PlayerArgs.dvrRecording(recording)),
+    );
+  }
+
+  /// An On Now or Upcoming show as a preview card: the channel's logo, the
+  /// show, and when it airs at title weight so it reads from the couch.
+  MediaPreviewItem _showResultItem(
+    ShowResultEntry entry,
+    Channel? channel,
+    String languageTag, {
+    required VoidCallback onTap,
+  }) {
+    final l = AppLocalizations.of(context);
+    final firstEpisode = entry.episodes.first;
+    final String? subtitle;
+    if (entry.isOnNow) {
+      subtitle = formatOnNowSubtitle(firstEpisode, firstEpisode.channelName);
+    } else {
+      final moreAirings = entry.episodes.length - 1;
+      subtitle = [
+        ?nullIfBlank(firstEpisode.channelName),
+        if (moreAirings > 0) l.liveTvMoreAirings(moreAirings),
+      ].join(' · ');
+    }
+    return MediaPreviewItem(
+      title: entry.show.displayTitle,
+      imageUrl: channel?.logoUrl,
+      imageFit: BoxFit.contain,
+      fallbackIcon: Icons.tv,
+      emphasisLabel: showResultAiringLabel(entry, languageTag, l),
+      subtitle: subtitle,
+      onTap: onTap,
     );
   }
 
@@ -606,161 +776,116 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       Center(child: Text(label, style: Theme.of(context).textTheme.bodyLarge));
 }
 
-/// Live TV, Movies and Series; Recordings is added on top when DVR is on.
+/// All, Live TV, Movies and Series; Recordings is added on top when DVR is
+/// on.
 const _baseTabCount = 4;
+const _liveTvTabIndex = 1;
+const _moviesTabIndex = 2;
+const _seriesTabIndex = 3;
+const _recordingsTabIndex = 4;
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title});
+/// The All tab's Live TV row: the Home Live TV row's card (logo, current
+/// programme and its progress). Watches the EPG on its own so a guide update
+/// rebuilds just this row, not the whole search screen.
+class _ChannelResultsRow extends ConsumerWidget {
+  const _ChannelResultsRow({
+    required this.title,
+    required this.channels,
+    required this.viewAll,
+    required this.onChannelTap,
+    required this.onEnsureEpg,
+    required this.useSidebarLayout,
+    required this.onSidebarActivate,
+    required this.onTopEdge,
+  });
+
   final String title;
+  final List<Channel> channels;
+  final MediaPreviewItem? viewAll;
+  final ValueChanged<Channel> onChannelTap;
+  final EnsureEpg? onEnsureEpg;
+  final bool useSidebarLayout;
+  final VoidCallback? onSidebarActivate;
+  final VoidCallback? onTopEdge;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Text(
-        title,
-        style: Theme.of(
-          context,
-        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-}
-
-class _ChannelListTile extends StatelessWidget {
-  const _ChannelListTile({
-    required this.channel,
-    required this.onTap,
-    this.autofocus = false,
-  });
-  final Channel channel;
-  final VoidCallback onTap;
-  final bool autofocus;
-
-  @override
-  Widget build(BuildContext context) {
-    return DpadFocusable(
-      autofocus: autofocus,
-      onSelect: onTap,
-      child: ListTile(
-        leading: ResilientMediaImage(
-          imageUrl: channel.logoUrl,
-          fallbackIcon: Icons.tv,
-          width: MediaBrowsingMetrics.logoSize,
-          height: MediaBrowsingMetrics.logoSize,
-          fit: BoxFit.contain,
-          oversample: 2,
-        ),
-        title: Text(channel.name),
-        onTap: onTap,
-      ),
-    );
-  }
-}
-
-class _VodListTile extends StatelessWidget {
-  const _VodListTile({
-    required this.item,
-    required this.onTap,
-    this.autofocus = false,
-  });
-  final VodItem item;
-  final VoidCallback onTap;
-  final bool autofocus;
-
-  @override
-  Widget build(BuildContext context) {
-    return DpadFocusable(
-      autofocus: autofocus,
-      onSelect: onTap,
-      child: ListTile(
-        leading: ResilientMediaImage(
-          imageUrl: item.logoUrl,
-          fallbackIcon: Icons.movie,
-          width: MediaBrowsingMetrics.logoSize,
-          height: MediaBrowsingMetrics.logoSize,
-          fit: BoxFit.contain,
-          oversample: 2,
-        ),
-        title: Text(item.name),
-        subtitle: item.rating != null ? Text(formatRating(item.rating!)) : null,
-        onTap: onTap,
-      ),
-    );
-  }
-}
-
-class _SeriesListTile extends StatelessWidget {
-  const _SeriesListTile({
-    required this.item,
-    required this.onTap,
-    this.autofocus = false,
-  });
-  final Series item;
-  final VoidCallback onTap;
-  final bool autofocus;
-
-  @override
-  Widget build(BuildContext context) {
-    return DpadFocusable(
-      autofocus: autofocus,
-      onSelect: onTap,
-      child: ListTile(
-        leading: ResilientMediaImage(
-          imageUrl: item.coverUrl,
-          fallbackIcon: Icons.tv,
-          width: MediaBrowsingMetrics.logoSize,
-          height: MediaBrowsingMetrics.logoSize,
-          fit: BoxFit.contain,
-          oversample: 2,
-        ),
-        title: Text(item.name),
-        subtitle: item.rating != null ? Text(formatRating(item.rating!)) : null,
-        onTap: onTap,
-      ),
-    );
-  }
-}
-
-class _RecordingListTile extends StatelessWidget {
-  const _RecordingListTile({
-    required this.recording,
-    required this.onTap,
-    this.autofocus = false,
-  });
-  final DvrRecording recording;
-  final VoidCallback onTap;
-  final bool autofocus;
-
-  @override
-  Widget build(BuildContext context) {
-    final season = recording.seasonNumber;
-    final episode = recording.episodeNumber;
-    final details = [
-      if (season != null && episode != null)
-        'S${season.toString().padLeft(2, '0')}E${episode.toString().padLeft(2, '0')}',
-      ?nullIfBlank(recording.subtitle),
-      ?nullIfBlank(recording.channelName),
-    ];
-    return DpadFocusable(
-      autofocus: autofocus,
-      onSelect: onTap,
-      child: ListTile(
-        leading: SizedBox(
-          width: MediaBrowsingMetrics.logoSize,
-          height: MediaBrowsingMetrics.logoSize,
-          child: Icon(
-            recording.isInProgress
-                ? Icons.fiber_manual_record
-                : Icons.video_library,
-            color: recording.isInProgress
-                ? Theme.of(context).colorScheme.error
-                : null,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final epgService = ref.watch(epgServiceProvider);
+    final recordingChannelIds = ref.watch(recordingChannelIdsProvider);
+    return MediaPreviewSection.builder(
+      title: title,
+      titleIcon: Icons.live_tv,
+      emptyLabel: AppLocalizations.of(context).searchNoResults,
+      viewAll: viewAll,
+      itemCount: channels.length,
+      baseCardWidth: ChannelGridTile.baseWidth,
+      baseCardHeight: ChannelGridTile.baseHeight,
+      itemBuilder: (context, index, cardSize, {required autofocus}) {
+        final channel = channels[index];
+        onEnsureEpg?.call([channel]);
+        return SizedBox.fromSize(
+          size: cardSize,
+          child: ChannelGridTile(
+            channel: channel,
+            epg: epgService.lookupForChannel(channel),
+            isFavorite: false,
+            isRecording: recordingChannelIds.contains(channel.id),
+            autofocus: autofocus,
+            onTap: () => onChannelTap(channel),
           ),
+        );
+      },
+      useSidebarLayout: useSidebarLayout,
+      onSidebarActivate: onSidebarActivate,
+      onTopEdge: onTopEdge,
+    );
+  }
+}
+
+/// The Live TV tab: Live TV's Grid view over the matching channels.
+class _ChannelResultsGrid extends ConsumerWidget {
+  const _ChannelResultsGrid({
+    required this.channels,
+    required this.onChannelTap,
+    required this.onEnsureEpg,
+    required this.onEdge,
+  });
+
+  final List<Channel> channels;
+  final ValueChanged<Channel> onChannelTap;
+  final EnsureEpg? onEnsureEpg;
+  final ValueChanged<TraversalDirection> onEdge;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final epgService = ref.watch(epgServiceProvider);
+    final recordingChannelIds = ref.watch(recordingChannelIdsProvider);
+    final scale = FontSizeScope.scaleOf(context);
+    return DpadRegion(
+      memoryKey: 'search/live-tv',
+      horizontalEdge: DpadEdgeBehavior.stop,
+      upEdge: DpadEdgeBehavior.stop,
+      onEdge: onEdge,
+      child: ScrollbarGridView(
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: ChannelGridTile.baseWidth * scale,
+          mainAxisExtent: ChannelGridTile.baseHeight * scale,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
         ),
-        title: Text(recording.title),
-        subtitle: details.isEmpty ? null : Text(details.join(' · ')),
-        onTap: onTap,
+        itemCount: channels.length,
+        itemBuilder: (context, index) {
+          final channel = channels[index];
+          onEnsureEpg?.call([channel]);
+          return ChannelGridTile(
+            channel: channel,
+            epg: epgService.lookupForChannel(channel),
+            isFavorite: false,
+            isRecording: recordingChannelIds.contains(channel.id),
+            autofocus: index == 0,
+            onTap: () => onChannelTap(channel),
+          );
+        },
       ),
     );
   }

@@ -204,7 +204,7 @@ class ShowResultRow extends StatelessWidget {
     final String? subtitle;
     final String trailingText;
     if (entry.isOnNow) {
-      subtitle = _formatOnNowSubtitle(firstEpisode, channelName);
+      subtitle = formatOnNowSubtitle(firstEpisode, channelName);
       trailingText = l10n.liveTvAiringUntil(
         DateFormat.jm(languageTag).format(firstEpisode.endTime.toLocal()),
       );
@@ -212,7 +212,7 @@ class ShowResultRow extends StatelessWidget {
       subtitle = channelName;
       final times = <String>[];
       for (final episode in entry.episodes.take(3)) {
-        times.add(_formatUpcomingTime(episode.startTime, languageTag, l10n));
+        times.add(formatUpcomingAiring(episode.startTime, languageTag, l10n));
       }
       final remainder = entry.episodes.length - times.length;
       if (remainder > 0) {
@@ -313,7 +313,7 @@ class ShowResultRow extends StatelessWidget {
 ///
 /// Returns null (not empty string) when both are absent - empty string
 /// would render a phantom 11px row in the result row.
-String? _formatOnNowSubtitle(EpgShowEpisode episode, String? channelName) {
+String? formatOnNowSubtitle(EpgShowEpisode episode, String? channelName) {
   final ep = episode.subtitle;
   final hasEp = ep != null && ep.trim().isNotEmpty;
   final hasCh = channelName != null && channelName.trim().isNotEmpty;
@@ -323,7 +323,7 @@ String? _formatOnNowSubtitle(EpgShowEpisode episode, String? channelName) {
   return null;
 }
 
-String _formatUpcomingTime(
+String formatUpcomingAiring(
   DateTime startTime,
   String languageTag,
   AppLocalizations l10n,
@@ -337,4 +337,20 @@ String _formatUpcomingTime(
   if (sameDay(local, now)) return time;
   if (sameDay(local, tomorrow)) return l10n.liveTvAiringTomorrow(time);
   return DateFormat.MMMd(languageTag).add_jm().format(local);
+}
+
+/// The time a result card leads with: when an On Now airing ends, or when an
+/// Upcoming show next airs.
+String showResultAiringLabel(
+  ShowResultEntry entry,
+  String languageTag,
+  AppLocalizations l10n,
+) {
+  final firstEpisode = entry.episodes.first;
+  if (entry.isOnNow) {
+    return l10n.liveTvAiringUntil(
+      DateFormat.jm(languageTag).format(firstEpisode.endTime.toLocal()),
+    );
+  }
+  return formatUpcomingAiring(firstEpisode.startTime, languageTag, l10n);
 }

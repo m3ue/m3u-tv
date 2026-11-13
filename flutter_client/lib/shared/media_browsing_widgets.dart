@@ -49,6 +49,24 @@ class MediaBrowsingMetrics {
   static const double interstitialNavWidth = 200;
 }
 
+/// Columns for a vertical poster grid (the Movies/Series pages' layout): as
+/// few as keep each card at most [maxCardWidth] wide, but never so many that
+/// a card drops below [minCardWidth]. Both are unscaled; [scale] is
+/// `FontSizeScope.scaleOf`.
+int posterGridColumnCount(
+  double availableWidth,
+  double scale, {
+  double minCardWidth = 120,
+  double maxCardWidth = 220,
+}) {
+  const gap = MediaBrowsingMetrics.itemGap;
+  final minimumColumns = ((availableWidth + gap) / (maxCardWidth * scale + gap))
+      .ceil();
+  final maximumColumns = ((availableWidth + gap) / (minCardWidth * scale + gap))
+      .floor();
+  return minimumColumns.clamp(1, maximumColumns.clamp(1, 100));
+}
+
 /// Small icon + label header used above a detail-page row (Cast, Related).
 /// Mirrors [MediaPreviewSection]'s own title-row styling so a header reads
 /// consistently whether the row sits inside a preview section or a locked
@@ -1208,6 +1226,7 @@ class MediaPreviewSection extends StatefulWidget {
     this.viewAll,
     this.useSidebarLayout = false,
     this.onSidebarActivate,
+    this.onTopEdge,
     super.key,
   }) : itemCount = null,
        itemBuilder = null,
@@ -1231,6 +1250,7 @@ class MediaPreviewSection extends StatefulWidget {
     this.viewAll,
     this.useSidebarLayout = false,
     this.onSidebarActivate,
+    this.onTopEdge,
     super.key,
   }) : items = const [],
        posterStyle = false,
@@ -1263,6 +1283,11 @@ class MediaPreviewSection extends StatefulWidget {
   /// the full window width.
   final bool useSidebarLayout;
   final VoidCallback? onSidebarActivate;
+
+  /// Up pressed in this row. Null lets directional traversal move focus to
+  /// whatever sits above; a row under a tab bar sets this to land on the
+  /// selected tab instead.
+  final VoidCallback? onTopEdge;
 
   /// A preview row renders at most this many cards regardless of how many
   /// [items] it is handed. Callers building [items] from a large catalog
@@ -1407,9 +1432,14 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
                 child: DpadRegion(
                   memoryKey: 'preview-row/${widget.title}',
                   horizontalEdge: DpadEdgeBehavior.stop,
+                  upEdge: widget.onTopEdge == null
+                      ? null
+                      : DpadEdgeBehavior.stop,
                   onEdge: (direction) {
                     if (direction == TraversalDirection.left) {
                       widget.onSidebarActivate?.call();
+                    } else if (direction == TraversalDirection.up) {
+                      widget.onTopEdge?.call();
                     }
                   },
                   // No Scrollbar, matching the detail screens' episode + cast

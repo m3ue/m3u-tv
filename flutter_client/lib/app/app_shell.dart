@@ -1674,6 +1674,8 @@ class AppShellState extends ConsumerState<AppShell>
         onSearchShows: _dvrActions.searchEpgShows,
         onShowSelect: _openShow,
         onRecordingPlay: _openPlayerDirect,
+        onEnsureEpg: _appState.ensureEpgForChannels,
+        useSidebarLayout: shouldUseSidebar(widget.deviceType),
       ),
       RouteNames.liveTv => LiveTvScreen(
         favoritesService: _appState.favoritesService,
