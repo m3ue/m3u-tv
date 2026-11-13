@@ -440,6 +440,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get searchSectionSeries => 'Série';
 
   @override
+  String get searchSectionRecordings => 'Enregistrements';
+
+  @override
   String get vodSearchHint => 'Rechercher…';
 
   @override
@@ -1366,6 +1369,12 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get vodDirector => 'Réalisateur';
+
+  @override
+  String get vodRecorded => 'Enregistré';
+
+  @override
+  String get detailDvrBadge => 'DVR';
 
   @override
   String get castShowAll => 'Voir tout le casting';

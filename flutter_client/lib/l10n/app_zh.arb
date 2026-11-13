@@ -205,6 +205,7 @@
   "searchSectionLiveTv": "直播电视",
   "searchSectionMovies": "电影",
   "searchSectionSeries": "剧集",
+  "searchSectionRecordings": "录制",
   "vodSearchHint": "搜索…",
   "seriesSearchHint": "搜索…",
   "settingsTitle": "设置",
@@ -619,6 +620,8 @@
   "vodContinueMovie": "继续播放",
   "vodCast": "演员阵容",
   "vodDirector": "导演",
+  "vodRecorded": "录制时间",
+  "detailDvrBadge": "录像",
   "castShowAll": "查看全部演员",
   "vodTimeLeftMinutes": "{minutes, plural, other{还剩{minutes}分钟}}",
   "@vodTimeLeftMinutes": {

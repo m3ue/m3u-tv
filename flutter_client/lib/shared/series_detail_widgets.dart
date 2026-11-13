@@ -892,7 +892,7 @@ class EpisodeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final runtime = episode.duration;
+    final runtime = formatRuntimeText(episode.duration);
 
     if (!horizontal) {
       return _buildVertical(context, theme, colorScheme, runtime);
@@ -992,6 +992,11 @@ class EpisodeCard extends StatelessWidget {
                               context,
                               'S${episode.seasonNumber}E${episode.episodeNumber}',
                             ),
+                            if (episode.isDvrRecording)
+                              _pillText(
+                                context,
+                                AppLocalizations.of(context).detailDvrBadge,
+                              ),
                             if (episode.rating != null)
                               _pillText(
                                 context,
@@ -1073,6 +1078,7 @@ class EpisodeCard extends StatelessWidget {
     const thumbHeight = thumbWidth * 9 / 16;
     final metaParts = <String>[
       'S${episode.seasonNumber}E${episode.episodeNumber}',
+      if (episode.isDvrRecording) AppLocalizations.of(context).detailDvrBadge,
       if (episode.rating != null) formatRating(episode.rating!),
       if (runtime != null && runtime.isNotEmpty) runtime,
     ];

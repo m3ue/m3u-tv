@@ -431,6 +431,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchSectionSeries => '剧集';
 
   @override
+  String get searchSectionRecordings => '录制';
+
+  @override
   String get vodSearchHint => '搜索…';
 
   @override
@@ -1297,6 +1300,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vodDirector => '导演';
+
+  @override
+  String get vodRecorded => '录制时间';
+
+  @override
+  String get detailDvrBadge => '录像';
 
   @override
   String get castShowAll => '查看全部演员';

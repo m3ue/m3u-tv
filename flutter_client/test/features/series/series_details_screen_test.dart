@@ -180,6 +180,36 @@ void main() {
     expect(find.text('~45m'), findsOneWidget);
   });
 
+  testWidgets('tags a DVR series and its recorded episodes', (tester) async {
+    const info = SeriesInfo(
+      series: Series(id: 7, name: 'Recorded Show'),
+      seasons: [Season(number: 1, name: 'Season 1')],
+      isDvrRecording: true,
+      episodesBySeason: {
+        1: [
+          Episode(
+            id: '101',
+            episodeNumber: 1,
+            title: 'Recorded Episode',
+            containerExtension: 'ts',
+            seasonNumber: 1,
+            duration: '00:02:00',
+            streamUrl: 'http://example.com/s1/e1.ts',
+            isDvrRecording: true,
+          ),
+        ],
+      },
+    );
+
+    await tester.pumpWidget(_app(info));
+    await tester.pumpAndSettle();
+
+    // The series chip plus the episode card's pill.
+    expect(find.text('DVR'), findsNWidgets(2));
+    expect(find.text('2m'), findsOneWidget);
+    expect(find.text('00:02:00'), findsNothing);
+  });
+
   testWidgets('a bare-seconds duration reads as seconds, not minutes', (
     tester,
   ) async {

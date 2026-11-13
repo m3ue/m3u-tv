@@ -1206,6 +1206,7 @@ class XtreamService {
               releaseDate: episode.releaseDate,
               streamUrl: episode.streamUrl,
               edlUrl: episode.edlUrl,
+              isDvrRecording: episode.isDvrRecording,
             );
           })
           .toList(growable: false);
@@ -1225,6 +1226,7 @@ class XtreamService {
       series: series,
       seasons: resolvedSeasons,
       episodesBySeason: episodeMap,
+      isDvrRecording: _asMap(json['info'])['dvr_recording'] == true,
     );
   }
 

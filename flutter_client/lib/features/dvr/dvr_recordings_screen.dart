@@ -1206,27 +1206,8 @@ class _RecordingListState extends ConsumerState<_RecordingList> {
   }
 
   void _openRecording(DvrRecording recording) {
-    final playbackUrl = recording.playbackUrl;
-    if (playbackUrl == null || playbackUrl.isEmpty) return;
-    widget.onPlay(
-      PlayerArgs(
-        streamUrl: playbackUrl,
-        title: recording.title,
-        type: recording.isInProgress ? 'live' : 'vod',
-        metadata: <String, Object?>{
-          'dvr_uuid': recording.uuid,
-          'dvr_status': recording.status.name,
-          if (recording.subtitle != null) 'subtitle': recording.subtitle,
-          if (recording.channelName != null)
-            'channel_name': recording.channelName,
-          if (recording.seasonNumber != null)
-            'season_number': recording.seasonNumber,
-          if (recording.episodeNumber != null)
-            'episode_number': recording.episodeNumber,
-          if (recording.edlUrl != null) 'edl_url': recording.edlUrl,
-        },
-      ),
-    );
+    if (!recording.isPlayable) return;
+    widget.onPlay(PlayerArgs.dvrRecording(recording));
   }
 
   Future<void> _confirmStop(DvrRecording recording) async {

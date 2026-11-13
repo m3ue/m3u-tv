@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dpad/dpad.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
     show kCatalogKindLive, kCatalogKindSeries, kCatalogKindVod;
@@ -41,6 +42,7 @@ class SearchScreen extends ConsumerStatefulWidget {
     this.onSidebarActivate,
     this.onSearchShows,
     this.onShowSelect,
+    this.onRecordingPlay,
   });
 
   final void Function(Channel) onChannelSelect;
@@ -66,6 +68,11 @@ class SearchScreen extends ConsumerStatefulWidget {
   /// semantics depend on that channel-first path).
   final void Function(EpgShow)? onShowSelect;
 
+  /// Plays a matching DVR recording. When non-null and the DVR feature is
+  /// enabled, playable recordings matching the query show as a Recordings
+  /// section in the All tab and in their own Recordings tab.
+  final void Function(PlayerArgs)? onRecordingPlay;
+
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
@@ -77,7 +84,7 @@ class SearchScreen extends ConsumerStatefulWidget {
 const _searchDebounce = Duration(milliseconds: 200);
 
 class _SearchScreenState extends ConsumerState<SearchScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late TabController _tabController;
   String _query = '';
   String _appliedQuery = '';
@@ -92,13 +99,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   List<VodItem> _vodResults = const [];
   List<Series> _seriesResults = const [];
 
+  /// Memo keys for [_recordingResults]: re-filtered only when the recordings
+  /// list or [_appliedQuery] changes, not on every keystroke-driven rebuild.
+  List<DvrRecording>? _recordingResultsSource;
+  String? _recordingResultsFor;
+  List<DvrRecording> _recordingResults = const [];
+
   /// The On Now rows' channels, read from the catalog.
   final ShowResultChannelLookup _showResultChannels = ShowResultChannelLookup();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: _baseTabCount, vsync: this);
     _showSearchController.addListener(_onShowSearchChanged);
   }
 
@@ -189,6 +202,56 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     );
   }
 
+  /// Swaps in a controller with one more (or one fewer) tab when the
+  /// Recordings tab appears or disappears with the DVR feature. The old
+  /// controller is disposed after the frame, once the tab bar has let go of it.
+  void _syncTabCount(int length) {
+    if (_tabController.length == length) return;
+    final previous = _tabController;
+    _tabController = TabController(
+      length: length,
+      vsync: this,
+      initialIndex: previous.index.clamp(0, length - 1),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => previous.dispose());
+  }
+
+  /// Playable recordings whose title, episode title or channel name contains
+  /// the query: in-progress ones first, then the newest.
+  List<DvrRecording> _matchingRecordings(List<DvrRecording> recordings) {
+    if (identical(recordings, _recordingResultsSource) &&
+        _recordingResultsFor == _appliedQuery) {
+      return _recordingResults;
+    }
+    _recordingResultsSource = recordings;
+    _recordingResultsFor = _appliedQuery;
+    final query = _appliedQuery.trim().toLowerCase();
+    if (query.isEmpty) return _recordingResults = const [];
+    bool matches(String? value) =>
+        value != null && value.toLowerCase().contains(query);
+    final matching = recordings
+        .where(
+          (recording) =>
+              recording.isPlayable &&
+              (matches(recording.title) ||
+                  matches(recording.subtitle) ||
+                  matches(recording.channelName)),
+        )
+        .toList();
+    DateTime? airedAt(DvrRecording recording) =>
+        recording.actualStart ?? recording.scheduledStart;
+    matching.sort((a, b) {
+      if (a.isInProgress != b.isInProgress) return a.isInProgress ? -1 : 1;
+      final aStart = airedAt(a);
+      final bStart = airedAt(b);
+      if (aStart == null || bStart == null) {
+        return aStart == null ? (bStart == null ? 0 : 1) : -1;
+      }
+      return bStart.compareTo(aStart);
+    });
+    return _recordingResults = matching;
+  }
+
   /// Active when the EPG show search should render in place of (Live TV
   /// tab) or alongside (All tab) the synchronous channel-name filter.
   /// Mirrors `live_tv_screen.dart:764`'s `showSearchActive` condition.
@@ -223,6 +286,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         ),
       );
     }
+
+    final showRecordings =
+        widget.onRecordingPlay != null && ref.watch(hasDvrFeatureProvider);
+    _syncTabCount(_baseTabCount + (showRecordings ? 1 : 0));
+    final recordingResults = showRecordings
+        ? _matchingRecordings(ref.watch(dvrRecordingsProvider))
+        : const <DvrRecording>[];
 
     final repo = ref.watch(catalogRepositoryProvider);
     _ensureCatalogResults(repo);
@@ -264,6 +334,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
               AppLocalizations.of(context).searchSectionLiveTv,
               AppLocalizations.of(context).searchSectionMovies,
               AppLocalizations.of(context).searchSectionSeries,
+              if (showRecordings)
+                AppLocalizations.of(context).searchSectionRecordings,
             ],
           ),
           Expanded(
@@ -274,12 +346,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                   filteredChannels,
                   filteredVodItems,
                   filteredSeries,
+                  recordingResults,
                   channelsById,
                   showResult,
                 ),
                 _buildLiveTvTab(filteredChannels, channelsById, showResult),
                 _buildMoviesTab(filteredVodItems),
                 _buildSeriesTab(filteredSeries),
+                if (showRecordings) _buildRecordingsTab(recordingResults),
               ],
             ),
           ),
@@ -292,6 +366,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     List<Channel> channels,
     List<VodItem> vodItems,
     List<Series> seriesList,
+    List<DvrRecording> recordings,
     Map<int, Channel> channelsById,
     ShowResultEntries? showResult,
   ) {
@@ -307,6 +382,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     if (channels.isEmpty &&
         vodItems.isEmpty &&
         seriesList.isEmpty &&
+        recordings.isEmpty &&
         onNowEntries.isEmpty &&
         upcomingEntries.isEmpty) {
       return _buildEmptyState(AppLocalizations.of(context).searchNoResults);
@@ -324,6 +400,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       if (upcomingEntries.isNotEmpty) ...[
         l.liveTvUpcomingAirings,
         ...upcomingEntries,
+      ],
+      if (recordings.isNotEmpty) ...[
+        l.searchSectionRecordings,
+        ...recordings,
       ],
       if (channels.isNotEmpty) ...[l.searchSectionLiveTv, ...channels],
       if (vodItems.isNotEmpty) ...[l.searchSectionMovies, ...vodItems],
@@ -352,6 +432,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
               onChannelContextChanged: widget.onChannelContextChanged,
               onShowSelect: widget.onShowSelect,
               languageTag: languageTag,
+            );
+          }
+          if (row is DvrRecording) {
+            return _RecordingListTile(
+              recording: row,
+              onTap: () =>
+                  widget.onRecordingPlay?.call(PlayerArgs.dvrRecording(row)),
             );
           }
           if (row is Channel) {
@@ -486,12 +573,41 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     );
   }
 
+  Widget _buildRecordingsTab(List<DvrRecording> recordings) {
+    if (!_hasQuery) return _buildPromptState();
+    if (recordings.isEmpty) {
+      return _buildEmptyState(AppLocalizations.of(context).searchNoResults);
+    }
+    return DpadRegion(
+      memoryKey: 'search/recordings',
+      horizontalEdge: DpadEdgeBehavior.stop,
+      onEdge: (direction) {
+        if (direction == TraversalDirection.left) {
+          widget.onSidebarActivate?.call();
+        }
+      },
+      child: ListView.builder(
+        itemCount: recordings.length,
+        itemBuilder: (context, index) => _RecordingListTile(
+          recording: recordings[index],
+          autofocus: index == 0,
+          onTap: () => widget.onRecordingPlay?.call(
+            PlayerArgs.dvrRecording(recordings[index]),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPromptState() =>
       _buildEmptyState(AppLocalizations.of(context).searchTypeToSearch);
 
   Widget _buildEmptyState(String label) =>
       Center(child: Text(label, style: Theme.of(context).textTheme.bodyLarge));
 }
+
+/// Live TV, Movies and Series; Recordings is added on top when DVR is on.
+const _baseTabCount = 4;
 
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title});
@@ -600,6 +716,50 @@ class _SeriesListTile extends StatelessWidget {
         ),
         title: Text(item.name),
         subtitle: item.rating != null ? Text(formatRating(item.rating!)) : null,
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+class _RecordingListTile extends StatelessWidget {
+  const _RecordingListTile({
+    required this.recording,
+    required this.onTap,
+    this.autofocus = false,
+  });
+  final DvrRecording recording;
+  final VoidCallback onTap;
+  final bool autofocus;
+
+  @override
+  Widget build(BuildContext context) {
+    final season = recording.seasonNumber;
+    final episode = recording.episodeNumber;
+    final details = [
+      if (season != null && episode != null)
+        'S${season.toString().padLeft(2, '0')}E${episode.toString().padLeft(2, '0')}',
+      ?nullIfBlank(recording.subtitle),
+      ?nullIfBlank(recording.channelName),
+    ];
+    return DpadFocusable(
+      autofocus: autofocus,
+      onSelect: onTap,
+      child: ListTile(
+        leading: SizedBox(
+          width: MediaBrowsingMetrics.logoSize,
+          height: MediaBrowsingMetrics.logoSize,
+          child: Icon(
+            recording.isInProgress
+                ? Icons.fiber_manual_record
+                : Icons.video_library,
+            color: recording.isInProgress
+                ? Theme.of(context).colorScheme.error
+                : null,
+          ),
+        ),
+        title: Text(recording.title),
+        subtitle: details.isEmpty ? null : Text(details.join(' · ')),
         onTap: onTap,
       ),
     );

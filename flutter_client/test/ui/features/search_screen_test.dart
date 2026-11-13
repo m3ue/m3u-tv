@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/search/search_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
@@ -745,6 +746,117 @@ void main() {
         },
       );
     });
+
+    group('DVR recordings', () {
+      final recordings = [
+        const DvrRecording(
+          uuid: 'done-1',
+          title: 'Catfish: The TV Show',
+          subtitle: 'Kyle & Karisma',
+          status: DvrRecordingStatus.completed,
+          channelName: 'MTV',
+          seasonNumber: 6,
+          episodeNumber: 7,
+          streamUrl: 'http://example.com/dvr/done-1.ts',
+          edlUrl: 'http://example.com/dvr/done-1/edl',
+        ),
+        const DvrRecording(
+          uuid: 'scheduled-1',
+          title: 'Catfish: Unplayable',
+          status: DvrRecordingStatus.scheduled,
+        ),
+        const DvrRecording(
+          uuid: 'done-2',
+          title: 'Evening Report',
+          status: DvrRecordingStatus.completed,
+          channelName: 'Catfish Network',
+          streamUrl: 'http://example.com/dvr/done-2.ts',
+        ),
+      ];
+
+      Finder tab(String label) => find.descendant(
+        of: find.byType(DpadTabBar),
+        matching: find.text(label),
+      );
+
+      testWidgets('hidden when the DVR feature is off', (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            catalogRepository: testRepo,
+            dvrRecordings: recordings,
+            onRecordingPlay: (_) {},
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'catfish');
+        await tester.pumpAndSettle();
+
+        expect(tab('Recordings'), findsNothing);
+        expect(find.text('Catfish: The TV Show'), findsNothing);
+      });
+
+      testWidgets(
+        'All tab lists playable matches by title, episode or channel',
+        (tester) async {
+          await tester.pumpWidget(
+            _TestApp(
+              catalogRepository: testRepo,
+              hasDvrFeature: true,
+              dvrRecordings: recordings,
+              onRecordingPlay: (_) {},
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tab('Recordings'), findsOneWidget);
+
+          await tester.enterText(find.byType(TextField), 'catfish');
+          await tester.pumpAndSettle();
+
+          expect(find.text('Catfish: The TV Show'), findsOneWidget);
+          expect(find.text('S06E07 · Kyle & Karisma · MTV'), findsOneWidget);
+          // Matched on its channel name.
+          expect(find.text('Evening Report'), findsOneWidget);
+          // Scheduled: nothing to play yet.
+          expect(find.text('Catfish: Unplayable'), findsNothing);
+
+          await tester.enterText(find.byType(TextField), 'karisma');
+          await tester.pump(const Duration(milliseconds: 400));
+          await tester.pumpAndSettle();
+          expect(find.text('Catfish: The TV Show'), findsOneWidget);
+          expect(find.text('Evening Report'), findsNothing);
+        },
+      );
+
+      testWidgets('Recordings tab plays the selected recording', (
+        tester,
+      ) async {
+        PlayerArgs? played;
+        await tester.pumpWidget(
+          _TestApp(
+            catalogRepository: testRepo,
+            hasDvrFeature: true,
+            dvrRecordings: recordings,
+            onRecordingPlay: (args) => played = args,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'catfish');
+        await tester.pumpAndSettle();
+
+        await tester.tap(tab('Recordings'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Catfish: The TV Show'));
+        await tester.pumpAndSettle();
+
+        expect(played?.streamUrl, 'http://example.com/dvr/done-1.ts');
+        expect(played?.type, 'vod');
+        expect(played?.metadata['dvr_uuid'], 'done-1');
+        expect(
+          played?.metadata['edl_url'],
+          'http://example.com/dvr/done-1/edl',
+        );
+      });
+    });
   });
 }
 
@@ -760,6 +872,9 @@ class _TestApp extends StatelessWidget {
     this.onShowSelect,
     this.categoriesState,
     this.playlistKeyState,
+    this.hasDvrFeature = false,
+    this.dvrRecordings = const <DvrRecording>[],
+    this.onRecordingPlay,
   });
 
   final CatalogRepository catalogRepository;
@@ -778,6 +893,10 @@ class _TestApp extends StatelessWidget {
   /// When set, a test can switch the shown playlist.
   final StateProvider<String?>? playlistKeyState;
 
+  final bool hasDvrFeature;
+  final List<DvrRecording> dvrRecordings;
+  final void Function(PlayerArgs)? onRecordingPlay;
+
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
@@ -795,6 +914,8 @@ class _TestApp extends StatelessWidget {
               ? 'playlist'
               : ref.watch(playlistKeyState!),
         ),
+        hasDvrFeatureProvider.overrideWith((_) => hasDvrFeature),
+        dvrRecordingsProvider.overrideWith((_) => dvrRecordings),
       ],
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -810,6 +931,7 @@ class _TestApp extends StatelessWidget {
           onSeriesSelect: onSeriesSelect ?? (_) {},
           onSearchShows: onSearchShows,
           onShowSelect: onShowSelect,
+          onRecordingPlay: onRecordingPlay,
         ),
       ),
     );

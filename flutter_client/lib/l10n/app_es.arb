@@ -205,6 +205,7 @@
   "searchSectionLiveTv": "Televisión en vivo",
   "searchSectionMovies": "Cine",
   "searchSectionSeries": "Serie",
+  "searchSectionRecordings": "Grabaciones",
   "vodSearchHint": "Buscar…",
   "seriesSearchHint": "Buscar…",
   "settingsTitle": "Ajustes",
@@ -619,6 +620,8 @@
   "vodContinueMovie": "Continuar película",
   "vodCast": "Reparto",
   "vodDirector": "Director",
+  "vodRecorded": "Grabado",
+  "detailDvrBadge": "DVR",
   "castShowAll": "Ver todo el reparto",
   "vodTimeLeftMinutes": "{minutes, plural, =1{Queda 1 min} other{Quedan {minutes} min}}",
   "@vodTimeLeftMinutes": {

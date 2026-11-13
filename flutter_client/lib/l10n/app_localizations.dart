@@ -872,6 +872,12 @@ abstract class AppLocalizations {
   /// **'Series'**
   String get searchSectionSeries;
 
+  /// No description provided for @searchSectionRecordings.
+  ///
+  /// In en, this message translates to:
+  /// **'Recordings'**
+  String get searchSectionRecordings;
+
   /// No description provided for @vodSearchHint.
   ///
   /// In en, this message translates to:
@@ -2389,6 +2395,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Director'**
   String get vodDirector;
+
+  /// No description provided for @vodRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded'**
+  String get vodRecorded;
+
+  /// No description provided for @detailDvrBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'DVR'**
+  String get detailDvrBadge;
 
   /// No description provided for @castShowAll.
   ///

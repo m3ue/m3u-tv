@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:intl/intl.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -183,6 +184,7 @@ class _VodDetailsBody extends StatelessWidget {
       year: details.year,
       contentRating: details.contentRating,
       chips: [
+        if (details.isDvrRecording) l.detailDvrBadge,
         if (details.genre != null) details.genre!,
         ?formatRuntimeText(details.duration),
         if (details.rating != null) formatRating(details.rating!),
@@ -202,6 +204,16 @@ class _VodDetailsBody extends StatelessWidget {
           MetaCreditLine(
             label: AppLocalizations.of(context).vodCast,
             value: details.cast!,
+          ),
+        if (details.recordedAt case final recordedAt?)
+          MetaCreditLine(
+            label: l.vodRecorded,
+            value: [
+              DateFormat.yMMMEd(
+                Localizations.localeOf(context).toLanguageTag(),
+              ).add_jm().format(recordedAt.toLocal()),
+              ?details.recordedChannelName,
+            ].join(' · '),
           ),
       ],
       richCast: richCast,
@@ -313,4 +325,7 @@ class _ResolvedVodDetails {
   int? get tmdbId => info?.tmdbId;
   String? get edlUrl => nullIfBlank(info?.edlUrl);
   String? get trailerUrl => info?.trailerUrl;
+  DateTime? get recordedAt => info?.recordedAt;
+  bool get isDvrRecording => info?.isDvrRecording ?? false;
+  String? get recordedChannelName => nullIfBlank(info?.recordedChannelName);
 }

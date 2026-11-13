@@ -54,6 +54,40 @@ void main() {
       await tester.pump(const Duration(seconds: 16));
     });
 
+    testWidgets('shows when and where a DVR recording was made', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          service: _VodDetailsXtreamService(
+            info: VodInfo(
+              id: 201,
+              name: 'Fairfield vs. Seton Hall',
+              duration: '00:00:00',
+              recordedAt: DateTime.utc(2026, 11, 13, 2),
+              recordedChannelName: 'ESPN+ 58',
+              isDvrRecording: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Recorded', findRichText: true),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining(' · ESPN+ 58', findRichText: true),
+        findsOneWidget,
+      );
+      expect(find.text('00:00:00'), findsNothing);
+      expect(find.text('DVR'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 16));
+    });
+
     testWidgets('paints session-cached info without the loading bar', (
       tester,
     ) async {
