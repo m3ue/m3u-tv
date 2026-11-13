@@ -12,6 +12,7 @@ import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
+import 'package:m3u_tv/services/mdblist_service.dart';
 import 'package:m3u_tv/services/online_subtitle_settings.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
@@ -27,6 +28,7 @@ class SettingsScreen extends StatefulWidget {
     required this.authNotifier,
     required this.traktService,
     required this.simklService,
+    required this.mdblistService,
     this.onlineSubtitleSettings,
     this.devicePairingService,
     this.activeViewer,
@@ -58,6 +60,7 @@ class SettingsScreen extends StatefulWidget {
   final AuthNotifier authNotifier;
   final TraktService traktService;
   final SimklService simklService;
+  final MdblistService mdblistService;
   final OnlineSubtitleSettings? onlineSubtitleSettings;
   final DevicePairingService? devicePairingService;
 
@@ -176,6 +179,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         authNotifier: widget.authNotifier,
         traktService: widget.traktService,
         simklService: widget.simklService,
+        mdblistService: widget.mdblistService,
         onlineSubtitleSettings: widget.onlineSubtitleSettings,
         activeViewer: widget.activeViewer,
         viewers: widget.viewers,

@@ -2294,6 +2294,54 @@ abstract class AppLocalizations {
   /// **'Register an app at simkl.com/settings/developer and set the client ID via --dart-define=SIMKL_CLIENT_ID.'**
   String get simklNotConfiguredHint;
 
+  /// No description provided for @mdblistName.
+  ///
+  /// In en, this message translates to:
+  /// **'MDBList'**
+  String get mdblistName;
+
+  /// No description provided for @mdblistConnectPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect your MDBList account to automatically track what you watch.'**
+  String get mdblistConnectPrompt;
+
+  /// No description provided for @mdblistConnectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect with MDBList'**
+  String get mdblistConnectButton;
+
+  /// No description provided for @mdblistConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to MDBList'**
+  String get mdblistConnected;
+
+  /// No description provided for @mdblistConnectedAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to MDBList as {account}'**
+  String mdblistConnectedAs(String account);
+
+  /// No description provided for @mdblistDisconnectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect MDBList'**
+  String get mdblistDisconnectButton;
+
+  /// No description provided for @mdblistNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'MDBList client ID is not configured.'**
+  String get mdblistNotConfigured;
+
+  /// No description provided for @mdblistNotConfiguredHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Register an app at mdblist.com/developer and set the client ID via --dart-define=MDBLIST_CLIENT_ID.'**
+  String get mdblistNotConfiguredHint;
+
   /// No description provided for @vodAllMovies.
   ///
   /// In en, this message translates to:

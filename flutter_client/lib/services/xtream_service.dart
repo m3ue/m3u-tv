@@ -376,9 +376,9 @@ class RequestsCapability {
   bool supports(String type) => contentTypes.contains(type);
 }
 
-/// A Trakt or SIMKL account M3U Editor already sends this login's watch
-/// progress to (Integrations > Trakt & SIMKL). [account] is the account's
-/// display name, when the server knows it.
+/// A Trakt, SIMKL or MDBList account M3U Editor already sends this login's
+/// watch progress to (Integrations > Watch Tracking). [account] is the
+/// account's display name, when the server knows it.
 class ServerWatchHistoryAccount {
   const ServerWatchHistoryAccount({required this.provider, this.account});
 
@@ -388,7 +388,7 @@ class ServerWatchHistoryAccount {
         account: _stringOrNull(json['account']),
       );
 
-  /// `trakt` or `simkl`.
+  /// `trakt`, `simkl` or `mdblist`.
   final String provider;
   final String? account;
 }
@@ -423,7 +423,7 @@ class XtreamAuthResponse {
 
   bool hasFeature(String feature) => features.contains(feature);
 
-  /// The server-side account for [provider] (`trakt` or `simkl`), if any.
+  /// The server-side account for [provider] (`trakt`, `simkl` or `mdblist`), if any.
   ServerWatchHistoryAccount? serverWatchHistory(String provider) {
     for (final account in watchHistory) {
       if (account.provider == provider) return account;
@@ -1266,9 +1266,9 @@ class XtreamService {
     return Progress.fromJson(_asMap(response), viewerId: viewerId);
   }
 
-  /// The watch-history providers (`trakt`, `simkl`) this device scrobbles to
-  /// itself. Sent with every progress save so the server skips sending the
-  /// same playback to its own account for that provider.
+  /// The watch-history providers (`trakt`, `simkl`, `mdblist`) this device
+  /// scrobbles to itself. Sent with every progress save so the server skips
+  /// sending the same playback to its own account for that provider.
   List<String> Function()? clientScrobblers;
 
   Future<void> updateProgress(Progress progress) async {

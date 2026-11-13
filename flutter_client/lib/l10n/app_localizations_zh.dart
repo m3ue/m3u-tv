@@ -1246,6 +1246,33 @@ class AppLocalizationsZh extends AppLocalizations {
       '请在 simkl.com/settings/developer 注册应用，并通过 --dart-define=SIMKL_CLIENT_ID 设置客户端 ID。';
 
   @override
+  String get mdblistName => 'MDBList';
+
+  @override
+  String get mdblistConnectPrompt => '连接你的 MDBList 账户，自动记录你观看的内容。';
+
+  @override
+  String get mdblistConnectButton => '连接 MDBList';
+
+  @override
+  String get mdblistConnected => '已连接到 MDBList';
+
+  @override
+  String mdblistConnectedAs(String account) {
+    return '已以 $account 身份连接到 MDBList';
+  }
+
+  @override
+  String get mdblistDisconnectButton => '断开 MDBList';
+
+  @override
+  String get mdblistNotConfigured => '未配置 MDBList 客户端 ID。';
+
+  @override
+  String get mdblistNotConfiguredHint =>
+      '请在 mdblist.com/developer 注册应用，并通过 --dart-define=MDBLIST_CLIENT_ID 设置客户端 ID。';
+
+  @override
   String get vodAllMovies => '全部电影';
 
   @override

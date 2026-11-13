@@ -1306,6 +1306,35 @@ class AppLocalizationsDe extends AppLocalizations {
       'Registriere eine App auf simkl.com/settings/developer und setze die Client-ID über --dart-define=SIMKL_CLIENT_ID.';
 
   @override
+  String get mdblistName => 'MDBList';
+
+  @override
+  String get mdblistConnectPrompt =>
+      'Verbinde deinen MDBList-Account, um automatisch zu verfolgen, was du schaust.';
+
+  @override
+  String get mdblistConnectButton => 'Mit MDBList verbinden';
+
+  @override
+  String get mdblistConnected => 'Mit MDBList verbunden';
+
+  @override
+  String mdblistConnectedAs(String account) {
+    return 'Mit MDBList verbunden als $account';
+  }
+
+  @override
+  String get mdblistDisconnectButton => 'MDBList trennen';
+
+  @override
+  String get mdblistNotConfigured =>
+      'MDBList-Client-ID ist nicht konfiguriert.';
+
+  @override
+  String get mdblistNotConfiguredHint =>
+      'Registriere eine App auf mdblist.com/developer und setze die Client-ID über --dart-define=MDBLIST_CLIENT_ID.';
+
+  @override
   String get vodAllMovies => 'Alle Filme';
 
   @override

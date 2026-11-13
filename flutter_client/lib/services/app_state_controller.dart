@@ -25,6 +25,7 @@ import 'package:m3u_tv/services/epg_coordinator.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
+import 'package:m3u_tv/services/mdblist_service.dart';
 import 'package:m3u_tv/services/notification_coordinator.dart';
 import 'package:m3u_tv/services/online_subtitle_service.dart';
 import 'package:m3u_tv/services/online_subtitle_settings.dart';
@@ -157,6 +158,7 @@ class AppStateController extends ChangeNotifier {
       epgService: epgService ?? EpgService(),
       traktService: TraktService(storage: resolvedSecureStorage),
       simklService: SimklService(storage: resolvedSecureStorage),
+      mdblistService: MdblistService(storage: resolvedSecureStorage),
       onlineSubtitleService: OnlineSubtitleService(),
       onlineSubtitleSettings: OnlineSubtitleSettings(store: store),
       devicePairingService: devicePairingService ?? DevicePairingService(),
@@ -202,6 +204,7 @@ class AppStateController extends ChangeNotifier {
     required this.epgService,
     required this.traktService,
     required this.simklService,
+    required this.mdblistService,
     required this.onlineSubtitleService,
     required this.onlineSubtitleSettings,
     required this.devicePairingService,
@@ -239,6 +242,7 @@ class AppStateController extends ChangeNotifier {
     xtreamService.clientScrobblers = () => [
       if (traktService.isConnected) 'trakt',
       if (simklService.isConnected) 'simkl',
+      if (mdblistService.isConnected) 'mdblist',
     ];
     favoritesService.captureMutationOwnership =
         _captureFavoriteMutationOwnership;
@@ -608,6 +612,7 @@ class AppStateController extends ChangeNotifier {
   final EpgService epgService;
   final TraktService traktService;
   final SimklService simklService;
+  final MdblistService mdblistService;
   final OnlineSubtitleService onlineSubtitleService;
   final OnlineSubtitleSettings onlineSubtitleSettings;
   final DevicePairingService devicePairingService;
@@ -771,6 +776,7 @@ class AppStateController extends ChangeNotifier {
     notifyListeners();
     unawaited(traktService.init());
     unawaited(simklService.init());
+    unawaited(mdblistService.init());
     unawaited(comskipSettings.load());
     unawaited(sportsSettings.ensureLoaded());
     unawaited(introDbSettings.load());

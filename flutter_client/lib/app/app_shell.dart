@@ -1820,6 +1820,7 @@ class AppShellState extends ConsumerState<AppShell>
           isConfiguredOverride: _appState.isConfigured,
           traktService: _appState.traktService,
           simklService: _appState.simklService,
+          mdblistService: _appState.mdblistService,
           onlineSubtitleSettings: _appState.onlineSubtitleSettings,
           devicePairingService: _appState.devicePairingService,
           // A saved playlist that is still stored opens at once, as a
@@ -2139,6 +2140,7 @@ class AppShellState extends ConsumerState<AppShell>
                     watchHistoryServices: [
                       _appState.simklService,
                       _appState.traktService,
+                      _appState.mdblistService,
                     ],
                     onlineSubtitleService: _appState.onlineSubtitleService,
                     onlineSubtitleSettings: _appState.onlineSubtitleSettings,
