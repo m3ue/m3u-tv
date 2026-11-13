@@ -37,7 +37,6 @@ void main() {
     final transport = _FakeTransport([]);
     final service = MdblistService(
       storage: InMemorySecureStorage(),
-      // ignore: avoid_redundant_argument_values
       clientId: '',
       transport: transport.call,
     );
