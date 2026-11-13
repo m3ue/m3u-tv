@@ -1224,15 +1224,10 @@ class _RecordingListState extends ConsumerState<_RecordingList> {
   Future<void> _confirmDeleteSingle(DvrRecording recording) async {
     final delete = widget.onDeleteRecording;
     if (delete == null) return;
-    final confirmed = await showDeleteRecordingDialog(context);
-    if (confirmed != true) return;
-    if (!mounted) return;
-    final l10n = AppLocalizations.of(context);
-    await runDvrActionWithFeedback(
+    await confirmDeleteRecording(
       context,
-      () => delete(recording.uuid),
-      successMessage: l10n.dvrDeleteSuccess,
-      failureMessage: l10n.dvrDeleteFailed,
+      uuid: recording.uuid,
+      onDelete: delete,
     );
   }
 

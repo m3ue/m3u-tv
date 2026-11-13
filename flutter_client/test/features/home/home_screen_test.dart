@@ -140,6 +140,8 @@ Finder _section(String title) => find.ancestor(
 void main() {
   // The shown playlist's key and catalog; a test swaps it to switch.
   late StateProvider<(String, _Catalog)> shown;
+  // Bumped by a test as a DVR change rewriting the catalog would.
+  late StateProvider<int> dvrRevision;
 
   Future<CatalogRepository> pumpHome(
     WidgetTester tester,
@@ -162,6 +164,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1920, 1080));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     shown = StateProvider<(String, _Catalog)>((_) => ('first', catalog));
+    dvrRevision = StateProvider<int>((_) => 0);
     final repo = await _buildRepo(tester, catalog);
     // Every read throws, as after the database closes during a sign-out.
     if (unreadable) await tester.runAsync(repo.close);
@@ -189,6 +192,9 @@ void main() {
           progressListProvider.overrideWith((_) => const <Progress>[]),
           hasDvrFeatureProvider.overrideWith((_) => hasDvr),
           dvrRecordingsProvider.overrideWith((_) => const <DvrRecording>[]),
+          dvrContentRevisionProvider.overrideWith(
+            (ref) => ref.watch(dvrRevision),
+          ),
           hasAioStreamsProvider.overrideWith((_) => hasAioStreams),
           hasRequestsFeatureProvider.overrideWith((_) => hasRequests),
           // Sports is off unless a test turns it on
@@ -789,6 +795,34 @@ void main() {
 
     await _settle(tester);
     expect(find.text('Elephants Dream'), findsWidgets);
+  });
+
+  testWidgets('a DVR change to the catalog reloads the Movies row', (
+    tester,
+  ) async {
+    final repo = await pumpHome(
+      tester,
+      const _Catalog(movies: [..._movies, ..._otherMovies]),
+    );
+    await _settle(tester);
+    expect(find.text('Elephants Dream'), findsWidgets);
+
+    // A deleted recording's movie leaves the catalog; the categories are
+    // unchanged, so only the DVR revision tells the row to read again.
+    await tester.runAsync(
+      () => repo.replaceItems(
+        sourceKey: CatalogRepository.defaultSource,
+        kind: kCatalogKindVod,
+        items: _movies,
+      ),
+    );
+    ProviderScope.containerOf(
+      tester.element(find.byType(HomeScreen)),
+    ).read(dvrRevision.notifier).state++;
+    await _settle(tester);
+
+    expect(find.text('Elephants Dream'), findsNothing);
+    expect(find.text('Big Buck Bunny'), findsWidgets);
   });
 
   testWidgets('after a switch the Live row waits for that playlist favorites', (

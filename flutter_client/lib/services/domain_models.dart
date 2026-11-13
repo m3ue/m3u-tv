@@ -205,6 +205,7 @@ class VodInfo {
     this.recordedAt,
     this.recordedChannelName,
     this.isDvrRecording = false,
+    this.dvrUuid,
   });
 
   final int id;
@@ -252,6 +253,10 @@ class VodInfo {
   /// Added to the library from a DVR recording (`dvr_recording`), sent for
   /// every viewer even when [recordedAt] is withheld.
   final bool isDvrRecording;
+
+  /// The DVR recording behind this movie (`dvr_uuid`), present only for the
+  /// viewer who may manage it (e.g. delete it).
+  final String? dvrUuid;
 
   factory VodInfo.fromXtream(Map<String, Object?> json) {
     final info = _asMap(json['info']);
@@ -309,6 +314,7 @@ class VodInfo {
       recordedChannelName: _asNullableString(pick(['dvr_channel_name'])),
       isDvrRecording:
           _asBool(pick(['dvr_recording'])) || pick(['dvr_recorded_at']) != null,
+      dvrUuid: _asNullableString(pick(['dvr_uuid'])),
     );
   }
 }
@@ -709,6 +715,7 @@ class Episode {
     this.streamUrl,
     this.edlUrl,
     this.isDvrRecording = false,
+    this.dvrUuid,
   });
 
   final String id;
@@ -726,6 +733,10 @@ class Episode {
 
   /// Added to the library from a DVR recording (`dvr_recording`).
   final bool isDvrRecording;
+
+  /// The DVR recording behind this episode (`dvr_uuid`), present only for the
+  /// viewer who may manage it (e.g. delete it).
+  final String? dvrUuid;
 
   factory Episode.fromXtream(Map<String, Object?> json, {String? streamUrl}) {
     final info =
@@ -759,6 +770,7 @@ class Episode {
       streamUrl: streamUrl,
       edlUrl: _asNullableString(pick(['edl_url'])),
       isDvrRecording: _asBool(json['dvr_recording']),
+      dvrUuid: _asNullableString(json['dvr_uuid']),
     );
   }
 }

@@ -9,6 +9,7 @@ import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
+import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
@@ -54,6 +55,7 @@ class SeriesDetailsScreen extends StatefulWidget {
     this.onSidebarActivate,
     this.onOpenRelated,
     this.onTapMember,
+    this.onDeleteRecording,
   });
 
   final int seriesId;
@@ -81,6 +83,10 @@ class SeriesDetailsScreen extends StatefulWidget {
   /// Opens a cast member's filmography screen. Null leaves cast
   /// non-interactive.
   final ValueChanged<CastMember>? onTapMember;
+
+  /// Deletes the DVR recording an episode came from (by uuid), offered from
+  /// the long-press dialog of episodes the viewer recorded. Null hides it.
+  final Future<void> Function(String uuid)? onDeleteRecording;
 
   @override
   State<SeriesDetailsScreen> createState() => _SeriesDetailsScreenState();
@@ -212,7 +218,8 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
               ),
             );
           }
-          final info = snapshot.data;
+          // After an episode is deleted, [_seriesInfo] holds the list without it.
+          final info = _seriesInfo ?? snapshot.data;
           if (info == null) {
             return Center(
               child: Text(AppLocalizations.of(context).seriesNoEpisodes),
@@ -236,6 +243,9 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
             },
             onEpisodeSelected: _selectEpisode,
             onMarkEpisode: _markEpisode,
+            onDeleteRecording: widget.onDeleteRecording == null
+                ? null
+                : (episode) => unawaited(_deleteEpisodeRecording(episode)),
             onMarkSeason: _markSeason,
             onOpenRelated: widget.onOpenRelated,
             onTapMember: widget.onTapMember,
@@ -297,6 +307,49 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
       case ResumeAction.markWatched:
         await _markEpisode(episode, watched: true);
     }
+  }
+
+  /// Deletes an episode's recording. The server deletes the episode with it
+  /// (and the series with its last one), so the episode leaves the list here,
+  /// and the page closes once none remain.
+  Future<void> _deleteEpisodeRecording(Episode episode) async {
+    final delete = widget.onDeleteRecording;
+    final uuid = episode.dvrUuid;
+    if (delete == null || uuid == null) return;
+    final deleted = await confirmDeleteRecording(
+      context,
+      uuid: uuid,
+      onDelete: delete,
+    );
+    final info = _seriesInfo;
+    if (!deleted || !mounted || info == null) return;
+
+    final remaining = <int, List<Episode>>{
+      for (final MapEntry(key: season, value: episodes)
+          in info.episodesBySeason.entries)
+        season: [
+          for (final e in episodes)
+            if (e.id != episode.id) e,
+        ],
+    }..removeWhere((_, episodes) => episodes.isEmpty);
+    if (remaining.isEmpty) {
+      await Navigator.of(context).maybePop();
+      return;
+    }
+    final emptied = episode.seasonNumber;
+    final seasonGone = !remaining.containsKey(emptied);
+    setState(() {
+      _seriesInfo = SeriesInfo(
+        series: info.series,
+        seasons: [
+          for (final season in info.seasons)
+            if (!seasonGone || season.number != emptied) season,
+        ],
+        episodesBySeason: remaining,
+        isDvrRecording: info.isDvrRecording,
+      );
+      if (seasonGone && _selectedSeason == emptied) _selectedSeason = null;
+    });
   }
 
   void _playEpisode(Episode episode, {double? startPosition}) {
@@ -393,6 +446,7 @@ class _SeriesDetailsBody extends StatelessWidget {
     required this.onEpisodeSelected,
     required this.onMarkEpisode,
     required this.onMarkSeason,
+    this.onDeleteRecording,
     this.onOpenRelated,
     this.onTapMember,
     this.scrollController,
@@ -421,6 +475,7 @@ class _SeriesDetailsBody extends StatelessWidget {
   final void Function(Episode episode, {required bool watched}) onMarkEpisode;
   final void Function(List<Episode> episodes, {required bool watched})
   onMarkSeason;
+  final void Function(Episode episode)? onDeleteRecording;
   final ValueChanged<RelatedItem>? onOpenRelated;
   final ValueChanged<CastMember>? onTapMember;
 
@@ -686,6 +741,7 @@ class _SeriesDetailsBody extends StatelessWidget {
       onEpisodeSelected: onEpisodeSelected,
       onMarkEpisode: onMarkEpisode,
       onMarkSeason: onMarkSeason,
+      onDeleteRecording: onDeleteRecording,
       onExitTop: playFocusNode.requestFocus,
       scrollController: scrollController,
     );

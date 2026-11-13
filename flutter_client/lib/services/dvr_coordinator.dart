@@ -70,6 +70,12 @@ class DvrCoordinator {
   DvrRecordingsLoadState get recordingsLoadState => _recordingsLoadState;
   DvrStorageInfo? get storageInfo => _dvrStorageInfo;
   Set<int> get recordingChannelIds => _recordingChannelIds;
+
+  /// Bumped each time a DVR change rewrites the movie or series catalog
+  /// (a recording landing in, or deleted from, the library), so views that
+  /// read catalog pages once know to read them again.
+  int get contentRevision => _contentRevision;
+  int _contentRevision = 0;
   List<DvrSeriesRule> get seriesRules => _dvrSeriesRules;
 
   // Coalesce multiple DVR post-processing pushes that land in quick
@@ -283,7 +289,10 @@ class DvrCoordinator {
             ),
         ]);
         if (_disposed || !ownsWork()) return;
-        if (results.contains(true)) _notifyListeners();
+        if (results.contains(true)) {
+          _contentRevision++;
+          _notifyListeners();
+        }
       }
     } finally {
       _dvrContentRefreshFlushing = false;
@@ -682,6 +691,9 @@ class DvrCoordinator {
       debugPrintStack(stackTrace: stackTrace);
       rethrow;
     }
+    final deleted = _dvrRecordings
+        .where((recording) => recording.uuid == uuid)
+        .firstOrNull;
     _dvrRecordings = _dvrRecordings
         .where((recording) => recording.uuid != uuid)
         .toList(growable: false);
@@ -689,6 +701,18 @@ class DvrCoordinator {
     if (!ownsWork()) return;
     _notifyListeners();
     unawaited(refreshDvrStorage());
+    // The server deletes the recording's movie or episode with it, so the
+    // catalog lists drop it too (the reverse of the completed-recording
+    // refresh in _refreshDvrRecordingDetail).
+    _scheduleDvrContentRefresh(
+      deleted != null
+          ? _classifyContentTargets(deleted)
+          : const <_DvrContentRefreshTarget>{
+              _DvrContentRefreshTarget.vod,
+              _DvrContentRefreshTarget.series,
+            },
+      ownsWork,
+    );
   }
 
   /// One-shot reconciliation of which channels are currently recording,

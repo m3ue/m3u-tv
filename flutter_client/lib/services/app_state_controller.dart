@@ -710,6 +710,9 @@ class AppStateController extends ChangeNotifier {
   DvrRecordingsLoadState get dvrRecordingsLoadState => _dvr.recordingsLoadState;
   DvrStorageInfo? get dvrStorageInfo => _dvr.storageInfo;
   Set<int> get recordingChannelIds => _dvr.recordingChannelIds;
+
+  /// See [DvrCoordinator.contentRevision].
+  int get dvrContentRevision => _dvr.contentRevision;
   List<DvrSeriesRule> get dvrSeriesRules => _dvr.seriesRules;
   List<Progress> get progressList => _progressList;
   List<MediaRequestSummary> get mediaRequests => _requests.requests;

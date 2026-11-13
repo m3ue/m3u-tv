@@ -1329,23 +1329,30 @@ class _MoviesRow extends ConsumerStatefulWidget {
 }
 
 class _MoviesRowState extends ConsumerState<_MoviesRow> {
-  (List<Category>, MediaBrowseOrder, Set<int>, String?)? _fetchedFor;
+  (List<Category>, MediaBrowseOrder, Set<int>, String?, int)? _fetchedFor;
 
   /// Null until the first page loads. A reload keeps these on screen.
   List<VodItem>? _items;
 
-  (List<Category>, MediaBrowseOrder, Set<int>, String?) _fetchKey(
+  (List<Category>, MediaBrowseOrder, Set<int>, String?, int) _fetchKey(
     List<Category> categories,
+    int dvrContentRevision,
   ) => (
     categories,
     widget.order,
     // Only a change in the favorites the order leads with moves the row.
     widget.order.favoritesFirst ? widget.favoriteVodIds : const <int>{},
     widget.custom?.categoryId,
+    // A DVR recording added or deleted rewrites the catalog under the row.
+    dvrContentRevision,
   );
 
-  void _fetch(List<Category> categories, CatalogRepository repo) {
-    final key = _fetchKey(categories);
+  void _fetch(
+    List<Category> categories,
+    int dvrContentRevision,
+    CatalogRepository repo,
+  ) {
+    final key = _fetchKey(categories, dvrContentRevision);
     _fetchedFor = key;
     unawaited(() async {
       List<VodItem> items;
@@ -1374,8 +1381,13 @@ class _MoviesRowState extends ConsumerState<_MoviesRow> {
   @override
   Widget build(BuildContext context) {
     final categories = ref.watch(vodCategoriesProvider);
-    if (_fetchKey(categories) != _fetchedFor) {
-      _fetch(categories, ref.read(catalogRepositoryProvider));
+    final dvrContentRevision = ref.watch(dvrContentRevisionProvider);
+    if (_fetchKey(categories, dvrContentRevision) != _fetchedFor) {
+      _fetch(
+        categories,
+        dvrContentRevision,
+        ref.read(catalogRepositoryProvider),
+      );
     }
     final items = _items;
     if (items != null && items.isEmpty) return const SizedBox.shrink();
@@ -1461,23 +1473,30 @@ class _SeriesRow extends ConsumerStatefulWidget {
 }
 
 class _SeriesRowState extends ConsumerState<_SeriesRow> {
-  (List<Category>, MediaBrowseOrder, Set<int>, String?)? _fetchedFor;
+  (List<Category>, MediaBrowseOrder, Set<int>, String?, int)? _fetchedFor;
 
   /// Null until the first page loads. A reload keeps these on screen.
   List<Series>? _items;
 
-  (List<Category>, MediaBrowseOrder, Set<int>, String?) _fetchKey(
+  (List<Category>, MediaBrowseOrder, Set<int>, String?, int) _fetchKey(
     List<Category> categories,
+    int dvrContentRevision,
   ) => (
     categories,
     widget.order,
     // Only a change in the favorites the order leads with moves the row.
     widget.order.favoritesFirst ? widget.favoriteSeriesIds : const <int>{},
     widget.custom?.categoryId,
+    // A DVR recording added or deleted rewrites the catalog under the row.
+    dvrContentRevision,
   );
 
-  void _fetch(List<Category> categories, CatalogRepository repo) {
-    final key = _fetchKey(categories);
+  void _fetch(
+    List<Category> categories,
+    int dvrContentRevision,
+    CatalogRepository repo,
+  ) {
+    final key = _fetchKey(categories, dvrContentRevision);
     _fetchedFor = key;
     unawaited(() async {
       List<Series> items;
@@ -1506,8 +1525,13 @@ class _SeriesRowState extends ConsumerState<_SeriesRow> {
   @override
   Widget build(BuildContext context) {
     final categories = ref.watch(seriesCategoriesProvider);
-    if (_fetchKey(categories) != _fetchedFor) {
-      _fetch(categories, ref.read(catalogRepositoryProvider));
+    final dvrContentRevision = ref.watch(dvrContentRevisionProvider);
+    if (_fetchKey(categories, dvrContentRevision) != _fetchedFor) {
+      _fetch(
+        categories,
+        dvrContentRevision,
+        ref.read(catalogRepositoryProvider),
+      );
     }
     final items = _items;
     if (items != null && items.isEmpty) return const SizedBox.shrink();

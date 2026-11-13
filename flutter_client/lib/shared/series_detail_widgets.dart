@@ -65,13 +65,45 @@ Future<bool?> confirmMarkWatched(
   required String title,
   required String message,
   bool? presetWatched,
-}) {
-  return showAppDialog<bool>(
+}) async {
+  final action = await showAppDialog<EpisodeAction>(
     context: context,
     builder: (context) => _ConfirmMarkDialog(
       title: title,
       message: message,
       presetWatched: presetWatched,
+    ),
+  );
+  return switch (action) {
+    EpisodeAction.markWatched => true,
+    EpisodeAction.markUnwatched => false,
+    _ => null,
+  };
+}
+
+/// What an episode's long-press dialog chose.
+enum EpisodeAction { markWatched, markUnwatched, deleteRecording }
+
+/// The episode long-press dialog: the mark-watched toggle ([presetWatched]
+/// picks which), unless [offerMark] is off, plus "Delete recording" when
+/// [offerDelete] is set (an episode the viewer recorded). Null when
+/// dismissed.
+Future<EpisodeAction?> confirmEpisodeAction(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required bool presetWatched,
+  bool offerMark = true,
+  bool offerDelete = false,
+}) {
+  return showAppDialog<EpisodeAction>(
+    context: context,
+    builder: (context) => _ConfirmMarkDialog(
+      title: title,
+      message: message,
+      presetWatched: presetWatched,
+      offerMark: offerMark,
+      offerDelete: offerDelete,
     ),
   );
 }
@@ -81,11 +113,15 @@ class _ConfirmMarkDialog extends StatefulWidget {
     required this.title,
     required this.message,
     this.presetWatched,
+    this.offerMark = true,
+    this.offerDelete = false,
   });
 
   final String title;
   final String message;
   final bool? presetWatched;
+  final bool offerMark;
+  final bool offerDelete;
 
   @override
   State<_ConfirmMarkDialog> createState() => _ConfirmMarkDialogState();
@@ -113,7 +149,7 @@ class _ConfirmMarkDialogState extends State<_ConfirmMarkDialog> {
     super.dispose();
   }
 
-  void _pop(bool? result) {
+  void _pop(EpisodeAction? result) {
     if (!_armed) return;
     Navigator.of(context).pop(result);
   }
@@ -122,27 +158,39 @@ class _ConfirmMarkDialogState extends State<_ConfirmMarkDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final preset = widget.presetWatched;
+    final offerMark = widget.offerMark;
     return AppAlertDialog(
       title: widget.title,
       message: widget.message,
       memoryKey: 'series/mark-watched-dialog-actions',
       actions: [
-        AppDialogAction(label: l.cancel, onPressed: () => _pop(null)),
-        if (preset != true)
+        // With nothing to mark, the safe choice takes focus, not the delete.
+        AppDialogAction(
+          label: l.cancel,
+          autofocus: !offerMark,
+          onPressed: () => _pop(null),
+        ),
+        if (widget.offerDelete)
+          AppDialogAction(
+            label: l.dvrDeleteConfirm,
+            variant: AppButtonVariant.destructive,
+            onPressed: () => _pop(EpisodeAction.deleteRecording),
+          ),
+        if (offerMark && preset != true)
           AppDialogAction(
             label: l.seriesMarkUnwatched,
             variant: preset == false
                 ? AppButtonVariant.primary
                 : AppButtonVariant.tonal,
             autofocus: preset == false,
-            onPressed: () => _pop(false),
+            onPressed: () => _pop(EpisodeAction.markUnwatched),
           ),
-        if (preset != false)
+        if (offerMark && preset != false)
           AppDialogAction(
             label: l.seriesMarkWatched,
             variant: AppButtonVariant.primary,
             autofocus: true,
-            onPressed: () => _pop(true),
+            onPressed: () => _pop(EpisodeAction.markWatched),
           ),
       ],
     );
@@ -479,6 +527,7 @@ class EpisodeStrip extends StatefulWidget {
     this.autofocusFirst = true,
     this.horizontal = true,
     this.progressResolver,
+    this.onDeleteRecording,
   });
 
   final List<Episode> episodes;
@@ -495,6 +544,10 @@ class EpisodeStrip extends StatefulWidget {
   final double cardWidth;
   final bool canMarkWatched;
   final bool autofocusFirst;
+
+  /// Deletes the DVR recording an episode came from. Offered in the
+  /// long-press dialog of episodes that carry a `dvrUuid`; null hides it.
+  final void Function(Episode episode)? onDeleteRecording;
 
   /// Horizontal thumbnail strip (TV/desktop) vs. a vertical list (phone).
   final bool horizontal;
@@ -613,7 +666,9 @@ class EpisodeStripState extends State<EpisodeStrip>
         event,
         isActive: () => mounted,
         onTap: _selectFocused,
-        onLongPress: widget.canMarkWatched ? _longSelectFocused : null,
+        onLongPress: widget.canMarkWatched || widget.onDeleteRecording != null
+            ? _longSelectFocused
+            : null,
       );
     }
     final isDown = event is KeyDownEvent || event is KeyRepeatEvent;
@@ -710,17 +765,35 @@ class EpisodeStripState extends State<EpisodeStrip>
     );
   }
 
+  bool _canDelete(Episode episode) =>
+      widget.onDeleteRecording != null && episode.dvrUuid != null;
+
+  bool _hasLongPress(Episode episode) =>
+      widget.canMarkWatched || _canDelete(episode);
+
   Future<void> _confirmEpisode(
     Episode episode, {
     required bool watched,
   }) async {
-    final choice = await confirmMarkWatched(
+    if (!_hasLongPress(episode)) return;
+    final choice = await confirmEpisodeAction(
       context,
       title: 'S${episode.seasonNumber}E${episode.episodeNumber}',
       message: episode.title,
       presetWatched: watched,
+      offerMark: widget.canMarkWatched,
+      offerDelete: _canDelete(episode),
     );
-    if (choice != null) widget.onMarkEpisode(episode, watched: choice);
+    switch (choice) {
+      case EpisodeAction.markWatched:
+        widget.onMarkEpisode(episode, watched: true);
+      case EpisodeAction.markUnwatched:
+        widget.onMarkEpisode(episode, watched: false);
+      case EpisodeAction.deleteRecording:
+        widget.onDeleteRecording?.call(episode);
+      case null:
+        break;
+    }
   }
 
   Widget _card(BuildContext context, int index) {
@@ -751,7 +824,7 @@ class EpisodeStripState extends State<EpisodeStrip>
       focused: widget.horizontal && _hasFocus && index == _focusedIndex,
       autofocus: !widget.horizontal && widget.autofocusFirst && index == 0,
       onTap: () => widget.onEpisodeSelected(episode),
-      onLongTap: widget.canMarkWatched
+      onLongTap: _hasLongPress(episode)
           ? () => unawaited(_confirmEpisode(episode, watched: !completed))
           : null,
     );
@@ -1624,6 +1697,7 @@ class SeriesDetailBody extends StatelessWidget {
     this.dominantColor,
     this.compactBreakpoint = 700,
     this.scrollController,
+    this.onDeleteRecording,
   });
 
   final String seriesName;
@@ -1697,6 +1771,9 @@ class SeriesDetailBody extends StatelessWidget {
   final void Function(Episode episode, {double? startPosition})
   onEpisodeSelected;
   final void Function(Episode episode, {required bool watched}) onMarkEpisode;
+
+  /// See [EpisodeStrip.onDeleteRecording].
+  final void Function(Episode episode)? onDeleteRecording;
   final void Function(List<Episode> episodes, {required bool watched})
   onMarkSeason;
 
@@ -1827,6 +1904,7 @@ class SeriesDetailBody extends StatelessWidget {
         horizontal: !compact,
         onEpisodeSelected: onEpisodeSelected,
         onMarkEpisode: onMarkEpisode,
+        onDeleteRecording: onDeleteRecording,
       );
       episodeSection = compact
           ? strip

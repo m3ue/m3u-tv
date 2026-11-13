@@ -147,6 +147,13 @@ final recordingChannelIdsProvider = Provider<Set<int>>((ref) {
   return ref.watch(appStateControllerProvider).appState.recordingChannelIds;
 });
 
+/// Changes when a DVR recording lands in, or is deleted from, the movie or
+/// series catalog. Rows that read a catalog page once include it in their
+/// fetch key so they read again.
+final dvrContentRevisionProvider = Provider<int>((ref) {
+  return ref.watch(appStateControllerProvider).appState.dvrContentRevision;
+});
+
 final sourceLabelProvider = Provider<String>((ref) {
   return ref.watch(appStateControllerProvider).appState.sourceLabel;
 });

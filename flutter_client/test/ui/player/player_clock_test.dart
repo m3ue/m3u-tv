@@ -64,12 +64,20 @@ void main() {
     });
 
     testWidgets('shows the clock and Ends at for VOD', (tester) async {
+      // The widget reads the wall clock while building; read it on both
+      // sides so a minute rolling over mid-test can't fail the match.
+      String endsAt(DateTime now) =>
+          'Ends at ${DateFormat.jm('en').format(now.add(const Duration(minutes: 55)))}';
+      final before = endsAt(DateTime.now());
       await tester.pumpWidget(_app(_controls()));
+      final after = endsAt(DateTime.now());
 
       expect(find.byType(SystemClock), findsOneWidget);
-      final finish = DateTime.now().add(const Duration(minutes: 55));
       expect(
-        find.text('Ends at ${DateFormat.jm('en').format(finish)}'),
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Text && (widget.data == before || widget.data == after),
+        ),
         findsOneWidget,
       );
     });

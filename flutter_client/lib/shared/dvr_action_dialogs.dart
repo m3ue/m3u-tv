@@ -101,7 +101,9 @@ Future<bool?> showDeleteSeriesRuleDialog(
   );
 }
 
-Future<void> runDvrActionWithFeedback(
+/// Runs [action] with a success or failure snackbar. Resolves to whether it
+/// succeeded.
+Future<bool> runDvrActionWithFeedback(
   BuildContext context,
   Future<void> Function() action, {
   required String successMessage,
@@ -111,9 +113,31 @@ Future<void> runDvrActionWithFeedback(
   try {
     await action();
     messenger.showSnackBar(SnackBar(content: Text(successMessage)));
+    return true;
   } on Object catch (_) {
     messenger.showSnackBar(SnackBar(content: Text(failureMessage)));
+    return false;
   }
+}
+
+/// Asks to confirm, then deletes the recording [uuid] through [onDelete] with
+/// snackbar feedback. Shared by the Recordings screen and the movie / episode
+/// detail pages of recordings in the library. Resolves to whether it was
+/// deleted.
+Future<bool> confirmDeleteRecording(
+  BuildContext context, {
+  required String uuid,
+  required Future<void> Function(String uuid) onDelete,
+}) async {
+  final confirmed = await showDeleteRecordingDialog(context);
+  if (confirmed != true || !context.mounted) return false;
+  final l10n = AppLocalizations.of(context);
+  return runDvrActionWithFeedback(
+    context,
+    () => onDelete(uuid),
+    successMessage: l10n.dvrDeleteSuccess,
+    failureMessage: l10n.dvrDeleteFailed,
+  );
 }
 
 /// Full "manage an in-progress recording" flow: shows [showStopRecordingDialog],

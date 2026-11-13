@@ -1207,6 +1207,7 @@ class XtreamService {
               streamUrl: episode.streamUrl,
               edlUrl: episode.edlUrl,
               isDvrRecording: episode.isDvrRecording,
+              dvrUuid: episode.dvrUuid,
             );
           })
           .toList(growable: false);
