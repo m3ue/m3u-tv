@@ -1227,6 +1227,8 @@ class MediaPreviewSection extends StatefulWidget {
     this.useSidebarLayout = false,
     this.onSidebarActivate,
     this.onTopEdge,
+    this.maxItems = maxVisibleItems,
+    this.autofocusFirst = true,
     super.key,
   }) : itemCount = null,
        itemBuilder = null,
@@ -1251,6 +1253,8 @@ class MediaPreviewSection extends StatefulWidget {
     this.useSidebarLayout = false,
     this.onSidebarActivate,
     this.onTopEdge,
+    this.maxItems = maxVisibleItems,
+    this.autofocusFirst = true,
     super.key,
   }) : items = const [],
        posterStyle = false,
@@ -1296,6 +1300,18 @@ class MediaPreviewSection extends StatefulWidget {
   /// every rebuild.
   static const int maxVisibleItems = 12;
 
+  /// The most cards this row renders: [maxVisibleItems] for a preview row
+  /// with a [viewAll] card; a row that is itself the full list (no View All)
+  /// passes its item count.
+  final int maxItems;
+
+  /// Whether the first card asks for focus when the row is built. Off for a
+  /// row in its own `FocusScope` that appears while focus is elsewhere (e.g.
+  /// search results arriving while the user types): autofocus applies
+  /// whenever the row's scope has nothing focused, so the card would take
+  /// focus from the search field.
+  final bool autofocusFirst;
+
   @override
   State<MediaPreviewSection> createState() => _MediaPreviewSectionState();
 }
@@ -1320,10 +1336,10 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
   Widget build(BuildContext context) {
     final fontScale = FontSizeScope.scaleOf(context);
     final visibleItems = widget.items
-        .take(MediaPreviewSection.maxVisibleItems)
+        .take(widget.maxItems)
         .toList(growable: false);
     final visibleCount = widget.itemBuilder != null
-        ? widget.itemCount!.clamp(0, MediaPreviewSection.maxVisibleItems)
+        ? widget.itemCount!.clamp(0, widget.maxItems)
         : visibleItems.length;
     final double baseWidth;
     final double baseHeight;
@@ -1470,14 +1486,14 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
                             context,
                             index,
                             Size(customCardWidth, cardHeight),
-                            autofocus: index == 0,
+                            autofocus: widget.autofocusFirst && index == 0,
                           );
                         }
                         return MediaPreviewCard(
                           item: visibleItems[index],
                           posterStyle: widget.posterStyle,
                           landscapeStyle: widget.landscapeStyle,
-                          autofocus: index == 0,
+                          autofocus: widget.autofocusFirst && index == 0,
                           cardWidth: cardWidth,
                         );
                       },

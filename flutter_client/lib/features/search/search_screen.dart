@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/features/epg/timeline_epg_view.dart' show EnsureEpg;
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -19,7 +20,6 @@ import 'package:m3u_tv/shared/epg_show_search_controller.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
-import 'package:m3u_tv/shared/show_search_results_view.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Hard cap on VOD/series search matches fetched from the catalog. A real
@@ -322,8 +322,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         if (mounted) setState(() {});
       },
     );
-    // Shared by the All tab and the Live TV tab's ShowSearchResultsView, so
-    // the On Now/Upcoming grouping runs once per build whichever is showing.
+    // Shared by the All and Live TV tabs, so the On Now/Upcoming grouping
+    // runs once per build whichever is showing.
     final showResult = _showSearchActive
         ? buildShowResultEntries(_showSearchController.results, channelsById)
         : null;
@@ -429,83 +429,33 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     ShowResultEntries? showResult,
   ) {
     if (!_hasQuery) return _buildPromptState();
-    final onNowEntries = showResult?.onNow ?? const <ShowResultEntry>[];
+    final liveChannels = _liveTvChannels(channels, showResult);
     final upcomingEntries = showResult?.upcoming ?? const <ShowResultEntry>[];
-    final onNowChannels = showResult?.onNowChannels ?? const <Channel>[];
     // Empty-state-guard: a query can match a show name that doesn't match
     // any channel/VOD/series name (e.g. "Bear" matching no channel called
     // "Bear" but airing on some channel). Without this check, the EPG
     // results would never render.
-    if (channels.isEmpty &&
+    if (liveChannels.isEmpty &&
         vodItems.isEmpty &&
         seriesList.isEmpty &&
         recordings.isEmpty &&
-        onNowEntries.isEmpty &&
         upcomingEntries.isEmpty) {
       return _buildEmptyState(AppLocalizations.of(context).searchNoResults);
     }
 
     final l = AppLocalizations.of(context);
-    final languageTag = Localizations.localeOf(context).toLanguageTag();
     final useSidebarLayout = widget.useSidebarLayout;
     final onSidebarActivate = widget.onSidebarActivate;
     const visible = MediaPreviewSection.maxVisibleItems;
 
-    // On Now rows play their channel, so ones whose channel isn't in the
-    // catalog have nothing to open and are left out.
-    final onNowItems = <MediaPreviewItem>[];
-    var onNowCount = 0;
-    for (final entry in onNowEntries) {
-      final channel = channelsById[entry.channelId];
-      if (channel == null) continue;
-      onNowCount += 1;
-      if (onNowItems.length < visible) {
-        onNowItems.add(
-          _showResultItem(
-            entry,
-            channel,
-            languageTag,
-            onTap: () => _selectChannel(onNowChannels, channel),
-          ),
-        );
-      }
-    }
-
-    // The first row takes Up to the selected tab; later rows move focus to
-    // the row above.
+    // Live TV and Upcoming lead, in the Live TV tab's order. The first row
+    // takes Up to the selected tab; later rows move focus to the row above.
     final rows = <Widget Function(VoidCallback? onTopEdge)>[
-      if (onNowItems.isNotEmpty)
-        (onTopEdge) => MediaPreviewSection(
-          title: l.liveTvOnNow,
-          titleIcon: Icons.play_circle_outline,
-          emptyLabel: l.searchNoResults,
-          items: onNowItems,
-          viewAll: _viewAllItem(onNowCount, _liveTvTabIndex),
-          useSidebarLayout: useSidebarLayout,
-          onSidebarActivate: onSidebarActivate,
-          onTopEdge: onTopEdge,
-        ),
-      if (upcomingEntries.isNotEmpty)
-        (onTopEdge) => MediaPreviewSection(
-          title: l.liveTvUpcomingAirings,
-          titleIcon: Icons.schedule,
-          emptyLabel: l.searchNoResults,
-          items: [
-            for (final entry in upcomingEntries.take(visible))
-              _showResultItem(
-                entry,
-                channelsById[entry.channelId],
-                languageTag,
-                onTap: () => widget.onShowSelect?.call(entry.show),
-              ),
-          ],
-          viewAll: _viewAllItem(upcomingEntries.length, _liveTvTabIndex),
-          useSidebarLayout: useSidebarLayout,
-          onSidebarActivate: onSidebarActivate,
-          onTopEdge: onTopEdge,
-        ),
+      ?_channelRow(liveChannels, showResult, preview: true),
+      ?_upcomingRow(channelsById, upcomingEntries, preview: true),
       if (recordings.isNotEmpty)
         (onTopEdge) => MediaPreviewSection(
+          autofocusFirst: false,
           title: l.searchSectionRecordings,
           titleIcon: Icons.video_library,
           emptyLabel: l.searchNoResults,
@@ -519,19 +469,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
           onSidebarActivate: onSidebarActivate,
           onTopEdge: onTopEdge,
         ),
-      if (channels.isNotEmpty)
-        (onTopEdge) => _ChannelResultsRow(
-          title: l.searchSectionLiveTv,
-          channels: channels,
-          viewAll: _viewAllItem(channels.length, _liveTvTabIndex),
-          onChannelTap: (channel) => _selectChannel(channels, channel),
-          onEnsureEpg: widget.onEnsureEpg,
-          useSidebarLayout: useSidebarLayout,
-          onSidebarActivate: onSidebarActivate,
-          onTopEdge: onTopEdge,
-        ),
       if (vodItems.isNotEmpty)
         (onTopEdge) => MediaPreviewSection(
+          autofocusFirst: false,
           title: l.searchSectionMovies,
           titleIcon: Icons.movie,
           emptyLabel: l.searchNoResults,
@@ -546,6 +486,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
         ),
       if (seriesList.isNotEmpty)
         (onTopEdge) => MediaPreviewSection(
+          autofocusFirst: false,
           title: l.searchSectionSeries,
           titleIcon: Icons.tv,
           emptyLabel: l.searchNoResults,
@@ -559,10 +500,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
           onTopEdge: onTopEdge,
         ),
     ];
-    // Its own focus scope keeps the tab bar out of reach of Up between rows:
-    // with the row above scrolled out of the list's cache, the tabs were the
-    // nearest thing above, so Up jumped there instead of scrolling the row
-    // back in. Inside the scope dpad scrolls up and retries instead.
+    return _buildRows(rows);
+  }
+
+  /// A tab's rows, stacked. Its own focus scope keeps the tab bar out of
+  /// reach of Up between rows: with the row above scrolled out of the list's
+  /// cache, the tabs were the nearest thing above, so Up jumped there
+  /// instead of scrolling the row back in. Inside the scope dpad scrolls up
+  /// and retries instead. The first row takes Up to the selected tab. Rows
+  /// set `autofocusFirst: false`: with nothing focused in this scope, a
+  /// first card's autofocus would take focus from the search field as
+  /// results arrive.
+  Widget _buildRows(List<Widget Function(VoidCallback? onTopEdge)> rows) {
     return FocusScope(
       child: ListView(
         padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
@@ -574,29 +523,123 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     );
   }
 
+  /// The channels for the Live TV row: those whose name matches, then
+  /// those airing a matching show right now (their tile shows it as the
+  /// current programme). Remembered between builds, as the name matches can
+  /// run long.
+  List<Channel> _liveTvChannels(
+    List<Channel> channels,
+    ShowResultEntries? showResult,
+  ) {
+    final airing = showResult?.onNowChannels ?? const <Channel>[];
+    if (airing.isEmpty) return channels;
+    final airingIds = [for (final channel in airing) channel.id];
+    final cached = _liveTvChannelsCache;
+    if (cached != null &&
+        identical(cached.channels, channels) &&
+        listEquals(cached.airingIds, airingIds)) {
+      return cached.result;
+    }
+    final seen = {for (final channel in channels) channel.id};
+    final result = [
+      ...channels,
+      for (final channel in airing)
+        if (seen.add(channel.id)) channel,
+    ];
+    _liveTvChannelsCache = (
+      channels: channels,
+      airingIds: airingIds,
+      result: result,
+    );
+    return result;
+  }
+
+  ({List<Channel> channels, List<int> airingIds, List<Channel> result})?
+  _liveTvChannelsCache;
+
+  /// Shows airing later that match, on Live TV's channel tiles. As a
+  /// [preview] (the All tab) it shows its first
+  /// [MediaPreviewSection.maxVisibleItems] and ends in a View All card
+  /// opening the Live TV tab; on the Live TV tab it is the full list. Null
+  /// with no matches.
+  Widget Function(VoidCallback? onTopEdge)? _upcomingRow(
+    Map<int, Channel> channelsById,
+    List<ShowResultEntry> entries, {
+    required bool preview,
+  }) {
+    if (entries.isEmpty) return null;
+    return (onTopEdge) => _ShowResultsRow(
+      title: AppLocalizations.of(context).liveTvUpcomingAirings,
+      titleIcon: Icons.schedule,
+      entries: entries,
+      channelsById: channelsById,
+      maxItems: _rowMaxItems(entries.length, preview: preview),
+      viewAll: _rowViewAll(entries.length, preview: preview),
+      onEntryTap: (entry) => widget.onShowSelect?.call(entry.show),
+      useSidebarLayout: widget.useSidebarLayout,
+      onSidebarActivate: widget.onSidebarActivate,
+      onTopEdge: onTopEdge,
+    );
+  }
+
+  /// The Live TV row, like [_upcomingRow]. Null with no channels.
+  Widget Function(VoidCallback? onTopEdge)? _channelRow(
+    List<Channel> channels,
+    ShowResultEntries? showResult, {
+    required bool preview,
+  }) {
+    if (channels.isEmpty) return null;
+    // A channel airing a matching show shows that airing, which needn't be
+    // in the local guide yet.
+    final airingByChannel = <int, ShowResultEntry>{
+      for (final entry in showResult?.onNow ?? const <ShowResultEntry>[])
+        entry.channelId: entry,
+    };
+    return (onTopEdge) => _ChannelResultsRow(
+      title: AppLocalizations.of(context).searchSectionLiveTv,
+      channels: channels,
+      airingByChannel: airingByChannel,
+      maxItems: _rowMaxItems(channels.length, preview: preview),
+      viewAll: _rowViewAll(channels.length, preview: preview),
+      onChannelTap: (channel) => _selectChannel(channels, channel),
+      onEnsureEpg: widget.onEnsureEpg,
+      useSidebarLayout: widget.useSidebarLayout,
+      onSidebarActivate: widget.onSidebarActivate,
+      onTopEdge: onTopEdge,
+    );
+  }
+
+  int _rowMaxItems(int count, {required bool preview}) =>
+      preview ? MediaPreviewSection.maxVisibleItems : count;
+
+  MediaPreviewItem? _rowViewAll(int count, {required bool preview}) =>
+      preview ? _viewAllItem(count, _liveTvTabIndex) : null;
+
   Widget _buildLiveTvTab(
     List<Channel> channels,
     Map<int, Channel> channelsById,
     ShowResultEntries? showResult,
   ) {
     if (!_hasQuery) return _buildPromptState();
-    // When the EPG show search is active, fully replace the channel grid
-    // with the same All/On-Now/Upcoming sub-tab view LiveTvScreen uses -
-    // mirrors LiveTvScreen exactly because (like Live TV) this tab has
-    // nothing else to show once a show search fires.
-    if (_showSearchActive) {
-      return ShowSearchResultsView(
-        shows: _showSearchController.results,
-        isLoading: _showSearchController.isLoading,
-        error: _showSearchController.error,
-        channelsById: channelsById,
-        onChannelSelect: widget.onChannelSelect,
-        onChannelContextChanged: widget.onChannelContextChanged,
-        onShowSelect: widget.onShowSelect,
-        memoryKeyPrefix: 'search/live-tv/search-results',
-        onEdge: _handleContentEdge,
-        resetTabsToken: _showSearchController.searchSessionId,
-        precomputedResult: showResult,
+    // With a show search running, the tab is the All tab's top rows (Live
+    // TV, then Upcoming), each in full.
+    if (showResult != null) {
+      final rows = [
+        ?_channelRow(
+          _liveTvChannels(channels, showResult),
+          showResult,
+          preview: false,
+        ),
+        ?_upcomingRow(channelsById, showResult.upcoming, preview: false),
+      ];
+      if (rows.isNotEmpty) return _buildRows(rows);
+      final l = AppLocalizations.of(context);
+      return _buildEmptyState(
+        _showSearchController.isLoading
+            ? l.liveTvShowResultsLoading
+            : _showSearchController.error != null
+            ? l.showsSearchError
+            : l.searchNoResults,
       );
     }
     if (channels.isEmpty) {
@@ -738,37 +781,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     );
   }
 
-  /// An On Now or Upcoming show as a preview card: the channel's logo, the
-  /// show, and when it airs at title weight so it reads from the couch.
-  MediaPreviewItem _showResultItem(
-    ShowResultEntry entry,
-    Channel? channel,
-    String languageTag, {
-    required VoidCallback onTap,
-  }) {
-    final l = AppLocalizations.of(context);
-    final firstEpisode = entry.episodes.first;
-    final String? subtitle;
-    if (entry.isOnNow) {
-      subtitle = formatOnNowSubtitle(firstEpisode, firstEpisode.channelName);
-    } else {
-      final moreAirings = entry.episodes.length - 1;
-      subtitle = [
-        ?nullIfBlank(firstEpisode.channelName),
-        if (moreAirings > 0) l.liveTvMoreAirings(moreAirings),
-      ].join(' · ');
-    }
-    return MediaPreviewItem(
-      title: entry.show.displayTitle,
-      imageUrl: channel?.logoUrl,
-      imageFit: BoxFit.contain,
-      fallbackIcon: Icons.tv,
-      emphasisLabel: showResultAiringLabel(entry, languageTag, l),
-      subtitle: subtitle,
-      onTap: onTap,
-    );
-  }
-
   Widget _buildPromptState() =>
       _buildEmptyState(AppLocalizations.of(context).searchTypeToSearch);
 
@@ -791,6 +803,8 @@ class _ChannelResultsRow extends ConsumerWidget {
   const _ChannelResultsRow({
     required this.title,
     required this.channels,
+    required this.airingByChannel,
+    required this.maxItems,
     required this.viewAll,
     required this.onChannelTap,
     required this.onEnsureEpg,
@@ -801,6 +815,11 @@ class _ChannelResultsRow extends ConsumerWidget {
 
   final String title;
   final List<Channel> channels;
+
+  /// The matching show airing now on a channel, shown in place of its guide
+  /// entry.
+  final Map<int, ShowResultEntry> airingByChannel;
+  final int maxItems;
   final MediaPreviewItem? viewAll;
   final ValueChanged<Channel> onChannelTap;
   final EnsureEpg? onEnsureEpg;
@@ -812,26 +831,107 @@ class _ChannelResultsRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final epgService = ref.watch(epgServiceProvider);
     final recordingChannelIds = ref.watch(recordingChannelIdsProvider);
+    final l = AppLocalizations.of(context);
+    final languageTag = Localizations.localeOf(context).toLanguageTag();
     return MediaPreviewSection.builder(
+      autofocusFirst: false,
       title: title,
       titleIcon: Icons.live_tv,
       emptyLabel: AppLocalizations.of(context).searchNoResults,
       viewAll: viewAll,
+      maxItems: maxItems,
       itemCount: channels.length,
       baseCardWidth: ChannelGridTile.baseWidth,
       baseCardHeight: ChannelGridTile.baseHeight,
       itemBuilder: (context, index, cardSize, {required autofocus}) {
         final channel = channels[index];
         onEnsureEpg?.call([channel]);
+        final airing = airingByChannel[channel.id];
         return SizedBox.fromSize(
           size: cardSize,
           child: ChannelGridTile(
             channel: channel,
             epg: epgService.lookupForChannel(channel),
+            programme: airing == null
+                ? null
+                : showResultTileProgramme(airing, languageTag, l),
             isFavorite: false,
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: autofocus,
             onTap: () => onChannelTap(channel),
+          ),
+        );
+      },
+      useSidebarLayout: useSidebarLayout,
+      onSidebarActivate: onSidebarActivate,
+      onTopEdge: onTopEdge,
+    );
+  }
+}
+
+/// The Upcoming row: each show on its channel's Live TV tile, with the airing
+/// (not the channel's current guide entry) under the channel name.
+class _ShowResultsRow extends ConsumerWidget {
+  const _ShowResultsRow({
+    required this.title,
+    required this.titleIcon,
+    required this.entries,
+    required this.channelsById,
+    required this.maxItems,
+    required this.viewAll,
+    required this.onEntryTap,
+    required this.useSidebarLayout,
+    required this.onSidebarActivate,
+    required this.onTopEdge,
+  });
+
+  final String title;
+  final IconData titleIcon;
+  final List<ShowResultEntry> entries;
+  final Map<int, Channel> channelsById;
+  final int maxItems;
+  final MediaPreviewItem? viewAll;
+  final ValueChanged<ShowResultEntry> onEntryTap;
+  final bool useSidebarLayout;
+  final VoidCallback? onSidebarActivate;
+  final VoidCallback? onTopEdge;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recordingChannelIds = ref.watch(recordingChannelIdsProvider);
+    final l = AppLocalizations.of(context);
+    final languageTag = Localizations.localeOf(context).toLanguageTag();
+    return MediaPreviewSection.builder(
+      autofocusFirst: false,
+      title: title,
+      titleIcon: titleIcon,
+      emptyLabel: l.searchNoResults,
+      viewAll: viewAll,
+      maxItems: maxItems,
+      itemCount: entries.length,
+      baseCardWidth: ChannelGridTile.baseWidth,
+      baseCardHeight: ChannelGridTile.baseHeight,
+      itemBuilder: (context, index, cardSize, {required autofocus}) {
+        final entry = entries[index];
+        final firstEpisode = entry.episodes.first;
+        // An Upcoming show can air on a channel this playlist doesn't carry;
+        // its tile still names the channel and opens the show.
+        final channel =
+            channelsById[entry.channelId] ??
+            Channel(
+              id: entry.channelId,
+              name: firstEpisode.channelName ?? '',
+              streamUrl: '',
+            );
+        return SizedBox.fromSize(
+          size: cardSize,
+          child: ChannelGridTile(
+            channel: channel,
+            programme: showResultTileProgramme(entry, languageTag, l),
+            isFavorite: false,
+            isRecording: recordingChannelIds.contains(channel.id),
+            autofocus: autofocus,
+            onTap: () => onEntryTap(entry),
           ),
         );
       },

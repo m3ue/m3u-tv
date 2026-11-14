@@ -10,10 +10,28 @@ import 'package:material_ui/material_ui.dart';
 /// Channel card used by the Live TV "Grid" view and the Home Live TV row:
 /// logo, current-program progress bar, channel name, current program title
 /// and its start/end time. Sized by its parent.
+/// What a [ChannelGridTile] shows under the channel name in place of its
+/// guide data: a matched show's airing in search results.
+class ChannelTileProgramme {
+  const ChannelTileProgramme({
+    required this.title,
+    required this.timeLabel,
+    this.progress,
+  });
+
+  final String title;
+  final String timeLabel;
+
+  /// How far through the airing it is (0-1), for one on now. Null hides the
+  /// progress bar, as for an upcoming airing.
+  final double? progress;
+}
+
 class ChannelGridTile extends StatelessWidget {
   const ChannelGridTile({
     required this.channel,
     this.epg,
+    this.programme,
     required this.isFavorite,
     required this.isRecording,
     required this.autofocus,
@@ -28,6 +46,9 @@ class ChannelGridTile extends StatelessWidget {
 
   final Channel channel;
   final EpgCurrentNext? epg;
+
+  /// Shown in place of [epg]'s current programme when set.
+  final ChannelTileProgramme? programme;
   final bool isFavorite;
   final bool isRecording;
   final bool autofocus;
@@ -40,6 +61,15 @@ class ChannelGridTile extends StatelessWidget {
     final scale = FontSizeScope.scaleOf(context);
     final languageTag = Localizations.localeOf(context).toLanguageTag();
     final timeFormat = DateFormat.jm(languageTag);
+    final current = epg?.current;
+    final programmeTitle = programme?.title ?? current?.displayTitle;
+    final timeLabel =
+        programme?.timeLabel ??
+        (current == null
+            ? null
+            : '${timeFormat.format(current.start.toLocal())} - '
+                  '${timeFormat.format(current.end.toLocal())}');
+    final progress = programme != null ? programme!.progress : epg?.progress;
     return DpadInkWell(
       autofocus: autofocus,
       onTap: onTap,
@@ -86,9 +116,9 @@ class ChannelGridTile extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            if (epg != null)
+            if (progress != null)
               LinearProgressIndicator(
-                value: epg!.progress,
+                value: progress,
                 minHeight: 3,
                 backgroundColor: colorScheme.surfaceContainerHighest,
                 valueColor: AlwaysStoppedAnimation(colorScheme.primary),
@@ -112,9 +142,9 @@ class ChannelGridTile extends StatelessWidget {
                 ),
               ],
             ),
-            if (epg != null) ...[
+            if (programmeTitle != null) ...[
               Text(
-                epg!.current.displayTitle,
+                programmeTitle,
                 style:
                     Theme.of(
                       context,
@@ -125,8 +155,7 @@ class ChannelGridTile extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
-                '${timeFormat.format(epg!.current.start.toLocal())} - '
-                '${timeFormat.format(epg!.current.end.toLocal())}',
+                timeLabel ?? '',
                 style:
                     Theme.of(
                       context,
