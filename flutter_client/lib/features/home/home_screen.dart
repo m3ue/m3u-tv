@@ -752,6 +752,14 @@ class _ContinueWatchingRowState extends ConsumerState<_ContinueWatchingRow> {
       id: 'continue-watching-more',
       title: l.homeContinueWatching,
       description: l.homeContinueWatchingMoreCount(continueWatchingOverflow),
+      kicker: l.homeViewAll,
+      icon: Icons.history,
+      // The ones the row doesn't have room for
+      artworkUrls: [
+        for (final item in _items.skip(continueWatchingRowLimit))
+          ?item.imageUrl,
+      ],
+      artworkShape: SpotlightArtworkShape.landscape,
     );
     return MediaPreviewSection(
       title: l.homeContinueWatching,
@@ -930,6 +938,10 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
           id: _viewAllId('live', custom),
           title: l.navLiveTv,
           description: l.homeBrowseLiveTv,
+          kicker: l.homeViewAll,
+          icon: Icons.live_tv,
+          artworkUrls: [for (final channel in rowChannels) ?channel.logoUrl],
+          artworkShape: SpotlightArtworkShape.logo,
         ),
         onTap: widget.onViewAll,
         spotlight: spotlight,
@@ -1242,6 +1254,13 @@ class _SportsRowState extends ConsumerState<_SportsRow> {
                 id: _viewAllId('sports', custom),
                 title: l.navSports,
                 description: l.homeBrowseSports,
+                kicker: l.homeViewAll,
+                icon: Icons.stadium_rounded,
+                artworkUrls: {
+                  for (final fixture in rowFixtures)
+                    for (final side in fixture.displayOrder) ?side.team.logoUrl,
+                }.toList(growable: false),
+                artworkShape: SpotlightArtworkShape.logo,
               ),
               onTap: onViewAll,
               spotlight: spotlight,
@@ -1406,6 +1425,11 @@ class _MoviesRowState extends ConsumerState<_MoviesRow> {
           id: _viewAllId('movies', custom),
           title: l.navVod,
           description: l.homeBrowseMovies,
+          kicker: l.homeViewAll,
+          icon: Icons.movie,
+          artworkUrls: [
+            for (final item in items ?? const <VodItem>[]) ?item.logoUrl,
+          ],
         ),
         onTap: widget.onViewAll,
         spotlight: spotlight,
@@ -1550,6 +1574,11 @@ class _SeriesRowState extends ConsumerState<_SeriesRow> {
           id: _viewAllId('series', custom),
           title: l.navSeries,
           description: l.homeBrowseSeries,
+          kicker: l.homeViewAll,
+          icon: Icons.tv,
+          artworkUrls: [
+            for (final series in items ?? const <Series>[]) ?series.coverUrl,
+          ],
         ),
         onTap: widget.onViewAll,
         spotlight: spotlight,
@@ -1597,11 +1626,15 @@ class _EntryPointRow extends StatelessWidget {
     required this.useSidebarLayout,
     required this.onSidebarActivate,
     required this.spotlight,
+    this.artworkUrls = const [],
   });
 
   final String targetId;
   final String title;
   final IconData icon;
+
+  /// Previewed in the rich hero; the [icon] stands in without any.
+  final List<String> artworkUrls;
   final String cardTitle;
   final String subtitle;
   final VoidCallback onTap;
@@ -1616,6 +1649,8 @@ class _EntryPointRow extends StatelessWidget {
       id: targetId,
       title: cardTitle,
       description: subtitle,
+      icon: icon,
+      artworkUrls: artworkUrls,
     );
     return MediaPreviewSection(
       title: title,
@@ -1666,6 +1701,9 @@ class _RecordingsRow extends ConsumerWidget {
       subtitle: dvrRecordings.isEmpty
           ? l.homeDvrRecordingsBrowse
           : l.dvrStorageRecordingCount(dvrRecordings.length),
+      artworkUrls: [
+        for (final recording in dvrRecordings) ?recording.posterUrl,
+      ],
       onTap: onRecordingsSelect,
       useSidebarLayout: useSidebarLayout,
       onSidebarActivate: onSidebarActivate,

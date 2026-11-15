@@ -482,6 +482,22 @@ class _SpotlightBackgroundState extends State<_SpotlightBackground> {
     final crests = spotlight?.backdropUrl == null
         ? spotlight?.crestUrls ?? const <String>[]
         : const <String>[];
+    // A non-media card (View all, DVR) previews where it leads instead.
+    final showcase =
+        spotlight != null &&
+        spotlight.backdropUrl == null &&
+        crests.isEmpty &&
+        (spotlight.artworkUrls.isNotEmpty || spotlight.icon != null);
+    // Icon-only cards have no image to take a tone from; glow in the theme
+    // colour so the hero isn't left bare.
+    final tone =
+        _tone ??
+        (showcase && spotlight.toneUrl == null
+            ? deepBackdropTone(
+                Theme.of(context).colorScheme.primary,
+                vivid: true,
+              )
+            : null);
     final backdrop = RepaintBoundary(
       child: _EdgeFade(
         child: _CrossfadeBackdrop(
@@ -500,7 +516,7 @@ class _SpotlightBackgroundState extends State<_SpotlightBackground> {
         // the app's own gradient background shows through instead of a
         // solid fill with hard edges.
         TweenAnimationBuilder<Color?>(
-          tween: ColorTween(end: _tone ?? Colors.transparent),
+          tween: ColorTween(end: tone ?? Colors.transparent),
           duration: const Duration(milliseconds: 500),
           curve: Curves.easeOut,
           builder: (context, tone, _) {
@@ -545,6 +561,26 @@ class _SpotlightBackgroundState extends State<_SpotlightBackground> {
                   key: ValueKey(spotlight!.key),
                   urls: crests,
                   size: crestHeight * 0.78,
+                ),
+              ),
+            ),
+          ),
+        if (showcase && crestHeight > 0)
+          Positioned(
+            top: crestTop,
+            right: 0,
+            left: 0,
+            height: crestHeight,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: FractionallySizedBox(
+                widthFactor: 0.6,
+                child: IgnorePointer(
+                  child: _SpotlightShowcase(
+                    key: ValueKey(spotlight.key),
+                    spotlight: spotlight,
+                    height: crestHeight,
+                  ),
                 ),
               ),
             ),
@@ -599,6 +635,202 @@ class _SpotlightCrests extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// What a non-media card leads to, where backdrop art would be: its row's
+/// artwork fanned out like a hand of cards, or without any, the card's icon
+/// as a glowing emblem. Both ease in as the spotlight moves to the card.
+class _SpotlightShowcase extends StatelessWidget {
+  const _SpotlightShowcase({
+    super.key,
+    required this.spotlight,
+    required this.height,
+  });
+
+  final HomeSpotlight spotlight;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 520),
+      curve: Curves.easeOutCubic,
+      builder: (context, t, _) => Opacity(
+        opacity: t.clamp(0.0, 1.0),
+        // Shrinks, never overflows, when the hero is narrow
+        child: Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: spotlight.artworkUrls.isEmpty
+                ? _emblem(context, t)
+                : _fan(t),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _emblem(BuildContext context, double t) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final size = height * 0.62;
+    final ring = size * 1.32;
+    return Transform.scale(
+      scale: 0.88 + 0.12 * t,
+      child: SizedBox.square(
+        dimension: ring,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  width: 1.5,
+                ),
+              ),
+              child: const SizedBox.expand(),
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  center: const Alignment(-0.3, -0.4),
+                  radius: 1.1,
+                  colors: [
+                    primary.withValues(alpha: 0.5),
+                    primary.withValues(alpha: 0.12),
+                  ],
+                ),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: primary.withValues(alpha: 0.35),
+                    blurRadius: size * 0.45,
+                  ),
+                ],
+              ),
+              child: SizedBox.square(
+                dimension: size,
+                child: Icon(
+                  spotlight.icon,
+                  size: size * 0.42,
+                  color: Colors.white.withValues(alpha: 0.92),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _fan(double t) {
+    final urls = spotlight.artworkUrls;
+    final shape = spotlight.artworkShape;
+    final (cardHeight, aspect) = switch (shape) {
+      SpotlightArtworkShape.poster => (height * 0.86, 2 / 3),
+      SpotlightArtworkShape.landscape => (height * 0.6, 16 / 9),
+      SpotlightArtworkShape.logo => (height * 0.5, 1.0),
+    };
+    final cardWidth = cardHeight * aspect;
+    final step =
+        cardWidth * (shape == SpotlightArtworkShape.landscape ? 0.42 : 0.56);
+    final center = (urls.length - 1) / 2;
+    // Outermost cards first, so the middle one ends up in front.
+    final order = List<int>.generate(urls.length, (i) => i)
+      ..sort(
+        (a, b) => (b - center).abs().compareTo((a - center).abs()),
+      );
+    return SizedBox(
+      width: cardWidth + step * (urls.length - 1) + cardWidth * 0.2,
+      height: cardHeight * 1.15,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          for (final index in order)
+            Builder(
+              builder: (context) {
+                final offset = index - center;
+                return Transform.translate(
+                  offset: Offset(
+                    offset * step * t,
+                    offset.abs() * cardHeight * 0.05 * t,
+                  ),
+                  child: Transform.rotate(
+                    angle: offset * 0.07 * t,
+                    child: Transform.scale(
+                      scale: 1 - offset.abs() * 0.07,
+                      child: _ShowcaseCard(
+                        url: urls[index],
+                        width: cardWidth,
+                        height: cardHeight,
+                        isLogo: shape == SpotlightArtworkShape.logo,
+                        fallbackIcon: spotlight.icon ?? Icons.image_outlined,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShowcaseCard extends StatelessWidget {
+  const _ShowcaseCard({
+    required this.url,
+    required this.width,
+    required this.height,
+    required this.isLogo,
+    required this.fallbackIcon,
+  });
+
+  final String url;
+  final double width;
+  final double height;
+  final bool isLogo;
+  final IconData fallbackIcon;
+
+  static const double _radius = 12;
+
+  @override
+  Widget build(BuildContext context) {
+    final inset = isLogo ? width * 0.16 : 0.0;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: isLogo ? const Color(0xFF1C1D24) : null,
+        borderRadius: BorderRadius.circular(_radius),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x8C000000),
+            blurRadius: 28,
+            offset: Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(inset),
+        child: ResilientMediaImage(
+          imageUrl: url,
+          fallbackIcon: fallbackIcon,
+          width: width - inset * 2,
+          height: height - inset * 2,
+          fit: isLogo ? BoxFit.contain : BoxFit.cover,
+          borderRadius: isLogo ? 0 : _radius,
+          backgroundColor: isLogo ? Colors.transparent : null,
         ),
       ),
     );
@@ -794,6 +1026,7 @@ class _SpotlightDetails extends StatelessWidget {
     final scale = FontSizeScope.scaleOf(context);
     final width = MediaQuery.sizeOf(context).width;
     final muted = theme.colorScheme.onSurfaceVariant;
+    final logoMaxHeight = (maxHeight * 0.32).clamp(40.0, 120.0 * scale);
     final hasKicker =
         spotlight.badge != null ||
         spotlight.kicker != null ||
@@ -812,12 +1045,34 @@ class _SpotlightDetails extends StatelessWidget {
               _SpotlightKicker(spotlight: spotlight),
               SizedBox(height: 8 * scale),
             ],
-            ItemTitleHeading(
-              name: spotlight.title,
-              clearLogoUrl: spotlight.clearLogoUrl,
-              logoMaxHeight: (maxHeight * 0.32).clamp(40.0, 120.0 * scale),
-              maxLines: 2,
-            ),
+            if (spotlight.largeTitle)
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: logoMaxHeight),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    spotlight.title,
+                    maxLines: 1,
+                    style: theme.textTheme.displayLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -1.5,
+                      height: 1,
+                      color: Colors.white,
+                      shadows: const [
+                        Shadow(color: Color(0x66000000), blurRadius: 24),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            else
+              ItemTitleHeading(
+                name: spotlight.title,
+                clearLogoUrl: spotlight.clearLogoUrl,
+                logoMaxHeight: logoMaxHeight,
+                maxLines: 2,
+              ),
             if (spotlight.secondaryTitle != null) ...[
               SizedBox(height: 4 * scale),
               Text(
