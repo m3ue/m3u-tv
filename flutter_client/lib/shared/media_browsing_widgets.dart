@@ -1325,6 +1325,115 @@ const double kSidebarRailInset = 64;
 
 class _MediaPreviewSectionState extends State<MediaPreviewSection> {
   final ScrollController _controller = ScrollController();
+  final GlobalKey<DpadRegionState> _regionKey = GlobalKey<DpadRegionState>();
+
+  /// Up/Down out of the row lands on the nearest row in that direction.
+  ///
+  /// dpad's own pick favours anything directly under the focused card
+  /// ("in the beam") over anything off to the side, however close. Focused
+  /// far along a long row, a short row next to it (two cards and View all)
+  /// has nothing under the card, so focus jumped over it to the row after.
+  /// Here the beam is the whole row's width, so the closest row wins and
+  /// then the card nearest across (or the one remembered) inside it.
+  void _onVerticalEdge(TraversalDirection direction) {
+    if (_focusAdjacentRow(direction)) return;
+    // The next row may not be built yet in a lazy list: reveal it, retry.
+    final scrollable = Scrollable.maybeOf(context, axis: Axis.vertical);
+    final position = scrollable?.position;
+    if (position == null) return;
+    final down = direction == TraversalDirection.down;
+    final target =
+        (position.pixels + (down ? 1 : -1) * position.viewportDimension * 0.6)
+            .clamp(position.minScrollExtent, position.maxScrollExtent);
+    if ((target - position.pixels).abs() < 1) return;
+    position.jumpTo(target);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusAdjacentRow(direction);
+    });
+  }
+
+  bool _focusAdjacentRow(TraversalDirection direction) {
+    final region = _regionKey.currentState;
+    final regionRect = region == null ? null : _globalRect(region.context);
+    final current = FocusManager.instance.primaryFocus;
+    final source = current == null ? null : _nodeRect(current);
+    final scope = current?.nearestScope;
+    if (region == null ||
+        regionRect == null ||
+        source == null ||
+        scope == null) {
+      return false;
+    }
+    final down = direction == TraversalDirection.down;
+    // Candidates beyond this row that share its horizontal span, so the
+    // sidebar or a side panel never counts as the row below.
+    final byRegion = <Object, List<(FocusNode, Rect)>>{};
+    double? nearestGap;
+    for (final node in scope.traversalDescendants) {
+      if (!node.canRequestFocus) continue;
+      final targetRegion = DpadRegion.ofNode(node);
+      if (identical(targetRegion, region)) continue;
+      final rect = _nodeRect(node);
+      // Off-screen lazy children can report NaN geometry, which would slip
+      // past every comparison below.
+      if (rect == null || !rect.isFinite || rect.isEmpty) continue;
+      if (rect.right <= regionRect.left || rect.left >= regionRect.right) {
+        continue;
+      }
+      final gap = down
+          ? rect.top - regionRect.bottom
+          : regionRect.top - rect.bottom;
+      if (gap < -1) continue;
+      (byRegion[targetRegion ?? node] ??= []).add((node, rect));
+      if (nearestGap == null || gap < nearestGap) nearestGap = gap;
+    }
+    if (nearestGap == null) return false;
+    // The closest row: the group holding the smallest gap.
+    List<(FocusNode, Rect)>? row;
+    for (final group in byRegion.values) {
+      final gap = group
+          .map(
+            (entry) => down
+                ? entry.$2.top - regionRect.bottom
+                : regionRect.top - entry.$2.bottom,
+          )
+          .reduce(math.min);
+      if (gap == nearestGap) {
+        row = group;
+        break;
+      }
+    }
+    if (row == null) return false;
+    // Inside it, the card closest across to the one focused now.
+    var nearest = row.first;
+    for (final entry in row.skip(1)) {
+      if ((entry.$2.center.dx - source.center.dx).abs() <
+          (nearest.$2.center.dx - source.center.dx).abs()) {
+        nearest = entry;
+      }
+    }
+    final targetRegion = DpadRegion.ofNode(nearest.$1);
+    (targetRegion?.resolveEnter(nearest.$1, [
+              for (final entry in row) entry.$1,
+            ]) ??
+            nearest.$1)
+        .requestFocus();
+    return true;
+  }
+
+  static Rect? _nodeRect(FocusNode node) {
+    final context = node.context;
+    return context == null || !context.mounted ? null : _globalRect(context);
+  }
+
+  static Rect? _globalRect(BuildContext context) {
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return null;
+    return MatrixUtils.transformRect(
+      box.getTransformTo(null),
+      Offset.zero & box.size,
+    );
+  }
 
   @override
   void dispose() {
@@ -1446,16 +1555,21 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
               // when scrolling quickly.
               child: ExcludeSemantics(
                 child: DpadRegion(
+                  key: _regionKey,
                   memoryKey: 'preview-row/${widget.title}',
                   horizontalEdge: DpadEdgeBehavior.stop,
-                  upEdge: widget.onTopEdge == null
-                      ? null
-                      : DpadEdgeBehavior.stop,
+                  verticalEdge: DpadEdgeBehavior.stop,
                   onEdge: (direction) {
-                    if (direction == TraversalDirection.left) {
-                      widget.onSidebarActivate?.call();
-                    } else if (direction == TraversalDirection.up) {
-                      widget.onTopEdge?.call();
+                    switch (direction) {
+                      case TraversalDirection.left:
+                        widget.onSidebarActivate?.call();
+                      case TraversalDirection.up when widget.onTopEdge != null:
+                        widget.onTopEdge!.call();
+                      case TraversalDirection.up:
+                      case TraversalDirection.down:
+                        _onVerticalEdge(direction);
+                      case TraversalDirection.right:
+                        break;
                     }
                   },
                   // No Scrollbar, matching the detail screens' episode + cast
