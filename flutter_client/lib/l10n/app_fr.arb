@@ -1003,6 +1003,8 @@
   "settingsMatchRefreshRateHint": "Bascule l'écran sur la fréquence d'images de la vidéo au démarrage de la lecture. L'écran peut brièvement clignoter ou devenir noir.",
   "settingsDeinterlace": "Désentrelacer la vidéo",
   "settingsDeinterlaceHint": "Atténue les lignes en peigne des chaînes entrelacées (comme 1080i et 576i). Utilise davantage le processeur.",
+  "settingsHideOverlayOnStart": "Masquer l'overlay du lecteur au démarrage",
+  "settingsHideOverlayOnStartHint": "Les flux s'ouvrent uniquement sur l'image, sans les commandes ni les infos de la chaîne. Appuyez sur n'importe quel bouton ou touchez l'écran pour les afficher.",
   "settingsBackgroundAudio": "Audio en arrière-plan",
   "settingsBackgroundAudioHint": "Continue la lecture audio, avec les commandes sur l'écran verrouillé et dans les notifications, lorsque vous quittez l'app ou verrouillez l'écran.",
   "settingsPrebufferLive": "Mettre en mémoire tampon les flux en direct avant la lecture",

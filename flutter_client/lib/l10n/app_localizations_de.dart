@@ -2045,6 +2045,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Glättet die Kammlinien bei Interlaced-Sendern (z. B. 1080i und 576i). Benötigt mehr CPU-Leistung.';
 
   @override
+  String get settingsHideOverlayOnStart =>
+      'Player-Overlay beim Start ausblenden';
+
+  @override
+  String get settingsHideOverlayOnStartHint =>
+      'Streams starten nur mit dem Bild, ohne Steuerelemente und Senderinfos. Drücke eine beliebige Taste oder tippe auf den Bildschirm, um sie einzublenden.';
+
+  @override
   String get settingsBackgroundAudio => 'Audio im Hintergrund';
 
   @override

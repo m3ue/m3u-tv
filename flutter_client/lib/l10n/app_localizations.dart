@@ -3542,6 +3542,18 @@ abstract class AppLocalizations {
   /// **'Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.'**
   String get settingsDeinterlaceHint;
 
+  /// No description provided for @settingsHideOverlayOnStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide player overlay on start'**
+  String get settingsHideOverlayOnStart;
+
+  /// No description provided for @settingsHideOverlayOnStartHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Open streams on just the picture, without the controls and channel info. Press any button or tap the screen to show them.'**
+  String get settingsHideOverlayOnStartHint;
+
   /// No description provided for @settingsBackgroundAudio.
   ///
   /// In en, this message translates to:

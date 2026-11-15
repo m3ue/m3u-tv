@@ -2030,6 +2030,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.';
 
   @override
+  String get settingsHideOverlayOnStart => 'Hide player overlay on start';
+
+  @override
+  String get settingsHideOverlayOnStartHint =>
+      'Open streams on just the picture, without the controls and channel info. Press any button or tap the screen to show them.';
+
+  @override
   String get settingsBackgroundAudio => 'Background audio';
 
   @override

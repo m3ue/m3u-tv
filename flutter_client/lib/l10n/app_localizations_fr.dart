@@ -2053,6 +2053,14 @@ class AppLocalizationsFr extends AppLocalizations {
       'Atténue les lignes en peigne des chaînes entrelacées (comme 1080i et 576i). Utilise davantage le processeur.';
 
   @override
+  String get settingsHideOverlayOnStart =>
+      'Masquer l\'overlay du lecteur au démarrage';
+
+  @override
+  String get settingsHideOverlayOnStartHint =>
+      'Les flux s\'ouvrent uniquement sur l\'image, sans les commandes ni les infos de la chaîne. Appuyez sur n\'importe quel bouton ou touchez l\'écran pour les afficher.';
+
+  @override
   String get settingsBackgroundAudio => 'Audio en arrière-plan';
 
   @override

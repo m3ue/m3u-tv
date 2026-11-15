@@ -1966,6 +1966,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '消除隔行扫描频道（如 1080i 和 576i）的梳状条纹。会占用更多 CPU。';
 
   @override
+  String get settingsHideOverlayOnStart => '开始播放时隐藏播放器叠加层';
+
+  @override
+  String get settingsHideOverlayOnStartHint =>
+      '播放开始时只显示画面，不显示控制栏和频道信息。按任意按键或轻触屏幕即可显示。';
+
+  @override
   String get settingsBackgroundAudio => '后台音频';
 
   @override

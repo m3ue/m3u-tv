@@ -1003,6 +1003,8 @@
   "settingsMatchRefreshRateHint": "Schaltet das Display beim Start der Wiedergabe auf die Bildrate des Videos. Der Bildschirm kann dabei kurz flackern oder schwarz werden.",
   "settingsDeinterlace": "Video deinterlacen",
   "settingsDeinterlaceHint": "Glättet die Kammlinien bei Interlaced-Sendern (z. B. 1080i und 576i). Benötigt mehr CPU-Leistung.",
+  "settingsHideOverlayOnStart": "Player-Overlay beim Start ausblenden",
+  "settingsHideOverlayOnStartHint": "Streams starten nur mit dem Bild, ohne Steuerelemente und Senderinfos. Drücke eine beliebige Taste oder tippe auf den Bildschirm, um sie einzublenden.",
   "settingsBackgroundAudio": "Audio im Hintergrund",
   "settingsBackgroundAudioHint": "Audio läuft weiter, mit Wiedergabesteuerung auf dem Sperrbildschirm und in den Mitteilungen, wenn du die App verlässt oder den Bildschirm sperrst.",
   "settingsPrebufferLive": "Live-Streams vor der Wiedergabe puffern",

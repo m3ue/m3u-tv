@@ -2049,6 +2049,14 @@ class AppLocalizationsEs extends AppLocalizations {
       'Suaviza las líneas de peine en los canales entrelazados (como 1080i y 576i). Usa más CPU.';
 
   @override
+  String get settingsHideOverlayOnStart =>
+      'Ocultar la superposición del reproductor al iniciar';
+
+  @override
+  String get settingsHideOverlayOnStartHint =>
+      'Las transmisiones se abren solo con la imagen, sin los controles ni la información del canal. Pulsa cualquier botón o toca la pantalla para mostrarlos.';
+
+  @override
   String get settingsBackgroundAudio => 'Audio en segundo plano';
 
   @override

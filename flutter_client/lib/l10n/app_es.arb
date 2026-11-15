@@ -1003,6 +1003,8 @@
   "settingsMatchRefreshRateHint": "Cambia la pantalla a la frecuencia de fotogramas del vídeo al iniciar la reproducción. La pantalla puede parpadear o quedarse en negro un instante.",
   "settingsDeinterlace": "Desentrelazar vídeo",
   "settingsDeinterlaceHint": "Suaviza las líneas de peine en los canales entrelazados (como 1080i y 576i). Usa más CPU.",
+  "settingsHideOverlayOnStart": "Ocultar la superposición del reproductor al iniciar",
+  "settingsHideOverlayOnStartHint": "Las transmisiones se abren solo con la imagen, sin los controles ni la información del canal. Pulsa cualquier botón o toca la pantalla para mostrarlos.",
   "settingsBackgroundAudio": "Audio en segundo plano",
   "settingsBackgroundAudioHint": "Sigue reproduciendo el audio, con controles en la pantalla de bloqueo y en las notificaciones, al salir de la app o bloquear la pantalla.",
   "settingsPrebufferLive": "Almacenar en búfer las transmisiones en vivo antes de reproducir",
