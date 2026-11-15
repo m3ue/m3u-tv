@@ -1677,19 +1677,20 @@ class _EntryPointRow extends StatelessWidget {
       onFocused: spotlight == null ? null : () => spotlight.select(target),
       onHoverChanged: spotlight?.hoverHandler(target),
     );
-    // Styled like a View all card: it opens a section, it isn't a title.
+    // Continue Watching's size, so the entry rows line up with it.
     return MediaPreviewSection.builder(
       title: title,
       titleIcon: icon,
       // Never shown: the row always has its one card.
       emptyLabel: subtitle,
       itemCount: 1,
-      baseCardWidth: MediaBrowsingMetrics.previewCardWidth,
-      baseCardHeight: MediaBrowsingMetrics.previewCardHeight,
+      baseCardWidth: MediaBrowsingMetrics.landscapeCardWidth,
+      baseCardHeight: MediaBrowsingMetrics.landscapeCardHeight,
       itemBuilder: (context, index, size, {required autofocus}) =>
-          PreviewActionCard(
+          PreviewEntryTile(
             item: item,
             width: size.width,
+            artworkUrls: artworkUrls,
             autofocus: autofocus,
           ),
       useSidebarLayout: useSidebarLayout,

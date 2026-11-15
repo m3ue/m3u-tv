@@ -1812,6 +1812,256 @@ class PreviewActionCard extends StatelessWidget {
   }
 }
 
+/// A one-card entry row's card (DVR, AIOStreams, Requests): Continue
+/// Watching's landscape size and text, so the rows line up, with a styled
+/// 16:9 face in place of a thumbnail - a tinted wash, the section's icon,
+/// and either a fan of [artworkUrls] (recording posters) or the icon again,
+/// large and faint.
+class PreviewEntryTile extends StatelessWidget {
+  const PreviewEntryTile({
+    super.key,
+    required this.item,
+    required this.width,
+    this.artworkUrls = const [],
+    this.accent,
+    this.autofocus = false,
+  });
+
+  final MediaPreviewItem item;
+  final double width;
+  final List<String> artworkUrls;
+
+  /// Tint for the face. Defaults to the theme's primary colour.
+  final Color? accent;
+  final bool autofocus;
+
+  static const int _maxArtwork = 3;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final artHeight = width * 9 / 16;
+    final card = SizedBox(
+      width: width,
+      child: DpadInkWell(
+        onTap: item.onTap,
+        autofocus: autofocus,
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: width,
+              height: artHeight,
+              child: _EntryTileFace(
+                icon: item.fallbackIcon,
+                accent: accent ?? colorScheme.primary,
+                artworkUrls: artworkUrls
+                    .where((url) => url.trim().isNotEmpty)
+                    .take(_maxArtwork)
+                    .toList(growable: false),
+                height: artHeight,
+              ),
+            ),
+            // Same text block as a landscape MediaPreviewCard.
+            Padding(
+              padding: const EdgeInsets.all(MediaBrowsingMetrics.chipGap),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (item.subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      item.subtitle!,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (item.onFocused == null && item.onHoverChanged == null) return card;
+    return PreviewFocusAnchor(
+      onFocused: item.onFocused,
+      onHoverChanged: item.onHoverChanged,
+      contentKey: (item.title, item.subtitle),
+      child: card,
+    );
+  }
+}
+
+class _EntryTileFace extends StatelessWidget {
+  const _EntryTileFace({
+    required this.icon,
+    required this.accent,
+    required this.artworkUrls,
+    required this.height,
+  });
+
+  final IconData icon;
+  final Color accent;
+  final List<String> artworkUrls;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final base = Theme.of(context).colorScheme.surfaceContainerHigh;
+    final scale = FontSizeScope.scaleOf(context);
+    final badge = 40 * scale;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Ink, so the press ripple still shows over the wash.
+        Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color.alphaBlend(accent.withValues(alpha: 0.34), base),
+                Color.alphaBlend(accent.withValues(alpha: 0.08), base),
+              ],
+            ),
+          ),
+        ),
+        if (artworkUrls.isEmpty)
+          Positioned(
+            right: -height * 0.12,
+            bottom: -height * 0.18,
+            child: Transform.rotate(
+              angle: -0.18,
+              child: Icon(
+                icon,
+                size: height * 0.95,
+                color: accent.withValues(alpha: 0.16),
+              ),
+            ),
+          )
+        else
+          Positioned(
+            top: 0,
+            bottom: 0,
+            right: 0,
+            width: height * 1.15,
+            child: _EntryTileArtwork(urls: artworkUrls, height: height),
+          ),
+        Positioned(
+          left: MediaBrowsingMetrics.chipGap * 1.5,
+          top: MediaBrowsingMetrics.chipGap * 1.5,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.24),
+              borderRadius: BorderRadius.circular(10 * scale),
+              border: Border.all(color: accent.withValues(alpha: 0.45)),
+            ),
+            child: SizedBox.square(
+              dimension: badge,
+              child: Icon(
+                icon,
+                size: badge * 0.55,
+                color: Color.alphaBlend(
+                  accent.withValues(alpha: 0.45),
+                  Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ),
+        // A soft top edge light, like the sheen on the other cards' art.
+        IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.white.withValues(alpha: 0.06),
+                  Colors.white.withValues(alpha: 0),
+                ],
+                stops: const [0, 0.4],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Up to three posters fanned against the tile's right edge, dissolving to
+/// the left so they sit behind the badge rather than crowd it.
+class _EntryTileArtwork extends StatelessWidget {
+  const _EntryTileArtwork({required this.urls, required this.height});
+
+  final List<String> urls;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final cardHeight = height * 0.78;
+    final cardWidth = cardHeight * 2 / 3;
+    final step = cardWidth * 0.42;
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (bounds) => const LinearGradient(
+        colors: [Color(0x00FFFFFF), Color(0xFFFFFFFF)],
+        stops: [0, 0.45],
+      ).createShader(bounds),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Back to front: the first poster ends up on top, at the right.
+          for (var i = urls.length - 1; i >= 0; i--)
+            Positioned(
+              right: height * 0.1 + i * step,
+              top: (height - cardHeight) / 2 + i * height * 0.03,
+              child: Transform.rotate(
+                angle: 0.06 - i * 0.05,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x73000000),
+                        blurRadius: 12,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ResilientMediaImage(
+                    imageUrl: urls[i],
+                    fallbackIcon: Icons.movie_outlined,
+                    width: cardWidth,
+                    height: cardHeight,
+                    borderRadius: 6,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class MediaPreviewCard extends StatefulWidget {
   const MediaPreviewCard({
     required this.item,
