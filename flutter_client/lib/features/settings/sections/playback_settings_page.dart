@@ -348,8 +348,7 @@ class PlayerSettingsGroup extends StatelessWidget {
           onTap: () => unawaited(
             pushSettingsSubpage<void>(
               context,
-              title: (context) =>
-                  AppLocalizations.of(context).settingsCaptions,
+              title: (context) => AppLocalizations.of(context).settingsCaptions,
               onBack: onHandleTopLevelBack,
               builder: (pageContext) {
                 final pl = AppLocalizations.of(pageContext);
@@ -365,7 +364,8 @@ class PlayerSettingsGroup extends StatelessWidget {
                       ),
                       SettingsRow(
                         title: pl.settingsCaptionsPosition,
-                        subtitle: service.captionPositionSync ==
+                        subtitle:
+                            service.captionPositionSync ==
                                 ViewSettingsService.captionPositionTop
                             ? pl.settingsCaptionsPositionTop
                             : pl.settingsCaptionsPositionBottom,
@@ -373,8 +373,9 @@ class PlayerSettingsGroup extends StatelessWidget {
                         onTap: () => unawaited(
                           pushSettingsPicker<String>(
                             pageContext,
-                            title: (context) => AppLocalizations.of(context)
-                                .settingsCaptionsPosition,
+                            title: (context) => AppLocalizations.of(
+                              context,
+                            ).settingsCaptionsPosition,
                             onBack: onHandleTopLevelBack,
                             selected: service.captionPositionSync,
                             options: [
@@ -394,7 +395,8 @@ class PlayerSettingsGroup extends StatelessWidget {
                       ),
                       SettingsRow(
                         title: pl.settingsCaptionsTextColor,
-                        subtitle: service.captionTextColorSync ==
+                        subtitle:
+                            service.captionTextColorSync ==
                                 ViewSettingsService.captionColorYellow
                             ? pl.settingsCaptionsColorYellow
                             : pl.settingsCaptionsColorWhite,
@@ -402,8 +404,9 @@ class PlayerSettingsGroup extends StatelessWidget {
                         onTap: () => unawaited(
                           pushSettingsPicker<String>(
                             pageContext,
-                            title: (context) => AppLocalizations.of(context)
-                                .settingsCaptionsTextColor,
+                            title: (context) => AppLocalizations.of(
+                              context,
+                            ).settingsCaptionsTextColor,
                             onBack: onHandleTopLevelBack,
                             selected: service.captionTextColorSync,
                             options: [
@@ -422,7 +425,8 @@ class PlayerSettingsGroup extends StatelessWidget {
                       ),
                       SettingsRow(
                         title: pl.settingsCaptionsBgColor,
-                        subtitle: service.captionBackgroundColorSync ==
+                        subtitle:
+                            service.captionBackgroundColorSync ==
                                 ViewSettingsService.captionBgTransparent
                             ? pl.settingsCaptionsBgTransparent
                             : pl.settingsCaptionsBgBlack,
@@ -430,8 +434,9 @@ class PlayerSettingsGroup extends StatelessWidget {
                         onTap: () => unawaited(
                           pushSettingsPicker<String>(
                             pageContext,
-                            title: (context) => AppLocalizations.of(context)
-                                .settingsCaptionsBgColor,
+                            title: (context) => AppLocalizations.of(
+                              context,
+                            ).settingsCaptionsBgColor,
                             onBack: onHandleTopLevelBack,
                             selected: service.captionBackgroundColorSync,
                             options: [
@@ -474,15 +479,16 @@ String _captionsSummary(AppLocalizations l, ViewSettingsService service) {
   final state = service.captionsDefaultSync
       ? l.settingsToggleOn
       : l.settingsToggleOff;
-  final position = service.captionPositionSync ==
-          ViewSettingsService.captionPositionTop
+  final position =
+      service.captionPositionSync == ViewSettingsService.captionPositionTop
       ? l.settingsCaptionsPositionTop
       : l.settingsCaptionsPositionBottom;
-  final fg = service.captionTextColorSync ==
-          ViewSettingsService.captionColorYellow
+  final fg =
+      service.captionTextColorSync == ViewSettingsService.captionColorYellow
       ? l.settingsCaptionsColorYellow
       : l.settingsCaptionsColorWhite;
-  final bg = service.captionBackgroundColorSync ==
+  final bg =
+      service.captionBackgroundColorSync ==
           ViewSettingsService.captionBgTransparent
       ? l.settingsCaptionsBgTransparent
       : l.settingsCaptionsBgBlack;
