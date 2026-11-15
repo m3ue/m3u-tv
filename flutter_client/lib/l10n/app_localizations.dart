@@ -935,7 +935,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsPlaybackSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Player, proxy, and DVR'**
+  /// **'Player, proxy, DVR, and captions'**
   String get settingsPlaybackSubtitle;
 
   /// No description provided for @settingsReleaseNotesSubtitle.
@@ -3487,6 +3487,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keep playing audio, with playback controls on the lock screen and in notifications, when you leave the app or lock the screen.'**
   String get settingsBackgroundAudioHint;
+
+  /// No description provided for @settingsCaptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Captions'**
+  String get settingsCaptions;
+
+  /// No description provided for @settingsCaptionsDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Captions by default'**
+  String get settingsCaptionsDefault;
+
+  /// No description provided for @settingsCaptionsDefaultHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a caption track automatically when the stream provides one.'**
+  String get settingsCaptionsDefaultHint;
+
+  /// No description provided for @settingsCaptionsPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Caption position'**
+  String get settingsCaptionsPosition;
+
+  /// No description provided for @settingsCaptionsPositionBottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom'**
+  String get settingsCaptionsPositionBottom;
+
+  /// No description provided for @settingsCaptionsPositionTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Top'**
+  String get settingsCaptionsPositionTop;
+
+  /// No description provided for @settingsCaptionsTextColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Caption text color'**
+  String get settingsCaptionsTextColor;
+
+  /// No description provided for @settingsCaptionsColorWhite.
+  ///
+  /// In en, this message translates to:
+  /// **'White'**
+  String get settingsCaptionsColorWhite;
+
+  /// No description provided for @settingsCaptionsColorYellow.
+  ///
+  /// In en, this message translates to:
+  /// **'Yellow'**
+  String get settingsCaptionsColorYellow;
+
+  /// No description provided for @settingsCaptionsBgColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Caption background'**
+  String get settingsCaptionsBgColor;
+
+  /// No description provided for @settingsCaptionsBgBlack.
+  ///
+  /// In en, this message translates to:
+  /// **'Black'**
+  String get settingsCaptionsBgBlack;
+
+  /// No description provided for @settingsCaptionsBgTransparent.
+  ///
+  /// In en, this message translates to:
+  /// **'Transparent'**
+  String get settingsCaptionsBgTransparent;
 
   /// No description provided for @settingsPrebufferLive.
   ///

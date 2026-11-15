@@ -7,6 +7,9 @@ import android.media.MediaFormat
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.graphics.Color
+import android.graphics.Typeface
+import android.text.Layout
 import android.view.SurfaceView
 import android.widget.FrameLayout
 import androidx.annotation.OptIn
@@ -27,6 +30,7 @@ import androidx.media3.exoplayer.source.UnrecognizedInputFormatException
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
+import androidx.media3.common.text.Cue
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
@@ -37,7 +41,9 @@ import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.video.VideoFrameMetadataListener
+import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.session.MediaSession
+import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.SubtitleView
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -142,8 +148,49 @@ class Media3PlaybackPlugin(
     fun attachSubtitleView(playerId: String, viewContext: Context): SubtitleView {
         val subtitleView = SubtitleView(viewContext)
         subtitleViews[playerId] = subtitleView
+        applyCaptionStyle(playerId, subtitleView)
         pushCurrentCues(playerId, subtitleView)
         return subtitleView
+    }
+
+    /**
+     * Applies the persisted caption colors to [view]. The default pair
+     * (white on black) keeps Media3's embedded styles on, preserving the
+     * broadcast's own cue colors/edges; any other pair switches to an
+     * explicit [CaptionStyleCompat] (outline kept so transparent background
+     * stays readable over video).
+     *
+     * Built with CaptionStyleCompat's public constructor -- the API-37 stub
+     * jar omits CaptioningManager.CaptionStyle.Builder, and the old reflective
+     * path returned null on failure, silently leaving colors stuck at
+     * white-on-black.
+     */
+    @OptIn(UnstableApi::class)
+    private fun applyCaptionStyle(playerId: String, view: SubtitleView) {
+        val state = states[playerId] ?: return
+        val native = state.captionTextColor == "white" &&
+            state.captionBackgroundColor == "black"
+        if (native) {
+            view.setApplyEmbeddedStyles(true)
+            return
+        }
+        val fg = if (state.captionTextColor == "yellow") Color.YELLOW else Color.WHITE
+        val bg = if (state.captionBackgroundColor == "transparent") {
+            Color.TRANSPARENT
+        } else {
+            Color.BLACK
+        }
+        // windowColor matches bg: transparent stays see-through, black fills.
+        val style = CaptionStyleCompat(
+            fg,
+            bg,
+            bg,
+            CaptionStyleCompat.EDGE_TYPE_OUTLINE,
+            Color.BLACK,
+            Typeface.DEFAULT,
+        )
+        view.setApplyEmbeddedStyles(false)
+        view.setStyle(style)
     }
 
     fun detachSubtitleView(playerId: String, subtitleView: SubtitleView) {
@@ -321,6 +368,37 @@ class Media3PlaybackPlugin(
         }
     }
 
+    /**
+     * A [DefaultExtractorsFactory] that tells [androidx.media3.extractor.ts.TsExtractor]
+     * to expect in-band CEA-608/708 closed-caption tracks: North American
+     * CC1/CC2 (accessibility channels 1 and 2) and CEA-708 services 1 and 2.
+     *
+     * Without this, TsExtractor only surfaces CC tracks it happens to parse
+     * during the initial prepare window. Two channels with structurally
+     * identical streams (video + 2 AC-3, A/53 side data on every frame) can
+     * then differ purely on timing: one exposes cea-608/708 tracks, the other
+     * never creates them -- no Subtitles button for the rest of playback,
+     * because progressive track lists are fixed after prepare.
+     */
+    @OptIn(UnstableApi::class)
+    private fun ccAwareExtractorsFactory(): DefaultExtractorsFactory {
+        fun ccFormat(mimeType: String, channel: Int): Format =
+            Format.Builder()
+                .setSampleMimeType(mimeType)
+                .setAccessibilityChannel(channel)
+                .setLanguage("en")
+                .build()
+
+        return DefaultExtractorsFactory().setTsSubtitleFormats(
+            listOf(
+                ccFormat(MimeTypes.APPLICATION_CEA608, 1), // CC1 - primary English
+                ccFormat(MimeTypes.APPLICATION_CEA608, 2), // CC2 - secondary
+                ccFormat(MimeTypes.APPLICATION_CEA708, 1), // Service 1
+                ccFormat(MimeTypes.APPLICATION_CEA708, 2), // Service 2
+            ),
+        )
+    }
+
     @OptIn(UnstableApi::class)
     private fun load(playerId: String, arguments: Map<String, Any?>, surfaceView: SurfaceView) {
         // The media session outlives the player it wraps: a reload (channel
@@ -383,7 +461,15 @@ class Media3PlaybackPlugin(
             .setMediaSourceFactory(
                 // DefaultDataSource passes web URLs to the HTTP factory and also reads
                 // the local files online subtitles are downloaded to.
-                DefaultMediaSourceFactory(context)
+                //
+                // The custom ExtractorsFactory tells TsExtractor to expect in-band
+                // CEA-608/708 closed-caption tracks (North American CC1/CC2 and
+                // 708 services 1/2). Without it, the extractor only surfaces CC
+                // tracks it happens to parse during the prepare window -- channels
+                // whose caption packets arrive later get no text tracks at all
+                // (observed as: no Subtitles button on KOLOTV while CBS, with
+                // identical stream structure, showed both).
+                DefaultMediaSourceFactory(context, ccAwareExtractorsFactory())
                     .setDataSourceFactory(DefaultDataSource.Factory(context, httpDataSourceFactory))
             )
             .setAudioAttributes(audioAttributes, handleAudioFocus)
@@ -397,6 +483,11 @@ class Media3PlaybackPlugin(
             subtitleConfigurations = subtitleConfigurations,
             matchDisplayRefreshRate = matchDisplayRefreshRate,
             allowDisplayModeChanges = allowDisplayModeChanges,
+            captionsDefaultOn = source["captionsDefaultOn"] as? Boolean ?: false,
+            captionPositionTop = (source["captionPosition"] as? String) == "top",
+            captionTextColor = source["captionTextColor"] as? String ?: "white",
+            captionBackgroundColor =
+                source["captionBackgroundColor"] as? String ?: "black",
         )
         val sessionPlayer = ChannelSkipPlayer(player) { forward ->
             nowPlayingChannel.invokeMethod(
@@ -415,6 +506,9 @@ class Media3PlaybackPlugin(
                 .setBitmapLoader(artworkLoader)
                 .build()
         states[playerId] = state
+        // A SubtitleView may already be attached (same player reused across a
+        // channel change) - re-apply the new stream's caption style to it.
+        subtitleViews[playerId]?.let { applyCaptionStyle(playerId, it) }
 
         player.setVideoSurfaceView(surfaceView)
         player.addListener(Media3Listener(playerId))
@@ -628,6 +722,22 @@ class Media3PlaybackPlugin(
     }
 
     private fun emitTrackSnapshot(playerId: String, player: Player) {
+        // "Captions by default": once per load, if the user hasn't chosen a
+        // track and the stream has text tracks, select the first (the CC
+        // track for OTA). Flag is set before selectTrack, whose own snapshot
+        // emission re-enters this method and must not loop.
+        val state = states[playerId]
+        if (state != null && state.captionsDefaultOn && !state.captionsAutoSelected) {
+            val subs = playbackTracks(player.currentTracks, C.TRACK_TYPE_TEXT)
+            if (subs.isNotEmpty() && selectedTrackId(player.currentTracks, C.TRACK_TYPE_TEXT) == null) {
+                state.captionsAutoSelected = true
+                val firstId = subs.first()["id"] as? String
+                if (firstId != null) {
+                    selectTrack(playerId, C.TRACK_TYPE_TEXT, firstId)
+                    return
+                }
+            }
+        }
         emit(
             playerId = playerId,
             type = if (player.isPlaying) "playing" else "ready",
@@ -895,7 +1005,48 @@ class Media3PlaybackPlugin(
         }
 
         override fun onCues(cueGroup: CueGroup) {
-            subtitleViews[playerId]?.setCues(cueGroup.cues)
+            val view = subtitleViews[playerId] ?: return
+            val state = states[playerId]
+            val top = state?.captionPositionTop == true
+            val customColors = state != null &&
+                !(state.captionTextColor == "white" &&
+                    state.captionBackgroundColor == "black")
+            val cues = cueGroup.cues.map { cue ->
+                var builder = cue.buildUpon()
+                if (top) {
+                    // Pin the cue's top edge to the top of the frame.
+                    builder = builder
+                        .setLine(0f, Cue.LINE_TYPE_FRACTION)
+                        .setLineAnchor(Cue.ANCHOR_TYPE_START)
+                } else {
+                    // Pin the cue's bottom edge to the bottom of the frame.
+                    // Without this the decoder's own row placement often
+                    // lands mid-screen ("just below center").
+                    builder = builder
+                        .setLine(1f, Cue.LINE_TYPE_FRACTION)
+                        .setLineAnchor(Cue.ANCHOR_TYPE_END)
+                }
+                // CEA-608 carries its own start column and left/center/right
+                // justification per caption, so horizontal placement varies
+                // by content. Force text cues to the horizontal center;
+                // leave bitmap cues (null text) at the decoder's placement.
+                if (cue.text != null) {
+                    builder = builder
+                        .setPosition(0.5f)
+                        .setPositionAnchor(Cue.ANCHOR_TYPE_MIDDLE)
+                        .setTextAlignment(Layout.Alignment.ALIGN_CENTER)
+                }
+                if (customColors) {
+                    // Drop cue-embedded color spans so CaptionStyleCompat
+                    // (set via setStyle + setApplyEmbeddedStyles(false))
+                    // actually wins.
+                    cue.text?.let { text ->
+                        builder = builder.setText(text.toString())
+                    }
+                }
+                builder.build()
+            }
+            view.setCues(cues)
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -991,6 +1142,11 @@ class Media3PlaybackPlugin(
         var lastVideoHeight: Int = 0,
         val matchDisplayRefreshRate: Boolean = false,
         var allowDisplayModeChanges: Boolean = true,
+        val captionsDefaultOn: Boolean = false,
+        val captionPositionTop: Boolean = false,
+        val captionTextColor: String = "white",
+        val captionBackgroundColor: String = "black",
+        var captionsAutoSelected: Boolean = false,
         var lastAppliedFps: Float = 0f,
         var resumeStallRunnable: Runnable? = null,
         var resumeStallBaselineFrames: Int = 0,

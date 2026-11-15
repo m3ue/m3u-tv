@@ -461,7 +461,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPlayback => '播放';
 
   @override
-  String get settingsPlaybackSubtitle => '播放器、代理和 DVR';
+  String get settingsPlaybackSubtitle => '播放器、代理、DVR 和字幕';
 
   @override
   String get settingsReleaseNotesSubtitle => '本版本的更新内容';
@@ -1934,6 +1934,42 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsBackgroundAudioHint => '离开应用或锁定屏幕时继续播放音频，并在锁屏和通知中显示播放控制。';
+
+  @override
+  String get settingsCaptions => '字幕';
+
+  @override
+  String get settingsCaptionsDefault => '默认显示字幕';
+
+  @override
+  String get settingsCaptionsDefaultHint => '流提供字幕轨时自动选择。';
+
+  @override
+  String get settingsCaptionsPosition => '字幕位置';
+
+  @override
+  String get settingsCaptionsPositionBottom => '底部';
+
+  @override
+  String get settingsCaptionsPositionTop => '顶部';
+
+  @override
+  String get settingsCaptionsTextColor => '字幕文字颜色';
+
+  @override
+  String get settingsCaptionsColorWhite => '白色';
+
+  @override
+  String get settingsCaptionsColorYellow => '黄色';
+
+  @override
+  String get settingsCaptionsBgColor => '字幕背景';
+
+  @override
+  String get settingsCaptionsBgBlack => '黑色';
+
+  @override
+  String get settingsCaptionsBgTransparent => '透明';
 
   @override
   String get settingsPrebufferLive => '播放前缓冲直播流';

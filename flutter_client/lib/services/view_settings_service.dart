@@ -273,6 +273,10 @@ class ViewSettingsService extends ChangeNotifier {
   static const deinterlaceKey = 'm3ue_tv_deinterlace';
   static const prebufferLiveKey = 'm3ue_tv_prebuffer_live';
   static const backgroundAudioKey = 'm3ue_tv_background_audio';
+  static const captionsDefaultKey = 'm3ue_tv_captions_default';
+  static const captionPositionKey = 'm3ue_tv_caption_position';
+  static const captionTextColorKey = 'm3ue_tv_caption_text_color';
+  static const captionBackgroundColorKey = 'm3ue_tv_caption_bg_color';
   static const vodPlayerKey = 'm3ue_tv_vod_player';
   static const showPlaybackDiagnosticsKey = 'm3ue_tv_show_playback_diagnostics';
   static const defaultStartPageKey = 'm3ue_tv_default_start_page';
@@ -975,6 +979,77 @@ class ViewSettingsService extends ChangeNotifier {
     bool enabled,
   ) async {
     await _write(backgroundAudioKey, enabled);
+    notifyListeners();
+  }
+
+  /// Whether caption tracks are selected automatically when playback starts
+  /// and the stream provides them. Defaults off: today the player always
+  /// starts with captions until the user turns them on.
+  Future<bool> captionsDefault() async {
+    final raw = await _readResolved(captionsDefaultKey);
+    return raw as bool? ?? false;
+  }
+
+  bool get captionsDefaultSync =>
+      (_cached(captionsDefaultKey) as bool?) ?? false;
+
+  Future<void> setCaptionsDefault(
+    // ignore: avoid_positional_boolean_parameters
+    bool enabled,
+  ) async {
+    await _write(captionsDefaultKey, enabled);
+    notifyListeners();
+  }
+
+  /// Caption vertical position on the video: 'bottom' (broadcast default) or
+  /// 'top'. Only applied by the Media3 (ExoPlayer) playback path.
+  static const captionPositionBottom = 'bottom';
+  static const captionPositionTop = 'top';
+
+  Future<String> captionPosition() async {
+    final raw = await _readResolved(captionPositionKey);
+    return raw as String? ?? captionPositionBottom;
+  }
+
+  String get captionPositionSync =>
+      (_cached(captionPositionKey) as String?) ?? captionPositionBottom;
+
+  Future<void> setCaptionPosition(String position) async {
+    await _write(captionPositionKey, position);
+    notifyListeners();
+  }
+
+  /// Caption text color: 'white' (broadcast default) or 'yellow'.
+  static const captionColorWhite = 'white';
+  static const captionColorYellow = 'yellow';
+
+  Future<String> captionTextColor() async {
+    final raw = await _readResolved(captionTextColorKey);
+    return raw as String? ?? captionColorWhite;
+  }
+
+  String get captionTextColorSync =>
+      (_cached(captionTextColorKey) as String?) ?? captionColorWhite;
+
+  Future<void> setCaptionTextColor(String color) async {
+    await _write(captionTextColorKey, color);
+    notifyListeners();
+  }
+
+  /// Caption background: 'black' (broadcast default) or 'transparent'.
+  static const captionBgBlack = 'black';
+  static const captionBgTransparent = 'transparent';
+
+  Future<String> captionBackgroundColor() async {
+    final raw = await _readResolved(captionBackgroundColorKey);
+    return raw as String? ?? captionBgBlack;
+  }
+
+  String get captionBackgroundColorSync =>
+      (_cached(captionBackgroundColorKey) as String?) ?? captionBgBlack;
+
+  Future<void> setCaptionBackgroundColor(String color) async {
+    await _write(captionBackgroundColorKey, color);
     notifyListeners();
   }
 

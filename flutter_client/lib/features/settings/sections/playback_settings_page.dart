@@ -336,6 +336,125 @@ class PlayerSettingsGroup extends StatelessWidget {
             value: service.backgroundAudioSync,
             onChanged: service.setBackgroundAudio,
           ),
+        // Captions: one entry row (the CC badge reads the same in US and
+        // EU markets); options live on their own sub-page. Media3/ExoPlayer
+        // path only. Subtitle summarizes all four settings at a glance:
+        // "On (Bottom · Yellow/Black)".
+        SettingsRow(
+          title: l.settingsCaptions,
+          subtitle: _captionsSummary(l, service),
+          icon: Icons.closed_caption_outlined,
+          trailing: const SettingsChevron(),
+          onTap: () => unawaited(
+            pushSettingsSubpage<void>(
+              context,
+              title: (context) =>
+                  AppLocalizations.of(context).settingsCaptions,
+              onBack: onHandleTopLevelBack,
+              builder: (pageContext) {
+                final pl = AppLocalizations.of(pageContext);
+                return ListenableBuilder(
+                  listenable: service,
+                  builder: (context, _) => SettingsGroup(
+                    children: [
+                      SettingsSwitchRow(
+                        title: pl.settingsCaptionsDefault,
+                        subtitle: pl.settingsCaptionsDefaultHint,
+                        value: service.captionsDefaultSync,
+                        onChanged: service.setCaptionsDefault,
+                      ),
+                      SettingsRow(
+                        title: pl.settingsCaptionsPosition,
+                        subtitle: service.captionPositionSync ==
+                                ViewSettingsService.captionPositionTop
+                            ? pl.settingsCaptionsPositionTop
+                            : pl.settingsCaptionsPositionBottom,
+                        trailing: const SettingsChevron(),
+                        onTap: () => unawaited(
+                          pushSettingsPicker<String>(
+                            pageContext,
+                            title: (context) => AppLocalizations.of(context)
+                                .settingsCaptionsPosition,
+                            onBack: onHandleTopLevelBack,
+                            selected: service.captionPositionSync,
+                            options: [
+                              SettingsPickerOption(
+                                value:
+                                    ViewSettingsService.captionPositionBottom,
+                                label: pl.settingsCaptionsPositionBottom,
+                              ),
+                              SettingsPickerOption(
+                                value: ViewSettingsService.captionPositionTop,
+                                label: pl.settingsCaptionsPositionTop,
+                              ),
+                            ],
+                            onSelected: service.setCaptionPosition,
+                          ),
+                        ),
+                      ),
+                      SettingsRow(
+                        title: pl.settingsCaptionsTextColor,
+                        subtitle: service.captionTextColorSync ==
+                                ViewSettingsService.captionColorYellow
+                            ? pl.settingsCaptionsColorYellow
+                            : pl.settingsCaptionsColorWhite,
+                        trailing: const SettingsChevron(),
+                        onTap: () => unawaited(
+                          pushSettingsPicker<String>(
+                            pageContext,
+                            title: (context) => AppLocalizations.of(context)
+                                .settingsCaptionsTextColor,
+                            onBack: onHandleTopLevelBack,
+                            selected: service.captionTextColorSync,
+                            options: [
+                              SettingsPickerOption(
+                                value: ViewSettingsService.captionColorWhite,
+                                label: pl.settingsCaptionsColorWhite,
+                              ),
+                              SettingsPickerOption(
+                                value: ViewSettingsService.captionColorYellow,
+                                label: pl.settingsCaptionsColorYellow,
+                              ),
+                            ],
+                            onSelected: service.setCaptionTextColor,
+                          ),
+                        ),
+                      ),
+                      SettingsRow(
+                        title: pl.settingsCaptionsBgColor,
+                        subtitle: service.captionBackgroundColorSync ==
+                                ViewSettingsService.captionBgTransparent
+                            ? pl.settingsCaptionsBgTransparent
+                            : pl.settingsCaptionsBgBlack,
+                        trailing: const SettingsChevron(),
+                        onTap: () => unawaited(
+                          pushSettingsPicker<String>(
+                            pageContext,
+                            title: (context) => AppLocalizations.of(context)
+                                .settingsCaptionsBgColor,
+                            onBack: onHandleTopLevelBack,
+                            selected: service.captionBackgroundColorSync,
+                            options: [
+                              SettingsPickerOption(
+                                value: ViewSettingsService.captionBgBlack,
+                                label: pl.settingsCaptionsBgBlack,
+                              ),
+                              SettingsPickerOption(
+                                value: ViewSettingsService.captionBgTransparent,
+                                label: pl.settingsCaptionsBgTransparent,
+                              ),
+                            ],
+                            onSelected: service.setCaptionBackgroundColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -348,3 +467,24 @@ String _vodPlayerLabel(
   VodPlayerPreference.exoPlayerFirst => l.settingsVodPlayerExoPlayerFirst,
   VodPlayerPreference.mpv => l.settingsVodPlayerMpv,
 };
+
+/// Glanceable summary of all four caption settings for the Captions row:
+/// `On (Bottom · Yellow/Black)`.
+String _captionsSummary(AppLocalizations l, ViewSettingsService service) {
+  final state = service.captionsDefaultSync
+      ? l.settingsToggleOn
+      : l.settingsToggleOff;
+  final position = service.captionPositionSync ==
+          ViewSettingsService.captionPositionTop
+      ? l.settingsCaptionsPositionTop
+      : l.settingsCaptionsPositionBottom;
+  final fg = service.captionTextColorSync ==
+          ViewSettingsService.captionColorYellow
+      ? l.settingsCaptionsColorYellow
+      : l.settingsCaptionsColorWhite;
+  final bg = service.captionBackgroundColorSync ==
+          ViewSettingsService.captionBgTransparent
+      ? l.settingsCaptionsBgTransparent
+      : l.settingsCaptionsBgBlack;
+  return '$state ($position · $fg/$bg)';
+}

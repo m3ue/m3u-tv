@@ -470,7 +470,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsPlayback => 'Reproducción';
 
   @override
-  String get settingsPlaybackSubtitle => 'Reproductor, proxy y DVR';
+  String get settingsPlaybackSubtitle => 'Reproductor, proxy, DVR y subtítulos';
 
   @override
   String get settingsReleaseNotesSubtitle => 'Novedades de esta versión';
@@ -2016,6 +2016,43 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsBackgroundAudioHint =>
       'Sigue reproduciendo el audio, con controles en la pantalla de bloqueo y en las notificaciones, al salir de la app o bloquear la pantalla.';
+
+  @override
+  String get settingsCaptions => 'Subtítulos';
+
+  @override
+  String get settingsCaptionsDefault => 'Subtítulos de forma predeterminada';
+
+  @override
+  String get settingsCaptionsDefaultHint =>
+      'Seleccionar automáticamente una pista de subtítulos cuando el stream la proporciona.';
+
+  @override
+  String get settingsCaptionsPosition => 'Posición de los subtítulos';
+
+  @override
+  String get settingsCaptionsPositionBottom => 'Abajo';
+
+  @override
+  String get settingsCaptionsPositionTop => 'Arriba';
+
+  @override
+  String get settingsCaptionsTextColor => 'Color del texto de los subtítulos';
+
+  @override
+  String get settingsCaptionsColorWhite => 'Blanco';
+
+  @override
+  String get settingsCaptionsColorYellow => 'Amarillo';
+
+  @override
+  String get settingsCaptionsBgColor => 'Fondo de los subtítulos';
+
+  @override
+  String get settingsCaptionsBgBlack => 'Negro';
+
+  @override
+  String get settingsCaptionsBgTransparent => 'Transparente';
 
   @override
   String get settingsPrebufferLive =>

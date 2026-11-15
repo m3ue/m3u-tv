@@ -505,6 +505,10 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
         'metadata': source.metadata,
         'matchDisplayRefreshRate': source.matchDisplayRefreshRate,
         'allowDisplayModeChanges': source.allowDisplayModeChanges,
+        'captionsDefaultOn': source.captionsDefaultOn,
+        'captionPosition': source.captionPosition,
+        'captionTextColor': source.captionTextColor,
+        'captionBackgroundColor': source.captionBackgroundColor,
         'externalSubtitles': source.externalSubtitles
             .map(
               (subtitle) => <String, Object?>{

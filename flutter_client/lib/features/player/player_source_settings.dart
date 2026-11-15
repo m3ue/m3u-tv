@@ -20,6 +20,10 @@ PlaybackSource applyPlayerSourceSettings(
     prebufferLive: settings?.prebufferLiveSync ?? false,
     preferMpv:
         !source.isLive && settings?.vodPlayerSync == VodPlayerPreference.mpv,
+    captionsDefaultOn: settings?.captionsDefaultSync ?? false,
+    captionPosition: settings?.captionPositionSync ?? 'bottom',
+    captionTextColor: settings?.captionTextColorSync ?? 'white',
+    captionBackgroundColor: settings?.captionBackgroundColorSync ?? 'black',
   );
 }
 

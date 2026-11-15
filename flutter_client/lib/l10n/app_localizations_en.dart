@@ -468,7 +468,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPlayback => 'Playback';
 
   @override
-  String get settingsPlaybackSubtitle => 'Player, proxy, and DVR';
+  String get settingsPlaybackSubtitle => 'Player, proxy, DVR, and captions';
 
   @override
   String get settingsReleaseNotesSubtitle => 'See what\'s new in this version';
@@ -1998,6 +1998,43 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsBackgroundAudioHint =>
       'Keep playing audio, with playback controls on the lock screen and in notifications, when you leave the app or lock the screen.';
+
+  @override
+  String get settingsCaptions => 'Captions';
+
+  @override
+  String get settingsCaptionsDefault => 'Captions by default';
+
+  @override
+  String get settingsCaptionsDefaultHint =>
+      'Select a caption track automatically when the stream provides one.';
+
+  @override
+  String get settingsCaptionsPosition => 'Caption position';
+
+  @override
+  String get settingsCaptionsPositionBottom => 'Bottom';
+
+  @override
+  String get settingsCaptionsPositionTop => 'Top';
+
+  @override
+  String get settingsCaptionsTextColor => 'Caption text color';
+
+  @override
+  String get settingsCaptionsColorWhite => 'White';
+
+  @override
+  String get settingsCaptionsColorYellow => 'Yellow';
+
+  @override
+  String get settingsCaptionsBgColor => 'Caption background';
+
+  @override
+  String get settingsCaptionsBgBlack => 'Black';
+
+  @override
+  String get settingsCaptionsBgTransparent => 'Transparent';
 
   @override
   String get settingsPrebufferLive => 'Buffer live streams before playing';

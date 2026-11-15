@@ -310,6 +310,10 @@ class PlaybackSource {
     this.prebufferLive = false,
     this.allowDisplayModeChanges = true,
     this.preferMpv = false,
+    this.captionsDefaultOn = false,
+    this.captionPosition = 'bottom',
+    this.captionTextColor = 'white',
+    this.captionBackgroundColor = 'black',
   });
 
   final String uri;
@@ -373,6 +377,22 @@ class PlaybackSource {
   /// `ViewSettingsService.vodPlayer` for non-live content.
   final bool preferMpv;
 
+  /// Auto-select a caption track when playback starts and the stream provides
+  /// one (Media3 path). Mirrors `ViewSettingsService.captionsDefault`.
+  final bool captionsDefaultOn;
+
+  /// 'bottom' (broadcast default) or 'top' — vertical caption placement
+  /// (Media3 path). Mirrors `ViewSettingsService.captionPosition`.
+  final String captionPosition;
+
+  /// 'white' (broadcast default) or 'yellow' — caption text color
+  /// (Media3 path). Mirrors `ViewSettingsService.captionTextColor`.
+  final String captionTextColor;
+
+  /// 'black' (broadcast default) or 'transparent' — caption background
+  /// (Media3 path). Mirrors `ViewSettingsService.captionBackgroundColor`.
+  final String captionBackgroundColor;
+
   double? get videoAspectRatio => playbackAspectRatioFromMetadata(metadata);
 
   PlaybackSource copyWith({
@@ -393,6 +413,10 @@ class PlaybackSource {
     bool? prebufferLive,
     bool? allowDisplayModeChanges,
     bool? preferMpv,
+    bool? captionsDefaultOn,
+    String? captionPosition,
+    String? captionTextColor,
+    String? captionBackgroundColor,
   }) {
     return PlaybackSource(
       uri: uri ?? this.uri,
@@ -414,6 +438,11 @@ class PlaybackSource {
       allowDisplayModeChanges:
           allowDisplayModeChanges ?? this.allowDisplayModeChanges,
       preferMpv: preferMpv ?? this.preferMpv,
+      captionsDefaultOn: captionsDefaultOn ?? this.captionsDefaultOn,
+      captionPosition: captionPosition ?? this.captionPosition,
+      captionTextColor: captionTextColor ?? this.captionTextColor,
+      captionBackgroundColor:
+          captionBackgroundColor ?? this.captionBackgroundColor,
     );
   }
 }

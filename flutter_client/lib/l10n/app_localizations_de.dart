@@ -470,7 +470,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsPlayback => 'Wiedergabe';
 
   @override
-  String get settingsPlaybackSubtitle => 'Player, Proxy und DVR';
+  String get settingsPlaybackSubtitle => 'Player, Proxy, DVR und Untertitel';
 
   @override
   String get settingsReleaseNotesSubtitle => 'Neuigkeiten in dieser Version';
@@ -2012,6 +2012,43 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsBackgroundAudioHint =>
       'Audio läuft weiter, mit Wiedergabesteuerung auf dem Sperrbildschirm und in den Mitteilungen, wenn du die App verlässt oder den Bildschirm sperrst.';
+
+  @override
+  String get settingsCaptions => 'Untertitel';
+
+  @override
+  String get settingsCaptionsDefault => 'Untertitel standardmäßig';
+
+  @override
+  String get settingsCaptionsDefaultHint =>
+      'Untertitelspur automatisch auswählen, wenn der Stream sie bereitstellt.';
+
+  @override
+  String get settingsCaptionsPosition => 'Untertitelposition';
+
+  @override
+  String get settingsCaptionsPositionBottom => 'Unten';
+
+  @override
+  String get settingsCaptionsPositionTop => 'Oben';
+
+  @override
+  String get settingsCaptionsTextColor => 'Untertitelfarbe';
+
+  @override
+  String get settingsCaptionsColorWhite => 'Weiß';
+
+  @override
+  String get settingsCaptionsColorYellow => 'Gelb';
+
+  @override
+  String get settingsCaptionsBgColor => 'Untertitelhintergrund';
+
+  @override
+  String get settingsCaptionsBgBlack => 'Schwarz';
+
+  @override
+  String get settingsCaptionsBgTransparent => 'Transparent';
 
   @override
   String get settingsPrebufferLive => 'Live-Streams vor der Wiedergabe puffern';
