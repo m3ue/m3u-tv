@@ -81,6 +81,12 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
   int _nextPlayerSeq = 0;
   bool _closing = false;
 
+  static const Duration _chromeHideDelay = Duration(seconds: 5);
+  static const Duration _chromeFadeDuration = Duration(milliseconds: 250);
+  final FocusNode _backFocusNode = FocusNode(debugLabel: 'multiview-back');
+  Timer? _chromeHideTimer;
+  bool _chromeVisible = true;
+
   // Set the first time [didChangeDependencies] finds a handheld (phone/
   // tablet) viewport, so dispose() knows whether it locked landscape here
   // and needs to restore portrait -- mirrors PlayerScreen's own auto-rotate
@@ -96,6 +102,8 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     // OS can't tell video is on screen and would otherwise run the
     // screensaver and sleep timer over live streams.
     unawaited(widget.wakelockController.enable());
+    HardwareKeyboard.instance.addHandler(_handleKeyActivity);
+    _restartChromeHideTimer();
     for (final channel in ref.read(multiviewChannelsProvider)) {
       _openTile(channel);
     }
@@ -118,6 +126,9 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
   @override
   void dispose() {
     unawaited(widget.wakelockController.disable());
+    HardwareKeyboard.instance.removeHandler(_handleKeyActivity);
+    _chromeHideTimer?.cancel();
+    _backFocusNode.dispose();
     if (_lockedLandscapeForHandheld) {
       unawaited(
         SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
@@ -128,6 +139,47 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     }
     super.dispose();
   }
+
+  // The header and tile labels sit on top of the video, so they fade out
+  // after a few idle seconds and any remote/key/pointer input brings them
+  // back. They stay up while a tile is being moved (the thicker border alone
+  // doesn't say which channel it is) and while there is nothing else to show.
+  bool get _showsChrome =>
+      _chromeVisible || _reorderingIndex != null || _tiles.isEmpty;
+
+  bool _handleKeyActivity(KeyEvent event) {
+    // Deferred so the press that reveals the chrome is still handled against
+    // the hidden state: Up from the top row must not jump to a back button
+    // that wasn't on screen when the button was pressed.
+    scheduleMicrotask(_showChrome);
+    return false;
+  }
+
+  void _restartChromeHideTimer() {
+    _chromeHideTimer?.cancel();
+    _chromeHideTimer = Timer(_chromeHideDelay, _hideChrome);
+  }
+
+  void _showChrome() {
+    if (!mounted) return;
+    _restartChromeHideTimer();
+    if (!_chromeVisible) setState(() => _chromeVisible = true);
+  }
+
+  void _hideChrome() {
+    if (!mounted || !_chromeVisible) return;
+    if (_backFocusNode.hasFocus && _tiles.isNotEmpty) {
+      _tiles[_focusedIndex].focusNode.requestFocus();
+    }
+    setState(() => _chromeVisible = false);
+  }
+
+  bool _isTopRow(int index) => switch (_layoutMode) {
+    _LayoutMode.grid => index < multiviewGridColumns(_tiles.length),
+    _LayoutMode.featured =>
+      index == _primaryIndex || index == (_primaryIndex == 0 ? 1 : 0),
+    _LayoutMode.pip => true,
+  };
 
   // Same rationale as app_shell.dart's _closePlayer: a platform-view-backed
   // core can hold an unretained pointer into its own native view's layer,
@@ -322,6 +374,14 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
       _tiles[index == 0 ? 1 : 0].focusNode.requestFocus();
       return true;
     }
+    // The header floats over the top row instead of sitting above it, so
+    // spatial traversal can't find the back button from there.
+    if (direction == TraversalDirection.up &&
+        _chromeVisible &&
+        _isTopRow(index)) {
+      _backFocusNode.requestFocus();
+      return true;
+    }
     return false;
   }
 
@@ -432,19 +492,75 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFF09090b),
         body: SafeArea(
-          child: Column(
+          child: Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerDown: (_) => _showChrome(),
+            onPointerHover: (_) => _showChrome(),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: _tiles.isEmpty
+                      ? Center(child: Text(l10n.multiviewEmpty))
+                      : _buildLayout(),
+                ),
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: _buildHeader(l10n, scale),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(AppLocalizations l10n, double scale) {
+    final visible = _showsChrome;
+    return IgnorePointer(
+      ignoring: !visible,
+      child: ExcludeFocus(
+        excluding: !visible,
+        child: AnimatedOpacity(
+          opacity: visible ? 1 : 0,
+          duration: _chromeFadeDuration,
+          child: Stack(
             children: [
+              const Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xCC000000), Color(0x00000000)],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               Padding(
                 padding: EdgeInsets.fromLTRB(
                   24 * scale,
                   16 * scale,
                   24 * scale,
-                  8 * scale,
+                  24 * scale,
                 ),
                 child: Row(
                   children: [
                     DpadFocusable(
+                      focusNode: _backFocusNode,
                       onSelect: () => Navigator.of(context).pop(),
+                      onDirection: (direction) {
+                        if (direction != TraversalDirection.down ||
+                            _tiles.isEmpty) {
+                          return false;
+                        }
+                        _tiles[_focusedIndex].focusNode.requestFocus();
+                        return true;
+                      },
                       effects: const [
                         GradientBorderEffect(
                           borderRadius: BorderRadius.all(Radius.circular(50)),
@@ -462,11 +578,6 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                     ),
                   ],
                 ),
-              ),
-              Expanded(
-                child: _tiles.isEmpty
-                    ? Center(child: Text(l10n.multiviewEmpty))
-                    : _buildLayout(),
               ),
             ],
           ),
@@ -662,26 +773,30 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                 left: 8 * scale,
                 right: 8 * scale,
                 bottom: 8 * scale,
-                child: Row(
-                  children: [
-                    Icon(
-                      isFocused ? Icons.volume_up : Icons.volume_off,
-                      size: 16 * scale,
-                      color: Colors.white,
-                    ),
-                    SizedBox(width: 6 * scale),
-                    Expanded(
-                      child: Text(
-                        tile.channel.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          shadows: [Shadow(blurRadius: 4)],
+                child: AnimatedOpacity(
+                  opacity: _showsChrome ? 1 : 0,
+                  duration: _chromeFadeDuration,
+                  child: Row(
+                    children: [
+                      Icon(
+                        isFocused ? Icons.volume_up : Icons.volume_off,
+                        size: 16 * scale,
+                        color: Colors.white,
+                      ),
+                      SizedBox(width: 6 * scale),
+                      Expanded(
+                        child: Text(
+                          tile.channel.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            shadows: [Shadow(blurRadius: 4)],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
