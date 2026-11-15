@@ -936,26 +936,34 @@ class Media3PlaybackPlugin(
         if (!hasVideoTrack) return
         val currentFrames = player.videoDecoderCounters?.renderedOutputBufferCount ?: return
 
-        when (
-            ResumeStallPolicy.evaluate(
-                baselineFrames = state.resumeStallBaselineFrames,
-                currentFrames = currentFrames,
-                baselinePositionMs = state.resumeStallBaselinePositionMs,
-                currentPositionMs = player.currentPosition,
-                durationMs = player.duration,
-                windowMs = windowMs,
-            )
-        ) {
-            ResumeStallPolicy.Verdict.HEALTHY, ResumeStallPolicy.Verdict.SKIP_NEAR_EOF -> Unit
-            ResumeStallPolicy.Verdict.RECHECK -> {
-                if (state.resumeStallRechecksLeft-- > 0) {
-                    val runnable = Runnable { checkResumeStall(playerId, windowMs) }
-                    state.resumeStallRunnable = runnable
-                    mainHandler.postDelayed(runnable, windowMs)
+            when (
+                ResumeStallPolicy.evaluate(
+                    baselineFrames = state.resumeStallBaselineFrames,
+                    currentFrames = currentFrames,
+                    baselinePositionMs = state.resumeStallBaselinePositionMs,
+                    currentPositionMs = player.currentPosition,
+                    durationMs = player.duration,
+                    windowMs = windowMs,
+                )
+            ) {
+                ResumeStallPolicy.Verdict.SKIP_NEAR_EOF -> Unit
+                ResumeStallPolicy.Verdict.HEALTHY -> {
+                    // Re-arm so the watchdog keeps monitoring for the rest of
+                    // playback, not just the first window after resume -- a
+                    // MediaCodec stall mid-show is the common case (#291).
+                    armResumeStallWatchdog(playerId)
                 }
+                ResumeStallPolicy.Verdict.RECHECK -> {
+                    if (state.resumeStallRechecksLeft-- > 0) {
+                        val runnable = Runnable { checkResumeStall(playerId, windowMs) }
+                        state.resumeStallRunnable = runnable
+                        mainHandler.postDelayed(runnable, windowMs)
+                    } else {
+                        armResumeStallWatchdog(playerId)
+                    }
+                }
+                ResumeStallPolicy.Verdict.STALLED -> recoverFromResumeStall(playerId)
             }
-            ResumeStallPolicy.Verdict.STALLED -> recoverFromResumeStall(playerId)
-        }
     }
 
     private fun recoverFromResumeStall(playerId: String) {
