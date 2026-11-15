@@ -1083,6 +1083,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get homeBrowseSeries => 'Explorar todas las series';
 
   @override
+  String homeBrowseCategory(String category) {
+    return 'Todo en $category';
+  }
+
+  @override
   String get homeNothingToShow => 'Aún no hay nada que mostrar';
 
   @override

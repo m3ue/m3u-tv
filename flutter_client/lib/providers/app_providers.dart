@@ -275,6 +275,15 @@ final applyProxyPlaybackProvider =
 /// `PlaybackOrchestrator.detachStreamSession`) so the preview rejoins it warm.
 final epgPreviewHandoffProvider = StateProvider<Channel?>((ref) => null);
 
+/// A section screen (Live TV, Movies, Series) asked to open on one category:
+/// Home's View all on a server category row. The section screen applies it
+/// when it is for its route, then clears it.
+typedef CategoryOpenRequest = ({String route, String categoryId});
+
+final categoryOpenRequestProvider = StateProvider<CategoryOpenRequest?>(
+  (ref) => null,
+);
+
 // ---------------------------------------------------------------------------
 // Multiview: standalone session state, not backed by AppStateController (it
 // tracks an in-memory grid selection, not fetched domain data).

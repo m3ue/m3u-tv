@@ -722,6 +722,18 @@ class AppShellState extends ConsumerState<AppShell>
     }
   }
 
+  /// Opens [route]'s screen on one category (Home's View all on a server
+  /// category row). The screen picks the request up whether it is already
+  /// alive in its branch or built by this navigation.
+  void _openCategory(String route, String categoryId) {
+    if (!_appState.availableMainRoutes.contains(route)) return;
+    ref.read(categoryOpenRequestProvider.notifier).state = (
+      route: route,
+      categoryId: categoryId,
+    );
+    _navigateToRoute(route);
+  }
+
   void _activateSidebar() {
     if (_fullScreenDetailActive) return;
     setState(() {
@@ -1657,6 +1669,7 @@ class AppShellState extends ConsumerState<AppShell>
         onSportsMore: () => _navigateToRoute(RouteNames.sports),
         onMoviesMore: () => _navigateToRoute(RouteNames.vod),
         onSeriesMore: () => _navigateToRoute(RouteNames.series),
+        onCategoryMore: _openCategory,
         onRecordingsSelect: () => _navigateToRoute(RouteNames.dvr),
         onAioStreamsSelect: () => _navigateToRoute(RouteNames.aiostreams),
         onRequestsSelect: () => _navigateToRoute(RouteNames.requests),

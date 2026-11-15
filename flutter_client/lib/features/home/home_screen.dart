@@ -59,6 +59,7 @@ class HomeScreen extends ConsumerStatefulWidget {
     this.onSportsMore,
     required this.onMoviesMore,
     required this.onSeriesMore,
+    this.onCategoryMore,
     required this.onRecordingsSelect,
     this.onAioStreamsSelect,
     this.onRequestsSelect,
@@ -84,6 +85,10 @@ class HomeScreen extends ConsumerStatefulWidget {
   final bool Function()? onHandleTopLevelBack;
   final VoidCallback onMoviesMore;
   final VoidCallback onSeriesMore;
+
+  /// View all on a server category row: opens that route's screen on the
+  /// category. Null opens the plain section, like the built-in rows.
+  final void Function(String route, String categoryId)? onCategoryMore;
   final VoidCallback onRecordingsSelect;
 
   /// Open the AIOStreams and Requests screens from their opt-in Home rows.
@@ -420,6 +425,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 : HomeRowKind.category)) {
       return const SizedBox.shrink();
     }
+    final categoryId = custom?.categoryId;
+    final onCategoryMore = widget.onCategoryMore;
+    VoidCallback viewAll(VoidCallback section) =>
+        categoryId == null || onCategoryMore == null
+        ? section
+        : () => onCategoryMore(route, categoryId);
     ValueChanged<bool> loaded(_CatalogRow catalogRow) => custom == null
         ? (hasItems) => _onCatalogRowLoaded(catalogRow, hasItems)
         : (hasItems) => _onCustomRowLoaded(custom.id, hasItems);
@@ -433,7 +444,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onChannelContextChanged: widget.onChannelContextChanged,
         onToggleFavorite: (channel) => _liveFavoritesService.toggle(channel.id),
         rowItemLimit: _rowItemLimit,
-        onViewAll: widget.onLiveTvMore,
+        onViewAll: viewAll(widget.onLiveTvMore),
         onLoaded: loaded(_CatalogRow.live),
         useSidebarLayout: widget.useSidebarLayout,
         onSidebarActivate: widget.onSidebarActivate,
@@ -460,7 +471,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onVodSelect: widget.onVodSelect,
         onToggleFavorite: (item) => _vodFavoritesService.toggle(item.id),
         rowItemLimit: _rowItemLimit,
-        onViewAll: widget.onMoviesMore,
+        onViewAll: viewAll(widget.onMoviesMore),
         onLoaded: loaded(_CatalogRow.movies),
         useSidebarLayout: widget.useSidebarLayout,
         onSidebarActivate: widget.onSidebarActivate,
@@ -474,7 +485,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onSeriesSelect: widget.onSeriesSelect,
         onToggleFavorite: (series) => _seriesFavoritesService.toggle(series.id),
         rowItemLimit: _rowItemLimit,
-        onViewAll: widget.onSeriesMore,
+        onViewAll: viewAll(widget.onSeriesMore),
         onLoaded: loaded(_CatalogRow.series),
         useSidebarLayout: widget.useSidebarLayout,
         onSidebarActivate: widget.onSidebarActivate,
@@ -936,8 +947,10 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
         l,
         target: StaticSpotlightTarget(
           id: _viewAllId('live', custom),
-          title: l.navLiveTv,
-          description: l.homeBrowseLiveTv,
+          title: custom?.title ?? l.navLiveTv,
+          description: custom == null
+              ? l.homeBrowseLiveTv
+              : l.homeBrowseCategory(custom.title ?? l.navLiveTv),
           kicker: l.homeViewAll,
           icon: Icons.live_tv,
           artworkUrls: [for (final channel in rowChannels) ?channel.logoUrl],
@@ -1423,8 +1436,10 @@ class _MoviesRowState extends ConsumerState<_MoviesRow> {
         l,
         target: StaticSpotlightTarget(
           id: _viewAllId('movies', custom),
-          title: l.navVod,
-          description: l.homeBrowseMovies,
+          title: custom?.title ?? l.navVod,
+          description: custom == null
+              ? l.homeBrowseMovies
+              : l.homeBrowseCategory(custom.title ?? l.navVod),
           kicker: l.homeViewAll,
           icon: Icons.movie,
           artworkUrls: [
@@ -1572,8 +1587,10 @@ class _SeriesRowState extends ConsumerState<_SeriesRow> {
         l,
         target: StaticSpotlightTarget(
           id: _viewAllId('series', custom),
-          title: l.navSeries,
-          description: l.homeBrowseSeries,
+          title: custom?.title ?? l.navSeries,
+          description: custom == null
+              ? l.homeBrowseSeries
+              : l.homeBrowseCategory(custom.title ?? l.navSeries),
           kicker: l.homeViewAll,
           icon: Icons.tv,
           artworkUrls: [

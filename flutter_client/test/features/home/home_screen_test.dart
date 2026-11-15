@@ -147,6 +147,7 @@ void main() {
     WidgetTester tester,
     _Catalog catalog, {
     VoidCallback? onMoviesMore,
+    void Function(String route, String categoryId)? onCategoryMore,
     FavoritesService? liveFavorites,
     bool unreadable = false,
     SportsCapability? sports,
@@ -236,6 +237,7 @@ void main() {
             onLiveTvMore: () {},
             onMoviesMore: onMoviesMore ?? () {},
             onSeriesMore: () {},
+            onCategoryMore: onCategoryMore,
             onRecordingsSelect: () {},
             onAioStreamsSelect: () {},
             onRequestsSelect: () {},
@@ -483,14 +485,35 @@ void main() {
           },
         }),
       );
+      final openedCategories = <(String, String)>[];
+      var openedMovies = 0;
       await pumpHome(
         tester,
         const _Catalog(movies: [..._movies, ..._otherMovies]),
         viewSettings: settings,
+        onMoviesMore: () => openedMovies += 1,
+        onCategoryMore: (route, categoryId) =>
+            openedCategories.add((route, categoryId)),
       );
       await _settle(tester);
 
       final shorts = _section('Animal Shorts');
+      Finder viewAllIn(String title) => find.ancestor(
+        of: find.descendant(
+          of: _section(title),
+          matching: find.text('View All'),
+        ),
+        matching: find.byType(DpadInkWell),
+      );
+      // View all opens Movies on the row's category; the built-in row's
+      // still opens the whole section.
+      await tester.tap(viewAllIn('Animal Shorts'));
+      expect(openedCategories, [(RouteNames.vod, '40')]);
+      expect(openedMovies, 0);
+      await tester.tap(viewAllIn('Movies'));
+      expect(openedMovies, 1);
+      expect(openedCategories, hasLength(1));
+
       expect(
         find.descendant(of: shorts, matching: find.text('Elephants Dream')),
         findsWidgets,

@@ -1030,6 +1030,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeBrowseSeries => '浏览所有剧集';
 
   @override
+  String homeBrowseCategory(String category) {
+    return '$category 中的全部内容';
+  }
+
+  @override
   String get homeNothingToShow => '暂无内容';
 
   @override

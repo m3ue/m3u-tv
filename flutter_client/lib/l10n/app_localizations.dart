@@ -1940,6 +1940,12 @@ abstract class AppLocalizations {
   /// **'Browse every series'**
   String get homeBrowseSeries;
 
+  /// Rich Home hero line for View all on a custom category row
+  ///
+  /// In en, this message translates to:
+  /// **'Everything in {category}'**
+  String homeBrowseCategory(String category);
+
   /// No description provided for @homeNothingToShow.
   ///
   /// In en, this message translates to:

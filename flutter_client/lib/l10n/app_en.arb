@@ -593,6 +593,15 @@
   },
   "homeBrowseMovies": "Browse every movie",
   "homeBrowseSeries": "Browse every series",
+  "homeBrowseCategory": "Everything in {category}",
+  "@homeBrowseCategory": {
+    "description": "Rich Home hero line for View all on a custom category row",
+    "placeholders": {
+      "category": {
+        "type": "String"
+      }
+    }
+  },
   "homeNothingToShow": "Nothing to show yet",
   "notificationsTitle": "Notifications",
   "notificationsTabNotifications": "Notifications",

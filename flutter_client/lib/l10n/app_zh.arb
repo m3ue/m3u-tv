@@ -461,6 +461,7 @@
   "homeSportsOnChannels": "在 {channels} 播出",
   "homeBrowseMovies": "浏览所有电影",
   "homeBrowseSeries": "浏览所有剧集",
+  "homeBrowseCategory": "{category} 中的全部内容",
   "homeNothingToShow": "暂无内容",
   "notificationsTitle": "通知",
   "notificationsTabNotifications": "通知",

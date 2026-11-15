@@ -461,6 +461,7 @@
   "homeSportsOnChannels": "En {channels}",
   "homeBrowseMovies": "Explorar todas las películas",
   "homeBrowseSeries": "Explorar todas las series",
+  "homeBrowseCategory": "Todo en {category}",
   "homeNothingToShow": "Aún no hay nada que mostrar",
   "notificationsTitle": "Notificaciones",
   "notificationsTabNotifications": "Notificaciones",
