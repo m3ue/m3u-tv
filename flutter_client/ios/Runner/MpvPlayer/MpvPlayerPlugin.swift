@@ -19,7 +19,15 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
   private var eventSink: FlutterEventSink?
   private let lock = NSLock()
 
-  func attachCore(viewId: Int, to displayLayer: AVSampleBufferDisplayLayer) {
+  /// `m3u_tv/system_ui`, the channel Android reports picture-in-picture on
+  /// (`pipModeChanged`), so PlayerScreen handles both the same way. Also
+  /// carries `pipDismissed` (closed without returning to the app) and the
+  /// PiP window's buttons (`pipSetPlaying`, `pipSkip`).
+  var systemUiChannel: FlutterMethodChannel?
+
+  /// `displayLayer` nil: an audio-only core, created by `load` itself since
+  /// no platform view will ever create one (CarPlay with no phone screen).
+  func attachCore(viewId: Int, to displayLayer: AVSampleBufferDisplayLayer?) {
     lock.lock()
     let staleCore = cores[viewId]
     lock.unlock()
@@ -47,6 +55,10 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
 
     switch call.method {
     case "load":
+      if args["audioOnly"] as? Bool == true, core(for: viewId) == nil {
+        Self.activatePlaybackAudioSession()
+        attachCore(viewId: viewId, to: nil)
+      }
       waitForCore(viewId: viewId, attemptsRemaining: 100) { core in
         guard let core else {
           result(["ok": false, "error": "mpv core not attached", "code": "backend_unavailable"])
@@ -93,9 +105,26 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
     case "setSubtitleTrack":
       core(for: viewId)?.setSubtitleTrack(trackId: args["trackId"] as? String)
       result(nil)
+    case "addExternalSubtitle":
+      if let uri = args["uri"] as? String, !uri.isEmpty {
+        core(for: viewId)?.addExternalSubtitle(
+          uri: uri,
+          title: args["title"] as? String,
+          language: args["language"] as? String
+        )
+      }
+      result(nil)
     case "setPlaybackSpeed":
       let speed = (args["speed"] as? NSNumber)?.doubleValue ?? 1.0
       core(for: viewId)?.setPlaybackSpeed(speed)
+      result(nil)
+    case "setAutoPictureInPicture":
+      core(for: viewId)?.setAutoPictureInPicture(args["enabled"] as? Bool ?? false)
+      result(nil)
+    case "setSyncOffset":
+      let property = args["property"] as? String ?? ""
+      let milliseconds = (args["milliseconds"] as? NSNumber)?.intValue ?? 0
+      core(for: viewId)?.setSyncOffset(property, seconds: Double(milliseconds) / 1000)
       result(nil)
     case "dispose":
       guard let existingCore = core(for: viewId) else {
@@ -123,6 +152,27 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
     }
   }
 
+  func mpvPlayerCore(_ core: MpvPlayerCore, pictureInPictureActive active: Bool, restored: Bool) {
+    invokeSystemUi("pipModeChanged", active)
+    if !active && !restored {
+      invokeSystemUi("pipDismissed", nil)
+    }
+  }
+
+  func mpvPlayerCore(_ core: MpvPlayerCore, pictureInPictureSetPlaying playing: Bool) {
+    invokeSystemUi("pipSetPlaying", playing)
+  }
+
+  func mpvPlayerCore(_ core: MpvPlayerCore, pictureInPictureSkip seconds: Double) {
+    invokeSystemUi("pipSkip", seconds)
+  }
+
+  private func invokeSystemUi(_ method: String, _ arguments: Any?) {
+    DispatchQueue.main.async { [weak self] in
+      self?.systemUiChannel?.invokeMethod(method, arguments: arguments)
+    }
+  }
+
   // MARK: - FlutterStreamHandler
 
   func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
@@ -136,6 +186,19 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
   }
 
   // MARK: - Helpers
+
+  /// With the phone's screen never opened (the car started the app), no
+  /// player has set up the audio session yet, and without the playback
+  /// category audio stops when the phone locks.
+  private static func activatePlaybackAudioSession() {
+    let session = AVAudioSession.sharedInstance()
+    do {
+      try session.setCategory(.playback, mode: .default)
+      try session.setActive(true)
+    } catch {
+      NSLog("[MpvPlayerPlugin] Audio session setup failed: %@", error.localizedDescription)
+    }
+  }
 
   private func core(for viewId: Int) -> MpvPlayerCore? {
     lock.lock()

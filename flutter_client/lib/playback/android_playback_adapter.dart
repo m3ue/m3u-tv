@@ -52,9 +52,11 @@ class AndroidBackendCapabilities {
 class AndroidPlaybackAdapter
     implements
         PlayerAdapter,
+        RuntimeSubtitleProvider,
         PlatformViewProvider,
         MultiviewBackend,
-        DisplayModeController {
+        DisplayModeController,
+        SyncOffsetProvider {
   AndroidPlaybackAdapter({
     required AndroidPlaybackProbe probe,
     this.playerId = defaultPlayerId,
@@ -246,6 +248,33 @@ class AndroidPlaybackAdapter
   }
 
   @override
+  Future<void> addExternalSubtitle(ExternalSubtitle subtitle) async {
+    if (_activeBackend == PlaybackBackend.androidExoPlayer) {
+      await _media3Host.addExternalSubtitle(subtitle);
+    }
+  }
+
+  @override
+  Future<void> setAudioDelay(Duration delay) async {
+    if (_activeBackend == PlaybackBackend.androidExoPlayer) {
+      await _media3Host.setSyncOffset(
+        property: 'audio-delay',
+        milliseconds: delay.inMilliseconds,
+      );
+    }
+  }
+
+  @override
+  Future<void> setSubtitleDelay(Duration delay) async {
+    if (_activeBackend == PlaybackBackend.androidExoPlayer) {
+      await _media3Host.setSyncOffset(
+        property: 'sub-delay',
+        milliseconds: delay.inMilliseconds,
+      );
+    }
+  }
+
+  @override
   Future<void> setPlaybackSpeed(double speed) async {
     if (!speed.isFinite || speed <= 0) {
       throw ArgumentError.value(
@@ -343,6 +372,7 @@ class AndroidPlaybackAdapter
           message: event.message ?? 'Android Media3 playback failed',
           code: event.code ?? 'android-media3-error',
           recoverable: event.recoverable,
+          position: event.position,
         ),
       );
       return;
@@ -392,7 +422,14 @@ abstract class AndroidMedia3Host {
   Future<void> stop();
   Future<void> setAudioTrack(String? trackId);
   Future<void> setSubtitleTrack(String? trackId);
+  Future<void> addExternalSubtitle(ExternalSubtitle subtitle);
   Future<void> setPlaybackSpeed(double speed);
+
+  /// `audio-delay` or `sub-delay`, as mpv names them; positive plays later.
+  Future<void> setSyncOffset({
+    required String property,
+    required int milliseconds,
+  });
   Future<void> setVolume(double volume);
 
   /// See [DisplayModeController].
@@ -520,11 +557,30 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
       });
 
   @override
+  Future<void> addExternalSubtitle(ExternalSubtitle subtitle) =>
+      _method.invokeMethod<void>('addExternalSubtitle', <String, Object?>{
+        'playerId': playerId,
+        'uri': subtitle.uri,
+        'title': subtitle.title,
+        'language': subtitle.language,
+      });
+
+  @override
   Future<void> setPlaybackSpeed(double speed) =>
       _method.invokeMethod<void>('setPlaybackSpeed', <String, Object?>{
         'playerId': playerId,
         'speed': speed,
       });
+
+  @override
+  Future<void> setSyncOffset({
+    required String property,
+    required int milliseconds,
+  }) => _method.invokeMethod<void>('setSyncOffset', <String, Object?>{
+    'playerId': playerId,
+    'property': property,
+    'milliseconds': milliseconds,
+  });
 
   @override
   Future<void> setVolume(double volume) =>

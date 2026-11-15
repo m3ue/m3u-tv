@@ -5,9 +5,11 @@ import 'package:m3u_tv/app/app_shell.dart' show DeviceType;
 import 'package:m3u_tv/features/settings/diagnostics_screen.dart';
 import 'package:m3u_tv/features/settings/release_notes_view.dart';
 import 'package:m3u_tv/features/settings/sections/app_version_card.dart';
+import 'package:m3u_tv/features/settings/sections/online_subtitle_settings_group.dart';
 import 'package:m3u_tv/features/settings/sections/playback_settings_page.dart';
 import 'package:m3u_tv/features/settings/sections/playlists_page.dart';
 import 'package:m3u_tv/features/settings/sections/settings_status_row.dart';
+import 'package:m3u_tv/features/settings/sections/simkl_card.dart';
 import 'package:m3u_tv/features/settings/sections/storage_page.dart';
 import 'package:m3u_tv/features/settings/sections/trakt_card.dart';
 import 'package:m3u_tv/features/settings/sections/view_settings_section.dart';
@@ -20,8 +22,10 @@ import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
+import 'package:m3u_tv/services/online_subtitle_settings.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
+import 'package:m3u_tv/services/simkl_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
@@ -38,6 +42,8 @@ class ConnectedView extends StatefulWidget {
     super.key,
     required this.authNotifier,
     required this.traktService,
+    required this.simklService,
+    this.onlineSubtitleSettings,
     this.activeViewer,
     this.viewers = const [],
     this.sourceLabel,
@@ -65,6 +71,8 @@ class ConnectedView extends StatefulWidget {
 
   final AuthNotifier authNotifier;
   final TraktService traktService;
+  final SimklService simklService;
+  final OnlineSubtitleSettings? onlineSubtitleSettings;
   final ProxyPlaybackSettings? proxyPlaybackSettings;
   final ComskipSettings? comskipSettings;
   final IntroDbSettings? introDbSettings;
@@ -139,7 +147,7 @@ class _ConnectedViewState extends State<ConnectedView> {
     final auth = widget.authNotifier.authResponse;
     final hasViewSettings = widget.viewSettingsService != null;
 
-    return SingleChildScrollView(
+    return SettingsScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -199,6 +207,7 @@ class _ConnectedViewState extends State<ConnectedView> {
                       comskipSettings: widget.comskipSettings,
                       viewSettingsService: widget.viewSettingsService,
                       onHandleTopLevelBack: widget.onHandleTopLevelBack,
+                      isTv: widget.deviceType == DeviceType.tv,
                     ),
                   ),
                 ),
@@ -238,10 +247,21 @@ class _ConnectedViewState extends State<ConnectedView> {
                       children: [
                         SettingsSectionHeader(l.settingsSectionServices),
                         ListenableBuilder(
+                          listenable: widget.simklService,
+                          builder: (context, _) => SettingsCard(
+                            child: SimklCard(
+                              simklService: widget.simklService,
+                              serverAccount: auth?.serverWatchHistory('simkl'),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ListenableBuilder(
                           listenable: widget.traktService,
                           builder: (context, _) => SettingsCard(
                             child: TraktCard(
                               traktService: widget.traktService,
+                              serverAccount: auth?.serverWatchHistory('trakt'),
                             ),
                           ),
                         ),
@@ -267,6 +287,12 @@ class _ConnectedViewState extends State<ConnectedView> {
                                 ),
                               ],
                             ),
+                          ),
+                        ],
+                        if (widget.onlineSubtitleSettings != null) ...[
+                          const SizedBox(height: 12),
+                          OnlineSubtitleSettingsGroup(
+                            settings: widget.onlineSubtitleSettings!,
                           ),
                         ],
                       ],
@@ -370,28 +396,44 @@ class _ConnectedViewState extends State<ConnectedView> {
 
         SettingsSectionHeader(l.settingsApp),
         const SettingsCard(child: AppVersionCard()),
-        if (widget.loadDiagnosticsHeader case final loadHeader?) ...[
+        if (widget.loadDiagnosticsHeader != null ||
+            widget.viewSettingsService != null) ...[
           const SizedBox(height: 12),
           SettingsGroup(
             children: [
-              SettingsRow(
-                title: l.settingsLogsDiagnostics,
-                subtitle: l.settingsLogsDiagnosticsSubtitle,
-                icon: Icons.bug_report_outlined,
-                trailing: const SettingsChevron(),
-                onTap: () => unawaited(
-                  pushSettingsSubpageFullHeight<void>(
-                    context,
-                    title: (context) =>
-                        AppLocalizations.of(context).settingsLogsDiagnostics,
-                    onBack: widget.onHandleTopLevelBack,
-                    builder: (_) => DiagnosticsScreen(
-                      loadHeader: loadHeader,
-                      onUpload: widget.onUploadLogs,
+              if (widget.loadDiagnosticsHeader case final loadHeader?)
+                SettingsRow(
+                  title: l.settingsLogsDiagnostics,
+                  subtitle: l.settingsLogsDiagnosticsSubtitle,
+                  icon: Icons.bug_report_outlined,
+                  trailing: const SettingsChevron(),
+                  onTap: () => unawaited(
+                    pushSettingsSubpageFullHeight<void>(
+                      context,
+                      title: (context) =>
+                          AppLocalizations.of(context).settingsLogsDiagnostics,
+                      onBack: widget.onHandleTopLevelBack,
+                      builder: (_) => DiagnosticsScreen(
+                        loadHeader: loadHeader,
+                        onUpload: widget.onUploadLogs,
+                      ),
                     ),
                   ),
                 ),
-              ),
+              if (widget.viewSettingsService case final viewSettings?)
+                ListenableBuilder(
+                  listenable: viewSettings,
+                  builder: (context, _) => SettingsSwitchRow(
+                    title: l.settingsPlaybackDiagnostics,
+                    locked: viewSettings.isEnforced(
+                      ViewSettingsService.showPlaybackDiagnosticsKey,
+                    ),
+                    subtitle: l.settingsPlaybackDiagnosticsHint,
+                    icon: Icons.monitor_heart_outlined,
+                    value: viewSettings.showPlaybackDiagnosticsSync,
+                    onChanged: viewSettings.setShowPlaybackDiagnostics,
+                  ),
+                ),
             ],
           ),
         ],

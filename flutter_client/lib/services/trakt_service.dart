@@ -1,14 +1,12 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'dart:async';
-import 'dart:convert';
-import 'dart:math';
-
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/services/api_client.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
+import 'package:m3u_tv/services/pkce.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/watch_history_service.dart';
 
 // Register your public app at https://trakt.tv/oauth/applications and pass the
 // client id with TRAKT_CLIENT_ID when building, or fall back to the app's
@@ -25,6 +23,7 @@ const _kApi = 'https://api.trakt.tv';
 const _kKeyAccess = 'trakt_access_token';
 const _kKeyRefresh = 'trakt_refresh_token';
 const _kKeyExpiry = 'trakt_token_expiry';
+const _kKeyAccount = 'trakt_account_name';
 
 enum TraktAuthStatus { disconnected, pending, connected }
 
@@ -43,15 +42,8 @@ class TraktPendingAuth {
 typedef TraktTransport = Future<TraktResponse> Function(TraktRequest request);
 typedef TraktCodeVerifierFactory = String Function();
 
-String _generateCodeVerifier() {
-  final random = Random.secure();
-  final bytes = List<int>.generate(32, (_) => random.nextInt(256));
-  return base64UrlEncode(bytes).replaceAll('=', '');
-}
-
-String _codeChallenge(String verifier) => base64UrlEncode(
-  sha256.convert(ascii.encode(verifier)).bytes,
-).replaceAll('=', '');
+/// Looks up the signed-in account's display name for an access token.
+typedef TraktAccountNameLookup = Future<String?> Function(String accessToken);
 
 class TraktRequest {
   const TraktRequest({
@@ -79,22 +71,25 @@ class TraktResponse {
 /// `pending.userCode` and `pending.verificationUrl` and show a spinner.
 /// The service polls automatically and transitions to
 /// `TraktAuthStatus.connected` on success.
-class TraktService extends ChangeNotifier {
+class TraktService extends ChangeNotifier implements WatchHistoryService {
   // Keep the public constructor parameter names stable for callers.
   TraktService({
     required SecureStorage storage,
     String clientId = _clientIdFromEnvironment,
     TraktTransport? transport,
     TraktCodeVerifierFactory? codeVerifierFactory,
+    TraktAccountNameLookup? accountNameLookup,
   }) : _storage = storage,
        _clientId = clientId,
        _transport = transport,
-       _codeVerifierFactory = codeVerifierFactory ?? _generateCodeVerifier;
+       _codeVerifierFactory = codeVerifierFactory ?? generatePkceVerifier,
+       _accountNameLookup = accountNameLookup;
 
   final SecureStorage _storage;
   final String _clientId;
   final TraktTransport? _transport;
   final TraktCodeVerifierFactory _codeVerifierFactory;
+  final TraktAccountNameLookup? _accountNameLookup;
   ApiClient? _apiInstance;
   ApiClient get _api => _apiInstance ??= ApiClient();
 
@@ -102,6 +97,7 @@ class TraktService extends ChangeNotifier {
   TraktPendingAuth? _pending;
   Timer? _pollTimer;
   String? _accessToken;
+  String? _accountName;
   String? _codeVerifier;
   Duration _pollInterval = Duration.zero;
   DateTime? _deviceCodeExpiresAt;
@@ -110,7 +106,18 @@ class TraktService extends ChangeNotifier {
   var _disposed = false;
 
   TraktAuthStatus get status => _status;
+
+  @override
+  bool get isConnected => _status == TraktAuthStatus.connected;
+
+  @override
+  bool get wantsProgressHeartbeat => true;
+
   TraktPendingAuth? get pending => _pending;
+
+  /// The signed-in account's username, once known. Sign-ins from before it
+  /// was stored look it up on the next start, so no reconnect is needed.
+  String? get accountName => _accountName;
 
   @visibleForTesting
   Duration get pollIntervalForTesting => _pollInterval;
@@ -134,7 +141,10 @@ class TraktService extends ChangeNotifier {
       await _tryRefresh();
     }
     if (_disposed || attempt != _authAttempt) return;
+    _accountName ??= await _storage.read(_kKeyAccount);
+    if (_disposed || attempt != _authAttempt) return;
     notifyListeners();
+    if (isConnected && _accountName == null) unawaited(_loadAccountName());
   }
 
   Future<void> startDeviceAuth() async {
@@ -150,7 +160,7 @@ class TraktService extends ChangeNotifier {
     try {
       final data = await _post('/oauth/device/code', {
         'client_id': _clientId,
-        'code_challenge': _codeChallenge(verifier),
+        'code_challenge': pkceChallenge(verifier),
         'code_challenge_method': 'S256',
       });
       if (_disposed || attempt != _authAttempt) return;
@@ -295,6 +305,7 @@ class TraktService extends ChangeNotifier {
     _accessToken = accessToken;
     _status = TraktAuthStatus.connected;
     notifyListeners();
+    if (_accountName == null) unawaited(_loadAccountName());
   });
 
   void cancelAuth() {
@@ -307,6 +318,7 @@ class TraktService extends ChangeNotifier {
     _clearPendingAttempt();
     await _tokenQueue.run(() async {
       _accessToken = null;
+      _accountName = null;
       await _clearStorage();
       _status = TraktAuthStatus.disconnected;
       if (!_disposed) notifyListeners();
@@ -341,9 +353,49 @@ class TraktService extends ChangeNotifier {
   }
 
   Future<void> _clearStorage() async {
+    _accountName = null;
     await _storage.delete(_kKeyAccess);
     await _storage.delete(_kKeyRefresh);
     await _storage.delete(_kKeyExpiry);
+    await _storage.delete(_kKeyAccount);
+  }
+
+  /// Best effort: a failure leaves the name unknown until the next start.
+  Future<void> _loadAccountName() async {
+    final token = _accessToken;
+    if (token == null) return;
+    final lookup =
+        _accountNameLookup ?? (_transport == null ? _fetchAccountName : null);
+    if (lookup == null) return;
+    try {
+      final name = await lookup(token);
+      if (_disposed || token != _accessToken || name == null || name.isEmpty) {
+        return;
+      }
+      _accountName = name;
+      await _storage.write(_kKeyAccount, name);
+      if (!_disposed) notifyListeners();
+    } on Object catch (_) {
+      debugPrint('[Trakt] account lookup failed');
+    }
+  }
+
+  Future<String?> _fetchAccountName(String accessToken) async {
+    final res = await _api.send(
+      'GET',
+      Uri.parse('$_kApi/users/settings'),
+      headers: {
+        'trakt-api-version': '2',
+        'trakt-api-key': _clientId,
+        'authorization': 'Bearer $accessToken',
+      },
+    );
+    if (res.statusCode >= 400 || res.bytes.isEmpty) return null;
+    final body = await res.json();
+    final user = body is Map<String, Object?> ? body['user'] : null;
+    if (user is! Map<String, Object?>) return null;
+    final name = user['username'] ?? user['name'];
+    return name is String ? name : null;
   }
 
   /// Scrobbles the current playback position to Trakt.
@@ -353,6 +405,7 @@ class TraktService extends ChangeNotifier {
   /// [progress] is 0 to 100.
   ///
   /// Errors are silently ignored because scrobbling is best-effort.
+  @override
   Future<void> scrobble({
     required String action,
     required String title,
@@ -361,6 +414,7 @@ class TraktService extends ChangeNotifier {
     int? episode,
     int? tmdbId,
     String? imdbId,
+    int? year,
     required double progress,
   }) async {
     final token = _accessToken;

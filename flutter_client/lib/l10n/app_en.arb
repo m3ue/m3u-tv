@@ -241,6 +241,7 @@
     }
   },
   "playerStartFromBeginning": "Start from Beginning",
+  "playerPlay": "Play",
   "playerResume": "Resume",
   "playerClearProgress": "Clear progress",
   "playerProgressCleared": "Progress cleared",
@@ -289,11 +290,11 @@
   "settingsGeneral": "General",
   "settingsGeneralSubtitle": "Language, connection, and account",
   "settingsIntegrations": "Integrations",
-  "settingsIntegrationsSubtitle": "Trakt and more",
+  "settingsIntegrationsSubtitle": "SIMKL, TheIntroDB, and more",
   "settingsAppearance": "Appearance",
   "settingsAppearanceSubtitle": "Layout, EPG, and display",
   "settingsPlayback": "Playback",
-  "settingsPlaybackSubtitle": "Proxy and DVR",
+  "settingsPlaybackSubtitle": "Player, proxy, and DVR",
   "settingsReleaseNotesSubtitle": "See what's new in this version",
   "settingsSectionLanguageRegion": "Language & Region",
   "settingsSectionLayout": "Layout",
@@ -465,6 +466,15 @@
   "settingsAppUpToDate": "Up to date",
   "settingsAppUpdateAvailable": "Update available: {version}",
   "@settingsAppUpdateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAppUpdateNoticeTitle": "App update available",
+  "settingsAppUpdateNoticeBody": "Version {version} is ready to install.",
+  "@settingsAppUpdateNoticeBody": {
     "placeholders": {
       "version": {
         "type": "String"
@@ -703,7 +713,59 @@
   "traktPendingEnterCode": "Then enter this code:",
   "traktPendingWaiting": "Waiting for authorization…",
   "traktConnected": "Connected to Trakt",
+  "traktConnectedAs": "Connected to Trakt as {account}",
+  "@traktConnectedAs": {
+    "placeholders": {
+      "account": {
+        "type": "String"
+      }
+    }
+  },
   "traktDisconnectButton": "Disconnect Trakt",
+  "traktName": "Trakt",
+  "simklName": "Simkl",
+  "serverWatchHistoryActive": "M3U Editor sends this login's watch progress to {service}.",
+  "@serverWatchHistoryActive": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "serverWatchHistoryActiveAs": "M3U Editor sends this login's watch progress to {service} as {account}.",
+  "@serverWatchHistoryActiveAs": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      },
+      "account": {
+        "type": "String"
+      }
+    }
+  },
+  "serverWatchHistoryOverrideHint": "Connect here to use your own {service} account on this device instead.",
+  "@serverWatchHistoryOverrideHint": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "serverWatchHistoryOverridden": "This device sends its playback to the account connected here instead. Disconnect to use the server account instead.",
+  "simklConnectPrompt": "Connect your Simkl account to automatically track what you watch.",
+  "simklConnectButton": "Connect with Simkl",
+  "simklConnected": "Connected to Simkl",
+  "simklConnectedAs": "Connected to Simkl as {account}",
+  "@simklConnectedAs": {
+    "placeholders": {
+      "account": {
+        "type": "String"
+      }
+    }
+  },
+  "simklDisconnectButton": "Disconnect Simkl",
+  "simklNotConfigured": "Simkl client ID is not configured.",
+  "simklNotConfiguredHint": "Register an app at simkl.com/settings/developer and set the client ID via --dart-define=SIMKL_CLIENT_ID.",
   "vodAllMovies": "All Movies",
   "seriesAllSeries": "All Series",
   "homeConnectedSource": "Connected source: {label}",
@@ -1097,12 +1159,18 @@
   "settingsHomeScreenStyle": "Home screen",
   "settingsHomeScreenStyleSimplified": "Simplified",
   "settingsHomeScreenStyleRich": "Spotlight",
+  "settingsSectionPlayer": "Player",
+  "settingsVodPlayer": "Movies and series player",
+  "settingsVodPlayerExoPlayerFirst": "Try ExoPlayer first",
+  "settingsVodPlayerMpv": "Use mpv",
   "settingsHdrMode": "HDR mode",
   "settingsHdrModeHint": "Let HDR videos switch the display into HDR mode. Windows and Linux only.",
   "settingsMatchRefreshRate": "Match display refresh rate",
   "settingsMatchRefreshRateHint": "Switch the display to the video's frame rate when playback starts. Can briefly flash or blank the screen.",
   "settingsDeinterlace": "Deinterlace video",
   "settingsDeinterlaceHint": "Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.",
+  "settingsBackgroundAudio": "Background audio",
+  "settingsBackgroundAudioHint": "Keep playing audio, with playback controls on the lock screen and in notifications, when you leave the app or lock the screen.",
   "settingsPrebufferLive": "Buffer live streams before playing",
   "settingsPrebufferLiveHint": "Wait for a few seconds of video before a channel starts moving, so streams that arrive unevenly stop pausing to buffer. Channel changes take a few seconds longer.",
   "settingsNavigationSound": "Navigation sound",
@@ -1115,6 +1183,8 @@
   "settingsOptimizeForSpeed": "Speed",
   "settingsOptimizeForSpeedHint": "Faster loading, lower image quality.",
   "settingsFontSize": "Display size",
+  "settingsFontSizeVerySmall": "Very Small",
+  "settingsFontSizeSmall": "Small",
   "settingsFontSizeNormal": "Normal",
   "settingsFontSizeLarge": "Large",
   "settingsFontSizeVeryLarge": "Very Large",
@@ -1126,6 +1196,8 @@
   "personDetailsNoLibraryMatches": "None of this actor's filmography is in your library.",
   "settingsLogsDiagnostics": "Logs & Diagnostics",
   "settingsLogsDiagnosticsSubtitle": "Device details and this session's logs, for troubleshooting",
+  "settingsPlaybackDiagnostics": "Show playback diagnostics",
+  "settingsPlaybackDiagnosticsHint": "Show the active player and why it switched in the player's controls, for troubleshooting.",
   "diagnosticsUpload": "Upload to server",
   "diagnosticsRefresh": "Refresh",
   "diagnosticsClear": "Clear logs",
@@ -1175,6 +1247,20 @@
   "playerTrackSubtitleTitle": "Subtitle Track",
   "playerTrackAudioDisabled": "Disable",
   "playerTrackSubtitlesOff": "Off",
+  "playerOnlineSubtitlesSearch": "Search online",
+  "playerOnlineSubtitlesTitle": "Online subtitles",
+  "playerOnlineSubtitlesSearching": "Searching for subtitles…",
+  "playerOnlineSubtitlesLoading": "Loading subtitle…",
+  "playerOnlineSubtitlesEmpty": "No subtitles found for this title.",
+  "playerOnlineSubtitlesFailed": "Couldn't load subtitles. Check your connection and try again.",
+  "playerOnlineSubtitlesRetry": "Try again",
+  "playerOnlineSubtitlesAllLanguages": "All languages",
+  "settingsOnlineSubtitles": "Online subtitles",
+  "settingsOnlineSubtitlesSubtitle": "Find subtitles for movies and episodes from the player's subtitle menu.",
+  "settingsOnlineSubtitlesAddress": "Subtitle source",
+  "settingsOnlineSubtitlesAddressHint": "Stremio subtitle add-on address",
+  "settingsOnlineSubtitlesAddressInvalid": "Enter a valid http or https address.",
+  "settingsOnlineSubtitlesUseDefault": "Use default",
   "playerHdrOn": "HDR On",
   "playerHdrOff": "HDR Off",
   "playerStartOver": "Start Over",
@@ -1338,11 +1424,83 @@
   "homeRequestsBrowse": "Search for and request movies and shows",
   "settingsNavLayout": "Navigation & Home",
   "settingsNavLayoutSubtitle": "Reorder or hide sections in the nav and on Home",
+  "settingsManagedByServer": "Managed by your server. Ask your admin to change it.",
   "settingsNavLayoutHintRemote": "Press OK on a row to pick it up, move it with Up and Down, then press OK to drop it. Back cancels.",
   "settingsNavLayoutHintTouch": "Drag a row by its handle to move it.",
   "settingsNavLayoutPinned": "Home and Search stay at the top, Notifications and Settings stay at the bottom, and Continue Watching stays first on Home.",
   "settingsNavLayoutColumnNav": "Nav",
   "settingsNavLayoutReset": "Reset to default",
   "settingsNavLayoutResetMessage": "This restores the original order and visibility of these sections.",
-  "settingsNavLayoutResetConfirm": "Reset"
+  "settingsNavLayoutResetConfirm": "Reset",
+  "dvrStatusProcessing": "Processing",
+  "dvrStatusCompleted": "Completed",
+  "dvrStatusCancelled": "Cancelled",
+  "dvrFilterAll": "All",
+  "dvrFilterWithCount": "{label} ({count})",
+  "@dvrFilterWithCount": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dvrFilterEmpty": "No recordings match this filter",
+  "dvrSortButton": "Sort: {option}",
+  "@dvrSortButton": {
+    "placeholders": {
+      "option": {
+        "type": "String"
+      }
+    }
+  },
+  "dvrSortDialogTitle": "Sort recordings",
+  "dvrSortNewest": "Newest first",
+  "dvrSortOldest": "Oldest first",
+  "dvrSortTitle": "Title (A-Z)",
+  "dvrLoadError": "Couldn't load your recordings. The server returned an error.",
+  "dvrLoadOffline": "Can't reach your server. Check your connection and try again.",
+  "dvrLoadPartial": "Some older recordings couldn't be loaded.",
+  "dvrLoadRefreshFailed": "Couldn't refresh your recordings. Showing the last list loaded.",
+  "dvrRetry": "Try again",
+  "requestsProviderHeading": "Request from",
+  "playerAudioSync": "Audio sync",
+  "playerSubtitleSync": "Subtitle sync",
+  "playerSyncRow": "{label}: {value}",
+  "@playerSyncRow": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "playerSyncMilliseconds": "{value} ms",
+  "@playerSyncMilliseconds": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "playerSyncSeconds": "{value} s",
+  "@playerSyncSeconds": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "playerSyncReset": "Reset",
+  "playerSyncDone": "Done",
+  "playerAudioSyncHint": "Plus delays the audio, minus plays it earlier. Saved for this channel or title.",
+  "playerSubtitleSyncHint": "Plus delays the subtitles, minus shows them earlier. Saved for this channel or title.",
+  "carPlayFavorites": "Favorites",
+  "carPlayNoFavorites": "No favorite channels yet",
+  "carPlayNoFavoritesHint": "Favorite channels in M3U TV on your iPhone to see them here.",
+  "carPlaySignInHint": "Open M3U TV on your iPhone to sign in."
 }

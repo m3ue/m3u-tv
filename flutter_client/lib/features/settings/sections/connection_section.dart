@@ -32,9 +32,14 @@ class ConnectionFormBody extends StatefulWidget {
     this.devicePairingService,
     this.deviceType,
     this.savedPlaylists = const <SavedPlaylist>[],
+    this.onPaired,
   });
 
   final Future<void> Function(UserCredentials credentials) onConnect;
+
+  /// Saves every playlist a pairing granted, before [onConnect] signs in to
+  /// the first.
+  final Future<void> Function(List<PairedPlaylist> playlists)? onPaired;
   final UserCredentials? initialValues;
   final String? error;
   final DevicePairingService? devicePairingService;
@@ -103,10 +108,28 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
     if (service == null) return;
     if (service.status == DevicePairingStatus.approved) {
       final result = service.result;
-      if (result != null) unawaited(widget.onConnect(result));
+      if (result != null) {
+        unawaited(_connectPaired(result, service.pairedPlaylists));
+      }
       return;
     }
     setState(() {});
+  }
+
+  Future<void> _connectPaired(
+    UserCredentials primary,
+    List<PairedPlaylist> paired,
+  ) async {
+    final onPaired = widget.onPaired;
+    if (onPaired != null && paired.isNotEmpty) {
+      try {
+        await onPaired(paired);
+      } on Object catch (error) {
+        // Saving the extra playlists is best effort; signing in still works.
+        debugPrint('Pairing: saving paired playlists failed: $error');
+      }
+    }
+    await widget.onConnect(primary);
   }
 
   void _handleConnect() {
@@ -161,7 +184,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
         service.status != DevicePairingStatus.idle) {
       return DpadRegion(
         memoryKey: 'device-pairing',
-        child: SingleChildScrollView(
+        child: SettingsScrollView(
           padding: const EdgeInsets.all(32),
           child: _DevicePairingBody(
             service: service,
@@ -178,7 +201,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
     if (service == null) {
       // No pairing service available - a single manual sign-in form, same
       // as before device pairing existed.
-      return SingleChildScrollView(
+      return SettingsScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -222,7 +245,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
             controller: _tabController,
             children: [
               if (_hasSavedPlaylists)
-                SingleChildScrollView(
+                SettingsScrollView(
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -244,7 +267,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
                     ],
                   ),
                 ),
-              SingleChildScrollView(
+              SettingsScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -296,7 +319,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
                   ],
                 ),
               ),
-              SingleChildScrollView(
+              SettingsScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,

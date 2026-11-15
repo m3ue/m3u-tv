@@ -60,11 +60,14 @@ class DvrCoordinator {
   bool _disposed = false;
 
   List<DvrRecording> _dvrRecordings = const <DvrRecording>[];
+  DvrRecordingsLoadState _recordingsLoadState =
+      DvrRecordingsLoadState.notLoaded;
   DvrStorageInfo? _dvrStorageInfo;
   Set<int> _recordingChannelIds = const <int>{};
   List<DvrSeriesRule> _dvrSeriesRules = const <DvrSeriesRule>[];
 
   List<DvrRecording> get recordings => _dvrRecordings;
+  DvrRecordingsLoadState get recordingsLoadState => _recordingsLoadState;
   DvrStorageInfo? get storageInfo => _dvrStorageInfo;
   Set<int> get recordingChannelIds => _recordingChannelIds;
   List<DvrSeriesRule> get seriesRules => _dvrSeriesRules;
@@ -89,6 +92,7 @@ class DvrCoordinator {
   /// content refresh does.
   void reset({bool clearStorage = true}) {
     _dvrRecordings = const <DvrRecording>[];
+    _recordingsLoadState = DvrRecordingsLoadState.notLoaded;
     if (clearStorage) _dvrStorageInfo = null;
     _recordingChannelIds = const <int>{};
     _dvrSeriesRules = const <DvrSeriesRule>[];
@@ -100,17 +104,19 @@ class DvrCoordinator {
   /// future), mirroring the progress-list guard in the controller's
   /// `_replaceWithXtreamContent`.
   void applyFetched(
-    List<DvrRecording> fetchedRecordings,
+    DvrRecordingsFetch fetchedRecordings,
     List<DvrSeriesRule> fetchedSeriesRules,
   ) {
-    final dvrRecordings = fetchedRecordings.isEmpty && _dvrRecordings.isNotEmpty
+    final recordings = fetchedRecordings.recordings;
+    final dvrRecordings = recordings.isEmpty && _dvrRecordings.isNotEmpty
         ? _dvrRecordings
-        : fetchedRecordings;
+        : recordings;
     final dvrSeriesRules =
         fetchedSeriesRules.isEmpty && _dvrSeriesRules.isNotEmpty
         ? _dvrSeriesRules
         : fetchedSeriesRules;
     _dvrRecordings = dvrRecordings;
+    _recordingsLoadState = fetchedRecordings.state;
     _recordingChannelIds = _extractRecordingChannelIds(dvrRecordings);
     _dvrSeriesRules = dvrSeriesRules;
   }
@@ -346,22 +352,25 @@ class DvrCoordinator {
     if (credentials == null) return;
     final ownsWork = _captureOwnership(credentials);
     if (!ownsWork()) return;
-    try {
-      final recordings = await xtreamService.getDvrRecordingsFor(credentials);
-      if (!ownsWork()) return;
-      final recordingChannelIds = _extractRecordingChannelIds(recordings);
-      if (!ownsWork()) return;
-      _dvrRecordings = recordings;
-      if (!ownsWork()) return;
-      _recordingChannelIds = recordingChannelIds;
-    } on Object catch (error, stackTrace) {
-      if (!ownsWork()) return;
-      debugPrint('DVR: refresh recordings failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
+    _recordingsLoadState = DvrRecordingsLoadState.loading;
+    _notifyListeners();
+    final fetch = await xtreamService.getAllDvrRecordingsFor(credentials);
+    if (!ownsWork()) return;
+    _applyLibraryFetch(fetch);
+    _notifyListeners();
+  }
+
+  /// Applies a full library load. A failed load keeps the recordings already
+  /// shown and only records the failure, so a refresh that can't reach the
+  /// server doesn't blank the list.
+  void _applyLibraryFetch(DvrRecordingsFetch fetch) {
+    _recordingsLoadState = fetch.state;
+    if (fetch.failed) {
+      debugPrint('DVR: refresh recordings failed (${fetch.state.name})');
       return;
     }
-    if (!ownsWork()) return;
-    _notifyListeners();
+    _dvrRecordings = fetch.recordings;
+    _recordingChannelIds = _extractRecordingChannelIds(fetch.recordings);
   }
 
   /// Schedules a one-shot DVR recording and refreshes the local list.
@@ -425,9 +434,14 @@ class DvrCoordinator {
     // placeholder. Since the schedule succeeded we know the recording
     // will appear eventually - always keep the optimistic channel id so
     // the dot and stop-button stay visible until the push transitions it.
-    try {
-      final recordings = await xtreamService.getDvrRecordingsFor(credentials);
-      if (!ownsWork()) return null;
+    final fetch = await xtreamService.getAllDvrRecordingsFor(credentials);
+    if (!ownsWork()) return null;
+    if (fetch.failed) {
+      _recordingsLoadState = fetch.state;
+      debugPrint('DVR: refresh after schedule failed (${fetch.state.name})');
+    } else {
+      final recordings = fetch.recordings;
+      _recordingsLoadState = fetch.state;
       // If the server list doesn't include this recording yet (still
       // processing), keep the optimistic placeholder so the stop dialog
       // can find it.
@@ -445,10 +459,6 @@ class DvrCoordinator {
         ..._extractRecordingChannelIds(_dvrRecordings),
         channelId,
       };
-    } on Object catch (error, stackTrace) {
-      if (!ownsWork()) return null;
-      debugPrint('DVR: refresh after schedule failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
     }
     if (!ownsWork()) return null;
     _notifyListeners();
@@ -560,16 +570,9 @@ class DvrCoordinator {
     }
 
     if (!ownsWork()) return results;
-    try {
-      final recordings = await xtreamService.getDvrRecordingsFor(credentials);
-      if (!ownsWork()) return results;
-      _dvrRecordings = recordings;
-      _recordingChannelIds = _extractRecordingChannelIds(recordings);
-    } on Object catch (error, stackTrace) {
-      if (!ownsWork()) return results;
-      debugPrint('DVR: refresh after batch schedule failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-    }
+    final fetch = await xtreamService.getAllDvrRecordingsFor(credentials);
+    if (!ownsWork()) return results;
+    _applyLibraryFetch(fetch);
     if (!ownsWork()) return results;
     _notifyListeners();
     unawaited(refreshDvrStorage());

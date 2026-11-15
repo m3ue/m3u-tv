@@ -3,6 +3,7 @@ package dev.sparkison.tv.mpv
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import dev.sparkison.tv.CarMediaService
 import dev.sparkison.tv.FrameRateManager
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -59,6 +60,9 @@ class MpvPlayerPlugin(
      * internal mutex until it's ready.
      */
     fun attachCore(viewId: Int, viewContext: Context): MpvPlayerCore {
+        // Android Auto's own player gives way. The car can't show this one:
+        // it isn't a Media3 player.
+        CarMediaService.phonePlaybackStarted(previous = null, replacement = null)
         val core = MpvPlayerCore(viewId, viewContext, this, frameRateManager)
         scope.launch {
             mutex.withLock {
@@ -160,10 +164,6 @@ class MpvPlayerPlugin(
                 core(viewId)?.setAllowDisplayModeChanges(args["allowed"] as? Boolean ?: true)
                 result.success(null)
             }
-            "setHdrEnabled" -> {
-                core(viewId)?.setHdrEnabled(args["enabled"] as? Boolean ?: true)
-                result.success(null)
-            }
             "setAudioTrack" -> {
                 core(viewId)?.setAudioTrack(args["trackId"] as? String)
                 result.success(null)
@@ -172,8 +172,26 @@ class MpvPlayerPlugin(
                 core(viewId)?.setSubtitleTrack(args["trackId"] as? String)
                 result.success(null)
             }
+            "addExternalSubtitle" -> {
+                val uri = args["uri"] as? String
+                if (!uri.isNullOrEmpty()) {
+                    core(viewId)?.addExternalSubtitle(
+                        uri,
+                        args["title"] as? String,
+                        args["language"] as? String,
+                    )
+                }
+                result.success(null)
+            }
             "setPlaybackSpeed" -> {
                 core(viewId)?.setPlaybackSpeed((args["speed"] as? Number)?.toDouble() ?: 1.0)
+                result.success(null)
+            }
+            "setSyncOffset" -> {
+                core(viewId)?.setSyncOffset(
+                    args["property"] as? String ?: "",
+                    ((args["milliseconds"] as? Number)?.toLong() ?: 0L) / 1000.0,
+                )
                 result.success(null)
             }
             "dispose" -> {

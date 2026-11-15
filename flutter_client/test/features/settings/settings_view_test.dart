@@ -1,11 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:m3u_tv/features/settings/sections/online_subtitle_settings_group.dart';
+import 'package:m3u_tv/features/settings/sections/simkl_card.dart';
+import 'package:m3u_tv/features/settings/sections/trakt_card.dart';
 import 'package:m3u_tv/features/settings/settings_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
+import 'package:m3u_tv/services/online_subtitle_settings.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/simkl_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
@@ -34,6 +39,7 @@ void main() {
     late ViewSettingsService viewSettingsService;
     late AuthNotifier authNotifier;
     late TraktService traktService;
+    late SimklService simklService;
     late ProxyPlaybackSettings proxyPlaybackSettings;
     late ComskipSettings comskipSettings;
     late IntroDbSettings introDbSettings;
@@ -46,6 +52,7 @@ void main() {
         secureStorage: secureStorage,
       );
       traktService = TraktService(storage: secureStorage);
+      simklService = SimklService(storage: secureStorage);
       proxyPlaybackSettings = ProxyPlaybackSettings();
       comskipSettings = ComskipSettings();
       introDbSettings = IntroDbSettings();
@@ -54,6 +61,7 @@ void main() {
     tearDown(() {
       authNotifier.dispose();
       traktService.dispose();
+      simklService.dispose();
       viewSettingsService.dispose();
       proxyPlaybackSettings.dispose();
       comskipSettings.dispose();
@@ -68,6 +76,8 @@ void main() {
           home: SettingsScreen(
             authNotifier: authNotifier,
             traktService: traktService,
+            simklService: simklService,
+            onlineSubtitleSettings: OnlineSubtitleSettings(),
             sourceLabel: 'Test',
             isConfiguredOverride: true,
             viewSettingsService: viewSettingsService,
@@ -90,6 +100,27 @@ void main() {
       await tester.tap(find.text(l.settingsAppearance));
       await tester.pumpAndSettle();
     }
+
+    testWidgets('Integrations lists Simkl above Trakt', (tester) async {
+      await pumpSettingsScreen(tester);
+      final l = AppLocalizations.of(
+        tester.element(find.byType(SettingsScreen)),
+      );
+
+      await tester.tap(find.text(l.settingsIntegrations));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getTopLeft(find.byType(SimklCard)).dy,
+        lessThan(tester.getTopLeft(find.byType(TraktCard)).dy),
+      );
+      expect(find.text(l.simklName), findsOneWidget);
+      expect(find.text(l.traktName), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.byType(OnlineSubtitleSettingsGroup)).dy,
+        greaterThan(tester.getTopLeft(find.text(l.settingsIntroDb)).dy),
+      );
+    });
 
     testWidgets('renders view settings rows and persists layout via picker', (
       tester,
@@ -119,16 +150,17 @@ void main() {
     });
 
     testWidgets(
-      'Filter Persistence defaults to Reset and toggles via switch row',
+      'Filter Persistence defaults to Remember and toggles via switch row',
       (tester) async {
         await pumpSettingsScreen(tester);
         final l = await AppLocalizations.delegate.load(const Locale('en'));
 
         await openAppearancePage(tester, l);
 
-        // Default state: rememberMediaSort is false → subtitle shows "Reset".
-        expect(await viewSettingsService.rememberMediaSort(), isFalse);
-        expect(find.text(l.settingsFilterPersistenceReset), findsOneWidget);
+        // Default state: rememberMediaSort is true, so the subtitle shows
+        // "Remember".
+        expect(await viewSettingsService.rememberMediaSort(), isTrue);
+        expect(find.text(l.settingsFilterPersistenceRemember), findsOneWidget);
 
         final filterRow = find.text(l.settingsFilterPersistence);
         await tester.ensureVisible(filterRow);
@@ -136,15 +168,15 @@ void main() {
         await tester.tap(filterRow);
         await tester.pumpAndSettle();
 
-        expect(await viewSettingsService.rememberMediaSort(), isTrue);
-        expect(find.text(l.settingsFilterPersistenceRemember), findsOneWidget);
+        expect(await viewSettingsService.rememberMediaSort(), isFalse);
+        expect(find.text(l.settingsFilterPersistenceReset), findsOneWidget);
 
         await tester.ensureVisible(filterRow);
         await tester.pumpAndSettle();
         await tester.tap(filterRow);
         await tester.pumpAndSettle();
 
-        expect(await viewSettingsService.rememberMediaSort(), isFalse);
+        expect(await viewSettingsService.rememberMediaSort(), isTrue);
       },
     );
 
@@ -166,6 +198,22 @@ void main() {
         await viewSettingsService.defaultStartPage(),
         DefaultStartPage.liveTv,
       );
+    });
+
+    testWidgets('playback diagnostics turn on from General', (tester) async {
+      await pumpSettingsScreen(tester);
+      final l = await AppLocalizations.delegate.load(const Locale('en'));
+
+      await tester.tap(find.text(l.settingsGeneral));
+      await tester.pumpAndSettle();
+
+      final row = find.text(l.settingsPlaybackDiagnostics);
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+
+      expect(viewSettingsService.showPlaybackDiagnosticsSync, isTrue);
     });
 
     testWidgets(

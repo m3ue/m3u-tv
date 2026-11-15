@@ -14,6 +14,7 @@ import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/simkl_service.dart';
 import 'package:m3u_tv/services/storage_usage.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
@@ -1142,6 +1143,7 @@ Widget _settingsApp(
       body: SettingsScreen(
         authNotifier: notifier,
         traktService: TraktService(storage: InMemorySecureStorage()),
+        simklService: SimklService(storage: InMemorySecureStorage()),
         devicePairingService: devicePairingService,
         deviceType: deviceType,
         activeViewer: activeViewer,

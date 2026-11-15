@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 Future<ResumeModalResult? Function()> _host(
   WidgetTester tester, {
   required bool showManageActions,
+  bool upNext = false,
 }) async {
   ResumeModalResult? captured;
   await tester.pumpWidget(
@@ -20,12 +21,17 @@ Future<ResumeModalResult? Function()> _host(
           body: Center(
             child: ElevatedButton(
               onPressed: () async {
-                captured = await showResumeModal(
-                  context,
-                  title: 'Murderbot - S1E4',
-                  positionSeconds: 120,
-                  showManageActions: showManageActions,
-                );
+                captured = upNext
+                    ? await showUpNextModal(
+                        context,
+                        title: 'Murderbot - S1E5',
+                      )
+                    : await showResumeModal(
+                        context,
+                        title: 'Murderbot - S1E4',
+                        positionSeconds: 120,
+                        showManageActions: showManageActions,
+                      );
               },
               child: const Text('open'),
             ),
@@ -94,5 +100,38 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(result()?.action, ResumeAction.startOver);
+  });
+
+  testWidgets('up next offers Play and Mark watched only', (tester) async {
+    await _host(tester, showManageActions: true, upNext: true);
+
+    expect(find.text('Up next'), findsOneWidget);
+    expect(find.text('Murderbot - S1E5'), findsOneWidget);
+    expect(find.text('Play'), findsNWidgets(2));
+    expect(find.text('Mark watched'), findsOneWidget);
+    expect(find.text('Start from Beginning'), findsNothing);
+    expect(find.text('Clear progress'), findsNothing);
+    expect(find.text('Resume'), findsNothing);
+  });
+
+  testWidgets('up next Play starts from the beginning', (tester) async {
+    final result = await _host(tester, showManageActions: true, upNext: true);
+
+    await tester.tap(find.text('Play').first);
+    await tester.pumpAndSettle();
+
+    expect(result()?.action, ResumeAction.startOver);
+    expect(result()?.startPositionSeconds, 0);
+  });
+
+  testWidgets('up next Mark watched resolves with markWatched', (
+    tester,
+  ) async {
+    final result = await _host(tester, showManageActions: true, upNext: true);
+
+    await tester.tap(find.text('Mark watched'));
+    await tester.pumpAndSettle();
+
+    expect(result()?.action, ResumeAction.markWatched);
   });
 }

@@ -181,6 +181,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
       onBack: widget.onBack,
       builder: (_) => _AddPlaylistBody(
         onAdd: widget.playlists.onSwitch,
+        onPaired: _service.adoptPaired,
         devicePairingService: widget.devicePairingService,
         deviceType: widget.deviceType,
       ),
@@ -523,11 +524,13 @@ class _RenamePlaylistDialogState extends State<_RenamePlaylistDialog> {
 class _AddPlaylistBody extends StatefulWidget {
   const _AddPlaylistBody({
     required this.onAdd,
+    this.onPaired,
     this.devicePairingService,
     this.deviceType,
   });
 
   final Future<String?> Function(UserCredentials credentials) onAdd;
+  final Future<void> Function(List<PairedPlaylist> playlists)? onPaired;
   final DevicePairingService? devicePairingService;
   final DeviceType? deviceType;
 
@@ -575,6 +578,7 @@ class _AddPlaylistBodyState extends State<_AddPlaylistBody> {
     return ConnectionFormBody(
       key: ValueKey(_formGeneration),
       onConnect: _add,
+      onPaired: widget.onPaired,
       initialValues: _lastCredentials,
       error: _error,
       devicePairingService: widget.devicePairingService,

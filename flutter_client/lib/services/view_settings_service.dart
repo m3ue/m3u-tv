@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/navigation/nav_layout.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
+import 'package:m3u_tv/services/client_config.dart';
+import 'package:m3u_tv/services/home_screen_config.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 
@@ -28,9 +30,9 @@ enum DefaultStartPage {
       );
 }
 
-/// Which Home screen layout TV/desktop show. [simplified] is the original
-/// rows-only page and stays the default; [rich] adds a fixed spotlight hero
-/// (backdrop, title, metadata) above the rows that follows the focused item.
+/// Which Home screen layout TV/desktop show. [rich], the default, adds a fixed
+/// spotlight hero (backdrop, title, metadata) above the rows that follows the
+/// focused item; [simplified] is the original rows-only page.
 /// Touch layouts always render [simplified].
 enum HomeScreenStyle {
   simplified('simplified'),
@@ -42,7 +44,7 @@ enum HomeScreenStyle {
   static HomeScreenStyle fromValue(String? value) =>
       HomeScreenStyle.values.firstWhere(
         (style) => style.value == value,
-        orElse: () => HomeScreenStyle.simplified,
+        orElse: () => HomeScreenStyle.rich,
       );
 }
 
@@ -78,6 +80,22 @@ enum EpgStartView {
 }
 
 /// Whether the EPG timeline's preview panel plays the live channel.
+/// Which player Android starts movies, episodes and other non-live content
+/// with. The other one stays as the automatic fallback either way.
+enum VodPlayerPreference {
+  exoPlayerFirst('exoPlayerFirst'),
+  mpv('mpv');
+
+  const VodPlayerPreference(this.value);
+  final String value;
+
+  static VodPlayerPreference fromValue(String? value) =>
+      VodPlayerPreference.values.firstWhere(
+        (preference) => preference.value == value,
+        orElse: () => VodPlayerPreference.exoPlayerFirst,
+      );
+}
+
 enum EpgPreviewPlayback {
   /// Static artwork only.
   off('off'),
@@ -148,6 +166,12 @@ enum MediaSortOption {
       );
 }
 
+/// The order a Movies or Series screen shows, which its Home row follows.
+typedef MediaBrowseOrder = ({MediaSortOption sort, bool favoritesFirst});
+
+/// The order the Live TV screen shows, which its Home row follows.
+typedef ChannelBrowseOrder = ({ChannelSortOption sort, bool favoritesFirst});
+
 /// Sort order for the Live TV channel list/grid. A separate enum from
 /// [MediaSortOption] rather than appended values on it - VOD/Series sort by
 /// rating/release date, while channels have neither field and sort by
@@ -185,13 +209,15 @@ enum OptimizeFor {
   );
 }
 
-/// Baseline multiplier applied under all three named sizes below, so one
-/// tweak here nudges Normal/Large/Very Large up or down together while
-/// keeping their relative ratios (1x/1.2x/1.5x) intact.
+/// Baseline multiplier applied under all the named sizes below, so one tweak
+/// here nudges them up or down together while keeping their relative ratios
+/// (0.75x/0.875x/1x/1.2x/1.5x) intact.
 const double _fontSizeBase = 1.15;
 
-/// Base font size multiplier for the UI.
+/// Base font size multiplier for the UI, smallest first.
 enum AppFontSize {
+  verySmall('verySmall', 0.75 * _fontSizeBase),
+  small('small', 0.875 * _fontSizeBase),
   normal('normal', 1 * _fontSizeBase),
   large('large', 1.2 * _fontSizeBase),
   veryLarge('veryLarge', 1.5 * _fontSizeBase);
@@ -246,6 +272,9 @@ class ViewSettingsService extends ChangeNotifier {
   static const matchRefreshRateKey = 'm3ue_tv_match_refresh_rate';
   static const deinterlaceKey = 'm3ue_tv_deinterlace';
   static const prebufferLiveKey = 'm3ue_tv_prebuffer_live';
+  static const backgroundAudioKey = 'm3ue_tv_background_audio';
+  static const vodPlayerKey = 'm3ue_tv_vod_player';
+  static const showPlaybackDiagnosticsKey = 'm3ue_tv_show_playback_diagnostics';
   static const defaultStartPageKey = 'm3ue_tv_default_start_page';
   static const homeScreenStyleKey = 'm3ue_tv_home_screen_style';
   static const navLayoutKey = 'm3ue_tv_nav_layout';
@@ -255,18 +284,240 @@ class ViewSettingsService extends ChangeNotifier {
   static const navigationSoundEnabledKey = 'm3ue_tv_navigation_sound_enabled';
   static const volumeKey = 'm3ue_tv_volume';
 
+  /// Home rows from the server's Home screen the user turned off here.
+  static const hiddenHomeRowsKey = 'm3ue_tv_hidden_home_rows';
+
   final Map<String, Object?> _memory;
   final PersistentJsonStore? store;
 
+  /// The last [ClientConfig] applied, so a cold start uses it before the
+  /// server answers.
+  static const managedSettingsKey = 'm3ue_tv_managed_settings';
+
+  /// The settings a Settings Profile can manage: the editor's key, the key
+  /// it's stored under here, and the values this version accepts. A key or
+  /// value this version doesn't know is ignored.
+  static final Map<String, ({String storageKey, bool Function(Object) accepts})>
+  managedSettingKeys = {
+    'default_start_page': (
+      storageKey: defaultStartPageKey,
+      accepts: _oneOf(DefaultStartPage.values.map((page) => page.value)),
+    ),
+    'home_screen_style': (
+      storageKey: homeScreenStyleKey,
+      accepts: _oneOf(HomeScreenStyle.values.map((style) => style.value)),
+    ),
+    'live_tv_layout': (
+      storageKey: liveTvLayoutKey,
+      accepts: _oneOf(LiveTvLayout.values.map((layout) => layout.value)),
+    ),
+    'channel_column_layout': (
+      storageKey: channelColumnLayoutKey,
+      accepts: _oneOf(ChannelColumnLayout.values.map((layout) => layout.value)),
+    ),
+    'epg_start_view': (
+      storageKey: epgStartViewKey,
+      accepts: _oneOf(EpgStartView.values.map((view) => view.value)),
+    ),
+    'epg_preview_playback': (
+      storageKey: epgPreviewPlaybackKey,
+      accepts: _oneOf(EpgPreviewPlayback.values.map((mode) => mode.value)),
+    ),
+    'epg_preview_delay_seconds': (
+      storageKey: epgPreviewDelayKey,
+      accepts: _oneOf(epgPreviewDelayOptions),
+    ),
+    'remember_media_sort': (storageKey: rememberMediaSortKey, accepts: _isBool),
+    'vod_sort_option': (
+      storageKey: vodSortOptionKey,
+      accepts: _oneOf(MediaSortOption.values.map((option) => option.value)),
+    ),
+    'series_sort_option': (
+      storageKey: seriesSortOptionKey,
+      accepts: _oneOf(MediaSortOption.values.map((option) => option.value)),
+    ),
+    'live_tv_sort_option': (
+      storageKey: liveTvSortOptionKey,
+      accepts: _oneOf(ChannelSortOption.values.map((option) => option.value)),
+    ),
+    'vod_favorites_first': (storageKey: vodFavoritesFirstKey, accepts: _isBool),
+    'series_favorites_first': (
+      storageKey: seriesFavoritesFirstKey,
+      accepts: _isBool,
+    ),
+    'live_tv_favorites_first': (
+      storageKey: liveTvFavoritesFirstKey,
+      accepts: _isBool,
+    ),
+    'vod_player': (
+      storageKey: vodPlayerKey,
+      accepts: _oneOf(VodPlayerPreference.values.map((player) => player.value)),
+    ),
+    'match_refresh_rate': (storageKey: matchRefreshRateKey, accepts: _isBool),
+    'hdr_enabled': (storageKey: hdrEnabledKey, accepts: _isBool),
+    'deinterlace': (storageKey: deinterlaceKey, accepts: _isBool),
+    'prebuffer_live': (storageKey: prebufferLiveKey, accepts: _isBool),
+    'show_playback_diagnostics': (
+      storageKey: showPlaybackDiagnosticsKey,
+      accepts: _isBool,
+    ),
+    'navigation_sound_enabled': (
+      storageKey: navigationSoundEnabledKey,
+      accepts: _isBool,
+    ),
+  };
+
+  static bool Function(Object) _oneOf(Iterable<Object> values) =>
+      values.toSet().contains;
+
+  static bool _isBool(Object value) => value is bool;
+
+  /// Managed values keyed by storage key.
+  Map<String, ManagedSetting> _managed = const {};
+  String? _managedProfileName;
+
+  /// The Settings Profile's name while it manages at least one setting.
+  String? get managedProfileName =>
+      _managed.isEmpty ? null : _managedProfileName;
+
+  /// Whether the setting stored under [storageKey] is locked by the server.
+  bool isEnforced(String storageKey) => _managed[storageKey]?.enforced ?? false;
+
+  /// Applies the last config [applyClientConfig] stored. Call before reading
+  /// any setting on a cold start.
+  Future<void> loadManagedSettings() async {
+    final raw = await store?.read(managedSettingsKey);
+    if (raw is Map) {
+      _useClientConfig(ClientConfig.fromJson(Map<String, dynamic>.from(raw)));
+    }
+  }
+
+  /// Makes [config] the managed settings (null: none) and keeps it for the
+  /// next cold start.
+  Future<void> applyClientConfig(ClientConfig? config) async {
+    if (!_useClientConfig(config)) return;
+    notifyListeners();
+    if (config == null) {
+      await store?.delete(managedSettingsKey);
+    } else {
+      await store?.write(managedSettingsKey, config.toJson());
+    }
+  }
+
+  bool _useClientConfig(ClientConfig? config) {
+    final next = <String, ManagedSetting>{
+      for (final MapEntry(:key, :value)
+          in (config?.settings ?? const {}).entries)
+        if (managedSettingKeys[key] case final known?
+            when known.accepts(value.value))
+          known.storageKey: value,
+    };
+    final homeScreen = config?.homeScreen;
+    final changed =
+        !mapEquals(next, _managed) ||
+        config?.profileName != _managedProfileName ||
+        homeScreen != _homeScreen;
+    _managed = Map.unmodifiable(next);
+    _managedProfileName = config?.profileName;
+    _homeScreen = homeScreen;
+    return changed;
+  }
+
+  HomeScreenConfig? _homeScreen;
+
+  /// Whether the server locks Navigation & Home.
+  bool get isNavLayoutEnforced => _homeScreen?.enforced ?? false;
+
+  /// Whether the server lays out Navigation & Home for this login.
+  bool get hasManagedHomeScreen => _homeScreen != null;
+
+  /// The server's layout when it's enforced or the user never arranged
+  /// their own, else the user's.
+  Object? _resolveNavLayout(Object? stored) {
+    final homeScreen = _homeScreen;
+    if (homeScreen == null) return stored;
+    if (homeScreen.enforced || stored == null) {
+      return homeScreen.navLayoutJson();
+    }
+    return stored;
+  }
+
+  /// The rows Home shows for [route], in order: the built-in row alone
+  /// without a server Home screen. A custom row shows inside its yearly
+  /// window, unless the user turned it off (when they're allowed to).
+  List<HomeRowSpec> homeRowsFor(String route, {DateTime? now}) {
+    final section = _homeScreen?.sectionFor(route);
+    if (section == null) return const [HomeRowSpec.builtIn];
+    final date = now ?? DateTime.now();
+    final hidden = isNavLayoutEnforced ? const <String>{} : hiddenHomeRowIds;
+    return [
+      for (final row in section.rows)
+        if (row.isBuiltIn || (row.isShownOn(date) && !hidden.contains(row.id)))
+          row,
+    ];
+  }
+
+  /// Every custom row the server put in [route], for Navigation & Home.
+  List<HomeRowSpec> customHomeRowsFor(String route) => [
+    for (final row
+        in _homeScreen?.sectionFor(route)?.rows ?? const <HomeRowSpec>[])
+      if (!row.isBuiltIn) row,
+  ];
+
+  Set<String> get hiddenHomeRowIds {
+    final raw = _memory[hiddenHomeRowsKey];
+    return {
+      if (raw is List)
+        for (final id in raw)
+          if (id is String) id,
+    };
+  }
+
+  Future<void> loadHiddenHomeRows() => _read(hiddenHomeRowsKey);
+
+  Future<void> setHomeRowShown(
+    String rowId, {
+    required bool shown,
+  }) async {
+    final hidden = hiddenHomeRowIds;
+    if (shown ? !hidden.remove(rowId) : !hidden.add(rowId)) return;
+    await _write(hiddenHomeRowsKey, hidden.toList()..sort());
+    notifyListeners();
+  }
+
+  /// Back to the default layout: the server's when it has one, and every
+  /// server row shown again.
+  Future<void> resetNavLayout() async {
+    _memory.remove(navLayoutKey);
+    _memory.remove(hiddenHomeRowsKey);
+    await store?.delete(navLayoutKey);
+    await store?.delete(hiddenHomeRowsKey);
+    notifyListeners();
+  }
+
+  /// What a setting reads as: an enforced value always, else the user's own
+  /// choice, else the server's default, else null (the app's default).
+  Object? _resolve(String key, Object? stored) {
+    final managed = _managed[key];
+    if (managed == null) return stored;
+    if (managed.enforced) return managed.value;
+    return stored ?? managed.value;
+  }
+
+  Object? _cached(String key) => _resolve(key, _memory[key]);
+
+  Future<Object?> _readResolved(String key) async =>
+      _resolve(key, await _read(key));
+
   Future<DefaultStartPage> defaultStartPage() async {
-    final raw = await _read(defaultStartPageKey);
+    final raw = await _readResolved(defaultStartPageKey);
     return DefaultStartPage.fromValue(raw as String?);
   }
 
   /// Synchronous access to the in-memory cached start page. Valid once
   /// [defaultStartPage] has resolved at least once.
   DefaultStartPage get defaultStartPageSync =>
-      DefaultStartPage.fromValue(_memory[defaultStartPageKey] as String?);
+      DefaultStartPage.fromValue(_cached(defaultStartPageKey) as String?);
 
   Future<void> setDefaultStartPage(DefaultStartPage page) async {
     await _write(defaultStartPageKey, page.value);
@@ -274,7 +525,7 @@ class ViewSettingsService extends ChangeNotifier {
   }
 
   Future<HomeScreenStyle> homeScreenStyle() async {
-    final raw = await _read(homeScreenStyleKey);
+    final raw = await _readResolved(homeScreenStyleKey);
     return HomeScreenStyle.fromValue(raw as String?);
   }
 
@@ -282,7 +533,7 @@ class ViewSettingsService extends ChangeNotifier {
   /// (or [setHomeScreenStyle]) has run once.
   HomeScreenStyle? get homeScreenStyleCached =>
       _memory.containsKey(homeScreenStyleKey)
-      ? HomeScreenStyle.fromValue(_memory[homeScreenStyleKey] as String?)
+      ? HomeScreenStyle.fromValue(_cached(homeScreenStyleKey) as String?)
       : null;
 
   Future<void> setHomeScreenStyle(HomeScreenStyle style) async {
@@ -291,11 +542,12 @@ class ViewSettingsService extends ChangeNotifier {
   }
 
   Future<NavLayout> navLayout() async =>
-      NavLayout.fromJson(await _read(navLayoutKey));
+      NavLayout.fromJson(_resolveNavLayout(await _read(navLayoutKey)));
 
   /// The layout from the in-memory cache. `main()` reads [navLayout] before
   /// the first frame, so the nav and Home never paint the default order first.
-  NavLayout get navLayoutSync => NavLayout.fromJson(_memory[navLayoutKey]);
+  NavLayout get navLayoutSync =>
+      NavLayout.fromJson(_resolveNavLayout(_memory[navLayoutKey]));
 
   Future<void> setNavLayout(NavLayout layout) async {
     await _write(navLayoutKey, layout.toJson());
@@ -303,7 +555,7 @@ class ViewSettingsService extends ChangeNotifier {
   }
 
   Future<LiveTvLayout> liveTvLayout() async {
-    final raw = await _read(liveTvLayoutKey);
+    final raw = await _readResolved(liveTvLayoutKey);
     return LiveTvLayout.fromValue(raw as String?);
   }
 
@@ -316,7 +568,7 @@ class ViewSettingsService extends ChangeNotifier {
   /// Synchronous access to the in-memory cached layout. Use after the service
   /// has been loaded or when a [notifyListeners] rebuild is imminent.
   LiveTvLayout get liveTvLayoutSync =>
-      LiveTvLayout.fromValue(_memory[liveTvLayoutKey] as String?);
+      LiveTvLayout.fromValue(_cached(liveTvLayoutKey) as String?);
 
   Future<void> setLiveTvLayout(LiveTvLayout layout) async {
     await _write(liveTvLayoutKey, layout.value);
@@ -324,13 +576,13 @@ class ViewSettingsService extends ChangeNotifier {
   }
 
   Future<EpgStartView> epgStartView() async {
-    final raw = await _read(epgStartViewKey);
+    final raw = await _readResolved(epgStartViewKey);
     return EpgStartView.fromValue(raw as String?);
   }
 
   /// Synchronous access to the in-memory cached EPG start view.
   EpgStartView get epgStartViewSync =>
-      EpgStartView.fromValue(_memory[epgStartViewKey] as String?);
+      EpgStartView.fromValue(_cached(epgStartViewKey) as String?);
 
   Future<void> setEpgStartView(EpgStartView view) async {
     await _write(epgStartViewKey, view.value);
@@ -338,7 +590,7 @@ class ViewSettingsService extends ChangeNotifier {
   }
 
   Future<EpgPreviewPlayback> epgPreviewPlayback() async {
-    final raw = await _read(epgPreviewPlaybackKey);
+    final raw = await _readResolved(epgPreviewPlaybackKey);
     return EpgPreviewPlayback.fromValue(raw as String?);
   }
 
@@ -350,7 +602,7 @@ class ViewSettingsService extends ChangeNotifier {
   /// How long the guide cursor must rest on a live programme before
   /// [EpgPreviewPlayback.pauseToPlay] starts it.
   Future<Duration> epgPreviewDelay() async {
-    final raw = await _read(epgPreviewDelayKey);
+    final raw = await _readResolved(epgPreviewDelayKey);
     final seconds = raw is num && raw > 0
         ? raw.toInt()
         : defaultEpgPreviewDelaySeconds;
@@ -363,13 +615,13 @@ class ViewSettingsService extends ChangeNotifier {
   }
 
   Future<ChannelColumnLayout> channelColumnLayout() async {
-    final raw = await _read(channelColumnLayoutKey);
+    final raw = await _readResolved(channelColumnLayoutKey);
     return ChannelColumnLayout.fromValue(raw as String?);
   }
 
   /// Synchronous access to the in-memory cached channel column layout.
   ChannelColumnLayout get channelColumnLayoutSync =>
-      ChannelColumnLayout.fromValue(_memory[channelColumnLayoutKey] as String?);
+      ChannelColumnLayout.fromValue(_cached(channelColumnLayoutKey) as String?);
 
   Future<void> setChannelColumnLayout(ChannelColumnLayout layout) async {
     await _write(channelColumnLayoutKey, layout.value);
@@ -380,12 +632,12 @@ class ViewSettingsService extends ChangeNotifier {
   /// switch playback and the OS display into HDR mode. Defaults on, matching
   /// the always-on behavior before this setting existed.
   Future<bool> hdrEnabled() async {
-    final raw = await _read(hdrEnabledKey);
+    final raw = await _readResolved(hdrEnabledKey);
     return raw as bool? ?? true;
   }
 
   /// Synchronous access to the in-memory cached HDR setting.
-  bool get hdrEnabledSync => (_memory[hdrEnabledKey] as bool?) ?? true;
+  bool get hdrEnabledSync => (_cached(hdrEnabledKey) as bool?) ?? true;
 
   Future<void> setHdrEnabled(
     // ignore: avoid_positional_boolean_parameters
@@ -396,67 +648,135 @@ class ViewSettingsService extends ChangeNotifier {
   }
 
   /// Whether the user's chosen media sort order (VOD, Series, Live TV)
-  /// survives across launches. Defaults to `false` so existing users keep
-  /// today's session-only behavior (resets to server order on each fresh
-  /// boot of the app). Shared across every sortable screen - persisted as
+  /// survives across launches. Defaults on; off resets to server order on
+  /// each fresh boot of the app. Shared across every sortable screen - persisted as
   /// its own key so toggling this off doesn't clear the separately-stored
   /// [vodSortOption]/[seriesSortOption]/[liveTvSortOption], which are simply
   /// ignored until re-enabled.
   Future<bool> rememberMediaSort() async {
-    final raw = await _read(rememberMediaSortKey);
-    return raw as bool? ?? false;
+    final raw = await _readResolved(rememberMediaSortKey);
+    return raw as bool? ?? true;
   }
 
   /// Synchronous accessor - see [hdrEnabledSync].
   bool get rememberMediaSortSync =>
-      (_memory[rememberMediaSortKey] as bool?) ?? false;
+      (_cached(rememberMediaSortKey) as bool?) ?? true;
 
   Future<void> setRememberMediaSort(
     // ignore: avoid_positional_boolean_parameters
     bool value,
   ) async {
+    // Flipping this only changes what the next launch starts with: the
+    // screens keep showing their current order, so Home must too.
+    _vodBrowseOrder = vodBrowseOrder;
+    _seriesBrowseOrder = seriesBrowseOrder;
+    _liveTvBrowseOrder = liveTvBrowseOrder;
     await _write(rememberMediaSortKey, value);
     notifyListeners();
   }
 
+  // What each screen was set to this session. Separate from the persisted
+  // options, which are only written under [rememberMediaSort], so Home can
+  // follow a screen's order with Filter Persistence off too.
+  MediaBrowseOrder? _vodBrowseOrder;
+  MediaBrowseOrder? _seriesBrowseOrder;
+  ChannelBrowseOrder? _liveTvBrowseOrder;
+
+  /// The order the Movies screen shows, and so its Home row.
+  MediaBrowseOrder get vodBrowseOrder =>
+      _vodBrowseOrder ??
+      (
+        sort: rememberMediaSortSync
+            ? vodSortOptionSync
+            : MediaSortOption.defaultOrder,
+        favoritesFirst: !rememberMediaSortSync || vodFavoritesFirstSync,
+      );
+
+  void setVodBrowseOrder(MediaBrowseOrder order) {
+    _vodBrowseOrder = order;
+    notifyListeners();
+  }
+
+  /// The order the Series screen shows, and so its Home row.
+  MediaBrowseOrder get seriesBrowseOrder =>
+      _seriesBrowseOrder ??
+      (
+        sort: rememberMediaSortSync
+            ? seriesSortOptionSync
+            : MediaSortOption.defaultOrder,
+        favoritesFirst: !rememberMediaSortSync || seriesFavoritesFirstSync,
+      );
+
+  void setSeriesBrowseOrder(MediaBrowseOrder order) {
+    _seriesBrowseOrder = order;
+    notifyListeners();
+  }
+
+  /// The order the Live TV screen shows, and so its Home row.
+  ChannelBrowseOrder get liveTvBrowseOrder =>
+      _liveTvBrowseOrder ??
+      (
+        sort: rememberMediaSortSync
+            ? liveTvSortOptionSync
+            : ChannelSortOption.playlistOrder,
+        favoritesFirst: !rememberMediaSortSync || liveTvFavoritesFirstSync,
+      );
+
+  void setLiveTvBrowseOrder(ChannelBrowseOrder order) {
+    _liveTvBrowseOrder = order;
+    notifyListeners();
+  }
+
   Future<MediaSortOption> vodSortOption() async {
-    final raw = await _read(vodSortOptionKey);
+    final raw = await _readResolved(vodSortOptionKey);
     return MediaSortOption.fromValue(raw as String?);
   }
 
   /// Synchronous accessor - see [hdrEnabledSync].
   MediaSortOption get vodSortOptionSync =>
-      MediaSortOption.fromValue(_memory[vodSortOptionKey] as String?);
+      MediaSortOption.fromValue(_cached(vodSortOptionKey) as String?);
 
   Future<void> setVodSortOption(MediaSortOption option) async {
+    final order = _vodBrowseOrder;
+    if (order != null) {
+      _vodBrowseOrder = (sort: option, favoritesFirst: order.favoritesFirst);
+    }
     await _write(vodSortOptionKey, option.value);
     notifyListeners();
   }
 
   Future<MediaSortOption> seriesSortOption() async {
-    final raw = await _read(seriesSortOptionKey);
+    final raw = await _readResolved(seriesSortOptionKey);
     return MediaSortOption.fromValue(raw as String?);
   }
 
   /// Synchronous accessor - see [hdrEnabledSync].
   MediaSortOption get seriesSortOptionSync =>
-      MediaSortOption.fromValue(_memory[seriesSortOptionKey] as String?);
+      MediaSortOption.fromValue(_cached(seriesSortOptionKey) as String?);
 
   Future<void> setSeriesSortOption(MediaSortOption option) async {
+    final order = _seriesBrowseOrder;
+    if (order != null) {
+      _seriesBrowseOrder = (sort: option, favoritesFirst: order.favoritesFirst);
+    }
     await _write(seriesSortOptionKey, option.value);
     notifyListeners();
   }
 
   Future<ChannelSortOption> liveTvSortOption() async {
-    final raw = await _read(liveTvSortOptionKey);
+    final raw = await _readResolved(liveTvSortOptionKey);
     return ChannelSortOption.fromValue(raw as String?);
   }
 
   /// Synchronous accessor - see [hdrEnabledSync].
   ChannelSortOption get liveTvSortOptionSync =>
-      ChannelSortOption.fromValue(_memory[liveTvSortOptionKey] as String?);
+      ChannelSortOption.fromValue(_cached(liveTvSortOptionKey) as String?);
 
   Future<void> setLiveTvSortOption(ChannelSortOption option) async {
+    final order = _liveTvBrowseOrder;
+    if (order != null) {
+      _liveTvBrowseOrder = (sort: option, favoritesFirst: order.favoritesFirst);
+    }
     await _write(liveTvSortOptionKey, option.value);
     notifyListeners();
   }
@@ -466,54 +786,66 @@ class ViewSettingsService extends ChangeNotifier {
   /// sort options, only read/written by the screen while [rememberMediaSort]
   /// is on - otherwise every launch starts back at this default.
   Future<bool> vodFavoritesFirst() async {
-    final raw = await _read(vodFavoritesFirstKey);
+    final raw = await _readResolved(vodFavoritesFirstKey);
     return raw as bool? ?? true;
   }
 
   /// Synchronous accessor - see [hdrEnabledSync].
   bool get vodFavoritesFirstSync =>
-      (_memory[vodFavoritesFirstKey] as bool?) ?? true;
+      (_cached(vodFavoritesFirstKey) as bool?) ?? true;
 
   Future<void> setVodFavoritesFirst(
     // ignore: avoid_positional_boolean_parameters
     bool value,
   ) async {
+    final order = _vodBrowseOrder;
+    if (order != null) {
+      _vodBrowseOrder = (sort: order.sort, favoritesFirst: value);
+    }
     await _write(vodFavoritesFirstKey, value);
     notifyListeners();
   }
 
   /// Series counterpart of [vodFavoritesFirst], stored independently.
   Future<bool> seriesFavoritesFirst() async {
-    final raw = await _read(seriesFavoritesFirstKey);
+    final raw = await _readResolved(seriesFavoritesFirstKey);
     return raw as bool? ?? true;
   }
 
   /// Synchronous accessor - see [hdrEnabledSync].
   bool get seriesFavoritesFirstSync =>
-      (_memory[seriesFavoritesFirstKey] as bool?) ?? true;
+      (_cached(seriesFavoritesFirstKey) as bool?) ?? true;
 
   Future<void> setSeriesFavoritesFirst(
     // ignore: avoid_positional_boolean_parameters
     bool value,
   ) async {
+    final order = _seriesBrowseOrder;
+    if (order != null) {
+      _seriesBrowseOrder = (sort: order.sort, favoritesFirst: value);
+    }
     await _write(seriesFavoritesFirstKey, value);
     notifyListeners();
   }
 
   /// Live TV counterpart of [vodFavoritesFirst], stored independently.
   Future<bool> liveTvFavoritesFirst() async {
-    final raw = await _read(liveTvFavoritesFirstKey);
+    final raw = await _readResolved(liveTvFavoritesFirstKey);
     return raw as bool? ?? true;
   }
 
   /// Synchronous accessor - see [hdrEnabledSync].
   bool get liveTvFavoritesFirstSync =>
-      (_memory[liveTvFavoritesFirstKey] as bool?) ?? true;
+      (_cached(liveTvFavoritesFirstKey) as bool?) ?? true;
 
   Future<void> setLiveTvFavoritesFirst(
     // ignore: avoid_positional_boolean_parameters
     bool value,
   ) async {
+    final order = _liveTvBrowseOrder;
+    if (order != null) {
+      _liveTvBrowseOrder = (sort: order.sort, favoritesFirst: value);
+    }
     await _write(liveTvFavoritesFirstKey, value);
     notifyListeners();
   }
@@ -527,13 +859,13 @@ class ViewSettingsService extends ChangeNotifier {
   /// keeps existing tvOS users' behavior unchanged now that it's a real
   /// toggle. Ignored on every other platform.
   Future<bool> matchRefreshRate() async {
-    final raw = await _read(matchRefreshRateKey);
+    final raw = await _readResolved(matchRefreshRateKey);
     return raw as bool? ?? _defaultMatchRefreshRate;
   }
 
   /// Synchronous access to the in-memory cached refresh-rate-match setting.
   bool get matchRefreshRateSync =>
-      (_memory[matchRefreshRateKey] as bool?) ?? _defaultMatchRefreshRate;
+      (_cached(matchRefreshRateKey) as bool?) ?? _defaultMatchRefreshRate;
 
   static bool get _defaultMatchRefreshRate => HostPlatform.isTvOS;
 
@@ -545,17 +877,51 @@ class ViewSettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Whether the player's controls show which backend is playing and why it
+  /// fell back. For troubleshooting, so off by default.
+  Future<bool> showPlaybackDiagnostics() async {
+    final raw = await _readResolved(showPlaybackDiagnosticsKey);
+    return raw as bool? ?? false;
+  }
+
+  /// Synchronous access to the in-memory cached diagnostics setting.
+  bool get showPlaybackDiagnosticsSync =>
+      (_cached(showPlaybackDiagnosticsKey) as bool?) ?? false;
+
+  Future<void> setShowPlaybackDiagnostics(
+    // ignore: avoid_positional_boolean_parameters
+    bool enabled,
+  ) async {
+    await _write(showPlaybackDiagnosticsKey, enabled);
+    notifyListeners();
+  }
+
+  /// See [VodPlayerPreference]. Only offered on Android.
+  Future<VodPlayerPreference> vodPlayer() async {
+    final raw = await _readResolved(vodPlayerKey);
+    return VodPlayerPreference.fromValue(raw as String?);
+  }
+
+  /// Synchronous access to the in-memory cached player preference.
+  VodPlayerPreference get vodPlayerSync =>
+      VodPlayerPreference.fromValue(_cached(vodPlayerKey) as String?);
+
+  Future<void> setVodPlayer(VodPlayerPreference preference) async {
+    await _write(vodPlayerKey, preference.value);
+    notifyListeners();
+  }
+
   /// Whether the mpv backends deinterlace video (mpv's `deinterlace=auto`,
   /// which filters only frames flagged interlaced, e.g. 1080i/576i live
   /// channels). Defaults off: the filter costs CPU. ExoPlayer and AVKit have
   /// no filter chain and ignore it.
   Future<bool> deinterlace() async {
-    final raw = await _read(deinterlaceKey);
+    final raw = await _readResolved(deinterlaceKey);
     return raw as bool? ?? false;
   }
 
   /// Synchronous access to the in-memory cached deinterlace setting.
-  bool get deinterlaceSync => (_memory[deinterlaceKey] as bool?) ?? false;
+  bool get deinterlaceSync => (_cached(deinterlaceKey) as bool?) ?? false;
 
   Future<void> setDeinterlace(
     // ignore: avoid_positional_boolean_parameters
@@ -571,18 +937,44 @@ class ViewSettingsService extends ChangeNotifier {
   /// waits for the same headroom, with or without this. ExoPlayer and AVKit
   /// ignore it.
   Future<bool> prebufferLive() async {
-    final raw = await _read(prebufferLiveKey);
+    final raw = await _readResolved(prebufferLiveKey);
     return raw as bool? ?? false;
   }
 
   /// Synchronous access to the in-memory cached live pre-buffer setting.
-  bool get prebufferLiveSync => (_memory[prebufferLiveKey] as bool?) ?? false;
+  bool get prebufferLiveSync => (_cached(prebufferLiveKey) as bool?) ?? false;
 
   Future<void> setPrebufferLive(
     // ignore: avoid_positional_boolean_parameters
     bool enabled,
   ) async {
     await _write(prebufferLiveKey, enabled);
+    notifyListeners();
+  }
+
+  /// Whether the player keeps playing audio after the app goes to the
+  /// background (lock screen, home screen, CarPlay). Defaults on for Android
+  /// and iOS, where leaving the player already drops into picture-in-picture
+  /// and this adds the system media controls alongside it. Only phones and
+  /// tablets act on it (see PlayerScreen); off, leaving the app pauses
+  /// playback until the user comes back.
+  Future<bool> backgroundAudio() async {
+    final raw = await _readResolved(backgroundAudioKey);
+    return raw as bool? ?? _defaultBackgroundAudio;
+  }
+
+  /// Synchronous access to the in-memory cached background audio setting.
+  bool get backgroundAudioSync =>
+      (_cached(backgroundAudioKey) as bool?) ?? _defaultBackgroundAudio;
+
+  static bool get _defaultBackgroundAudio =>
+      HostPlatform.isAndroid || HostPlatform.isIOS;
+
+  Future<void> setBackgroundAudio(
+    // ignore: avoid_positional_boolean_parameters
+    bool enabled,
+  ) async {
+    await _write(backgroundAudioKey, enabled);
     notifyListeners();
   }
 
@@ -650,13 +1042,13 @@ class ViewSettingsService extends ChangeNotifier {
   /// changes. Defaults on, matching the always-on behavior before this
   /// setting existed. Ignored on touch devices, which never play it.
   Future<bool> navigationSoundEnabled() async {
-    final raw = await _read(navigationSoundEnabledKey);
+    final raw = await _readResolved(navigationSoundEnabledKey);
     return raw as bool? ?? true;
   }
 
   /// Synchronous access to the in-memory cached navigation sound setting.
   bool get navigationSoundEnabledSync =>
-      (_memory[navigationSoundEnabledKey] as bool?) ?? true;
+      (_cached(navigationSoundEnabledKey) as bool?) ?? true;
 
   Future<void> setNavigationSoundEnabled(
     // ignore: avoid_positional_boolean_parameters

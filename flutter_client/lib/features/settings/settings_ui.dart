@@ -20,6 +20,7 @@ import 'package:material_ui/material_ui.dart';
 /// the same macOS traffic-light clearance.
 bool get _isMacDesktopWindow => HostPlatform.isMacOS;
 const double _kMacTrafficLightInset = 72;
+const double _kSubpagePadding = 24;
 
 /// tvOS reports its overscan-safe area as real MediaQuery padding on every
 /// edge. Settings sub-pages are pushed on the root Navigator, outside
@@ -129,11 +130,16 @@ class SettingsRow extends StatelessWidget {
     this.onTap,
     this.destructive = false,
     this.autofocus = false,
+    this.locked = false,
   });
 
   final String title;
   final String? subtitle;
   final IconData? icon;
+
+  /// The server enforces this setting (Settings Profile): the row shows a lock,
+  /// drops its chevron, and selecting it explains why it can't change.
+  final bool locked;
 
   /// Custom leading visual (e.g. a service logo) shown in place of [icon].
   final Widget? leading;
@@ -150,6 +156,17 @@ class SettingsRow extends StatelessWidget {
     final theme = Theme.of(context);
     final scale = FontSizeScope.scaleOf(context);
     final titleColor = destructive ? theme.colorScheme.error : null;
+    final titleTrailing = locked
+        ? Icon(
+            Icons.lock_outline,
+            size: 16 * scale,
+            color: theme.colorScheme.onSurfaceVariant,
+          )
+        : this.titleTrailing;
+    final trailing = locked && this.trailing is SettingsChevron
+        ? null
+        : this.trailing;
+    final onTap = locked ? () => _explainLocked(context) : this.onTap;
     final titleText = Text(
       title,
       style: theme.textTheme.bodyLarge?.copyWith(
@@ -187,7 +204,7 @@ class SettingsRow extends StatelessWidget {
                     children: [
                       Flexible(child: titleText),
                       SizedBox(width: 8 * scale),
-                      titleTrailing!,
+                      titleTrailing,
                     ],
                   ),
                 if (subtitle != null) ...[
@@ -204,7 +221,7 @@ class SettingsRow extends StatelessWidget {
               ],
             ),
           ),
-          if (trailing != null) ...[SizedBox(width: 12 * scale), trailing!],
+          if (trailing != null) ...[SizedBox(width: 12 * scale), trailing],
         ],
       ),
     );
@@ -219,6 +236,18 @@ class SettingsRow extends StatelessWidget {
       borderRadius: borderRadius,
       child: content,
     );
+  }
+
+  static void _explainLocked(BuildContext context) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).settingsManagedByServer),
+        ),
+      );
   }
 }
 
@@ -247,6 +276,7 @@ class SettingsSwitchRow extends StatelessWidget {
     this.leading,
     required this.value,
     required this.onChanged,
+    this.locked = false,
   });
 
   final String title;
@@ -256,6 +286,9 @@ class SettingsSwitchRow extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
 
+  /// See [SettingsRow.locked]; the switch shows the enforced value, disabled.
+  final bool locked;
+
   @override
   Widget build(BuildContext context) {
     return SettingsRow(
@@ -263,7 +296,8 @@ class SettingsSwitchRow extends StatelessWidget {
       subtitle: subtitle,
       icon: icon,
       leading: leading,
-      trailing: AppSwitch(value: value, onChanged: onChanged),
+      locked: locked,
+      trailing: AppSwitch(value: value, onChanged: locked ? null : onChanged),
       onTap: () => onChanged(!value),
     );
   }
@@ -320,6 +354,34 @@ class SettingsGroup extends StatelessWidget {
   }
 }
 
+/// The logo and name at the top of an integration's [SettingsCard].
+class IntegrationCardHeader extends StatelessWidget {
+  const IntegrationCardHeader({
+    super.key,
+    required this.logo,
+    required this.title,
+  });
+
+  final Widget logo;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        logo,
+        SizedBox(width: 12 * FontSizeScope.scaleOf(context)),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// A plain rounded card for settings content that doesn't fit the
 /// row-per-line [SettingsGroup] shape (status readouts, the app version
 /// card, the Trakt integration panel).
@@ -366,6 +428,96 @@ class SettingsSectionHeader extends StatelessWidget {
   }
 }
 
+/// A [SingleChildScrollView] that a remote can see all of. Focus only stops on
+/// focusable items and each only scrolls itself into view, so a card or heading
+/// above the first one or below the last one would otherwise stay cut off.
+/// Focus reaching either end scrolls the page to that end.
+class SettingsScrollView extends StatefulWidget {
+  const SettingsScrollView({super.key, this.padding, required this.child});
+
+  final EdgeInsetsGeometry? padding;
+  final Widget child;
+
+  @override
+  State<SettingsScrollView> createState() => _SettingsScrollViewState();
+}
+
+class _SettingsScrollViewState extends State<SettingsScrollView> {
+  final ScrollController _controller = ScrollController();
+  final FocusNode _contentFocusNode = FocusNode(
+    debugLabel: 'settingsScrollContent',
+    canRequestFocus: false,
+    skipTraversal: true,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    FocusManager.instance.addListener(_onPrimaryFocusChanged);
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeListener(_onPrimaryFocusChanged);
+    _contentFocusNode.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onPrimaryFocusChanged() {
+    if (!_contentFocusNode.hasFocus ||
+        FocusManager.instance.highlightMode == FocusHighlightMode.touch) {
+      return;
+    }
+    // The manager notifies after the focus nodes, so this callback runs after
+    // the one DpadFocusable just queued for its own reveal, and overrides it.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _revealPageEnd());
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  void _revealPageEnd() {
+    final focused = FocusManager.instance.primaryFocus;
+    if (!mounted ||
+        focused == null ||
+        !_contentFocusNode.hasFocus ||
+        !_controller.hasClients) {
+      return;
+    }
+    final focusedRect = focused.rect;
+    final items = _contentFocusNode.traversalDescendants;
+    // With a little tolerance, for a row of side by side buttons
+    final isFirst = !items.any((n) => n.rect.top < focusedRect.top - 1);
+    final isLast = !items.any((n) => n.rect.bottom > focusedRect.bottom + 1);
+    // The only item on the page stays wherever its own reveal puts it.
+    if (isFirst == isLast) return;
+
+    // Stops early if the page's end is too far away to keep the item on screen.
+    final viewport = context.findRenderObject()! as RenderBox;
+    final viewportRect = viewport.localToGlobal(Offset.zero) & viewport.size;
+    final position = _controller.position;
+    final target = isFirst
+        ? position.pixels - (viewportRect.bottom - focusedRect.bottom)
+        : position.pixels + (focusedRect.top - viewportRect.top);
+    _controller.animateTo(
+      target.clamp(position.minScrollExtent, position.maxScrollExtent),
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: _contentFocusNode,
+      child: SingleChildScrollView(
+        controller: _controller,
+        padding: widget.padding,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 /// A `Scaffold` + `AppBar` matching the app's other immersive top-level
 /// pages byte-for-byte (`show_detail_screen.dart`,
 /// `dvr_series_rule_options_screen.dart`): same `AppIconButton` back button,
@@ -376,6 +528,7 @@ Widget _settingsSubpageScaffold(
   BuildContext context, {
   required String Function(BuildContext) title,
   required Widget body,
+  bool padBody = true,
 }) {
   final scale = FontSizeScope.scaleOf(context);
   final macInset =
@@ -389,7 +542,9 @@ Widget _settingsSubpageScaffold(
       leadingInset: macInset,
       onBack: () => Navigator.of(context, rootNavigator: true).pop(),
     ),
-    body: Padding(padding: const EdgeInsets.all(24), child: body),
+    body: padBody
+        ? Padding(padding: const EdgeInsets.all(_kSubpagePadding), child: body)
+        : body,
   );
 }
 
@@ -438,13 +593,20 @@ Future<T?> pushSettingsSubpage<T>(
     content: (context) => _settingsSubpageScaffold(
       context,
       title: title,
-      body: SingleChildScrollView(child: builder(context)),
+      // Padding goes inside the scroll view, not around it, so rows scroll
+      // all the way to the top bar and the window bottom instead of clipping
+      // 24px short of both edges.
+      padBody: false,
+      body: SettingsScrollView(
+        padding: const EdgeInsets.all(_kSubpagePadding),
+        child: builder(context),
+      ),
     ),
   );
 }
 
 /// Like [pushSettingsSubpage], but gives [builder] the full remaining height
-/// instead of wrapping it in a [SingleChildScrollView], for sub-pages that
+/// instead of wrapping it in a [SettingsScrollView], for sub-pages that
 /// manage their own scrolling/layout (e.g. the Release Notes master/detail
 /// view).
 Future<T?> pushSettingsSubpageFullHeight<T>(

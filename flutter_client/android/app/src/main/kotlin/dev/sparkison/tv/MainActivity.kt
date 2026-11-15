@@ -1,15 +1,12 @@
 package dev.sparkison.tv
 
-import android.app.ActivityManager
 import android.app.PictureInPictureParams
-import android.app.UiModeManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
-import android.os.Process
 import android.util.DisplayMetrics
 import android.util.Log
 import android.util.Rational
@@ -26,16 +23,13 @@ import dev.sparkison.tv.mpv.MpvPlayerPlatformViewFactory
 import dev.sparkison.tv.mpv.MpvPlayerPlugin
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.embedding.engine.FlutterShellArgs
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var media3Plugin: Media3PlaybackPlugin? = null
     private var mpvPlugin: MpvPlayerPlugin? = null
-    private var deviceInfoChannel: MethodChannel? = null
     private var systemUiChannel: MethodChannel? = null
     private var textInputChannel: MethodChannel? = null
-    private var nativeLogChannel: NativeLogChannel? = null
 
     // Mirrors the Dart-side player route (set via applySystemUiPolicy) so
     // onUserLeaveHint knows whether leaving the app should enter PiP.
@@ -45,16 +39,7 @@ class MainActivity : FlutterActivity() {
     // holds the text input connection; read by TextEditorProxyView.
     private var flutterTextInputActive = false
 
-    // What getFlutterShellArgs picked, for the Logs & Diagnostics header.
-    private var rendererDescription = "unknown"
-
-    // The real display density, before the TV override below. The system
-    // draws the launch splash at this density, so LaunchSplash (Dart) needs it
-    // to take over at the same on-screen logo size.
-    private var launchDensity = 1f
-
     override fun attachBaseContext(newBase: Context) {
-        launchDensity = newBase.resources.displayMetrics.density
         // UiModeManager.getCurrentModeType() calls getDisplayId() internally on Android 17+,
         // which NPEs here because the display isn't attached until after attachBaseContext returns.
         val isTV = newBase.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
@@ -136,59 +121,54 @@ class MainActivity : FlutterActivity() {
         if (flutterView.isFocused) proxy.requestFocus()
     }
 
-    override fun getFlutterShellArgs(): FlutterShellArgs {
-        val args = super.getFlutterShellArgs()
-        val vulkan11 = 0x401000 // FEATURE_VULKAN_HARDWARE_VERSION encodes 1.1.0 as 0x401000
-        // Feature flag only, not UiModeManager - see attachBaseContext.
-        val isAndroidTv = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
-        val renderer = FlutterRendererPolicy.select(
-            manufacturer = Build.MANUFACTURER,
-            isAndroidTv = isAndroidTv,
-            sdkInt = Build.VERSION.SDK_INT,
-            supportsVulkan11 = packageManager.hasSystemFeature(PackageManager.FEATURE_VULKAN_HARDWARE_VERSION, vulkan11),
-            is64Bit = Process.is64Bit(),
-        )
-        renderer.shellArgument?.let { args.add(it) }
-        val memoryArgs = FlutterRendererPolicy.engineMemoryArgs(
-            DeviceMemoryClass.isLowRam(this),
-            DeviceMemoryClass.totalMemBytes(this),
-        )
-        memoryArgs.forEach { args.add(it) }
-        rendererDescription = "${renderer.diagnosticName} $memoryArgs"
-        Log.i(TAG, "Flutter renderer: $rendererDescription")
-        return args
+    // The shared engine (see AppFlutterEngine): Android Auto may have
+    // started it already, and keeps it while connected. It's created with
+    // the per-device shell args there, so getFlutterShellArgs never applies.
+    override fun provideFlutterEngine(context: Context): FlutterEngine =
+        AppFlutterEngine.attachActivity(this)
+
+    override fun shouldDestroyEngineWithHost(): Boolean = false
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (!isChangingConfigurations) AppFlutterEngine.detachActivity()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        isInForeground = true
+        CarMediaService.phoneCameToForeground()
+    }
+
+    override fun onPause() {
+        isInForeground = false
+        super.onPause()
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         // Shared across both playback plugins -- see FrameRateManager's class
         // doc for why a single Window-scoped instance, not one per plugin.
-        val nativeLog = NativeLogChannel(flutterEngine.dartExecutor.binaryMessenger)
-        nativeLogChannel = nativeLog
-        val frameRateManager = FrameRateManager(this) { message -> nativeLog.log("FrameRateManager", message) }
+        val nativeLog = AppFlutterEngine.nativeLog
+        val frameRateManager = FrameRateManager(this) { message ->
+            nativeLog?.log("FrameRateManager", message) ?: Log.i("FrameRateManager", message)
+        }
         val media3 = Media3PlaybackPlugin(this, flutterEngine, frameRateManager)
         media3Plugin = media3
+        currentMedia3Plugin = media3
+        // Ignored after the first activity on this engine (it can outlive
+        // one, see AppFlutterEngine); the factories ask for the current plugin.
         flutterEngine.platformViewsController.registry.registerViewFactory(
             "m3u_tv/android_exo_view",
-            Media3PlatformViewFactory(media3),
+            Media3PlatformViewFactory { currentMedia3Plugin },
         )
         val mpv = MpvPlayerPlugin(this, flutterEngine, frameRateManager)
         mpvPlugin = mpv
+        currentMpvPlugin = mpv
         flutterEngine.platformViewsController.registry.registerViewFactory(
             "m3u_tv/android_mpv_view",
-            MpvPlayerPlatformViewFactory(mpv),
+            MpvPlayerPlatformViewFactory { currentMpvPlugin },
         )
-        deviceInfoChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DEVICE_INFO_CHANNEL).also { channel ->
-            channel.setMethodCallHandler { call, result ->
-                when (call.method) {
-                    "isTelevision" -> result.success(isTelevisionDevice())
-                    "getPerformanceSignals" -> result.success(performanceSignals())
-                    "getRenderer" -> result.success(rendererDescription)
-                    "getLaunchDensity" -> result.success(launchDensity.toDouble())
-                    else -> result.notImplemented()
-                }
-            }
-        }
         systemUiChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SYSTEM_UI_CHANNEL).also { channel ->
             channel.setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -214,18 +194,16 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        if (currentMedia3Plugin === media3Plugin) currentMedia3Plugin = null
+        if (currentMpvPlugin === mpvPlugin) currentMpvPlugin = null
         media3Plugin?.dispose()
         media3Plugin = null
         mpvPlugin?.dispose()
         mpvPlugin = null
-        deviceInfoChannel?.setMethodCallHandler(null)
-        deviceInfoChannel = null
         systemUiChannel?.setMethodCallHandler(null)
         systemUiChannel = null
         textInputChannel?.setMethodCallHandler(null)
         textInputChannel = null
-        nativeLogChannel?.dispose()
-        nativeLogChannel = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 
@@ -286,35 +264,19 @@ class MainActivity : FlutterActivity() {
         systemUiChannel?.invokeMethod("pipModeChanged", isInPictureInPictureMode)
     }
 
-    /// Hardware signals the Dart-side [DevicePerformance] uses to pick the
-    /// reduced tier: a 32-bit process (cheap TV sticks run 32-bit userspace),
-    /// the platform low-RAM flag, and total physical memory.
-    private fun performanceSignals(): Map<String, Any> {
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-        val memInfo = ActivityManager.MemoryInfo().also { activityManager?.getMemoryInfo(it) }
-        val is64Bit = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Process.is64Bit()
-        } else {
-            Build.SUPPORTED_64_BIT_ABIS.isNotEmpty()
-        }
-        return mapOf(
-            "is64Bit" to is64Bit,
-            "isLowRamDevice" to (activityManager?.isLowRamDevice ?: false),
-            "totalMemBytes" to memInfo.totalMem,
-        )
-    }
-
-    private fun isTelevisionDevice(): Boolean {
-        val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
-        val uiModeType = uiModeManager?.currentModeType
-        return uiModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
-            packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
-            packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK_ONLY)
-    }
+    private fun isTelevisionDevice(): Boolean = AppFlutterEngine.isTelevisionDevice(this)
 
     companion object {
         private const val TAG = "MainActivity"
-        private const val DEVICE_INFO_CHANNEL = "m3u_tv/device_info"
+
+        /** Whether the app is in front, for Android Auto (CarMediaService). Main thread. */
+        var isInForeground = false
+            private set
+
+        // The attached activity's player plugins, for the engine's view
+        // factories. Main thread only.
+        private var currentMedia3Plugin: Media3PlaybackPlugin? = null
+        private var currentMpvPlugin: MpvPlayerPlugin? = null
         private const val SYSTEM_UI_CHANNEL = "m3u_tv/system_ui"
         private const val TEXT_INPUT_CHANNEL = "m3u_tv/text_input"
     }

@@ -1,0 +1,21 @@
+name: Security scan
+description: >-
+  Checks every lockfile under flutter_client (pubspec.lock and the iOS, macOS
+  and tvOS Swift Package Manager Package.resolved files) against the OSV
+  vulnerability database, and fails if any dependency has a known
+  vulnerability. Used by ci.yml and by release.yml's validate gate, so a
+  vulnerability published between pushing a tag and the release build still
+  stops the release. A reviewed exception goes in flutter_client/osv-scanner.toml
+  ([[IgnoredVulns]] with an id, ignoreUntil and reason), never by skipping
+  this step.
+
+runs:
+  using: composite
+  steps:
+    - name: Scan dependencies for known vulnerabilities
+      # Pinned to the v2.7.0 commit; bump deliberately.
+      uses: google/osv-scanner-action/osv-scanner-action@6ad84ce1ef2d4124ba333b221894c133c4a970ea # v2.7.0
+      with:
+        scan-args: |-
+          --recursive
+          flutter_client

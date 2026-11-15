@@ -46,18 +46,38 @@ void main() {
     await service.authenticate(_credentials);
   });
 
-  test('skips a playback report while the previous one is pending', () async {
-    final first = service.reportPlaybackProgress(_progress(10));
-    expect(await service.reportPlaybackProgress(_progress(20)), isFalse);
-    expect(transport.positions, ['10']);
+  test(
+    'queues only the latest report while the previous one is pending',
+    () async {
+      final first = service.reportPlaybackProgress(_progress(10));
+      expect(await service.reportPlaybackProgress(_progress(20)), isFalse);
+      expect(await service.reportPlaybackProgress(_progress(25)), isFalse);
+      expect(transport.positions, ['10']);
 
-    transport.pending.single.complete(null);
-    expect(await first, isTrue);
+      transport.pending.single.complete(null);
+      await pumpEventQueue();
+      expect(transport.positions, ['10', '25']);
 
-    final third = service.reportPlaybackProgress(_progress(30));
-    expect(transport.positions, ['10', '30']);
+      final settled = service.playbackProgressSettled();
+      transport.pending.last.complete(null);
+      expect(await first, isTrue);
+      await settled;
+
+      final next = service.reportPlaybackProgress(_progress(30));
+      expect(transport.positions, ['10', '25', '30']);
+      transport.pending.last.complete(null);
+      expect(await next, isTrue);
+    },
+  );
+
+  test('a failed report still sends the queued one', () async {
+    final failed = service.reportPlaybackProgress(_progress(10));
+    unawaited(service.reportPlaybackProgress(_progress(20)));
+    transport.pending.single.completeError(StateError('editor down'));
+    await pumpEventQueue();
+    expect(transport.positions, ['10', '20']);
     transport.pending.last.complete(null);
-    expect(await third, isTrue);
+    await expectLater(failed, throwsStateError);
   });
 
   test('reports again after a failed playback report', () async {

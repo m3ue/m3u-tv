@@ -66,6 +66,8 @@ wl_surface* ParentSurface(GtkWidget* view) {
 
 }  // namespace
 
+bool WaylandVideoSurface::nudge_parent_on_present_ = false;
+
 WaylandVideoSurface::~WaylandVideoSurface() { Destroy(); }
 
 void WaylandVideoSurface::HandleManagerIntent(void* data, wp_color_manager_v1* manager, uint32_t intent) {
@@ -1073,6 +1075,15 @@ void WaylandVideoSurface::ArmFrameAckWatchdog() {
         self->frame_ack_source_ = 0;
         if (!self->frame_pending_) return G_SOURCE_REMOVE;
         self->ClearFrameCallback();
+        if (!nudge_parent_on_present_) {
+          nudge_parent_on_present_ = true;
+          g_message(
+              "MPV video plane: compositor withheld a frame acknowledgement; "
+              "redrawing the window with each video frame from now on");
+        }
+        // The parent repainting is what gets this frame acknowledged on such
+        // compositors, so ask for it alongside the re-present.
+        self->RequestParentCommit();
         if (++self->consecutive_frame_acks_missed_ > kMaxConsecutiveFrameAckMisses) {
           g_warning(
               "MPV video plane: compositor is not acknowledging frames (%d misses); "
@@ -1120,6 +1131,8 @@ bool WaylandVideoSurface::Present() {
       wl_surface_set_buffer_scale(surface_, scale_);
       scale_sent_ = scale_;
     }
+    RequestParentCommit();
+  } else if (nudge_parent_on_present_) {
     RequestParentCommit();
   }
   ArmFrameAckWatchdog();

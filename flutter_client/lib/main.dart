@@ -13,6 +13,9 @@ import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/app/launch_splash.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/app/text_input_reporting_binding.dart';
+import 'package:m3u_tv/features/android_auto/android_auto_bridge.dart';
+import 'package:m3u_tv/features/carplay/car_catalog.dart';
+import 'package:m3u_tv/features/carplay/carplay_controller.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
@@ -76,6 +79,18 @@ Future<void> main() async {
   final systemUiPolicy = SystemUiPolicy();
   await systemUiPolicy.applyBrowsing();
   final appState = await _buildAppState();
+  if (HostPlatform.isIOS) {
+    // Before the UI: the car can open the app without a phone window.
+    final carPlay = CarPlayController(appState);
+    CarPlayController.instance = carPlay;
+    unawaited(carPlay.start());
+  } else if (HostPlatform.isAndroid) {
+    // Before the UI, likewise: Android Auto can start the app with no
+    // activity (CarMediaService.kt).
+    final androidAuto = AndroidAutoBridge(CarCatalog(appState));
+    AndroidAutoBridge.instance = androidAuto;
+    androidAuto.start();
+  }
   _configureImageCache(await appState.viewSettingsService.optimizeFor());
   DesktopFullscreenService? desktopFullscreen;
   if (_isDesktop) {
@@ -99,11 +114,14 @@ Future<void> main() async {
   // focus change until Settings was opened once; volumeSync defaults to
   // full volume, so a custom desktop volume would similarly be ignored by
   // the very first stream opened in a session. The player reads
-  // hdrEnabledSync, matchRefreshRateSync, deinterlaceSync and
-  // prebufferLiveSync when it opens a stream, so without these an
+  // hdrEnabledSync, matchRefreshRateSync, deinterlaceSync, prebufferLiveSync,
+  // vodPlayerSync and showPlaybackDiagnosticsSync, so without these an
   // Android/Windows user's Auto Frame Rate stayed off (and a tvOS user's
   // opt-out, or anyone's HDR opt-out, was undone) after every cold start
   // until Settings was opened (issue #314).
+  // Settings the editor manages (Settings Profile) as last fetched, so the
+  // reads below and the start page already reflect them.
+  await appState.viewSettingsService.loadManagedSettings();
   await appState.viewSettingsService.fontSize();
   await Future.wait([
     appState.viewSettingsService.rememberMediaSort(),
@@ -117,6 +135,9 @@ Future<void> main() async {
     appState.viewSettingsService.matchRefreshRate(),
     appState.viewSettingsService.deinterlace(),
     appState.viewSettingsService.prebufferLive(),
+    appState.viewSettingsService.backgroundAudio(),
+    appState.viewSettingsService.vodPlayer(),
+    appState.viewSettingsService.showPlaybackDiagnostics(),
     appState.viewSettingsService.navigationSoundEnabled(),
     appState.viewSettingsService.volume(),
     // Home picks its layout synchronously on first build; reading the style
@@ -125,6 +146,7 @@ Future<void> main() async {
     appState.viewSettingsService.homeScreenStyle(),
     // Same for the nav and Home row order, read synchronously from here on.
     appState.viewSettingsService.navLayout(),
+    appState.viewSettingsService.loadHiddenHomeRows(),
   ]);
   // Resolve the user's preferred start page before the router is built so a
   // cold launch opens there instead of always on Home.

@@ -349,6 +349,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playerStartFromBeginning => '从头开始';
 
   @override
+  String get playerPlay => '播放';
+
+  @override
   String get playerResume => '恢复播放';
 
   @override
@@ -446,7 +449,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsIntegrations => '集成';
 
   @override
-  String get settingsIntegrationsSubtitle => 'Trakt 等';
+  String get settingsIntegrationsSubtitle => 'SIMKL、TheIntroDB 等';
 
   @override
   String get settingsAppearance => '外观';
@@ -458,7 +461,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPlayback => '播放';
 
   @override
-  String get settingsPlaybackSubtitle => '代理和 DVR';
+  String get settingsPlaybackSubtitle => '播放器、代理和 DVR';
 
   @override
   String get settingsReleaseNotesSubtitle => '本版本的更新内容';
@@ -811,6 +814,14 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String settingsAppUpdateAvailable(String version) {
     return '有可用更新：$version';
+  }
+
+  @override
+  String get settingsAppUpdateNoticeTitle => '应用有可用更新';
+
+  @override
+  String settingsAppUpdateNoticeBody(String version) {
+    return '版本 $version 已可安装。';
   }
 
   @override
@@ -1178,7 +1189,61 @@ class AppLocalizationsZh extends AppLocalizations {
   String get traktConnected => '已连接到 Trakt';
 
   @override
+  String traktConnectedAs(String account) {
+    return '已以 $account 身份连接到 Trakt';
+  }
+
+  @override
   String get traktDisconnectButton => '断开 Trakt';
+
+  @override
+  String get traktName => 'Trakt';
+
+  @override
+  String get simklName => 'Simkl';
+
+  @override
+  String serverWatchHistoryActive(String service) {
+    return 'M3U Editor 会将此登录的观看进度发送到 $service。';
+  }
+
+  @override
+  String serverWatchHistoryActiveAs(String service, String account) {
+    return 'M3U Editor 会以 $account 的身份将此登录的观看进度发送到 $service。';
+  }
+
+  @override
+  String serverWatchHistoryOverrideHint(String service) {
+    return '在此连接即可在本设备上改用您自己的 $service 账户。';
+  }
+
+  @override
+  String get serverWatchHistoryOverridden =>
+      '本设备会将播放记录发送到此处连接的账户。断开连接即可改用服务器账户。';
+
+  @override
+  String get simklConnectPrompt => '连接你的 Simkl 账户，自动记录你观看的内容。';
+
+  @override
+  String get simklConnectButton => '连接 Simkl';
+
+  @override
+  String get simklConnected => '已连接到 Simkl';
+
+  @override
+  String simklConnectedAs(String account) {
+    return '已以 $account 身份连接到 Simkl';
+  }
+
+  @override
+  String get simklDisconnectButton => '断开 Simkl';
+
+  @override
+  String get simklNotConfigured => '未配置 Simkl 客户端 ID。';
+
+  @override
+  String get simklNotConfiguredHint =>
+      '请在 simkl.com/settings/developer 注册应用，并通过 --dart-define=SIMKL_CLIENT_ID 设置客户端 ID。';
 
   @override
   String get vodAllMovies => '全部电影';
@@ -1833,6 +1898,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsHomeScreenStyleRich => '聚光灯';
 
   @override
+  String get settingsSectionPlayer => '播放器';
+
+  @override
+  String get settingsVodPlayer => '电影和剧集播放器';
+
+  @override
+  String get settingsVodPlayerExoPlayerFirst => '优先尝试 ExoPlayer';
+
+  @override
+  String get settingsVodPlayerMpv => '使用 mpv';
+
+  @override
   String get settingsHdrMode => 'HDR 模式';
 
   @override
@@ -1851,6 +1928,12 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get settingsDeinterlaceHint =>
       '消除隔行扫描频道（如 1080i 和 576i）的梳状条纹。会占用更多 CPU。';
+
+  @override
+  String get settingsBackgroundAudio => '后台音频';
+
+  @override
+  String get settingsBackgroundAudioHint => '离开应用或锁定屏幕时继续播放音频，并在锁屏和通知中显示播放控制。';
 
   @override
   String get settingsPrebufferLive => '播放前缓冲直播流';
@@ -1890,6 +1973,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsFontSize => '显示大小';
 
   @override
+  String get settingsFontSizeVerySmall => '特小';
+
+  @override
+  String get settingsFontSizeSmall => '小';
+
+  @override
   String get settingsFontSizeNormal => '标准';
 
   @override
@@ -1921,6 +2010,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsLogsDiagnosticsSubtitle => '设备详情和本次会话的日志，用于排查问题';
+
+  @override
+  String get settingsPlaybackDiagnostics => '显示播放诊断信息';
+
+  @override
+  String get settingsPlaybackDiagnosticsHint => '在播放器控件中显示当前播放器及其切换原因，用于排查问题。';
 
   @override
   String get diagnosticsUpload => '上传到服务器';
@@ -1992,6 +2087,48 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get playerTrackSubtitlesOff => '关闭';
+
+  @override
+  String get playerOnlineSubtitlesSearch => '在线搜索';
+
+  @override
+  String get playerOnlineSubtitlesTitle => '在线字幕';
+
+  @override
+  String get playerOnlineSubtitlesSearching => '正在搜索字幕…';
+
+  @override
+  String get playerOnlineSubtitlesLoading => '正在加载字幕…';
+
+  @override
+  String get playerOnlineSubtitlesEmpty => '未找到此内容的字幕。';
+
+  @override
+  String get playerOnlineSubtitlesFailed => '无法加载字幕。请检查网络连接后重试。';
+
+  @override
+  String get playerOnlineSubtitlesRetry => '重试';
+
+  @override
+  String get playerOnlineSubtitlesAllLanguages => '所有语言';
+
+  @override
+  String get settingsOnlineSubtitles => '在线字幕';
+
+  @override
+  String get settingsOnlineSubtitlesSubtitle => '在播放器的字幕菜单中查找电影和剧集的字幕。';
+
+  @override
+  String get settingsOnlineSubtitlesAddress => '字幕来源';
+
+  @override
+  String get settingsOnlineSubtitlesAddressHint => 'Stremio 字幕插件地址';
+
+  @override
+  String get settingsOnlineSubtitlesAddressInvalid => '请输入有效的 http 或 https 地址。';
+
+  @override
+  String get settingsOnlineSubtitlesUseDefault => '使用默认值';
 
   @override
   String get playerHdrOn => 'HDR 开';
@@ -2269,6 +2406,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsNavLayoutSubtitle => '重新排序或隐藏导航和主页中的栏目';
 
   @override
+  String get settingsManagedByServer => '由你的服务器管理。请联系管理员更改。';
+
+  @override
   String get settingsNavLayoutHintRemote =>
       '在某一行按确定键将其选中,用上下键移动,再按确定键放下。按返回键取消。';
 
@@ -2289,4 +2429,104 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsNavLayoutResetConfirm => '恢复';
+
+  @override
+  String get dvrStatusProcessing => '处理中';
+
+  @override
+  String get dvrStatusCompleted => '已完成';
+
+  @override
+  String get dvrStatusCancelled => '已取消';
+
+  @override
+  String get dvrFilterAll => '全部';
+
+  @override
+  String dvrFilterWithCount(String label, int count) {
+    return '$label（$count）';
+  }
+
+  @override
+  String get dvrFilterEmpty => '没有符合此筛选条件的录像';
+
+  @override
+  String dvrSortButton(String option) {
+    return '排序：$option';
+  }
+
+  @override
+  String get dvrSortDialogTitle => '录像排序';
+
+  @override
+  String get dvrSortNewest => '最新优先';
+
+  @override
+  String get dvrSortOldest => '最早优先';
+
+  @override
+  String get dvrSortTitle => '标题（A-Z）';
+
+  @override
+  String get dvrLoadError => '无法加载你的录像，服务器返回了错误。';
+
+  @override
+  String get dvrLoadOffline => '无法连接到你的服务器。请检查网络连接后重试。';
+
+  @override
+  String get dvrLoadPartial => '部分较早的录像未能加载。';
+
+  @override
+  String get dvrLoadRefreshFailed => '无法刷新你的录像，当前显示的是上次加载的列表。';
+
+  @override
+  String get dvrRetry => '重试';
+
+  @override
+  String get requestsProviderHeading => '请求来源';
+
+  @override
+  String get playerAudioSync => '音频同步';
+
+  @override
+  String get playerSubtitleSync => '字幕同步';
+
+  @override
+  String playerSyncRow(String label, String value) {
+    return '$label：$value';
+  }
+
+  @override
+  String playerSyncMilliseconds(String value) {
+    return '$value 毫秒';
+  }
+
+  @override
+  String playerSyncSeconds(String value) {
+    return '$value 秒';
+  }
+
+  @override
+  String get playerSyncReset => '重置';
+
+  @override
+  String get playerSyncDone => '完成';
+
+  @override
+  String get playerAudioSyncHint => '加号延后音频，减号提前音频。会为此频道或节目保存。';
+
+  @override
+  String get playerSubtitleSyncHint => '加号延后字幕，减号提前字幕。会为此频道或节目保存。';
+
+  @override
+  String get carPlayFavorites => '收藏';
+
+  @override
+  String get carPlayNoFavorites => '还没有收藏的频道';
+
+  @override
+  String get carPlayNoFavoritesHint => '在 iPhone 上的 M3U TV 中收藏频道，即可在此处查看。';
+
+  @override
+  String get carPlaySignInHint => '在 iPhone 上打开 M3U TV 进行登录。';
 }

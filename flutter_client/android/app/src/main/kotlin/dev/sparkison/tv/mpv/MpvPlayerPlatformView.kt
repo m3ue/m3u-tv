@@ -15,13 +15,15 @@ import io.flutter.plugin.platform.PlatformViewFactory
  *
  * Modeled on `macos/Runner/MpvPlayer/MpvPlayerPlatformView.swift`.
  */
-class MpvPlayerPlatformViewFactory(private val plugin: MpvPlayerPlugin) :
+/** Asks for the current activity's plugin each time; see Media3PlatformViewFactory. */
+class MpvPlayerPlatformViewFactory(private val plugin: () -> MpvPlayerPlugin?) :
     PlatformViewFactory(StandardMessageCodec.INSTANCE) {
     override fun create(context: Context, androidViewId: Int, args: Any?): PlatformView {
         @Suppress("UNCHECKED_CAST")
         val params = args as? Map<String, Any?>
         val mpvViewId = (params?.get("viewId") as? Int) ?: androidViewId
-        return MpvPlayerPlatformView(context, mpvViewId, plugin)
+        val current = checkNotNull(plugin()) { "No mpv plugin: the activity is gone" }
+        return MpvPlayerPlatformView(context, mpvViewId, current)
     }
 }
 

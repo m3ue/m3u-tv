@@ -326,6 +326,15 @@ class WaylandVideoSurface {
   guint frame_ack_source_ = 0;
   int consecutive_frame_acks_missed_ = 0;
 
+  // Set once any plane in this process has had a frame go unacknowledged.
+  // Some compositors (KWin, #345) only service a desync subsurface's frame
+  // callbacks when its parent surface repaints, so an idle Flutter view
+  // starves the video: from then on every Present() also asks the view to
+  // redraw. Process-wide so the next plane (a new channel, preview to
+  // fullscreen) starts in that mode instead of losing its first frames to
+  // the 500 ms watchdog again.
+  static bool nudge_parent_on_present_;
+
   int depth_bits_ = 8;
 
   wp_color_manager_v1* color_manager_ = nullptr;

@@ -1,6 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 
 /// Secure storage abstraction for persisting sensitive data like credentials.
 ///
@@ -95,10 +96,28 @@ class InMemorySecureStorage implements SecureStorage {
 
 /// Secure storage backed by platform secure storage via flutter_secure_storage.
 /// Use on Android, iOS, tvOS, Linux, and Windows.
+///
+/// iPhone items are readable after the first unlock since boot, not only
+/// while unlocked: CarPlay starts the app with the phone locked, and the
+/// default left every credential unreadable then (errSecInteractionNotAllowed,
+/// -25308). The plugin matches items on that setting, so older items, saved
+/// with the default, are moved over the first time they're read unlocked.
 class FlutterSecureStorageAdapter implements SecureStorage {
-  FlutterSecureStorageAdapter() : _storage = const FlutterSecureStorage();
+  FlutterSecureStorageAdapter({bool? migratesToFirstUnlock})
+    : _migratesToFirstUnlock = migratesToFirstUnlock ?? HostPlatform.isIOS,
+      _storage = (migratesToFirstUnlock ?? HostPlatform.isIOS)
+          ? const FlutterSecureStorage(
+              iOptions: IOSOptions(
+                accessibility: KeychainAccessibility.first_unlock,
+              ),
+            )
+          : const FlutterSecureStorage();
 
+  final bool _migratesToFirstUnlock;
   final FlutterSecureStorage _storage;
+
+  /// Where items were saved before (readable only while unlocked).
+  static const FlutterSecureStorage _legacyStorage = FlutterSecureStorage();
 
   /// One queue per key so operations on unrelated keys don't serialize
   /// behind each other — only same-key ordering needs to be guaranteed.
@@ -108,9 +127,20 @@ class FlutterSecureStorageAdapter implements SecureStorage {
       _queues.putIfAbsent(key, SerialQueue.new);
 
   @override
-  Future<String?> read(String key) => _queueFor(key).run(
-    () => _storage.read(key: key),
-  );
+  Future<String?> read(String key) => _queueFor(key).run(() => _read(key));
+
+  Future<String?> _read(String key) async {
+    final value = await _storage.read(key: key);
+    if (value != null || !_migratesToFirstUnlock) return value;
+    final legacy = await _legacyStorage.read(key: key);
+    if (legacy == null) return null;
+    // An item's accessibility isn't part of its identity, so the old one
+    // must go before the new one can be added. delete() removes every
+    // accessibility variant.
+    await _storage.delete(key: key);
+    await _storage.write(key: key, value: legacy);
+    return legacy;
+  }
 
   @override
   Future<void> write(String key, String value) => _queueFor(key).run(
@@ -124,7 +154,7 @@ class FlutterSecureStorageAdapter implements SecureStorage {
   ) => _queueFor(key).run(
     () => writeStringIfCurrent(
       shouldCommit: shouldCommit,
-      read: () => _storage.read(key: key),
+      read: () => _read(key),
       write: (v) => _storage.write(key: key, value: v),
       delete: () => _storage.delete(key: key),
       value: value,

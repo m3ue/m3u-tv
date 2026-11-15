@@ -61,6 +61,11 @@ abstract class NativePlaneProvider {
   /// path (or a black placeholder) until it flips.
   bool get usesNativePlane;
 
+  /// True when the plane should cover the whole video area because the
+  /// native side draws its own letterbox bars. False when it should be sized
+  /// to the video's aspect ratio.
+  bool get planeDrawsLetterbox;
+
   /// Reports the widget's current on-screen rect, in physical pixels within
   /// the native window, plus the current device pixel ratio.
   void reportVideoRect(
@@ -87,12 +92,38 @@ abstract class HtmlViewProvider {
 /// Implemented by `DesktopLibmpvBackend` (Linux/Windows) only -- Apple's mpv
 /// backends and ExoPlayer decide HDR automatically from the source and
 /// display, with no equivalent override.
+/// A backend whose video can move into the system's picture-in-picture
+/// window when the viewer leaves the app (iOS mpv; Android's PiP is the
+/// whole activity instead, see MainActivity).
+// ignore: one_member_abstracts
+abstract class PictureInPictureProvider {
+  /// Only the full-screen player turns this on.
+  Future<void> setAutoPictureInPicture({required bool enabled});
+}
+
 // ignore: one_member_abstracts
 abstract class HdrToggleProvider {
   Future<void> setHdrEnabled(
     // ignore: avoid_positional_boolean_parameters
     bool enabled,
   );
+}
+
+/// A [PlayerAdapter] that can shift audio or subtitles against the picture
+/// while playing (mpv's `audio-delay`/`sub-delay`, and the same on
+/// ExoPlayer). A positive delay plays them later, a negative one earlier.
+abstract class SyncOffsetProvider {
+  Future<void> setAudioDelay(Duration delay);
+  Future<void> setSubtitleDelay(Duration delay);
+}
+
+/// A [PlayerAdapter] that can load a subtitle file during playback, without
+/// restarting the stream. [ExternalSubtitle.uri] must be a local file: mpv's
+/// `sub-add` runs on the UI thread on Linux and Windows.
+// ignore: one_member_abstracts
+abstract class RuntimeSubtitleProvider {
+  /// Loads [subtitle] and selects it.
+  Future<void> addExternalSubtitle(ExternalSubtitle subtitle);
 }
 
 /// A [PlayerAdapter] whose native side can change the display's mode (see
@@ -278,6 +309,7 @@ class PlaybackSource {
     this.deinterlace = false,
     this.prebufferLive = false,
     this.allowDisplayModeChanges = true,
+    this.preferMpv = false,
   });
 
   final String uri;
@@ -336,6 +368,11 @@ class PlaybackSource {
   /// that player goes full screen.
   final bool allowDisplayModeChanges;
 
+  /// Whether Android should start with mpv and keep ExoPlayer as the fallback,
+  /// instead of the other way round. Mirrors
+  /// `ViewSettingsService.vodPlayer` for non-live content.
+  final bool preferMpv;
+
   double? get videoAspectRatio => playbackAspectRatioFromMetadata(metadata);
 
   PlaybackSource copyWith({
@@ -355,6 +392,7 @@ class PlaybackSource {
     bool? deinterlace,
     bool? prebufferLive,
     bool? allowDisplayModeChanges,
+    bool? preferMpv,
   }) {
     return PlaybackSource(
       uri: uri ?? this.uri,
@@ -375,6 +413,7 @@ class PlaybackSource {
       prebufferLive: prebufferLive ?? this.prebufferLive,
       allowDisplayModeChanges:
           allowDisplayModeChanges ?? this.allowDisplayModeChanges,
+      preferMpv: preferMpv ?? this.preferMpv,
     );
   }
 }
@@ -521,6 +560,7 @@ class PlaybackError {
     required this.message,
     required this.code,
     this.recoverable = false,
+    this.position,
   });
 
   factory PlaybackError.fromException(PlaybackException exception) {
@@ -536,6 +576,9 @@ class PlaybackError {
   final String message;
   final String code;
   final bool recoverable;
+
+  /// Where playback had got to, when the backend reports it.
+  final Duration? position;
 }
 
 class PlaybackException implements Exception {

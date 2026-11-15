@@ -5,7 +5,6 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // ---------------------------------------------------------------------------
@@ -77,11 +76,7 @@ class _AppVersionCardState extends State<AppVersionCard> {
   }
 }
 
-/// TV screens can't scan a QR code shown on themselves, and tvOS has no
-/// in-app browser for url_launcher to hand off to - so this shows a QR
-/// code (scan on your phone) on wide/TV layouts, and an "Open" button
-/// (which works via url_launcher) only on narrow/mobile layouts. Mirrors
-/// the same wide/narrow split _TraktPending already uses.
+/// Opens the latest GitHub release.
 class _AppReleaseLink extends StatelessWidget {
   const _AppReleaseLink();
 
@@ -89,44 +84,16 @@ class _AppReleaseLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth >= 600) {
-          return Column(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: QrImageView(
-                  data: _releaseUrl,
-                  size: 140,
-                  backgroundColor: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                l.settingsAppScanQr,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          );
-        }
-        return SizedBox(
-          width: double.infinity,
-          child: AppButton(
-            icon: Icons.open_in_new,
-            label: l.settingsAppViewRelease,
-            onPressed: () => launchUrl(
-              Uri.parse(_releaseUrl),
-              mode: LaunchMode.externalApplication,
-            ),
-          ),
-        );
-      },
+    return SizedBox(
+      width: double.infinity,
+      child: AppButton(
+        icon: Icons.open_in_new,
+        label: AppLocalizations.of(context).settingsAppViewRelease,
+        onPressed: () => launchUrl(
+          Uri.parse(_releaseUrl),
+          mode: LaunchMode.externalApplication,
+        ),
+      ),
     );
   }
 }

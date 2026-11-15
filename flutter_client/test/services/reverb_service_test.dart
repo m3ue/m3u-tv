@@ -299,6 +299,39 @@ void main() {
     expect(deregisteredId, 'device-abc');
   });
 
+  test('client_config.updated invokes the client config callback', () async {
+    final sockets = <_ControlledWebSocket>[];
+    final service = ReverbService(
+      notificationApi: _FakeNotificationApi(),
+      channelFactory: (_) {
+        final socket = _ControlledWebSocket();
+        sockets.add(socket);
+        return socket;
+      },
+    );
+    addTearDown(service.disconnect);
+
+    var updates = 0;
+    service.onClientConfigUpdated = () => updates += 1;
+    await service.connect(
+      session: _session('tv.playlist.uuid-123'),
+      credentials: _credentials('user'),
+      onNotification: (_) {},
+    );
+    sockets.single.addConnectionEstablished('socket-a');
+    await Future<void>.delayed(Duration.zero);
+    sockets.single.addEvent('client_config.updated', {});
+    await Future<void>.delayed(Duration.zero);
+    expect(updates, 0, reason: 'ignored until the channel is subscribed');
+
+    sockets.single.addSubscriptionSucceeded();
+    await Future<void>.delayed(Duration.zero);
+    sockets.single.addEvent('client_config.updated', {});
+    await Future<void>.delayed(Duration.zero);
+
+    expect(updates, 1);
+  });
+
   test('device.deregister before subscription is ignored', () async {
     final sockets = <_ControlledWebSocket>[];
     final service = ReverbService(

@@ -2,10 +2,12 @@ import 'package:flutter/foundation.dart' show ChangeNotifier;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
+import 'package:m3u_tv/features/epg/epg_recording_index.dart';
 import 'package:m3u_tv/features/multiview/multiview_controller.dart';
 import 'package:m3u_tv/playback/editor_stream_session_gateway.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/services/app_state_controller.dart';
+import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
@@ -121,6 +123,18 @@ final dvrRecordingsProvider = Provider<List<DvrRecording>>((ref) {
   return ref.watch(appStateControllerProvider).appState.dvrRecordings;
 });
 
+/// How the last full DVR library load went (loaded, partial, error...).
+final dvrRecordingsLoadStateProvider = Provider<DvrRecordingsLoadState>((ref) {
+  return ref.watch(appStateControllerProvider).appState.dvrRecordingsLoadState;
+});
+
+/// Recording badges for guide and show rows. Rebuilt only when the
+/// recordings list itself changes, not on every app-state notification, since
+/// the list holds the whole DVR library.
+final epgRecordingIndexProvider = Provider<EpgRecordingIndex>((ref) {
+  return EpgRecordingIndex.fromRecordings(ref.watch(dvrRecordingsProvider));
+});
+
 final dvrStorageInfoProvider = Provider<DvrStorageInfo?>((ref) {
   return ref.watch(appStateControllerProvider).appState.dvrStorageInfo;
 });
@@ -184,6 +198,10 @@ final vodFavoritesServiceProvider = Provider<FavoritesService>((ref) {
 
 final seriesFavoritesServiceProvider = Provider<FavoritesService>((ref) {
   return ref.read(appStateControllerProvider).appState.seriesFavoritesService;
+});
+
+final appUpdateNoticeProvider = Provider<AppUpdateNotice?>((ref) {
+  return ref.watch(appStateControllerProvider).appState.appUpdateNotice;
 });
 
 final notificationStoreProvider = Provider<TvNotificationStore>((ref) {

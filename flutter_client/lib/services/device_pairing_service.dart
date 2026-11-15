@@ -39,6 +39,16 @@ class DevicePairingResponse {
   final Map<String, Object?> body;
 }
 
+/// One credential an admin granted while approving a pairing, with the
+/// Playlist Auth's name from the editor.
+@immutable
+class PairedPlaylist {
+  const PairedPlaylist({required this.credentials, this.name});
+
+  final UserCredentials credentials;
+  final String? name;
+}
+
 typedef DevicePairingTransport =
     Future<DevicePairingResponse> Function(DevicePairingRequest request);
 
@@ -61,6 +71,7 @@ class DevicePairingService extends ChangeNotifier {
   DevicePairingStatus _status = DevicePairingStatus.idle;
   DevicePairingPending? _pending;
   UserCredentials? _result;
+  List<PairedPlaylist> _paired = const <PairedPlaylist>[];
   Timer? _pollTimer;
   Duration _pollInterval = const Duration(seconds: 5);
   DateTime? _codeExpiresAt;
@@ -70,6 +81,10 @@ class DevicePairingService extends ChangeNotifier {
   DevicePairingStatus get status => _status;
   DevicePairingPending? get pending => _pending;
   UserCredentials? get result => _result;
+
+  /// Every credential the admin granted, in their order; the first is
+  /// [result]. Editors that predate multiple credentials send only the one.
+  List<PairedPlaylist> get pairedPlaylists => _paired;
 
   @visibleForTesting
   Duration get pollIntervalForTesting => _pollInterval;
@@ -82,6 +97,7 @@ class DevicePairingService extends ChangeNotifier {
     final normalizedServer = normalizeServerUrl(server);
     _pending = null;
     _result = null;
+    _paired = const <PairedPlaylist>[];
     _status = DevicePairingStatus.pending;
     notifyListeners();
     try {
@@ -157,11 +173,8 @@ class DevicePairingService extends ChangeNotifier {
       final status = '${data['status'] ?? ''}';
       switch (status) {
         case 'approved':
-          _result = UserCredentials(
-            server: server,
-            username: '${data['username'] ?? ''}',
-            password: '${data['password'] ?? ''}',
-          );
+          _paired = _parsePaired(server, data);
+          _result = _paired.first.credentials;
           _pollTimer?.cancel();
           _pollTimer = null;
           _status = DevicePairingStatus.approved;
@@ -185,6 +198,43 @@ class DevicePairingService extends ChangeNotifier {
         _schedulePoll(attempt, server);
       }
     }
+  }
+
+  static List<PairedPlaylist> _parsePaired(
+    String server,
+    Map<String, Object?> data,
+  ) {
+    final listed = <PairedPlaylist>[
+      for (final entry
+          in data['playlists'] is List
+              ? data['playlists']! as List
+              : const <Object?>[])
+        if (entry is Map &&
+            '${entry['username'] ?? ''}'.isNotEmpty &&
+            entry['password'] != null)
+          PairedPlaylist(
+            credentials: UserCredentials(
+              server: server,
+              username: '${entry['username']}',
+              password: '${entry['password']}',
+            ),
+            name:
+                entry['name'] is String &&
+                    (entry['name']! as String).trim().isNotEmpty
+                ? (entry['name']! as String).trim()
+                : null,
+          ),
+    ];
+    if (listed.isNotEmpty) return List<PairedPlaylist>.unmodifiable(listed);
+    return <PairedPlaylist>[
+      PairedPlaylist(
+        credentials: UserCredentials(
+          server: server,
+          username: '${data['username'] ?? ''}',
+          password: '${data['password'] ?? ''}',
+        ),
+      ),
+    ];
   }
 
   void _fail(int attempt) {

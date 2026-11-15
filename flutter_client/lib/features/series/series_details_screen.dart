@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:m3u_tv/features/player/resume_modal.dart';
 import 'package:m3u_tv/features/series/episode_player_args.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -19,6 +20,10 @@ import 'package:material_ui/material_ui.dart';
 /// poster, full-width description, narrower episode cards. The episode-card
 /// metrics live in `series_detail_widgets.dart` (kEpisodeCardWidth*).
 const double _kSeriesCompactBreakpoint = 700;
+
+/// Same threshold the shell uses before offering to resume: anything shorter
+/// was an accidental tap, not a resume point.
+const int _kResumePromptMinSeconds = 30;
 
 /// Marks one series episode watched / unwatched for the active viewer.
 /// Structurally matches `ContentActions.onMarkEpisodeWatched`. Resolves to
@@ -229,7 +234,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                 setState(() => _displayedSeason = season);
               }
             },
-            onEpisodeSelected: _playEpisode,
+            onEpisodeSelected: _selectEpisode,
             onMarkEpisode: _markEpisode,
             onMarkSeason: _markSeason,
             onOpenRelated: widget.onOpenRelated,
@@ -249,6 +254,49 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
       color: Theme.of(context).colorScheme.surface,
       child: const Center(child: AppLoadingIndicator()),
     );
+  }
+
+  /// An episode card tap. A mid-watch episode asks first, like a Continue
+  /// Watching card does. The dialog has to open here: the player route pops
+  /// this page as soon as it asks to play, which would dismiss a dialog the
+  /// shell opened on top of it. So every tap hands over an explicit start
+  /// position and the shell never asks again.
+  Future<void> _selectEpisode(Episode episode, {double? startPosition}) async {
+    if (startPosition != null) {
+      _playEpisode(episode, startPosition: startPosition);
+      return;
+    }
+    final streamId = int.tryParse(episode.id);
+    final progress = streamId == null
+        ? null
+        : _effectiveProgress.firstWhereOrNull(
+            (p) => p.streamId == streamId,
+          );
+    if (progress == null ||
+        progress.completed ||
+        progress.positionSeconds < _kResumePromptMinSeconds) {
+      _playEpisode(episode, startPosition: 0);
+      return;
+    }
+    final choice = await showResumeModal(
+      context,
+      title:
+          '${widget.seriesName} - '
+          'S${episode.seasonNumber}E${episode.episodeNumber}',
+      positionSeconds: progress.positionSeconds,
+      showManageActions: widget.onMarkEpisodeWatched != null,
+    );
+    if (choice == null || !mounted) return;
+    switch (choice.action) {
+      case ResumeAction.resume:
+        _playEpisode(episode, startPosition: choice.startPositionSeconds);
+      case ResumeAction.startOver:
+        _playEpisode(episode, startPosition: 0);
+      case ResumeAction.clearProgress:
+        await _markEpisode(episode, watched: false);
+      case ResumeAction.markWatched:
+        await _markEpisode(episode, watched: true);
+    }
   }
 
   void _playEpisode(Episode episode, {double? startPosition}) {

@@ -218,6 +218,8 @@ void main() {
           episodeTitle: 'The You You Are',
           seriesName: 'Severance',
           runtime: '50m',
+          // The editor sends the episode's own still here.
+          backdropUrl: 'http://img/episode-still.jpg',
         );
         final enricher = HomeSpotlightEnricher(
           lookupSeries: (id) async => const Series(

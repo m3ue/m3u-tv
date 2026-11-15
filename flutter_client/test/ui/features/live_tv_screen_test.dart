@@ -16,6 +16,7 @@ import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -428,6 +429,32 @@ void main() {
         expect(find.byKey(const Key('recording-dot')), findsOneWidget);
       },
     );
+
+    for (final fontSize in [AppFontSize.verySmall, AppFontSize.small]) {
+      for (final layout in LiveTvLayout.values) {
+        testWidgets('$layout fits at ${fontSize.name}', (tester) async {
+          tester.view
+            ..physicalSize = const Size(1920, 1080)
+            ..devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final service = ViewSettingsService(memory: <String, Object?>{});
+          await service.setLiveTvLayout(layout);
+
+          await tester.pumpWidget(
+            _TestApp(
+              channels: testChannels,
+              categories: testCategories,
+              viewSettingsService: service,
+              fontSize: fontSize,
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(tester.takeException(), isNull);
+          expect(find.text('News'), findsWidgets);
+        });
+      }
+    }
 
     testWidgets(
       'bootstrap layout mapping loads list, grid and timeline correctly',
@@ -2010,6 +2037,7 @@ class _TestApp extends StatelessWidget {
     this.useSidebarLayout = true,
     this.onSearchShows,
     this.onShowSelect,
+    this.fontSize,
   });
 
   final List<Channel> channels;
@@ -2026,9 +2054,11 @@ class _TestApp extends StatelessWidget {
   final bool useSidebarLayout;
   final Future<List<EpgShow>> Function(String query)? onSearchShows;
   final void Function(EpgShow)? onShowSelect;
+  final AppFontSize? fontSize;
 
   @override
   Widget build(BuildContext context) {
+    final fontSize = this.fontSize;
     final epg = epgService ?? EpgService();
     return ProviderScope(
       overrides: [
@@ -2050,6 +2080,17 @@ class _TestApp extends StatelessWidget {
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         theme: ThemeData.dark(useMaterial3: true),
+        builder: fontSize == null
+            ? null
+            : (context, child) => FontSizeScope(
+                fontSize: fontSize,
+                child: MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(textScaler: TextScaler.linear(fontSize.scale)),
+                  child: child!,
+                ),
+              ),
         home: LiveTvScreen(
           favoritesService: favoritesService ?? FavoritesService(),
           viewSettingsService: viewSettingsService,

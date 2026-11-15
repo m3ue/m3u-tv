@@ -75,13 +75,12 @@ class FontSizeScope extends InheritedWidget {
 
   final AppFontSize fontSize;
 
-  /// The text scale factor (1.0 for normal, 1.2 for large, 1.5 for very
-  /// large).
+  /// The text and layout scale factor of [fontSize].
   double get scale => fontSize.scale;
 
   /// Whether the user has selected large or very large (i.e. anything above
   /// the normal default).
-  bool get isLarge => fontSize != AppFontSize.normal;
+  bool get isLarge => fontSize.scale > AppFontSize.normal.scale;
 
   static FontSizeScope? of(BuildContext context) {
     return context.dependOnInheritedWidgetOfExactType<FontSizeScope>();

@@ -7,7 +7,9 @@ import 'dart:typed_data';
 
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/cache_service.dart';
+import 'package:m3u_tv/services/client_config.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/home_screen_config.dart';
 import 'package:m3u_tv/services/json_isolate.dart';
 import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/services/xtream_http_transport_stub.dart'
@@ -86,6 +88,23 @@ String userFacingXtreamError(Object error) {
     return serverUnavailableMessage;
   }
   return message;
+}
+
+/// Whether a failed DVR library load means the server answered with an error
+/// or couldn't be reached at all.
+DvrRecordingsLoadState dvrRecordingsLoadStateFor(Object error) {
+  if (error is XtreamHttpException) {
+    return error.isServerUnavailable
+        ? DvrRecordingsLoadState.offline
+        : DvrRecordingsLoadState.error;
+  }
+  if (error is XtreamResponseException ||
+      error is XtreamAuthException ||
+      error is FormatException ||
+      error is TypeError) {
+    return DvrRecordingsLoadState.error;
+  }
+  return DvrRecordingsLoadState.offline;
 }
 
 extension XtreamHttpExceptionClassification on XtreamHttpException {
@@ -357,6 +376,23 @@ class RequestsCapability {
   bool supports(String type) => contentTypes.contains(type);
 }
 
+/// A Trakt or SIMKL account M3U Editor already sends this login's watch
+/// progress to (Integrations > Trakt & SIMKL). [account] is the account's
+/// display name, when the server knows it.
+class ServerWatchHistoryAccount {
+  const ServerWatchHistoryAccount({required this.provider, this.account});
+
+  factory ServerWatchHistoryAccount.fromJson(Map<String, dynamic> json) =>
+      ServerWatchHistoryAccount(
+        provider: '${json['provider'] ?? ''}',
+        account: _stringOrNull(json['account']),
+      );
+
+  /// `trakt` or `simkl`.
+  final String provider;
+  final String? account;
+}
+
 class XtreamAuthResponse {
   const XtreamAuthResponse({
     required this.isAuthenticated,
@@ -367,6 +403,8 @@ class XtreamAuthResponse {
     this.proxy,
     this.requests,
     this.sports,
+    this.watchHistory = const <ServerWatchHistoryAccount>[],
+    this.clientConfig,
   });
 
   final bool isAuthenticated;
@@ -377,8 +415,22 @@ class XtreamAuthResponse {
   final ProxyCapability? proxy;
   final RequestsCapability? requests;
   final SportsCapability? sports;
+  final List<ServerWatchHistoryAccount> watchHistory;
+
+  /// Settings the editor manages for this login; null on editors without
+  /// Settings Profiles.
+  final ClientConfigCapability? clientConfig;
 
   bool hasFeature(String feature) => features.contains(feature);
+
+  /// The server-side account for [provider] (`trakt` or `simkl`), if any.
+  ServerWatchHistoryAccount? serverWatchHistory(String provider) {
+    for (final account in watchHistory) {
+      if (account.provider == provider) return account;
+    }
+    return null;
+  }
+
   bool get hasAioStreams =>
       hasFeature('aiostreams') && aiostreamsIntegrations.isNotEmpty;
   bool get hasProxy => hasFeature('proxy') && proxy != null;
@@ -522,6 +574,15 @@ class XtreamService {
     final sports = sportsJson is Map<String, dynamic>
         ? SportsCapability.fromJson(sportsJson)
         : null;
+    final watchHistory = _asList(m3uEditor['watch_history'])
+        .whereType<Map<String, dynamic>>()
+        .map(ServerWatchHistoryAccount.fromJson)
+        .where((account) => account.provider.isNotEmpty)
+        .toList(growable: false);
+    final clientConfigJson = m3uEditor['client_config'];
+    final clientConfig = clientConfigJson is Map<String, dynamic>
+        ? ClientConfigCapability.tryFromJson(clientConfigJson)
+        : null;
     final authResponse = XtreamAuthResponse(
       isAuthenticated: true,
       status: status,
@@ -531,6 +592,8 @@ class XtreamService {
       proxy: proxy,
       requests: requests,
       sports: sports,
+      watchHistory: watchHistory,
+      clientConfig: clientConfig,
     );
     if (!_authenticationGeneration.isStale(authenticationGeneration)) {
       _credentials = normalized;
@@ -679,12 +742,23 @@ class XtreamService {
     ).map((item) => Series.fromXtream(_asMap(item))).toList(growable: false);
   }
 
+  /// Largest page m3u-editor's `get_dvr_recordings` returns (it caps
+  /// `limit` at 200).
+  static const int dvrRecordingsPageSize = 200;
+
+  /// Upper bound on pages per full load (10,000 recordings), so a server that
+  /// keeps returning full pages can't loop forever.
+  static const int _dvrRecordingsMaxPages = 50;
+
   Future<List<DvrRecording>> getDvrRecordings({
     DvrRecordingStatus? status,
     int? limit,
+    int? offset,
   }) async {
-    final params = {'status': ?status?.name, 'limit': ?limit?.toString()};
-    final response = await _request('get_dvr_recordings', params: params);
+    final response = await _request(
+      'get_dvr_recordings',
+      params: _dvrRecordingsParams(status, limit, offset),
+    );
     return _asList(response)
         .map((item) => DvrRecording.fromXtream(_asMap(item)))
         .toList(growable: false);
@@ -694,15 +768,86 @@ class XtreamService {
     UserCredentials credentials, {
     DvrRecordingStatus? status,
     int? limit,
+    int? offset,
   }) async {
     final response = await _requestWithCredentials(
       credentials,
       'get_dvr_recordings',
-      params: {'status': ?status?.name, 'limit': ?limit?.toString()},
+      params: _dvrRecordingsParams(status, limit, offset),
     );
     return _asList(response)
         .map((item) => DvrRecording.fromXtream(_asMap(item)))
         .toList(growable: false);
+  }
+
+  static Map<String, String> _dvrRecordingsParams(
+    DvrRecordingStatus? status,
+    int? limit,
+    int? offset,
+  ) {
+    final wireStatus = status == null ? null : dvrRecordingStatusToWire(status);
+    return {
+      'status': ?wireStatus,
+      'limit': ?limit?.toString(),
+      if (offset != null && offset > 0) 'offset': offset.toString(),
+    };
+  }
+
+  /// Loads the whole DVR library (every status), page by page.
+  Future<DvrRecordingsFetch> getAllDvrRecordings() => collectDvrRecordingPages(
+    (offset) => getDvrRecordings(limit: dvrRecordingsPageSize, offset: offset),
+  );
+
+  Future<DvrRecordingsFetch> getAllDvrRecordingsFor(
+    UserCredentials credentials,
+  ) => collectDvrRecordingPages(
+    (offset) => getDvrRecordingsFor(
+      credentials,
+      limit: dvrRecordingsPageSize,
+      offset: offset,
+    ),
+  );
+
+  /// Fetches pages of [dvrRecordingsPageSize] until a short page comes back.
+  /// A failed first page is returned as [DvrRecordingsFetch.failed]; a later
+  /// failure keeps what loaded and reports [DvrRecordingsLoadState.partial].
+  /// Stops early when a page adds nothing new, which is what a server that
+  /// ignores `offset` looks like.
+  static Future<DvrRecordingsFetch> collectDvrRecordingPages(
+    Future<List<DvrRecording>> Function(int offset) fetchPage,
+  ) async {
+    final recordings = <DvrRecording>[];
+    final seen = <String>{};
+    var offset = 0;
+    for (var page = 0; page < _dvrRecordingsMaxPages; page++) {
+      final List<DvrRecording> batch;
+      try {
+        batch = await fetchPage(offset);
+      } on Object catch (error) {
+        if (page == 0) {
+          return DvrRecordingsFetch.failed(dvrRecordingsLoadStateFor(error));
+        }
+        return DvrRecordingsFetch(
+          List<DvrRecording>.unmodifiable(recordings),
+          state: DvrRecordingsLoadState.partial,
+        );
+      }
+      var added = 0;
+      for (final recording in batch) {
+        if (seen.add(recording.uuid)) {
+          recordings.add(recording);
+          added++;
+        }
+      }
+      if (batch.length < dvrRecordingsPageSize || added == 0) {
+        return DvrRecordingsFetch(List<DvrRecording>.unmodifiable(recordings));
+      }
+      offset += batch.length;
+    }
+    return DvrRecordingsFetch(
+      List<DvrRecording>.unmodifiable(recordings),
+      state: DvrRecordingsLoadState.partial,
+    );
   }
 
   Future<DvrRecording> getDvrRecording(String uuid) async {
@@ -1121,25 +1266,40 @@ class XtreamService {
     return Progress.fromJson(_asMap(response), viewerId: viewerId);
   }
 
+  /// The watch-history providers (`trakt`, `simkl`) this device scrobbles to
+  /// itself. Sent with every progress save so the server skips sending the
+  /// same playback to its own account for that provider.
+  List<String> Function()? clientScrobblers;
+
   Future<void> updateProgress(Progress progress) async {
+    final scrobblers = clientScrobblers?.call() ?? const <String>[];
     await _request(
       'update_progress',
       method: 'POST',
-      body: progress.toJson().map((key, value) => MapEntry(key, '$value')),
+      body: {
+        ...progress.toJson().map((key, value) => MapEntry(key, '$value')),
+        if (scrobblers.isNotEmpty) 'client_scrobblers': scrobblers.join(','),
+      },
     );
   }
 
   Future<void>? _playbackProgressInFlight;
+  Progress? _queuedPlaybackProgress;
 
-  /// The player's periodic progress report, skipped (resolving `false`)
-  /// while the previous one is still pending: against an editor that stopped
-  /// answering, a report every few seconds otherwise piles up in the
-  /// connection pool, and the next tick carries a fresher position anyway
-  /// (Plezy a63c80ced). Explicit writes such as mark watched go through
-  /// [updateProgress] and are never skipped.
+  /// The player's periodic progress report. While the previous one is still
+  /// pending, the new report is queued instead (resolving `false`) and sent
+  /// once that one settles; a newer report replaces a queued one. Against an
+  /// editor that stopped answering, a report every few seconds would
+  /// otherwise pile up in the connection pool (Plezy a63c80ced), but dropping
+  /// it outright could lose the position a closing player reports last.
+  /// Explicit writes such as mark watched go through [updateProgress] and are
+  /// never queued.
   Future<bool> reportPlaybackProgress(Progress progress) async {
-    if (_playbackProgressInFlight != null) return false;
-    final inFlight = updateProgress(progress);
+    if (_playbackProgressInFlight != null) {
+      _queuedPlaybackProgress = progress;
+      return false;
+    }
+    final inFlight = _sendPlaybackProgress(progress);
     _playbackProgressInFlight = inFlight;
     try {
       await inFlight;
@@ -1147,6 +1307,41 @@ class XtreamService {
       _playbackProgressInFlight = null;
     }
     return true;
+  }
+
+  /// Sends [first], then whatever report was queued meanwhile, until the
+  /// queue is empty. Only [first]'s failure reaches its caller.
+  Future<void> _sendPlaybackProgress(Progress first) async {
+    Object? firstError;
+    StackTrace? firstStack;
+    var current = first;
+    while (true) {
+      try {
+        await updateProgress(current);
+      } on Object catch (error, stack) {
+        if (identical(current, first)) {
+          firstError = error;
+          firstStack = stack;
+        }
+      }
+      final queued = _queuedPlaybackProgress;
+      _queuedPlaybackProgress = null;
+      if (queued == null) break;
+      current = queued;
+    }
+    if (firstError != null) Error.throwWithStackTrace(firstError, firstStack!);
+  }
+
+  /// Resolves once every pending playback report (including a queued one)
+  /// has been sent, so a read right after playback sees the final position.
+  Future<void> playbackProgressSettled() async {
+    final inFlight = _playbackProgressInFlight;
+    if (inFlight == null) return;
+    try {
+      await inFlight;
+    } on Object {
+      // The reporter already surfaced it; settling only waits.
+    }
   }
 
   Future<List<Progress>> getSeriesProgress(
@@ -1594,6 +1789,21 @@ class XtreamService {
     },
   );
 
+  /// The settings the editor manages for this login
+  /// ([ClientConfigCapability.action]).
+  Future<ClientConfig> getClientConfig(
+    ClientConfigCapability capability,
+  ) async {
+    final json = await _request(
+      capability.action,
+      params: {'row_kinds': HomeScreenConfig.supportedRowKinds.join(',')},
+    );
+    if (json is! Map) {
+      throw const FormatException('Unexpected client config response');
+    }
+    return ClientConfig.fromJson(Map<String, dynamic>.from(json));
+  }
+
   /// One game's details ([SportsCapability.detailsAction]), raw.
   Future<Object?> getSportsFixtureDetails(
     SportsCapability capability, {
@@ -1960,7 +2170,11 @@ EpgProgram? _epgProgramFromMap(
     subtitle: _decodedSubtitle(json['subtitle']),
     iconUrl: nullIfBlank(_stringOrNull(json['icon'])),
     posterUrl: nullIfBlank(_stringOrNull(json['poster_url'])),
-    backdropUrl: nullIfBlank(_stringOrNull(json['backdrop_url'])),
+    // Newer editors no longer reuse an episode still as the backdrop; fall
+    // back to `still_url` so the guide keeps landscape art for those rows.
+    backdropUrl:
+        nullIfBlank(_stringOrNull(json['backdrop_url'])) ??
+        nullIfBlank(_stringOrNull(json['still_url'])),
     category: nullIfBlank(_stringOrNull(json['category'])),
     rating: nullIfBlank(_stringOrNull(json['rating'])),
     season: _positiveIntOrNull(json['season']),

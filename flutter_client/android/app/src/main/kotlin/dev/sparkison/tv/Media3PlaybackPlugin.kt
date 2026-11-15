@@ -1,6 +1,8 @@
 package dev.sparkison.tv
 
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.media.MediaFormat
 import android.net.Uri
 import android.os.Handler
@@ -13,8 +15,10 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
@@ -25,8 +29,11 @@ import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.video.VideoFrameMetadataListener
@@ -75,6 +82,8 @@ class Media3PlaybackPlugin(
 ) : MethodChannel.MethodCallHandler, EventChannel.StreamHandler, DefaultLifecycleObserver {
     private val methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
     private val eventChannel = EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL)
+    private val nowPlayingChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NOW_PLAYING_CHANNEL)
+    private val artworkLoader = LogoFramingBitmapLoader(context)
     private val mainHandler = Handler(Looper.getMainLooper())
     private var events: EventChannel.EventSink? = null
     private val states = mutableMapOf<String, PlayerState>()
@@ -86,6 +95,19 @@ class Media3PlaybackPlugin(
     init {
         methodChannel.setMethodCallHandler(this)
         eventChannel.setStreamHandler(this)
+        nowPlayingChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "update" -> {
+                    updateNowPlaying(call.arguments as? Map<*, *> ?: emptyMap<String, Any?>())
+                    result.success(null)
+                }
+                "clear" -> {
+                    clearNowPlaying()
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
     }
 
@@ -217,10 +239,28 @@ class Media3PlaybackPlugin(
                     selectTrack(playerId, C.TRACK_TYPE_TEXT, call.optionalStringArgument("trackId"))
                     result.success(null)
                 }
+                "addExternalSubtitle" -> {
+                    addExternalSubtitle(
+                        playerId,
+                        call.argument<String>("uri") ?: throw IllegalArgumentException("uri required"),
+                        call.optionalStringArgument("title"),
+                        call.optionalStringArgument("language"),
+                    )
+                    result.success(null)
+                }
                 "setPlaybackSpeed" -> {
                     val speed = call.argument<Number>("speed")?.toFloat()
                     val playbackParameters = PlaybackSpeedValidation.validateAndCreatePlaybackParameters(speed)
                     requirePlayer(playerId).playbackParameters = playbackParameters
+                    result.success(null)
+                }
+                "setSyncOffset" -> {
+                    val factory = states[playerId]?.renderersFactory
+                    val delayUs = (call.argument<Number>("milliseconds")?.toLong() ?: 0L) * 1_000L
+                    when (call.argument<String>("property")) {
+                        "audio-delay" -> factory?.audioDelayUs?.set(delayUs)
+                        "sub-delay" -> factory?.subtitleDelayUs?.set(delayUs)
+                    }
                     result.success(null)
                 }
                 "setAllowDisplayModeChanges" -> {
@@ -261,7 +301,7 @@ class Media3PlaybackPlugin(
 
     override fun onStop(owner: LifecycleOwner) {
         for (state in states.values) {
-            state.player.pause()
+            if (!state.keepPlayingInBackground) state.player.pause()
         }
     }
 
@@ -274,6 +314,7 @@ class Media3PlaybackPlugin(
     fun dispose() {
         ProcessLifecycleOwner.get().lifecycle.removeObserver(this)
         methodChannel.setMethodCallHandler(null)
+        nowPlayingChannel.setMethodCallHandler(null)
         eventChannel.setStreamHandler(null)
         for (playerId in states.keys.toList()) {
             releasePlayer(playerId)
@@ -282,7 +323,13 @@ class Media3PlaybackPlugin(
 
     @OptIn(UnstableApi::class)
     private fun load(playerId: String, arguments: Map<String, Any?>, surfaceView: SurfaceView) {
-        releasePlayer(playerId)
+        // The media session outlives the player it wraps: a reload (channel
+        // change, possibly from the notification with the app in the
+        // background) swaps the new player in, so PlaybackService and the
+        // notification carry on instead of stopping and having to restart
+        // from the background, which Android 12+ doesn't allow.
+        val previousSessionPlayer = states[playerId]?.sessionPlayer
+        val keptSession = releasePlayer(playerId, keepSession = true)
 
         val source = arguments["source"] as? Map<*, *> ?: emptyMap<String, Any?>()
         val uri = source["uri"] as? String ?: throw IllegalStateException("Missing playback source uri")
@@ -329,25 +376,53 @@ class Media3PlaybackPlugin(
                 .setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true)
                 .build(),
         )
-        val player = ExoPlayer.Builder(context)
+        // DefaultRenderersFactory plus live audio/subtitle sync offsets.
+        val renderersFactory = SyncOffsetRenderersFactory(context)
+        val player = ExoPlayer.Builder(context, renderersFactory)
             .setTrackSelector(trackSelector)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(httpDataSourceFactory))
+            .setMediaSourceFactory(
+                // DefaultDataSource passes web URLs to the HTTP factory and also reads
+                // the local files online subtitles are downloaded to.
+                DefaultMediaSourceFactory(context)
+                    .setDataSourceFactory(DefaultDataSource.Factory(context, httpDataSourceFactory))
+            )
             .setAudioAttributes(audioAttributes, handleAudioFocus)
             .build()
         val subtitleConfigurations = buildSubtitleConfigurations(source["externalSubtitles"])
         val state = PlayerState(
             playerId = playerId,
             player = player,
+            renderersFactory = renderersFactory,
             uri = uri,
             subtitleConfigurations = subtitleConfigurations,
             matchDisplayRefreshRate = matchDisplayRefreshRate,
             allowDisplayModeChanges = allowDisplayModeChanges,
         )
-        state.mediaSession = MediaSession.Builder(context, player).setId(playerId).build()
+        val sessionPlayer = ChannelSkipPlayer(player) { forward ->
+            nowPlayingChannel.invokeMethod(
+                "command",
+                mapOf("name" to if (forward) "next" else "previous"),
+            )
+        }
+        state.sessionPlayer = sessionPlayer
+        // Android Auto's own player gives way, and follows a channel change
+        // here if it was showing this one.
+        CarMediaService.phonePlaybackStarted(previousSessionPlayer, sessionPlayer)
+        state.mediaSession = keptSession?.also { it.player = sessionPlayer }
+            ?: MediaSession.Builder(context, sessionPlayer)
+                .setId(playerId)
+                .setSessionActivity(appLaunchIntent())
+                .setBitmapLoader(artworkLoader)
+                .build()
         states[playerId] = state
 
         player.setVideoSurfaceView(surfaceView)
         player.addListener(Media3Listener(playerId))
+        // A live stream's splices jump the audio clock in normal use, and live has
+        // nothing to resume, so this only watches on-demand content.
+        if (source["isLive"] as? Boolean != true) {
+            player.addAnalyticsListener(AudioDiscontinuityListener(playerId, player))
+        }
         if (matchDisplayRefreshRate && allowDisplayModeChanges) {
             frameRateManager.log("ExoPlayer load: Auto Frame Rate on")
             player.setVideoFrameMetadataListener(FrameRateProbe(playerId, player))
@@ -368,10 +443,24 @@ class Media3PlaybackPlugin(
      * hands off to doesn't immediately reapply it, avoiding a visible
      * restore-then-reswitch flicker. See [FrameRateManager]'s class doc.
      */
-    private fun releasePlayer(playerId: String, preserveDisplayMode: Boolean = false) {
-        val state = states.remove(playerId) ?: return
+    /**
+     * [keepSession]: hand the player's media session back instead of
+     * releasing it, for [load] to put its new player into. Returns it.
+     */
+    private fun releasePlayer(
+        playerId: String,
+        preserveDisplayMode: Boolean = false,
+        keepSession: Boolean = false,
+    ): MediaSession? {
+        val state = states.remove(playerId) ?: return null
         state.resumeStallRunnable?.let { mainHandler.removeCallbacks(it) }
-        state.mediaSession?.release()
+        if (!keepSession) {
+            state.sessionPlayer?.let(CarMediaService::phonePlaybackStopped)
+            state.mediaSession?.let { session ->
+                PlaybackService.detach(session)
+                session.release()
+            }
+        }
         // Detach the surface before release() instead of letting release()
         // discover and tear it down itself: ACodec's disconnectFromSurface
         // then folds into the same synchronous call as decoder/renderer
@@ -386,6 +475,74 @@ class Media3PlaybackPlugin(
             frameRateManager.restore()
         }
         emit(playerId, "disposed")
+        return if (keepSession) state.mediaSession else null
+    }
+
+    private fun appLaunchIntent(): PendingIntent = PendingIntent.getActivity(
+        context,
+        0,
+        Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
+    /**
+     * Dart's Now Playing update for the full-screen player (see
+     * `now_playing_bridge.dart`): the title, artwork and channel buttons, for
+     * Android Auto (see [CarMediaService]) and, while Background audio is on,
+     * for [PlaybackService] (notification, lock screen controls, keeps playing
+     * after leaving the app).
+     */
+    private fun updateNowPlaying(arguments: Map<*, *>) {
+        val target = (arguments["playerId"] as? String)?.let { states[it] }
+        for (state in states.values) {
+            if (state !== target) stopBackgroundPlayback(state)
+        }
+        if (target == null) return
+        // Kept up to date whatever the Background audio setting: Android
+        // Auto shows and controls this player too (see CarMediaService).
+        target.sessionPlayer?.canChangeChannel = arguments["canChangeChannel"] as? Boolean ?: false
+        val artworkUri = (arguments["artworkUrl"] as? String)?.let(Uri::parse)
+        // Registered before the metadata goes out, so the first load of it
+        // is already framed.
+        if (artworkUri != null && arguments["artworkIsLogo"] == true) {
+            artworkLoader.markLogo(artworkUri)
+        }
+        val metadata = MediaMetadata.Builder()
+            .setTitle(arguments["title"] as? String)
+            .setArtist(arguments["subtitle"] as? String)
+            .setArtworkUri(artworkUri)
+            .build()
+        if (metadata != target.nowPlayingMetadata) {
+            target.nowPlayingMetadata = metadata
+            val player = target.player
+            // Same URI, so ExoPlayer swaps the metadata in place without
+            // re-preparing the stream.
+            player.currentMediaItem?.let { item ->
+                player.replaceMediaItem(
+                    player.currentMediaItemIndex,
+                    item.buildUpon().setMediaMetadata(metadata).build(),
+                )
+            }
+        }
+        target.sessionPlayer?.let(CarMediaService::showPhonePlayer)
+
+        val keepPlaying = arguments["keepPlayingInBackground"] as? Boolean ?: false
+        if (!keepPlaying) {
+            stopBackgroundPlayback(target)
+            return
+        }
+        target.keepPlayingInBackground = true
+        target.mediaSession?.let { PlaybackService.attach(context.applicationContext, it) }
+    }
+
+    private fun clearNowPlaying() {
+        for (state in states.values) stopBackgroundPlayback(state)
+    }
+
+    private fun stopBackgroundPlayback(state: PlayerState) {
+        if (!state.keepPlayingInBackground) return
+        state.keepPlayingInBackground = false
+        state.mediaSession?.let(PlaybackService::detach)
     }
 
     private fun emit(
@@ -418,6 +575,36 @@ class Media3PlaybackPlugin(
         if (message != null) event["message"] = message
         if (recoverable != null) event["recoverable"] = recoverable
         events?.success(event)
+    }
+
+    /**
+     * ExoPlayer can only take a sideloaded subtitle as part of the media item, so
+     * this re-prepares at the current position. [PlayerState.subtitleConfigurations]
+     * keeps it for a later retryAsTs.
+     */
+    private fun addExternalSubtitle(playerId: String, uri: String, title: String?, language: String?) {
+        val state = states[playerId] ?: throw IllegalStateException("Unknown player: $playerId")
+        val player = state.player
+        val item = player.currentMediaItem ?: return
+        val configuration = MediaItem.SubtitleConfiguration.Builder(Uri.parse(uri))
+            .setMimeType(subtitleMimeTypeFromUri(uri))
+            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+            .apply {
+                if (language != null) setLanguage(language)
+                if (title != null) setLabel(title)
+            }
+            .build()
+        state.subtitleConfigurations = state.subtitleConfigurations + configuration
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            .setPreferredTextLanguage(language)
+            .build()
+        player.setMediaItem(
+            item.buildUpon().setSubtitleConfigurations(state.subtitleConfigurations).build(),
+            player.currentPosition,
+        )
+        player.prepare()
     }
 
     private fun selectTrack(playerId: String, trackType: Int, trackId: String?) {
@@ -748,12 +935,57 @@ class Media3PlaybackPlugin(
         }
     }
 
+    /** Reports a title ExoPlayer can't keep in time. See [AudioDiscontinuityPolicy]. */
+    private inner class AudioDiscontinuityListener(
+        private val playerId: String,
+        private val player: ExoPlayer,
+    ) : AnalyticsListener {
+        private val policy = AudioDiscontinuityPolicy()
+        private var stallCheck: Runnable? = null
+
+        override fun onAudioSinkError(eventTime: AnalyticsListener.EventTime, audioSinkError: Exception) {
+            if (audioSinkError !is AudioSink.UnexpectedDiscontinuityException) return
+            stallCheck?.let { mainHandler.removeCallbacks(it) }
+            stallCheck = null
+            if (policy.record(eventTime.realtimeMs)) {
+                report()
+                return
+            }
+            val jumpPositionMs = player.currentPosition
+            val check = Runnable {
+                stallCheck = null
+                // A released player's position can't be read, and it has nothing left to report.
+                if (states[playerId]?.player !== player) return@Runnable
+                if (policy.checkStalled(jumpPositionMs, player.currentPosition, player.playWhenReady)) report()
+            }
+            stallCheck = check
+            mainHandler.postDelayed(check, AudioDiscontinuityPolicy.STALL_CHECK_MS)
+        }
+
+        private fun report() {
+            emit(
+                playerId,
+                "error",
+                positionMs = player.currentPosition,
+                code = AUDIO_DISCONTINUITY_ERROR_CODE,
+                message = "Repeated audio timestamp discontinuities",
+                recoverable = true,
+            )
+        }
+    }
+
     private data class PlayerState(
         val playerId: String,
         val player: ExoPlayer,
+        val renderersFactory: SyncOffsetRenderersFactory,
         val uri: String,
-        val subtitleConfigurations: List<MediaItem.SubtitleConfiguration> = emptyList(),
+        var subtitleConfigurations: List<MediaItem.SubtitleConfiguration> = emptyList(),
         var mediaSession: MediaSession? = null,
+        var sessionPlayer: ChannelSkipPlayer? = null,
+        // Set from Dart's Now Playing updates while Background audio is on:
+        // this player keeps going in the background, hosted by PlaybackService.
+        var keepPlayingInBackground: Boolean = false,
+        var nowPlayingMetadata: MediaMetadata? = null,
         var retriedHlsAsProgressive: Boolean = false,
         var lastVideoWidth: Int = 0,
         var lastVideoHeight: Int = 0,
@@ -778,6 +1010,7 @@ class Media3PlaybackPlugin(
             if (subtitleConfigurations.isNotEmpty()) {
                 builder.setSubtitleConfigurations(subtitleConfigurations)
             }
+            nowPlayingMetadata?.let { builder.setMediaMetadata(it) }
             player.setMediaItem(builder.build(), player.currentPosition)
             return true
         }
@@ -856,10 +1089,65 @@ class Media3PlaybackPlugin(
     companion object {
         const val METHOD_CHANNEL = "m3u_tv/android_media3"
         const val EVENT_CHANNEL = "m3u_tv/android_media3/events"
+        const val NOW_PLAYING_CHANNEL = "m3u_tv/now_playing"
+
+        /** See `looksLikeAudioTimingFailure` in decoder_failure.dart. */
+        const val AUDIO_DISCONTINUITY_ERROR_CODE = "AUDIO_TIMESTAMP_DISCONTINUITY"
     }
 }
 
-private fun PlaybackException.looksLikeFormatMismatch(): Boolean {
+/**
+ * The player a [MediaSession] drives. Passes everything through to ExoPlayer,
+ * except that while [canChangeChannel] is set, the notification and lock
+ * screen next/previous buttons change channel (via Dart) instead of seeking
+ * within the single live item.
+ */
+@OptIn(UnstableApi::class)
+private class ChannelSkipPlayer(
+    player: ExoPlayer,
+    private val onChangeChannel: (forward: Boolean) -> Unit,
+) : ForwardingPlayer(player) {
+    var canChangeChannel = false
+
+    override fun getAvailableCommands(): Player.Commands {
+        val commands = super.getAvailableCommands()
+        if (!canChangeChannel) return commands
+        return commands.buildUpon()
+            .add(Player.COMMAND_SEEK_TO_NEXT)
+            .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+            .build()
+    }
+
+    override fun isCommandAvailable(command: Int): Boolean = availableCommands.contains(command)
+
+    override fun seekToNext() {
+        if (canChangeChannel) onChangeChannel(true) else super.seekToNext()
+    }
+
+    override fun seekToPrevious() {
+        if (canChangeChannel) onChangeChannel(false) else super.seekToPrevious()
+    }
+
+    // A channel picked in Android Auto while this player is up arrives here
+    // as an item without a stream: Dart opens it (see CarMediaService).
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>, resetPosition: Boolean) {
+        if (!mediaItems.isCarPick()) super.setMediaItems(mediaItems, resetPosition)
+    }
+
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>, startIndex: Int, startPositionMs: Long) {
+        if (!mediaItems.isCarPick()) super.setMediaItems(mediaItems, startIndex, startPositionMs)
+    }
+
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>) {
+        if (!mediaItems.isCarPick()) super.setMediaItems(mediaItems)
+    }
+}
+
+/** Items Android Auto set that Dart plays elsewhere: no stream URI. */
+internal fun List<MediaItem>.isCarPick(): Boolean =
+    isNotEmpty() && all { it.localConfiguration == null }
+
+internal fun PlaybackException.looksLikeFormatMismatch(): Boolean {
     if (cause is UnrecognizedInputFormatException) return true
     val text = listOfNotNull(message, cause?.message).joinToString("\n")
     return text.contains("Input does not start with the #EXTM3U header") ||

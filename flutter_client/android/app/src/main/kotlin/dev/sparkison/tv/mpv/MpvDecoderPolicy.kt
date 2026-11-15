@@ -9,6 +9,14 @@ internal object MpvDecoderPolicy {
     private const val ANDROID_12_API = 31
 
     /**
+     * What mpv sends to MediaCodec (`hwdec-codecs`); anything else decodes in
+     * software. Leaves out MPEG-4 Part 2 and other old codecs: on SHIELD
+     * `OMX.Nvidia.mp4.decode` accepted a 624x352 AVI, but its video never
+     * reached the screen. These files are low resolution, so software copes.
+     */
+    const val HARDWARE_CODECS = "h264,hevc,vp8,vp9,av1,mpeg2video,vc1"
+
+    /**
      * FFmpeg's MediaCodec decoder options (`vd-lavc-o`).
      *
      * `ndk_codec=0`: the Java MediaCodec wrapper, the one Media3 drives and

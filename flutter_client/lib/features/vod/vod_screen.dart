@@ -118,18 +118,14 @@ class _VodScreenState extends ConsumerState<VodScreen> {
   /// again once the persisted value resolved) with a visible reorder in
   /// between.
   MediaSortOption _initialSortOption() {
-    final service = ref.read(viewSettingsServiceProvider);
-    if (!service.rememberMediaSortSync) return MediaSortOption.defaultOrder;
-    return service.vodSortOptionSync;
+    return ref.read(viewSettingsServiceProvider).vodBrowseOrder.sort;
   }
 
   /// Favorites First's starting state: the persisted VOD choice under Filter
   /// Persistence, otherwise on. Sync for the same reason as
   /// [_initialSortOption].
   bool _initialFavoritesFirst() {
-    final service = ref.read(viewSettingsServiceProvider);
-    if (!service.rememberMediaSortSync) return true;
-    return service.vodFavoritesFirstSync;
+    return ref.read(viewSettingsServiceProvider).vodBrowseOrder.favoritesFirst;
   }
 
   @override
@@ -566,6 +562,10 @@ class _VodScreenState extends ConsumerState<VodScreen> {
       _favoritesFirst = favoritesFirst;
     });
     _reconfigureWindow();
+    service.setVodBrowseOrder((
+      sort: _sortOption,
+      favoritesFirst: _favoritesFirst,
+    ));
     if (!remember) return;
     if (selected != null) unawaited(service.setVodSortOption(selected));
     if (favoritesFirstChanged) {

@@ -198,6 +198,7 @@ class VodInfo {
     this.clearLogoUrl,
     this.containerExtension,
     this.tmdbId,
+    this.imdbId,
     this.edlUrl,
     this.related,
     this.trailerUrl,
@@ -231,6 +232,9 @@ class VodInfo {
   final String? clearLogoUrl;
   final String? containerExtension;
   final int? tmdbId;
+
+  /// From `get_vod_info`. Older editors don't send it.
+  final String? imdbId;
   final String? edlUrl;
 
   /// YouTube trailer watch URL (`youtube_trailer`), opened externally - see
@@ -285,6 +289,7 @@ class VodInfo {
         pick(['container_extension', 'containerExtension']),
       ),
       tmdbId: _asIntOrNull(pick(['tmdb_id', 'tmdb'])),
+      imdbId: _asNullableString(pick(['imdb_id', 'imdb'])),
       edlUrl: _asNullableString(pick(['edl_url'])),
       related: _parseRelatedList(pick(['related'])),
       trailerUrl: _youtubeTrailerUrl(pick(['youtube_trailer'])),
@@ -540,6 +545,7 @@ class Series {
     this.rating,
     this.contentRating,
     this.tmdbId,
+    this.imdbId,
     this.richCast,
     this.year,
     this.genre,
@@ -571,6 +577,10 @@ class Series {
   /// m3u-editor uses for movies - see [VodInfo.contentRating].
   final String? contentRating;
   final int? tmdbId;
+
+  /// From `get_series_info` only, not stored in the catalog. Older editors
+  /// don't send it.
+  final String? imdbId;
   final List<CastMember>? richCast;
 
   /// Four-digit release year, derived from m3u-editor's `get_series`
@@ -607,6 +617,7 @@ class Series {
     rating: _asDoubleOrNull(json['rating'] ?? json['rating_5based']),
     contentRating: _contentRating([json['mpaa_rating'], json['age']]),
     tmdbId: _asIntOrNull(json['tmdb_id'] ?? json['tmdb']),
+    imdbId: _asNullableString(json['imdb_id']),
     richCast: _parseCastList(json['cast_list']),
     year: _yearString(
       json['releaseDate'] ?? json['release_date'] ?? json['year'],
@@ -772,6 +783,65 @@ DvrRecordingStatus dvrRecordingStatusFromWire(String value) {
     'deleted' => DvrRecordingStatus.deleted,
     _ => DvrRecordingStatus.unknown,
   };
+}
+
+/// The `status` filter value m3u-editor's `get_dvr_recordings` accepts, or
+/// null for the local-only states the server has no filter for. The enum
+/// names don't match the wire (`postProcessing` vs `post_processing`), and an
+/// unrecognised filter makes the server return every status.
+String? dvrRecordingStatusToWire(DvrRecordingStatus status) {
+  return switch (status) {
+    DvrRecordingStatus.scheduled => 'scheduled',
+    DvrRecordingStatus.recording => 'recording',
+    DvrRecordingStatus.postProcessing => 'post_processing',
+    DvrRecordingStatus.completed => 'completed',
+    DvrRecordingStatus.failed => 'failed',
+    DvrRecordingStatus.cancelled => 'cancelled',
+    DvrRecordingStatus.deleted || DvrRecordingStatus.unknown => null,
+  };
+}
+
+/// How the last full load of the DVR library went, so the Recordings screen
+/// can tell "nothing recorded" apart from "couldn't load".
+enum DvrRecordingsLoadState {
+  /// No load has finished yet for this playlist.
+  notLoaded,
+
+  /// A load is in flight. The list may still hold the previous result.
+  loading,
+
+  /// Every page loaded.
+  loaded,
+
+  /// The first pages loaded but a later one failed, so older recordings are
+  /// missing from the list.
+  partial,
+
+  /// The server answered with an error.
+  error,
+
+  /// The server couldn't be reached (network error or timeout).
+  offline,
+}
+
+/// Result of loading the whole DVR library page by page
+/// (`XtreamService.getAllDvrRecordings`).
+class DvrRecordingsFetch {
+  const DvrRecordingsFetch(
+    this.recordings, {
+    this.state = DvrRecordingsLoadState.loaded,
+  });
+
+  /// A load whose first page failed: nothing usable came back.
+  const DvrRecordingsFetch.failed(this.state)
+    : recordings = const <DvrRecording>[];
+
+  final List<DvrRecording> recordings;
+  final DvrRecordingsLoadState state;
+
+  bool get failed =>
+      state == DvrRecordingsLoadState.error ||
+      state == DvrRecordingsLoadState.offline;
 }
 
 class DvrRecording {
@@ -1057,10 +1127,14 @@ class ContentRequestSearchResult {
     this.clearLogo,
     this.castList = const <CastMember>[],
     this.directors = const <String>[],
+    this._providers,
   });
 
   final String type;
   final String externalId;
+
+  /// The default integration to request from: m3u-editor points it at the
+  /// first one that doesn't already have the title. See [providers] for all.
   final int integrationId;
   final String integrationName;
   final String title;
@@ -1073,7 +1147,58 @@ class ContentRequestSearchResult {
   final int? runtimeMinutes;
   final String? certification;
   final List<ContentRequestSeason> seasons;
+
+  /// True only when every integration already has the title.
   final bool alreadyAvailable;
+
+  final List<ContentRequestProvider>? _providers;
+
+  /// Every integration that returned this title, each with its own
+  /// availability and seasons (m3u-tv #137). Editors that predate the
+  /// `providers` field only send the one, so it is rebuilt from the
+  /// top-level fields.
+  List<ContentRequestProvider> get providers {
+    final providers = _providers;
+    if (providers != null && providers.isNotEmpty) return providers;
+    return <ContentRequestProvider>[
+      ContentRequestProvider(
+        integrationId: integrationId,
+        integrationName: integrationName,
+        alreadyAvailable: alreadyAvailable,
+        seasons: seasons,
+      ),
+    ];
+  }
+
+  /// The active request this guest already made for [provider]. A request
+  /// without an integration id (older editors) counts against every one.
+  MediaRequestSummary? requestFor(
+    ContentRequestProvider provider,
+    Iterable<MediaRequestSummary> requests,
+    Set<MediaRequestStatus> statuses,
+  ) {
+    for (final request in requests) {
+      if (request.type != type || request.externalId != externalId) continue;
+      if (!statuses.contains(request.status)) continue;
+      final integrationId = request.integrationId;
+      if (integrationId == null || integrationId == provider.integrationId) {
+        return request;
+      }
+    }
+    return null;
+  }
+
+  /// Integrations that can still take a request: they don't have the title
+  /// and this guest hasn't already asked them for it.
+  List<ContentRequestProvider> requestableProviders(
+    Iterable<MediaRequestSummary> requests,
+    Set<MediaRequestStatus> statuses,
+  ) => [
+    for (final provider in providers)
+      if (!provider.alreadyAvailable &&
+          requestFor(provider, requests, statuses) == null)
+        provider,
+  ];
 
   /// Transparent title logo and rich cast, TMDB-enriched server-side (best
   /// effort - empty/null when TMDB isn't configured or the lookup fails).
@@ -1112,6 +1237,39 @@ class ContentRequestSearchResult {
         directors: _asList(
           json['director'],
         ).map((name) => '$name').toList(growable: false),
+        providers: _asList(json['providers'])
+            .whereType<Map<String, dynamic>>()
+            .map(
+              (provider) => ContentRequestProvider.fromJson(_asMap(provider)),
+            )
+            .toList(growable: false),
+      );
+}
+
+/// One integration (Radarr/Sonarr instance) that can fulfil a request search
+/// result, with its own availability and season list.
+class ContentRequestProvider {
+  const ContentRequestProvider({
+    required this.integrationId,
+    required this.integrationName,
+    this.alreadyAvailable = false,
+    this.seasons = const <ContentRequestSeason>[],
+  });
+
+  final int integrationId;
+  final String integrationName;
+  final bool alreadyAvailable;
+  final List<ContentRequestSeason> seasons;
+
+  factory ContentRequestProvider.fromJson(Map<String, Object?> json) =>
+      ContentRequestProvider(
+        integrationId: _asInt(json['integration_id']),
+        integrationName: '${json['integration_name'] ?? ''}',
+        alreadyAvailable: json['already_available'] == true,
+        seasons: _asList(json['seasons'])
+            .whereType<Map<String, dynamic>>()
+            .map((season) => ContentRequestSeason.fromJson(_asMap(season)))
+            .toList(growable: false),
       );
 }
 

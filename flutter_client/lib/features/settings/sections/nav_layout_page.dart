@@ -21,6 +21,9 @@ import 'package:material_ui/material_ui.dart';
 /// Touch and mouse drag a row by its handle. A remote can't drag, so OK picks a
 /// row up, Up/Down move it and OK drops it (the same idea as Multiview's tile
 /// reorder mode); the order is only saved on drop.
+///
+/// An M3U TV Home screen from the server adds its rows under their section,
+/// each with its own Home switch, and locks the whole page when enforced.
 class NavLayoutPage extends ConsumerStatefulWidget {
   const NavLayoutPage({
     super.key,
@@ -58,6 +61,20 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
 
   final Map<String, FocusNode> _rowNodes = {};
 
+  bool get _locked => widget.service.isNavLayoutEnforced;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.service.addListener(_onServiceChanged);
+  }
+
+  /// The server's layout can arrive or change while the page is open.
+  void _onServiceChanged() {
+    if (!mounted || _grabbedRoute != null) return;
+    setState(() => _layout = widget.service.navLayoutSync);
+  }
+
   FocusNode _nodeFor(String route) => _rowNodes.putIfAbsent(
     route,
     () => FocusNode(debugLabel: 'nav-layout-$route'),
@@ -65,6 +82,7 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
 
   @override
   void dispose() {
+    widget.service.removeListener(_onServiceChanged);
     _grabbedRoute = null;
     for (final node in _rowNodes.values) {
       node.dispose();
@@ -142,6 +160,7 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
   }
 
   void _onDragReorder(List<String> rows, int oldIndex, int newIndex) {
+    if (_locked) return;
     _save(_layout.moved(rows[oldIndex], newIndex - oldIndex, _available));
   }
 
@@ -153,7 +172,10 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
       confirmLabel: l.settingsNavLayoutResetConfirm,
       isDestructive: true,
     );
-    if (confirmed && mounted) _save(NavLayout.defaults);
+    if (!confirmed || !mounted) return;
+    // Back to the server's layout when there is one, else the app's.
+    await widget.service.resetNavLayout();
+    if (mounted) setState(() => _layout = widget.service.navLayoutSync);
   }
 
   @override
@@ -173,15 +195,31 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
       fontWeight: FontWeight.w600,
     );
 
+    final locked = _locked;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          widget.usesRemote
-              ? l.settingsNavLayoutHintRemote
-              : l.settingsNavLayoutHintTouch,
-          style: hintStyle,
-        ),
+        if (locked)
+          Row(
+            children: [
+              Icon(
+                Icons.lock_outline,
+                size: 18 * scale,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              SizedBox(width: 8 * scale),
+              Expanded(
+                child: Text(l.settingsManagedByServer, style: hintStyle),
+              ),
+            ],
+          )
+        else
+          Text(
+            widget.usesRemote
+                ? l.settingsNavLayoutHintRemote
+                : l.settingsNavLayoutHintTouch,
+            style: hintStyle,
+          ),
         SizedBox(height: 4 * scale),
         Text(l.settingsNavLayoutPinned, style: hintStyle),
         SizedBox(height: 16 * scale),
@@ -218,14 +256,16 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
             ),
           ),
         ),
-        SizedBox(height: 16 * scale),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: AppButton(
-            label: l.settingsNavLayoutReset,
-            onPressed: () => unawaited(_confirmReset(l)),
+        if (!locked) ...[
+          SizedBox(height: 16 * scale),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: AppButton(
+              label: l.settingsNavLayoutReset,
+              onPressed: () => unawaited(_confirmReset(l)),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -234,6 +274,18 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
     final theme = Theme.of(context);
     final scale = FontSizeScope.scaleOf(context);
     final isGrabbed = route == _grabbedRoute;
+    final locked = _locked;
+    final serverRows = widget.service.customHomeRowsFor(route);
+    final hiddenRows = locked
+        ? const <String>{}
+        : widget.service.hiddenHomeRowIds;
+    final handle = Icon(
+      isGrabbed ? Icons.swap_vert : Icons.drag_handle,
+      size: 24 * scale,
+      color: isGrabbed
+          ? theme.colorScheme.primary
+          : theme.colorScheme.onSurfaceVariant,
+    );
     return Material(
       key: ValueKey(route),
       color: isGrabbed
@@ -249,79 +301,148 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
       ),
       child: Padding(
         padding: EdgeInsets.all(_rowInset * scale),
-        // Stretches the switch cells to the row's height, so their focus
-        // borders match the row's at any font scale.
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: DpadFocusable(
-                  focusNode: _nodeFor(route),
-                  autofocus: index == 0,
-                  // Keys only: a tap would pick the row up with no way to move it.
-                  tapToSelect: false,
-                  onSelect: () => isGrabbed ? _drop() : _grab(route),
-                  onDirection: (direction) => _onDirection(route, direction),
-                  effects: [
-                    GradientBorderEffect(
-                      borderRadius: const BorderRadius.all(Radius.circular(8)),
-                      width: isGrabbed ? 4 : 2.5,
-                    ),
-                  ],
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 8 * scale,
-                      vertical: 10 * scale,
-                    ),
-                    child: Row(
-                      children: [
-                        ReorderableDragStartListener(
-                          index: index,
-                          child: Icon(
-                            isGrabbed ? Icons.swap_vert : Icons.drag_handle,
-                            size: 24 * scale,
-                            color: isGrabbed
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurfaceVariant,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Stretches the switch cells to the row's height, so their focus
+            // borders match the row's at any font scale.
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: DpadFocusable(
+                      focusNode: _nodeFor(route),
+                      autofocus: index == 0,
+                      // Keys only: a tap would pick the row up with no way to move it.
+                      tapToSelect: false,
+                      onSelect: () {
+                        if (locked) return;
+                        isGrabbed ? _drop() : _grab(route);
+                      },
+                      onDirection: (direction) =>
+                          _onDirection(route, direction),
+                      effects: [
+                        GradientBorderEffect(
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(8),
                           ),
-                        ),
-                        SizedBox(width: 12 * scale),
-                        Icon(
-                          navigationRouteIcon(route),
-                          size: 22 * scale,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                        SizedBox(width: 12 * scale),
-                        Expanded(
-                          child: Text(
-                            navigationRouteLabel(context, route),
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          width: isGrabbed ? 4 : 2.5,
                         ),
                       ],
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8 * scale,
+                          vertical: 10 * scale,
+                        ),
+                        child: Row(
+                          children: [
+                            if (locked)
+                              Icon(
+                                Icons.lock_outline,
+                                size: 24 * scale,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              )
+                            else
+                              ReorderableDragStartListener(
+                                index: index,
+                                child: handle,
+                              ),
+                            SizedBox(width: 12 * scale),
+                            Icon(
+                              navigationRouteIcon(route),
+                              size: 22 * scale,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            SizedBox(width: 12 * scale),
+                            Expanded(
+                              child: Text(
+                                navigationRouteLabel(context, route),
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
+                  _switchCell(
+                    scale,
+                    value: _layout.showsInNav(route),
+                    onChanged: locked
+                        ? null
+                        : (shown) =>
+                              _save(_layout.withNav(route, shown: shown)),
+                  ),
+                  _switchCell(
+                    scale,
+                    value: _layout.showsHomeRow(route),
+                    onChanged: locked
+                        ? null
+                        : (shown) =>
+                              _save(_layout.withHomeRow(route, shown: shown)),
+                  ),
+                ],
+              ),
+            ),
+            for (final row in serverRows)
+              _serverRowLine(
+                context,
+                scale,
+                row.title ?? '',
+                shown: !hiddenRows.contains(row.id),
+                onChanged: locked
+                    ? null
+                    : (shown) => unawaited(
+                        widget.service.setHomeRowShown(row.id, shown: shown),
+                      ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// A row the server added to a section: only its Home switch, under the
+  /// section it moves with.
+  Widget _serverRowLine(
+    BuildContext context,
+    double scale,
+    String title, {
+    required bool shown,
+    required ValueChanged<bool>? onChanged,
+  }) {
+    final theme = Theme.of(context);
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                (8 + 24 + 12 + 22 + 12) * scale,
+                8 * scale,
+                8 * scale,
+                8 * scale,
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  title,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              _switchCell(
-                scale,
-                value: _layout.showsInNav(route),
-                onChanged: (shown) =>
-                    _save(_layout.withNav(route, shown: shown)),
-              ),
-              _switchCell(
-                scale,
-                value: _layout.showsHomeRow(route),
-                onChanged: (shown) =>
-                    _save(_layout.withHomeRow(route, shown: shown)),
-              ),
-            ],
+            ),
           ),
-        ),
+          SizedBox(width: _switchColumnWidth * scale),
+          _switchCell(scale, value: shown, onChanged: onChanged),
+        ],
       ),
     );
   }
@@ -329,8 +450,16 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
   Widget _switchCell(
     double scale, {
     required bool value,
-    required ValueChanged<bool> onChanged,
+    required ValueChanged<bool>? onChanged,
   }) {
+    if (onChanged == null) {
+      return SizedBox(
+        width: _switchColumnWidth * scale,
+        child: Center(
+          child: AppSwitch(value: value, onChanged: null),
+        ),
+      );
+    }
     return DpadInkWell(
       onTap: () => onChanged(!value),
       borderRadius: BorderRadius.circular(8),

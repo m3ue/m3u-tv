@@ -10,6 +10,8 @@ import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/navigation_sidebar.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_catalog_screen.dart';
+import 'package:m3u_tv/features/android_auto/android_auto_bridge.dart';
+import 'package:m3u_tv/features/carplay/carplay_controller.dart';
 import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
 import 'package:m3u_tv/features/epg/epg_preview_player.dart';
 import 'package:m3u_tv/features/home/home_screen.dart';
@@ -44,6 +46,7 @@ import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/shared/app_background.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/app_modal.dart';
+import 'package:m3u_tv/shared/background_frame.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/desktop_back_key.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
@@ -272,11 +275,33 @@ class AppShellState extends ConsumerState<AppShell>
     _notificationActivationSub = _appState.notificationActivations.listen(
       _onNotificationActivation,
     );
-    if (!_appState.isConfigured) {
-      unawaited(_appState.boot());
-    }
+    unawaited(_appState.ensureBooted());
+    CarPlayController.instance?.onPlayChannel = _playCarPlayChannel;
+    AndroidAutoBridge.instance?.onPlayChannel = _playCarPlayChannel;
     _visibleRoutes = _mainRoutes;
     _initSidebarFocusNodes();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(_announceAppUpdate()),
+    );
+  }
+
+  // Settings > General already shows the update status, but only to someone
+  // who goes looking; this pins a newer release in Notifications (with an
+  // unread badge on the bell) and toasts it once per version. Tapping the
+  // toast opens Notifications like any other.
+  Future<void> _announceAppUpdate() async {
+    final version = await _appState.checkForAppUpdate();
+    if (version == null || !mounted) return;
+    final l = AppLocalizations.of(context);
+    _enqueueNotificationToast(
+      TvNotificationItem(
+        id: 'app-update-$version',
+        channel: 'app_update',
+        title: l.settingsAppUpdateNoticeTitle,
+        body: l.settingsAppUpdateNoticeBody(version),
+        status: 'info',
+      ),
+    );
   }
 
   @override
@@ -563,6 +588,14 @@ class AppShellState extends ConsumerState<AppShell>
     }
     _contentFocusNode.dispose();
     _sidebarScopeNode.dispose();
+    final carPlay = CarPlayController.instance;
+    if (carPlay?.onPlayChannel == _playCarPlayChannel) {
+      carPlay!.onPlayChannel = null;
+    }
+    final androidAuto = AndroidAutoBridge.instance;
+    if (androidAuto?.onPlayChannel == _playCarPlayChannel) {
+      androidAuto!.onPlayChannel = null;
+    }
     _appState.removeListener(_onAppStateChanged);
     _appState.viewSettingsService.removeListener(_onAppStateChanged);
     if (_ownsAppState) _appState.dispose();
@@ -583,6 +616,14 @@ class AppShellState extends ConsumerState<AppShell>
             (state == AppLifecycleState.hidden ||
                 state == AppLifecycleState.inactive))) {
       _awayFromForeground = true;
+    }
+    if (state == AppLifecycleState.detached && _playerArgs != null) {
+      // Android: the activity closed but the app keeps running (Android
+      // Auto is connected, see AppFlutterEngine.kt). Its native players went
+      // with it, so close the full-screen player now: that releases its
+      // stream, and the app doesn't reopen onto a player with no video.
+      unawaited(_closePlayer());
+      return;
     }
     if (state == AppLifecycleState.paused) {
       _backgroundedAt = clock.now();
@@ -897,6 +938,10 @@ class AppShellState extends ConsumerState<AppShell>
     final nativePlaneSub = _playerNativePlaneSub;
     final savedFocus = _focusBeforePlayer;
     _focusBeforePlayer = null;
+    if (args?.type == 'series' || args?.type == 'vod') {
+      // A finished episode only turns into its "up next" on the server.
+      unawaited(_appState.refreshRecentlyWatched());
+    }
     if (lease != null &&
         adoptBack != null &&
         orch != null &&
@@ -950,6 +995,10 @@ class AppShellState extends ConsumerState<AppShell>
     } on TimeoutException {
       // Fall through and close anyway -- better to leak a not-fully-disposed
       // adapter than leave the user stuck on a dead player screen.
+    } on Object catch (error) {
+      // Likewise when the native player is already gone (the activity
+      // closed under Android Auto, see didChangeAppLifecycleState).
+      debugPrint('Player dispose failed: $error');
     }
     _finishClosePlayer(nativePlaneSub: nativePlaneSub, savedFocus: savedFocus);
   }
@@ -1062,6 +1111,18 @@ class AppShellState extends ConsumerState<AppShell>
   // Stable tearoffs passed to PlayerScreen so PlaybackControls can offer
   // channel-up/channel-down without PlayerScreen needing to know about the
   // channel catalog itself.
+  /// A channel picked on the CarPlay or Android Auto screen. It may arrive with the app in
+  /// the background, where nothing builds until a frame is run.
+  void _playCarPlayChannel(Channel channel, ChannelContext context) {
+    _setChannelContext(context);
+    // Already playing or opening it: Android hands the car's channel over
+    // on every resume, and a resume can come twice in a row. A second open
+    // while the first is still starting would replace that player.
+    if (_playerLiveChannel?.id == channel.id && !_playerHasFailed) return;
+    _openChannel(channel);
+    runFrameIfBackgrounded();
+  }
+
   void _openNextChannel() => unawaited(_switchChannel(1));
   void _openPreviousChannel() => unawaited(_switchChannel(-1));
 
@@ -1099,6 +1160,9 @@ class AppShellState extends ConsumerState<AppShell>
       return;
     }
     _openChannel(next);
+    // Lock screen/notification skips arrive with the app in the background,
+    // where the player would only pick the new channel up on return.
+    runFrameIfBackgrounded();
   }
 
   Future<void> _handleRecordButtonTap(EpgProgram program) async {
@@ -1370,7 +1434,10 @@ class AppShellState extends ConsumerState<AppShell>
       }
     }
     await _appState.resumeService.save(progress);
-    if (mounted) _appState.updateProgressEntry(progress);
+    if (mounted) {
+      _appState.updateProgressEntry(progress);
+      unawaited(_appState.refreshRecentlyWatched());
+    }
     return serverOk;
   }
 
@@ -1378,7 +1445,7 @@ class AppShellState extends ConsumerState<AppShell>
   /// watched or unwatched from the resume dialog. "Unwatched" zeroes the row
   /// (position 0, not completed); "watched" completes it at its full runtime.
   /// Either way the title drops out of Continue Watching, and for a series the
-  /// next episode surfaces as "up next" on the following refresh. Server write
+  /// next episode surfaces as "up next" once the refresh below lands. Server write
   /// is best-effort - the local resume store and in-memory list always update,
   /// and a missed server write self-heals on the next successful sync.
   Future<void> _setWatchState(
@@ -1422,6 +1489,7 @@ class AppShellState extends ConsumerState<AppShell>
     await _appState.resumeService.save(updated);
     if (!mounted) return;
     _appState.updateProgressEntry(updated);
+    unawaited(_appState.refreshRecentlyWatched());
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -1498,6 +1566,29 @@ class AppShellState extends ConsumerState<AppShell>
         id: progress.seriesId!,
       );
       if (series != null && mounted) {
+        if (progress.upNext) {
+          // Nothing to resume, but the viewer may want to skip this episode:
+          // marking it watched surfaces the one after it as "up next".
+          final l = AppLocalizations.of(context);
+          final season = progress.seasonNumber;
+          final episode = progress.episodeNumber;
+          final choice = await showUpNextModal(
+            context,
+            title: season != null && episode != null
+                ? '${progress.seriesName ?? series.name} - S${season}E$episode'
+                : progress.episodeTitle ?? series.name,
+          );
+          if (choice == null || !mounted) return;
+          if (choice.action == ResumeAction.markWatched) {
+            await _setWatchState(
+              progress,
+              watched: true,
+              message: l.seriesMarkedWatched,
+            );
+            return;
+          }
+        }
+        if (!mounted) return;
         final streamUrl = _appState.xtreamService.getSeriesStreamUrl(
           progress.streamId.toString(),
         );
@@ -1513,6 +1604,7 @@ class AppShellState extends ConsumerState<AppShell>
               seasonNumber: progress.seasonNumber,
               metadata: <String, Object?>{
                 if (series.tmdbId != null) 'tmdb_id': series.tmdbId,
+                if (series.year != null) 'year': series.year,
                 if (series.coverUrl != null) 'poster_url': series.coverUrl,
                 if (series.backdropUrl != null)
                   'backdrop_url': series.backdropUrl,
@@ -1668,6 +1760,8 @@ class AppShellState extends ConsumerState<AppShell>
           return DvrRecordingsScreen(
             recordings: _appState.dvrRecordings,
             isLoading: _appState.isLoadingContent,
+            loadState: _appState.dvrRecordingsLoadState,
+            onRetry: _appState.refreshDvrRecordings,
             isConfigured: _appState.isConfigured,
             useInlineRowActions: shouldUseSidebar(widget.deviceType),
             storageInfo: ref.watch(dvrStorageInfoProvider),
@@ -1710,6 +1804,7 @@ class AppShellState extends ConsumerState<AppShell>
       RouteNames.notifications => NotificationsScreen(
         onMarkRead: _appState.markNotificationRead,
         onMarkAllRead: _appState.markAllNotificationsRead,
+        onMarkAppUpdateRead: _appState.markAppUpdateRead,
         onSetChannels: _appState.setNotificationChannels,
       ),
       RouteNames.settings => ListenableBuilder(
@@ -1724,6 +1819,8 @@ class AppShellState extends ConsumerState<AppShell>
           sourceError: _appState.error,
           isConfiguredOverride: _appState.isConfigured,
           traktService: _appState.traktService,
+          simklService: _appState.simklService,
+          onlineSubtitleSettings: _appState.onlineSubtitleSettings,
           devicePairingService: _appState.devicePairingService,
           // A saved playlist that is still stored opens at once, as a
           // switch does.
@@ -1891,6 +1988,7 @@ class AppShellState extends ConsumerState<AppShell>
                     epgService: _appState.epgService,
                     xtreamService: _appState.xtreamService,
                     comskipSettings: _appState.comskipSettings,
+                    syncOffsetStore: _appState.syncOffsetStore,
                     introDbSettings: _appState.introDbSettings,
                     hasDvrFeature: _appState.hasDvrFeature,
                     viewerId: viewerId,
@@ -2038,7 +2136,12 @@ class AppShellState extends ConsumerState<AppShell>
                         );
                       }
                     },
-                    traktService: _appState.traktService,
+                    watchHistoryServices: [
+                      _appState.simklService,
+                      _appState.traktService,
+                    ],
+                    onlineSubtitleService: _appState.onlineSubtitleService,
+                    onlineSubtitleSettings: _appState.onlineSubtitleSettings,
                     onPlaybackFailure: () {
                       if (!mounted) return;
                       setState(() => _playerHasFailed = true);

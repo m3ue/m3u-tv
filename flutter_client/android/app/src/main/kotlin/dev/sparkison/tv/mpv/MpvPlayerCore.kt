@@ -132,11 +132,10 @@ class MpvPlayerCore(
     // [matchDisplayRefreshRate].
     private var allowDisplayModeChanges: Boolean = true
 
-    // HDR GL surface -- see [applyHdrSurfaceIfNeeded]. User-facing toggle
-    // (mirrored from the app's HDR setting via [setHdrEnabled], default on);
-    // whether this core has already engaged a BT.2020 PQ surface, which is
-    // sticky for the core's whole life once true (see that function's doc).
-    private var hdrUserEnabled: Boolean = true
+    // HDR GL surface -- see [applyHdrSurfaceIfNeeded]. Whether this core has
+    // already engaged a BT.2020 PQ surface, which is sticky for the core's
+    // whole life once true (see that function's doc). Always on where the
+    // device supports it: the HDR on/off override is desktop only.
     private var hdrSurfaceEngaged: Boolean = false
 
     val surfaceView: SurfaceView = SurfaceView(context)
@@ -250,7 +249,7 @@ class MpvPlayerCore(
                         setOption("gpu-context", "android")
                         setOption("opengl-es", "yes")
                         setOption("hwdec", "mediacodec-copy")
-                        setOption("hwdec-codecs", "all")
+                        setOption("hwdec-codecs", MpvDecoderPolicy.HARDWARE_CODECS)
                         // Async MediaCodec (API 31+) and a decoder thread with
                         // a frame queue, so a decoder that falls behind no
                         // longer stalls audio and frame presentation; see
@@ -537,7 +536,36 @@ class MpvPlayerCore(
 
     fun setSubtitleTrack(trackId: String?) = setProperty("sid", trackId ?: "no")
 
+    fun addExternalSubtitle(uri: String, title: String?, language: String?) {
+        scope.launch {
+            mutex.withLock {
+                val current = player ?: return@withLock
+                val subArgs = mutableListOf("sub-add", uri, "select")
+                if (!title.isNullOrEmpty()) {
+                    subArgs.add(title)
+                    if (!language.isNullOrEmpty()) subArgs.add(language)
+                }
+                try {
+                    current.command(*subArgs.toTypedArray())
+                    emit("PLAYBACK_RESTART", snapshot(current, includeTracks = true))
+                } catch (error: Exception) {
+                    Log.w(TAG, "sub-add failed: ${error.message}")
+                }
+            }
+        }
+    }
+
     fun setPlaybackSpeed(speed: Double) = setProperty("speed", speed.toString())
+
+    /**
+     * Audio or subtitle sync offset: `audio-delay` or `sub-delay`, in seconds
+     * (positive plays them later). Any other property is ignored.
+     */
+    fun setSyncOffset(property: String, seconds: Double) {
+        if (property != "audio-delay" && property != "sub-delay") return
+        if (!seconds.isFinite()) return
+        setProperty(property, seconds.toString())
+    }
 
     private fun setProperty(name: String, value: String) {
         scope.launch {
@@ -722,7 +750,7 @@ class MpvPlayerCore(
      * once per core.
      */
     private suspend fun applyHdrSurfaceIfNeeded(player: MpvPlayer) {
-        if (hdrSurfaceEngaged || !hdrUserEnabled) return
+        if (hdrSurfaceEngaged) return
         if (!DisplayHdrCaps.supportsHdr(context)) return
         val gamma = runCatching { player.getString("video-params/gamma") }.getOrNull()
         if (gamma != "pq" && gamma != "hlg") return
@@ -758,18 +786,6 @@ class MpvPlayerCore(
                 } else {
                     mainHandler.post { frameRateManager.restore() }
                 }
-            }
-        }
-    }
-
-    /** Mirrors the app's HDR setting; see [applyHdrSurfaceIfNeeded]. */
-    fun setHdrEnabled(enabled: Boolean) {
-        // Written here, not synchronously on the caller's thread, so it's
-        // only ever touched from this single-threaded scope -- same
-        // invariant [matchDisplayRefreshRate] relies on in [load].
-        scope.launch {
-            mutex.withLock {
-                hdrUserEnabled = enabled
             }
         }
     }

@@ -18,3 +18,10 @@ bool looksLikeDecoderFailure(String? code) {
   };
   return decoderErrorCodes.contains(code);
 }
+
+/// Whether [code] is `Media3PlaybackPlugin.kt`'s report of a title whose audio
+/// timing ExoPlayer can't follow. ExoPlayer itself treats this as non-fatal, so
+/// unlike a decoder failure it isn't worth ending playback over if there's
+/// nowhere left to go.
+bool looksLikeAudioTimingFailure(String? code) =>
+    code == 'AUDIO_TIMESTAMP_DISCONTINUITY';

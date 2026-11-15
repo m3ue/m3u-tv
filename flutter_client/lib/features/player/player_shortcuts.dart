@@ -1,11 +1,24 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+
+/// What a remote's dedicated transport button asks for. Play and Pause are
+/// directed: a remote with separate buttons must not flip the state it asked
+/// for.
+enum PlayerTransportCommand { play, pause, toggle, stop }
+
+/// The transport command for [key], or null for any other key.
+PlayerTransportCommand? playerTransportCommandFor(LogicalKeyboardKey key) {
+  if (key == LogicalKeyboardKey.mediaPlay) return PlayerTransportCommand.play;
+  if (key == LogicalKeyboardKey.mediaPause) return PlayerTransportCommand.pause;
+  if (key == LogicalKeyboardKey.mediaPlayPause) {
+    return PlayerTransportCommand.toggle;
+  }
+  if (key == LogicalKeyboardKey.mediaStop) return PlayerTransportCommand.stop;
+  return null;
+}
 
 class PlayerBackIntent extends Intent {
   const PlayerBackIntent();
-}
-
-class PlayerPlayPauseIntent extends Intent {
-  const PlayerPlayPauseIntent();
 }
 
 class PlayerSeekBackIntent extends Intent {
@@ -30,16 +43,6 @@ class PlayerBackAction extends Action<PlayerBackIntent> {
   @override
   Object? invoke(PlayerBackIntent intent) {
     onBack();
-    return null;
-  }
-}
-
-class PlayerPlayPauseAction extends Action<PlayerPlayPauseIntent> {
-  PlayerPlayPauseAction(this.onToggle);
-  final VoidCallback onToggle;
-  @override
-  Object? invoke(PlayerPlayPauseIntent intent) {
-    onToggle();
     return null;
   }
 }

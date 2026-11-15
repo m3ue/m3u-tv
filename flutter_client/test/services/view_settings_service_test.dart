@@ -18,10 +18,31 @@ void main() {
     test('default values when no persisted settings exist', () async {
       expect(await service.liveTvLayout(), LiveTvLayout.list);
       expect(await service.epgStartView(), EpgStartView.currentTime);
-      expect(await service.rememberMediaSort(), isFalse);
+      expect(await service.rememberMediaSort(), isTrue);
+      expect(await service.homeScreenStyle(), HomeScreenStyle.rich);
       expect(await service.vodSortOption(), MediaSortOption.defaultOrder);
       expect(await service.seriesSortOption(), MediaSortOption.defaultOrder);
       expect(await service.defaultStartPage(), DefaultStartPage.home);
+    });
+
+    test('playback diagnostics default off and persist', () async {
+      expect(await service.showPlaybackDiagnostics(), isFalse);
+      expect(service.showPlaybackDiagnosticsSync, isFalse);
+
+      await service.setShowPlaybackDiagnostics(true);
+
+      expect(await service.showPlaybackDiagnostics(), isTrue);
+      expect(service.showPlaybackDiagnosticsSync, isTrue);
+    });
+
+    test('VOD player defaults to ExoPlayer first and persists', () async {
+      expect(await service.vodPlayer(), VodPlayerPreference.exoPlayerFirst);
+      expect(service.vodPlayerSync, VodPlayerPreference.exoPlayerFirst);
+
+      await service.setVodPlayer(VodPlayerPreference.mpv);
+
+      expect(await service.vodPlayer(), VodPlayerPreference.mpv);
+      expect(service.vodPlayerSync, VodPlayerPreference.mpv);
     });
 
     test('persists and restores the default start page', () async {
@@ -77,13 +98,11 @@ void main() {
     test(
       'persists and restores rememberMediaSort with bool semantics',
       () async {
-        // Defaults to false (conservative; not the always-true hdrEnabled
-        // default - preserves today's "reset each launch" behavior).
-        expect(await service.rememberMediaSort(), isFalse);
-        await service.setRememberMediaSort(true);
         expect(await service.rememberMediaSort(), isTrue);
         await service.setRememberMediaSort(false);
         expect(await service.rememberMediaSort(), isFalse);
+        await service.setRememberMediaSort(true);
+        expect(await service.rememberMediaSort(), isTrue);
       },
     );
 
@@ -139,8 +158,8 @@ void main() {
       () async {
         // Stored independently - toggling rememberMediaSort off doesn't
         // clear the sort key; the screen just refuses to read it.
+        await service.setRememberMediaSort(false);
         await service.setVodSortOption(MediaSortOption.ratingDesc);
-        expect(await service.rememberMediaSort(), isFalse);
         expect(await service.vodSortOption(), MediaSortOption.ratingDesc);
       },
     );

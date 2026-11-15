@@ -7,12 +7,14 @@ import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/app_log_buffer.dart';
+import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
+import 'package:m3u_tv/services/client_config.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/device_identity_service.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
@@ -24,6 +26,8 @@ import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
 import 'package:m3u_tv/services/notification_coordinator.dart';
+import 'package:m3u_tv/services/online_subtitle_service.dart';
+import 'package:m3u_tv/services/online_subtitle_settings.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/push_notification_service.dart';
@@ -32,9 +36,11 @@ import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/reverb_service.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
+import 'package:m3u_tv/services/simkl_service.dart';
 import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/services/sports_settings.dart';
 import 'package:m3u_tv/services/storage_usage.dart';
+import 'package:m3u_tv/services/sync_offset_store.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/services/tv_notification_store.dart';
@@ -84,6 +90,7 @@ class AppStateController extends ChangeNotifier {
     AIOStreamsFavoritesService? aioFavoritesService,
     ProxyPlaybackSettings? proxyPlaybackSettings,
     ComskipSettings? comskipSettings,
+    SyncOffsetStore? syncOffsetStore,
     SportsSettings? sportsSettings,
     IntroDbSettings? introDbSettings,
     PushNotificationService? pushNotificationService,
@@ -149,6 +156,9 @@ class AppStateController extends ChangeNotifier {
       viewerService: viewerService ?? ViewerService(store: store),
       epgService: epgService ?? EpgService(),
       traktService: TraktService(storage: resolvedSecureStorage),
+      simklService: SimklService(storage: resolvedSecureStorage),
+      onlineSubtitleService: OnlineSubtitleService(),
+      onlineSubtitleSettings: OnlineSubtitleSettings(store: store),
       devicePairingService: devicePairingService ?? DevicePairingService(),
       deviceIdentityService: resolvedDeviceIdentityService,
       tvNotificationService:
@@ -162,12 +172,14 @@ class AppStateController extends ChangeNotifier {
       proxyPlaybackSettings:
           proxyPlaybackSettings ?? ProxyPlaybackSettings(store: store),
       comskipSettings: comskipSettings ?? ComskipSettings(store: store),
+      syncOffsetStore: syncOffsetStore ?? SyncOffsetStore(store: store),
       sportsSettings: sportsSettings ?? SportsSettings(store: store),
       introDbSettings: introDbSettings ?? IntroDbSettings(store: store),
       pushNotificationService:
           pushNotificationService ?? PushNotificationService(),
       viewSettingsService:
           viewSettingsService ?? ViewSettingsService(store: store),
+      clientConfigStore: ClientConfigStore(store: store),
       savedPlaylists:
           savedPlaylistsService ??
           SavedPlaylistsService(storage: resolvedSecureStorage),
@@ -189,6 +201,9 @@ class AppStateController extends ChangeNotifier {
     required this.viewerService,
     required this.epgService,
     required this.traktService,
+    required this.simklService,
+    required this.onlineSubtitleService,
+    required this.onlineSubtitleSettings,
     required this.devicePairingService,
     required this.deviceIdentityService,
     required this._tvNotificationService,
@@ -197,12 +212,16 @@ class AppStateController extends ChangeNotifier {
     required this.aioFavoritesService,
     required this.proxyPlaybackSettings,
     required this.comskipSettings,
+    required this.syncOffsetStore,
     required this.sportsSettings,
     required this.introDbSettings,
     required this._pushNotificationService,
     required this.viewSettingsService,
+    required this.clientConfigStore,
     required this.savedPlaylists,
   }) {
+    _reverbService.onClientConfigUpdated = () =>
+        _runBackgroundPersistence(_syncClientConfig(refetch: true));
     epgService
       ..cacheTtl = cacheService.refreshInterval
       // SQLite is the guide's store of record; memory keeps now/next for
@@ -215,6 +234,12 @@ class AppStateController extends ChangeNotifier {
     seriesFavoritesService.onChanged = (streamId, {required favorited}) =>
         _pushFavoriteChange('series', streamId, favorited: favorited);
     sportsSettings.onFollowChanged = _pushSportsFollow;
+    // A tracker signed in on this device takes over from M3U Editor's own
+    // account for that provider: the server skips what the device scrobbles.
+    xtreamService.clientScrobblers = () => [
+      if (traktService.isConnected) 'trakt',
+      if (simklService.isConnected) 'simkl',
+    ];
     favoritesService.captureMutationOwnership =
         _captureFavoriteMutationOwnership;
     vodFavoritesService.captureMutationOwnership =
@@ -230,6 +255,7 @@ class AppStateController extends ChangeNotifier {
     seriesFavoritesService.playlistScope = _playlistScope;
     aioFavoritesService.playlistScope = _playlistScope;
     proxyPlaybackSettings.playlistScope = _playlistScope;
+    syncOffsetStore.playlistScope = _playlistScope;
     authNotifier.addListener(_registerLogSecrets);
     _registerLogSecrets();
   }
@@ -269,11 +295,80 @@ class AppStateController extends ChangeNotifier {
     } else if (!proxyPlaybackSettings.isLoadedFor(scope)) {
       unawaited(proxyPlaybackSettings.load());
     }
+    _showStoredClientConfig(credentials == null ? null : scope);
     if (scope == previousScope) return;
     favoritesService.notifyPlaylistChanged();
     vodFavoritesService.notifyPlaylistChanged();
     seriesFavoritesService.notifyPlaylistChanged();
     aioFavoritesService.notifyPlaylistChanged();
+  }
+
+  /// The scope whose stored [ClientConfig] is applied ([_noClientConfig]:
+  /// none, signed out). Unset until the first publish: until then the config
+  /// [ViewSettingsService.loadManagedSettings] restored at launch stands.
+  Object? _clientConfigScope = _clientConfigUnset;
+  static const _clientConfigUnset = Object();
+  static const _noClientConfig = Object();
+
+  /// Puts the shown playlist's stored config in place (none when signed
+  /// out), ahead of [_syncClientConfig] checking it with the server.
+  void _showStoredClientConfig(String? scope) {
+    final target = _publishedLogin == null ? _noClientConfig : scope;
+    if (target == _clientConfigScope) return;
+    final firstPublish = _clientConfigScope == _clientConfigUnset;
+    _clientConfigScope = target;
+    if (target == _noClientConfig) {
+      unawaited(viewSettingsService.applyClientConfig(null));
+      return;
+    }
+    // The launch config is this playlist's: keep it unless the playlist has
+    // its own stored (it always has, once a sync has run).
+    unawaited(() async {
+      final stored = await clientConfigStore.readFor(scope);
+      if (_clientConfigScope != target) return;
+      if (stored == null && firstPublish) return;
+      await viewSettingsService.applyClientConfig(stored);
+    }());
+  }
+
+  /// Brings the shown playlist's managed settings in line with the editor:
+  /// fetches them when the handshake's revision differs from the stored one
+  /// (or [refetch], on a push), and drops them when the editor no longer
+  /// advertises any. A failed fetch keeps the last known config.
+  Future<void> _syncClientConfig({bool refetch = false}) async {
+    final login = _publishedLogin;
+    final response = authNotifier.authResponse;
+    if (_disposed || login == null || response == null) return;
+    if (!sameCredentials(authNotifier.credentials, login)) return;
+    final scope = _playlistScope();
+    bool isCurrent() =>
+        !_disposed &&
+        sameCredentials(_publishedLogin, login) &&
+        _clientConfigScope == scope;
+
+    final capability = response.clientConfig;
+    if (capability == null) {
+      if (await clientConfigStore.readFor(scope) != null) {
+        await clientConfigStore.clearPlaylistState(scope);
+      }
+      if (isCurrent()) await viewSettingsService.applyClientConfig(null);
+      return;
+    }
+    final stored = await clientConfigStore.readFor(scope);
+    if (!refetch && stored != null && stored.revision == capability.revision) {
+      if (isCurrent()) await viewSettingsService.applyClientConfig(stored);
+      return;
+    }
+    final ClientConfig config;
+    try {
+      config = await xtreamService.getClientConfig(capability);
+    } on Object catch (error) {
+      debugPrint('Client config fetch failed: $error');
+      return;
+    }
+    if (!isCurrent()) return;
+    await clientConfigStore.writeFor(scope, config);
+    if (isCurrent()) await viewSettingsService.applyClientConfig(config);
   }
 
   /// Scrubs the active username/password from every captured log line, on
@@ -329,7 +424,11 @@ class AppStateController extends ChangeNotifier {
   final ResumeService resumeService;
   final AIOStreamsFavoritesService aioFavoritesService;
   final ProxyPlaybackSettings proxyPlaybackSettings;
+
+  /// Each saved playlist's managed settings (Settings Profile).
+  final ClientConfigStore clientConfigStore;
   final ComskipSettings comskipSettings;
+  final SyncOffsetStore syncOffsetStore;
   final SportsSettings sportsSettings;
   final IntroDbSettings introDbSettings;
   final ViewSettingsService viewSettingsService;
@@ -356,11 +455,22 @@ class AppStateController extends ChangeNotifier {
   Stream<TvNotificationDestination> get notificationActivations =>
       _notifications.activations;
 
-  int get unreadNotificationCount => _notifications.unreadCount;
+  int get unreadNotificationCount =>
+      _notifications.unreadCount +
+      (_appUpdateNotice != null && !_appUpdateNotice!.isRead ? 1 : 0);
+
+  /// A newer app release, shown pinned at the top of Notifications. Kept
+  /// apart from the notification store, which mirrors the server's list.
+  AppUpdateNotice? get appUpdateNotice => _appUpdateNotice;
+  AppUpdateNotice? _appUpdateNotice;
+  final AppVersionService _appVersionService = AppVersionService();
 
   Future<void> markNotificationRead(String id) => _notifications.markRead(id);
 
-  Future<void> markAllNotificationsRead() => _notifications.markAllRead();
+  Future<void> markAllNotificationsRead() async {
+    await markAppUpdateRead();
+    await _notifications.markAllRead();
+  }
 
   Future<void> setNotificationChannels(Set<String> channels) =>
       _notifications.setChannels(channels);
@@ -497,6 +607,9 @@ class AppStateController extends ChangeNotifier {
   final ViewerService viewerService;
   final EpgService epgService;
   final TraktService traktService;
+  final SimklService simklService;
+  final OnlineSubtitleService onlineSubtitleService;
+  final OnlineSubtitleSettings onlineSubtitleSettings;
   final DevicePairingService devicePairingService;
 
   AppSourceType _sourceType = AppSourceType.none;
@@ -589,6 +702,7 @@ class AppStateController extends ChangeNotifier {
   /// here exclusively; screens page or look up rows rather than hold lists.
   CatalogRepository get catalogRepository => _catalogRepository;
   List<DvrRecording> get dvrRecordings => _dvr.recordings;
+  DvrRecordingsLoadState get dvrRecordingsLoadState => _dvr.recordingsLoadState;
   DvrStorageInfo? get dvrStorageInfo => _dvr.storageInfo;
   Set<int> get recordingChannelIds => _dvr.recordingChannelIds;
   List<DvrSeriesRule> get dvrSeriesRules => _dvr.seriesRules;
@@ -638,15 +752,29 @@ class AppStateController extends ChangeNotifier {
   String? get serverTimezone =>
       _sourceType == AppSourceType.xtream ? xtreamService.serverTimezone : null;
 
+  Future<void>? _ensureBootFuture;
+
+  /// Boots once if no source is configured yet, sharing an in-flight boot
+  /// between callers: the phone's shell and the CarPlay screens (which can
+  /// start the app with no phone window, where the shell never builds).
+  Future<void> ensureBooted() {
+    if (isConfigured) return Future<void>.value();
+    return _ensureBootFuture ??= boot().whenComplete(
+      () => _ensureBootFuture = null,
+    );
+  }
+
   Future<void> boot() async {
     final sourceGeneration = _sourceOperationGeneration.advance();
     _isBootstrapping = true;
     _error = null;
     notifyListeners();
     unawaited(traktService.init());
+    unawaited(simklService.init());
     unawaited(comskipSettings.load());
     unawaited(sportsSettings.ensureLoaded());
     unawaited(introDbSettings.load());
+    unawaited(onlineSubtitleSettings.load());
 
     // One-time move of the content cache into its own file for installs that
     // predate the split. No-op once done, or when a single store is in use.
@@ -1736,6 +1864,7 @@ class AppStateController extends ChangeNotifier {
       seriesFavoritesService.clearPlaylistState(scope),
       aioFavoritesService.clearPlaylistState(scope),
       proxyPlaybackSettings.clearPlaylistState(scope),
+      clientConfigStore.clearPlaylistState(scope),
       viewerService.forgetActiveViewer(
         loginKey: _loginKeyFor(credentials, scope),
       ),
@@ -1878,6 +2007,31 @@ class AppStateController extends ChangeNotifier {
       '${interval.inMinutes}',
     );
     notifyListeners();
+  }
+
+  /// Checks for a newer app release and, if there is one, surfaces it in
+  /// Notifications (and the bell's unread count). Returns the version when
+  /// it was seen for the first time on this install, so the caller can toast
+  /// it once. Best-effort: any failure just skips the notice this launch.
+  Future<String?> checkForAppUpdate() async {
+    final AppUpdateNotice? notice;
+    try {
+      notice = await _appVersionService.updateNotice(secureStorage);
+    } on Object {
+      return null;
+    }
+    if (notice == null) return null;
+    _appUpdateNotice = notice;
+    notifyListeners();
+    return notice.isNew ? notice.version : null;
+  }
+
+  Future<void> markAppUpdateRead() async {
+    final notice = _appUpdateNotice;
+    if (notice == null || notice.isRead) return;
+    _appUpdateNotice = notice.markedRead();
+    notifyListeners();
+    await _appVersionService.markNoticeRead(secureStorage, notice.version);
   }
 
   Future<void> setLocale(Locale? locale) async {
@@ -2132,10 +2286,10 @@ class AppStateController extends ChangeNotifier {
       final vodItemsFuture = xtreamService.getVodStreams();
       final seriesFuture = xtreamService.getSeries();
       final recordingsFuture = hasDvrFeature
-          ? xtreamService.getDvrRecordings().catchError(
-              (Object _) => const <DvrRecording>[],
-            )
-          : Future<List<DvrRecording>>.value(const <DvrRecording>[]);
+          ? xtreamService.getAllDvrRecordings()
+          : Future<DvrRecordingsFetch>.value(
+              const DvrRecordingsFetch(<DvrRecording>[]),
+            );
       final seriesRulesFuture = hasDvrFeature
           ? xtreamService.listDvrSeriesRules().catchError(
               (Object _) => const <DvrSeriesRule>[],
@@ -2329,6 +2483,7 @@ class AppStateController extends ChangeNotifier {
           if (clearCache) aiostreamsApiService.clearCache();
           notifyListeners();
           unawaited(refreshDvrStorage());
+          _runBackgroundPersistence(_syncClientConfig());
           if (activeViewer != null) {
             if (!replacingXtreamSource) {
               _runBackgroundPersistence(
@@ -2400,7 +2555,7 @@ class AppStateController extends ChangeNotifier {
   /// already resolves to an empty list on failure (catchError at the call
   /// site), so [Future.wait] here never throws.
   Future<void> _applyDvrAndRequestExtras(
-    Future<List<DvrRecording>> recordingsFuture,
+    Future<DvrRecordingsFetch> recordingsFuture,
     Future<List<DvrSeriesRule>> seriesRulesFuture,
     Future<List<MediaRequestSummary>> mediaRequestsFuture, {
     required int sourceGeneration,
@@ -2414,7 +2569,7 @@ class AppStateController extends ChangeNotifier {
       return;
     }
     _dvr.applyFetched(
-      results[0] as List<DvrRecording>,
+      results[0] as DvrRecordingsFetch,
       results[1] as List<DvrSeriesRule>,
     );
     _requests.applyFetched(results[2] as List<MediaRequestSummary>);
@@ -2514,6 +2669,44 @@ class AppStateController extends ChangeNotifier {
     }
     unawaited(refreshDvrStorage());
     return true;
+  }
+
+  bool _recentlyWatchedRefreshRunning = false;
+  bool _recentlyWatchedRefreshAgain = false;
+
+  /// Re-reads Continue Watching from the server after something changed
+  /// what it should hold: playback closed, or an item was marked watched or
+  /// unwatched. The server works out "up next" (the episode after a finished
+  /// one), so without this the finished episode lingered until a relaunch.
+  /// Waits for pending playback reports first; a call made while one is
+  /// running queues a single follow-up instead of piling up requests (a
+  /// season mark fires one per episode).
+  Future<void> refreshRecentlyWatched() async {
+    if (_recentlyWatchedRefreshRunning) {
+      _recentlyWatchedRefreshAgain = true;
+      return;
+    }
+    _recentlyWatchedRefreshRunning = true;
+    try {
+      do {
+        _recentlyWatchedRefreshAgain = false;
+        final viewer = _activeViewer;
+        if (viewer == null || _sourceType != AppSourceType.xtream) return;
+        final sourceGeneration = _sourceOperationGeneration.current;
+        final viewerGeneration = _viewerOperationGeneration.current;
+        await xtreamService.playbackProgressSettled().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {},
+        );
+        await _refreshRecentlyWatchedForActiveViewer(
+          viewer,
+          sourceGeneration: sourceGeneration,
+          viewerGeneration: viewerGeneration,
+        );
+      } while (_recentlyWatchedRefreshAgain);
+    } finally {
+      _recentlyWatchedRefreshRunning = false;
+    }
   }
 
   Future<void> _refreshRecentlyWatchedForActiveViewer(

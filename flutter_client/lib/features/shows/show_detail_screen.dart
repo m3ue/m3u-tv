@@ -194,9 +194,7 @@ class _ShowDetailScreenState extends ConsumerState<ShowDetailScreen> {
     if (handler == null || _selectedEpisodeKeys.isEmpty || _batchSubmitting) {
       return;
     }
-    final recordingIndex = EpgRecordingIndex.fromRecordings(
-      ref.read(dvrRecordingsProvider),
-    );
+    final recordingIndex = ref.read(epgRecordingIndexProvider);
     final selectedEpisodes = [
       for (final episode in widget.show.recentEpisodes)
         if (_selectedEpisodeKeys.contains(_episodeRecordKey(episode)) &&
@@ -389,8 +387,7 @@ class _ShowDetailScreenState extends ConsumerState<ShowDetailScreen> {
 
     // Watching so a freshly-scheduled airing (single tap or batch) flips
     // the per-row "Scheduled" badge without a full route re-push.
-    final recordings = ref.watch(dvrRecordingsProvider);
-    final recordingIndex = EpgRecordingIndex.fromRecordings(recordings);
+    final recordingIndex = ref.watch(epgRecordingIndexProvider);
     final scale = FontSizeScope.scaleOf(context);
     final macInset =
         _isMacDesktopWindow && !DesktopFullscreenScope.isFullscreenOf(context)

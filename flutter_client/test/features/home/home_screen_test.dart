@@ -12,6 +12,7 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
+import 'package:m3u_tv/services/client_config.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/favorites_service.dart';
@@ -65,6 +66,14 @@ class _GatedFavorites extends FavoritesService {
     return {...ids};
   }
 }
+
+/// Settings for the plain rows layout. The default Spotlight layout repeats
+/// the focused row's text in its hero.
+ViewSettingsService _rowsOnlySettings() => ViewSettingsService(
+  memory: <String, Object?>{
+    ViewSettingsService.homeScreenStyleKey: HomeScreenStyle.simplified.value,
+  },
+);
 
 /// The catalog one playlist shows.
 class _Catalog {
@@ -147,6 +156,7 @@ void main() {
     bool hasAioStreams = false,
     bool hasRequests = false,
     VoidCallback? onSidebarActivate,
+    FavoritesService? vodFavorites,
   }) async {
     // A TV screen: every row is on it.
     await tester.binding.setSurfaceSize(const Size(1920, 1080));
@@ -192,13 +202,15 @@ void main() {
           epgServiceProvider.overrideWith((_) => EpgService()),
           recordingChannelIdsProvider.overrideWith((_) => const <int>{}),
           viewSettingsServiceProvider.overrideWith(
-            (_) => viewSettings ?? ViewSettingsService(),
+            (_) => viewSettings ?? _rowsOnlySettings(),
           ),
           liveFavoritesServiceProvider.overrideWith(
             (_) => liveFavorites ?? FavoritesService(memory: memory),
           ),
           vodFavoritesServiceProvider.overrideWith(
-            (_) => FavoritesService(memory: memory, namespace: 'vod'),
+            (_) =>
+                vodFavorites ??
+                FavoritesService(memory: memory, namespace: 'vod'),
           ),
           seriesFavoritesServiceProvider.overrideWith(
             (_) => FavoritesService(memory: memory, namespace: 'series'),
@@ -414,7 +426,7 @@ void main() {
     Future<ViewSettingsService> serviceWith(
       NavLayout Function(NavLayout) change,
     ) async {
-      final service = ViewSettingsService();
+      final service = _rowsOnlySettings();
       await service.setNavLayout(change(NavLayout.defaults));
       return service;
     }
@@ -435,6 +447,61 @@ void main() {
 
       expect(rowTop(tester, 'Live TV'), lessThan(rowTop(tester, 'Movies')));
       expect(rowTop(tester, 'Series'), lessThan(rowTop(tester, 'Live TV')));
+    });
+
+    testWidgets('a server category row shows just its category, in place', (
+      tester,
+    ) async {
+      final settings = _rowsOnlySettings();
+      await settings.applyClientConfig(
+        ClientConfig.fromJson(const {
+          'revision': 'rev',
+          'home_screen': {
+            'mode': 'default',
+            'sections': [
+              {
+                'section': 'movies',
+                'nav': true,
+                'home': true,
+                'rows': [
+                  {
+                    'id': 'shorts',
+                    'kind': 'category',
+                    'title': 'Animal Shorts',
+                    'params': {'category_id': '40'},
+                  },
+                  {'id': 'default', 'kind': 'default'},
+                ],
+              },
+            ],
+          },
+        }),
+      );
+      await pumpHome(
+        tester,
+        const _Catalog(movies: [..._movies, ..._otherMovies]),
+        viewSettings: settings,
+      );
+      await _settle(tester);
+
+      final shorts = _section('Animal Shorts');
+      expect(
+        find.descendant(of: shorts, matching: find.text('Elephants Dream')),
+        findsWidgets,
+      );
+      expect(
+        find.descendant(of: shorts, matching: find.text('Big Buck Bunny')),
+        findsNothing,
+      );
+      expect(
+        rowTop(tester, 'Animal Shorts'),
+        lessThan(rowTop(tester, 'Movies')),
+      );
+
+      await settings.setHomeRowShown('shorts', shown: false);
+      await _settle(tester);
+      expect(find.text('Animal Shorts'), findsNothing);
+      expect(find.text('Movies'), findsWidgets);
     });
 
     testWidgets('a row turned off is gone, and its siblings stay', (
@@ -645,7 +712,7 @@ void main() {
     });
 
     testWidgets('the rich layout shows the empty message too', (tester) async {
-      final service = ViewSettingsService();
+      final service = _rowsOnlySettings();
       await service.setHomeScreenStyle(HomeScreenStyle.rich);
       await pumpHome(tester, const _Catalog(), viewSettings: service);
       await _settle(tester);
@@ -781,5 +848,167 @@ void main() {
     await _settle(tester);
 
     expect(favorites.reads - readsBefore, 1);
+  });
+
+  group('rows follow the order their screen shows', () {
+    const movies = <VodItem>[
+      VodItem(
+        id: 1,
+        name: 'Alpha',
+        streamUrl: 'http://x/1.mp4',
+        containerExtension: 'mp4',
+        categoryId: '20',
+      ),
+      VodItem(
+        id: 2,
+        name: 'Middle',
+        streamUrl: 'http://x/2.mp4',
+        containerExtension: 'mp4',
+        categoryId: '20',
+      ),
+      VodItem(
+        id: 3,
+        name: 'Zulu',
+        streamUrl: 'http://x/3.mp4',
+        containerExtension: 'mp4',
+        categoryId: '20',
+      ),
+    ];
+    const series = <Series>[
+      Series(id: 1, name: 'Ant Saga', categoryId: '30'),
+      Series(id: 2, name: 'Yak Saga', categoryId: '30'),
+    ];
+    const channels = <Channel>[
+      Channel(id: 1, name: 'Able', streamUrl: 'http://x/1', categoryId: '10'),
+      Channel(id: 2, name: 'Baker', streamUrl: 'http://x/2', categoryId: '10'),
+    ];
+
+    /// The names in [expected], which must read left to right on screen.
+    void expectOrder(WidgetTester tester, List<String> expected) {
+      final positions = [
+        for (final name in expected)
+          tester.getTopLeft(find.text(name).first).dx,
+      ];
+      expect(positions, orderedEquals([...positions]..sort()));
+    }
+
+    testWidgets('Movies re-sorts its row', (tester) async {
+      final settings = _rowsOnlySettings();
+      await pumpHome(
+        tester,
+        const _Catalog(movies: movies),
+        viewSettings: settings,
+      );
+      await _settle(tester);
+      expectOrder(tester, ['Alpha', 'Middle', 'Zulu']);
+
+      settings.setVodBrowseOrder((
+        sort: MediaSortOption.titleDesc,
+        favoritesFirst: true,
+      ));
+      await _settle(tester);
+
+      expectOrder(tester, ['Zulu', 'Middle', 'Alpha']);
+    });
+
+    testWidgets('Series re-sorts its row', (tester) async {
+      final settings = _rowsOnlySettings();
+      await pumpHome(
+        tester,
+        const _Catalog(series: series),
+        viewSettings: settings,
+      );
+      await _settle(tester);
+      expectOrder(tester, ['Ant Saga', 'Yak Saga']);
+
+      settings.setSeriesBrowseOrder((
+        sort: MediaSortOption.titleDesc,
+        favoritesFirst: true,
+      ));
+      await _settle(tester);
+
+      expectOrder(tester, ['Yak Saga', 'Ant Saga']);
+    });
+
+    testWidgets('Movies Favorites First leads the row with favorites', (
+      tester,
+    ) async {
+      final settings = _rowsOnlySettings();
+      await pumpHome(
+        tester,
+        const _Catalog(movies: movies),
+        viewSettings: settings,
+        vodFavorites: _GatedFavorites({3}),
+      );
+      await _settle(tester);
+      expectOrder(tester, ['Zulu', 'Alpha', 'Middle']);
+
+      settings.setVodBrowseOrder((
+        sort: MediaSortOption.defaultOrder,
+        favoritesFirst: false,
+      ));
+      await _settle(tester);
+
+      expectOrder(tester, ['Alpha', 'Middle', 'Zulu']);
+    });
+
+    testWidgets('Live TV re-sorts its row', (tester) async {
+      final settings = _rowsOnlySettings();
+      await pumpHome(
+        tester,
+        const _Catalog(channels: channels),
+        viewSettings: settings,
+      );
+      await _settle(tester);
+      expectOrder(tester, ['Able', 'Baker']);
+
+      settings.setLiveTvBrowseOrder((
+        sort: ChannelSortOption.alphabeticalDesc,
+        favoritesFirst: true,
+      ));
+      await _settle(tester);
+
+      expectOrder(tester, ['Baker', 'Able']);
+    });
+
+    testWidgets('the favorites row sorts too, and only shows while they lead', (
+      tester,
+    ) async {
+      final settings = _rowsOnlySettings();
+      await pumpHome(
+        tester,
+        const _Catalog(
+          channels: [
+            ...channels,
+            Channel(
+              id: 3,
+              name: 'Charlie',
+              streamUrl: 'http://x/3',
+              categoryId: '10',
+            ),
+          ],
+        ),
+        viewSettings: settings,
+        liveFavorites: _GatedFavorites({1, 3}),
+      );
+      await _settle(tester);
+      expect(find.text('Baker'), findsNothing);
+      expectOrder(tester, ['Able', 'Charlie']);
+
+      settings.setLiveTvBrowseOrder((
+        sort: ChannelSortOption.alphabeticalDesc,
+        favoritesFirst: true,
+      ));
+      await _settle(tester);
+      expect(find.text('Baker'), findsNothing);
+      expectOrder(tester, ['Charlie', 'Able']);
+
+      settings.setLiveTvBrowseOrder((
+        sort: ChannelSortOption.alphabeticalDesc,
+        favoritesFirst: false,
+      ));
+      await _settle(tester);
+      expectOrder(tester, ['Charlie', 'Baker', 'Able']);
+    });
   });
 }

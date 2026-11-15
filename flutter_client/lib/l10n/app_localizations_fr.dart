@@ -358,6 +358,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get playerStartFromBeginning => 'Recommencer depuis le début';
 
   @override
+  String get playerPlay => 'Lire';
+
+  @override
   String get playerResume => 'Reprendre';
 
   @override
@@ -455,7 +458,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsIntegrations => 'Intégrations';
 
   @override
-  String get settingsIntegrationsSubtitle => 'Trakt et plus';
+  String get settingsIntegrationsSubtitle => 'SIMKL, TheIntroDB et plus';
 
   @override
   String get settingsAppearance => 'Apparence';
@@ -467,7 +470,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsPlayback => 'Lecture';
 
   @override
-  String get settingsPlaybackSubtitle => 'Proxy et DVR';
+  String get settingsPlaybackSubtitle => 'Lecteur, proxy et DVR';
 
   @override
   String get settingsReleaseNotesSubtitle => 'Nouveautés de cette version';
@@ -848,6 +851,14 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String settingsAppUpdateAvailable(String version) {
     return 'Mise à jour disponible : $version';
+  }
+
+  @override
+  String get settingsAppUpdateNoticeTitle => 'Mise à jour de l\'app disponible';
+
+  @override
+  String settingsAppUpdateNoticeBody(String version) {
+    return 'La version $version est prête à être installée.';
   }
 
   @override
@@ -1243,7 +1254,63 @@ class AppLocalizationsFr extends AppLocalizations {
   String get traktConnected => 'Connecté à Trakt';
 
   @override
+  String traktConnectedAs(String account) {
+    return 'Connecté à Trakt en tant que $account';
+  }
+
+  @override
   String get traktDisconnectButton => 'Déconnecter Trakt';
+
+  @override
+  String get traktName => 'Trakt';
+
+  @override
+  String get simklName => 'Simkl';
+
+  @override
+  String serverWatchHistoryActive(String service) {
+    return 'M3U Editor envoie la progression de lecture de cet identifiant à $service.';
+  }
+
+  @override
+  String serverWatchHistoryActiveAs(String service, String account) {
+    return 'M3U Editor envoie la progression de lecture de cet identifiant à $service en tant que $account.';
+  }
+
+  @override
+  String serverWatchHistoryOverrideHint(String service) {
+    return 'Connectez-vous ici pour utiliser votre propre compte $service sur cet appareil.';
+  }
+
+  @override
+  String get serverWatchHistoryOverridden =>
+      'Cet appareil envoie sa lecture au compte connecté ici. Déconnectez-le pour utiliser plutôt le compte du serveur.';
+
+  @override
+  String get simklConnectPrompt =>
+      'Connectez votre compte Simkl pour suivre automatiquement ce que vous regardez.';
+
+  @override
+  String get simklConnectButton => 'Se connecter avec Simkl';
+
+  @override
+  String get simklConnected => 'Connecté à Simkl';
+
+  @override
+  String simklConnectedAs(String account) {
+    return 'Connecté à Simkl en tant que $account';
+  }
+
+  @override
+  String get simklDisconnectButton => 'Déconnecter Simkl';
+
+  @override
+  String get simklNotConfigured =>
+      'L\'identifiant client Simkl n\'est pas configuré.';
+
+  @override
+  String get simklNotConfiguredHint =>
+      'Enregistrez une application sur simkl.com/settings/developer et définissez l\'identifiant client avec --dart-define=SIMKL_CLIENT_ID.';
 
   @override
   String get vodAllMovies => 'Tous les films';
@@ -1914,6 +1981,18 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsHomeScreenStyleRich => 'Spotlight';
 
   @override
+  String get settingsSectionPlayer => 'Lecteur';
+
+  @override
+  String get settingsVodPlayer => 'Lecteur des films et séries';
+
+  @override
+  String get settingsVodPlayerExoPlayerFirst => 'Essayer ExoPlayer d\'abord';
+
+  @override
+  String get settingsVodPlayerMpv => 'Utiliser mpv';
+
+  @override
   String get settingsHdrMode => 'Mode HDR';
 
   @override
@@ -1934,6 +2013,13 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsDeinterlaceHint =>
       'Atténue les lignes en peigne des chaînes entrelacées (comme 1080i et 576i). Utilise davantage le processeur.';
+
+  @override
+  String get settingsBackgroundAudio => 'Audio en arrière-plan';
+
+  @override
+  String get settingsBackgroundAudioHint =>
+      'Continue la lecture audio, avec les commandes sur l\'écran verrouillé et dans les notifications, lorsque vous quittez l\'app ou verrouillez l\'écran.';
 
   @override
   String get settingsPrebufferLive =>
@@ -1977,6 +2063,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsFontSize => 'Taille d\'affichage';
 
   @override
+  String get settingsFontSizeVerySmall => 'Très petit';
+
+  @override
+  String get settingsFontSizeSmall => 'Petit';
+
+  @override
   String get settingsFontSizeNormal => 'Normal';
 
   @override
@@ -2011,6 +2103,13 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsLogsDiagnosticsSubtitle =>
       'Détails de l\'appareil et journaux de cette session, pour le dépannage';
+
+  @override
+  String get settingsPlaybackDiagnostics => 'Afficher le diagnostic de lecture';
+
+  @override
+  String get settingsPlaybackDiagnosticsHint =>
+      'Affiche dans les commandes le lecteur actif et la raison de son changement, pour le dépannage.';
 
   @override
   String get diagnosticsUpload => 'Envoyer au serveur';
@@ -2084,6 +2183,54 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get playerTrackSubtitlesOff => 'Désactivés';
+
+  @override
+  String get playerOnlineSubtitlesSearch => 'Rechercher en ligne';
+
+  @override
+  String get playerOnlineSubtitlesTitle => 'Sous-titres en ligne';
+
+  @override
+  String get playerOnlineSubtitlesSearching => 'Recherche de sous-titres…';
+
+  @override
+  String get playerOnlineSubtitlesLoading => 'Chargement du sous-titre…';
+
+  @override
+  String get playerOnlineSubtitlesEmpty =>
+      'Aucun sous-titre trouvé pour ce titre.';
+
+  @override
+  String get playerOnlineSubtitlesFailed =>
+      'Impossible de charger les sous-titres. Vérifiez votre connexion et réessayez.';
+
+  @override
+  String get playerOnlineSubtitlesRetry => 'Réessayer';
+
+  @override
+  String get playerOnlineSubtitlesAllLanguages => 'Toutes les langues';
+
+  @override
+  String get settingsOnlineSubtitles => 'Sous-titres en ligne';
+
+  @override
+  String get settingsOnlineSubtitlesSubtitle =>
+      'Trouvez des sous-titres pour les films et les épisodes depuis le menu des sous-titres du lecteur.';
+
+  @override
+  String get settingsOnlineSubtitlesAddress => 'Source des sous-titres';
+
+  @override
+  String get settingsOnlineSubtitlesAddressHint =>
+      'Adresse de l\'extension de sous-titres Stremio';
+
+  @override
+  String get settingsOnlineSubtitlesAddressInvalid =>
+      'Saisissez une adresse http ou https valide.';
+
+  @override
+  String get settingsOnlineSubtitlesUseDefault =>
+      'Utiliser la valeur par défaut';
 
   @override
   String get playerHdrOn => 'HDR activé';
@@ -2374,6 +2521,10 @@ class AppLocalizationsFr extends AppLocalizations {
       'Réorganiser ou masquer des sections dans la navigation et sur l\'Accueil';
 
   @override
+  String get settingsManagedByServer =>
+      'Géré par votre serveur. Demandez à votre administrateur de le modifier.';
+
+  @override
   String get settingsNavLayoutHintRemote =>
       'Appuyez sur OK sur une ligne pour la saisir, déplacez-la avec Haut et Bas, puis appuyez sur OK pour la déposer. Retour annule.';
 
@@ -2397,4 +2548,112 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsNavLayoutResetConfirm => 'Rétablir';
+
+  @override
+  String get dvrStatusProcessing => 'Traitement';
+
+  @override
+  String get dvrStatusCompleted => 'Terminé';
+
+  @override
+  String get dvrStatusCancelled => 'Annulé';
+
+  @override
+  String get dvrFilterAll => 'Tous';
+
+  @override
+  String dvrFilterWithCount(String label, int count) {
+    return '$label ($count)';
+  }
+
+  @override
+  String get dvrFilterEmpty => 'Aucun enregistrement ne correspond à ce filtre';
+
+  @override
+  String dvrSortButton(String option) {
+    return 'Trier : $option';
+  }
+
+  @override
+  String get dvrSortDialogTitle => 'Trier les enregistrements';
+
+  @override
+  String get dvrSortNewest => 'Plus récents en premier';
+
+  @override
+  String get dvrSortOldest => 'Plus anciens en premier';
+
+  @override
+  String get dvrSortTitle => 'Titre (A-Z)';
+
+  @override
+  String get dvrLoadError =>
+      'Impossible de charger vos enregistrements. Le serveur a renvoyé une erreur.';
+
+  @override
+  String get dvrLoadOffline =>
+      'Impossible de joindre votre serveur. Vérifiez votre connexion et réessayez.';
+
+  @override
+  String get dvrLoadPartial =>
+      'Certains enregistrements plus anciens n\'ont pas pu être chargés.';
+
+  @override
+  String get dvrLoadRefreshFailed =>
+      'Impossible d\'actualiser vos enregistrements. La dernière liste chargée est affichée.';
+
+  @override
+  String get dvrRetry => 'Réessayer';
+
+  @override
+  String get requestsProviderHeading => 'Demander à';
+
+  @override
+  String get playerAudioSync => 'Synchro audio';
+
+  @override
+  String get playerSubtitleSync => 'Synchro des sous-titres';
+
+  @override
+  String playerSyncRow(String label, String value) {
+    return '$label : $value';
+  }
+
+  @override
+  String playerSyncMilliseconds(String value) {
+    return '$value ms';
+  }
+
+  @override
+  String playerSyncSeconds(String value) {
+    return '$value s';
+  }
+
+  @override
+  String get playerSyncReset => 'Réinitialiser';
+
+  @override
+  String get playerSyncDone => 'Terminé';
+
+  @override
+  String get playerAudioSyncHint =>
+      'Plus retarde le son, moins l\'avance. Enregistré pour cette chaîne ou ce titre.';
+
+  @override
+  String get playerSubtitleSyncHint =>
+      'Plus retarde les sous-titres, moins les avance. Enregistré pour cette chaîne ou ce titre.';
+
+  @override
+  String get carPlayFavorites => 'Favoris';
+
+  @override
+  String get carPlayNoFavorites => 'Aucune chaîne favorite pour l\'instant';
+
+  @override
+  String get carPlayNoFavoritesHint =>
+      'Ajoutez des chaînes en favoris dans M3U TV sur votre iPhone pour les voir ici.';
+
+  @override
+  String get carPlaySignInHint =>
+      'Ouvrez M3U TV sur votre iPhone pour vous connecter.';
 }

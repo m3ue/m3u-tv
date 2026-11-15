@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
@@ -45,6 +46,70 @@ void main() {
         );
       },
     );
+
+    group('adoptPaired', () {
+      test(
+        'puts paired playlists first in order and keeps user names',
+        () async {
+          final service = SavedPlaylistsService(
+            storage: InMemorySecureStorage(),
+          );
+          final other = await service.remember(_other);
+          final movies = await service.remember(_movies);
+          await service.rename(movies.id, 'My Movies');
+
+          await service.adoptPaired(const [
+            PairedPlaylist(credentials: _sports, name: 'Sports'),
+            PairedPlaylist(credentials: _movies, name: 'Movies'),
+          ]);
+
+          final playlists = service.playlists;
+          expect(playlists.map((p) => p.credentials), [
+            _sports,
+            _movies,
+            _other,
+          ]);
+          expect(playlists[0].name, 'Sports');
+          // A name set on the TV wins over the editor's.
+          expect(playlists[1].name, 'My Movies');
+          expect(playlists[1].id, movies.id);
+          expect(playlists[2].id, other.id);
+          // Nothing is marked used until the primary connects.
+          expect(playlists[0].lastUsed, isNull);
+        },
+      );
+
+      test(
+        'a fresh device gives the first paired playlist the unscoped keys',
+        () async {
+          final service = SavedPlaylistsService(
+            storage: InMemorySecureStorage(),
+          );
+
+          await service.adoptPaired(const [
+            PairedPlaylist(credentials: _sports),
+            PairedPlaylist(credentials: _movies),
+          ]);
+
+          expect(service.playlists[0].usesBaseKeys, isTrue);
+          expect(service.playlists[1].usesBaseKeys, isFalse);
+          final connected = await service.remember(_sports);
+          expect(connected.id, service.playlists[0].id);
+        },
+      );
+
+      test('the order survives a reload', () async {
+        final storage = InMemorySecureStorage();
+        await SavedPlaylistsService(storage: storage).adoptPaired(const [
+          PairedPlaylist(credentials: _movies, name: 'Movies'),
+          PairedPlaylist(credentials: _sports, name: 'Sports'),
+        ]);
+
+        final reloaded = SavedPlaylistsService(storage: storage);
+        await reloaded.load();
+        expect(reloaded.playlists.map((p) => p.name), ['Movies', 'Sports']);
+      });
+    });
 
     test('remembering a saved login returns the existing entry', () async {
       final service = SavedPlaylistsService(storage: InMemorySecureStorage());

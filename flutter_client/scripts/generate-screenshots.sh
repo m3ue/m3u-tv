@@ -9,13 +9,14 @@
 #   tvos*.png    → Apple tvOS (1920×1080, 3840×2160)
 #   ios*.png     → Apple iPhone (6.9", 6.3", 6.7", 6.5", 5.5")
 #   ipados*.png  → Apple iPad (12.9", 11")
+#   macos*.png   → Apple macOS (1440×900)
 #   tv*.png      → Android TV (1920×1080, 1280×720)
 #   mobile*.png  → Android Phone (1080×2340)
 #   tablet*.png  → Android Tablet (7", 10")
-#   desktop*.png → Apple macOS (1440×900)
+#   desktop*.png → generic desktop set (docs; macOS fallback)
 #
 # An Apple set that has no files yet falls back to its generic set
-# (tvos → tv, ios → mobile, ipados → tablet).
+# (tvos → tv, ios → mobile, ipados → tablet, macos → desktop).
 #
 # Store headers and banners (Google feature graphic, Android TV banner, iOS
 # product page header, Microsoft art) come from generate-store-assets.sh.
@@ -88,6 +89,32 @@ resize_fill() {
         -resize "${w}x${h}^" \
         -gravity center \
         -extent "${w}x${h}" \
+        "$dst"
+}
+
+# macOS window captures (Cmd+Shift+5 > Capture Selected Window) are PNGs with
+# a transparent drop-shadow margin, a 1px light window outline and see-through
+# rounded corners. Crop to the fully opaque window, shave the outline, and
+# flatten the corners onto the window's own edge colour before resizing, so
+# the store image is just the app. Captures without transparency (shadow
+# turned off, or a full-screen grab) go straight to resize_fill.
+window_fill() {
+    local src="$1" dst="$2" w="$3" h="$4" bbox edge
+    if [[ "$(magick "$src" -format "%[opaque]" info:)" == "True" ]]; then
+        resize_fill "$src" "$dst" "$w" "$h"
+        return
+    fi
+    bbox=$(magick "$src" -alpha extract -threshold 99% -format "%@" info:)
+    edge=$(magick "$src" -crop "$bbox" +repage -shave 1x1 \
+        -format "%[pixel:p{w/2,2}]" info:)
+    magick "$src" \
+        -crop "$bbox" +repage \
+        -shave 1x1 \
+        -background "$edge" -alpha remove \
+        -resize "${w}x${h}^" \
+        -gravity center \
+        -extent "${w}x${h}" \
+        -alpha off \
         "$dst"
 }
 
@@ -181,8 +208,9 @@ echo "--- Apple macOS ---"
 #   Minimum: 1280×800
 #   Accepted common sizes: 1440×900, 2560×1600, 2880×1800
 #
-# Source desktop screenshots (1707×1160, ratio ~1.47) are slightly taller
-# than the 16:10 store ratio (1.6). A small center crop is applied.
+# Sources are window captures (see window_fill): the shadow margin and
+# rounded corners are removed, then the window is scaled to 16:10 with a
+# small center crop if its ratio differs.
 # ---------------------------------------------------------------------------
 MACOS_DIR="$OUT_DIR/apple/macos/1440x900"
 prepare_dirs "$MACOS_DIR"
@@ -191,8 +219,8 @@ while IFS= read -r src; do
     [[ -n "$src" ]] || continue
     name=$(basename "$src")
     echo "  [macOS 1440×900] $name"
-    resize_fill "$src" "$MACOS_DIR/$name" 1440 900
-done < <(sources_for desktop)
+    window_fill "$src" "$MACOS_DIR/$name" 1440 900
+done < <(apple_sources macos desktop)
 
 # ---------------------------------------------------------------------------
 echo ""

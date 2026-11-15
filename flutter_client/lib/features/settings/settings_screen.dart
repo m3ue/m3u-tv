@@ -12,8 +12,10 @@ import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
+import 'package:m3u_tv/services/online_subtitle_settings.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
+import 'package:m3u_tv/services/simkl_service.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
@@ -24,6 +26,8 @@ class SettingsScreen extends StatefulWidget {
     super.key,
     required this.authNotifier,
     required this.traktService,
+    required this.simklService,
+    this.onlineSubtitleSettings,
     this.devicePairingService,
     this.activeViewer,
     this.viewers = const [],
@@ -53,6 +57,8 @@ class SettingsScreen extends StatefulWidget {
 
   final AuthNotifier authNotifier;
   final TraktService traktService;
+  final SimklService simklService;
+  final OnlineSubtitleSettings? onlineSubtitleSettings;
   final DevicePairingService? devicePairingService;
 
   /// Used to decide whether the pairing URL should be a tappable link with an
@@ -160,6 +166,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           deviceType: widget.deviceType,
           savedPlaylists:
               widget.playlists?.service.playlists ?? const <SavedPlaylist>[],
+          onPaired: widget.playlists?.service.adoptPaired,
         ),
       );
     }
@@ -168,6 +175,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ConnectedView(
         authNotifier: widget.authNotifier,
         traktService: widget.traktService,
+        simklService: widget.simklService,
+        onlineSubtitleSettings: widget.onlineSubtitleSettings,
         activeViewer: widget.activeViewer,
         viewers: widget.viewers,
         sourceLabel: widget.sourceLabel,

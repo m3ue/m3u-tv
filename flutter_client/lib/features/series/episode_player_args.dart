@@ -35,6 +35,7 @@ PlayerArgs? episodePlayerArgs({
       'episode_title': episode.title,
       'series_name': seriesName,
       if (series?.tmdbId != null) 'tmdb_id': series!.tmdbId,
+      if (series?.year != null) 'year': series!.year,
       if (series?.backdropUrl != null) 'backdrop_url': series!.backdropUrl,
       if (series?.coverUrl != null) 'poster_url': series!.coverUrl,
       if (episode.thumbnailUrl != null) 'thumbnail_url': episode.thumbnailUrl,

@@ -711,6 +711,17 @@ int64_t IntArg(FlValue* args, const char* key) {
   return fl_value_get_int(value);
 }
 
+// "-1.250" for -1250: formatted by hand, not with std::to_string, so the
+// decimal separator can't follow the locale (mpv only parses a dot).
+std::string FormatMillisecondsAsSeconds(int64_t milliseconds) {
+  const bool negative = milliseconds < 0;
+  const uint64_t magnitude =
+      negative ? static_cast<uint64_t>(-(milliseconds + 1)) + 1 : static_cast<uint64_t>(milliseconds);
+  std::string fraction = std::to_string(magnitude % 1000);
+  fraction.insert(0, 3 - fraction.size(), '0');
+  return (negative ? "-" : "") + std::to_string(magnitude / 1000) + "." + fraction;
+}
+
 bool BoolArg(FlValue* args, const char* key, bool fallback) {
   if (args == nullptr || fl_value_get_type(args) != FL_VALUE_TYPE_MAP) return fallback;
   FlValue* value = fl_value_lookup_string(args, key);
@@ -1669,6 +1680,11 @@ FlMethodResponse* Load(FlValue* args) {
       mpv_render_context* gpu_render_context = nullptr;
       std::string render_error;
       if (CreateGpuRenderContext(api, handle, *plane, &gpu_context, &gpu_render_context, &render_error)) {
+        // The window around the plane is transparent, so anything the plane
+        // doesn't cover shows the desktop. It fills the whole video area
+        // instead and mpv draws the letterbox bars into it (as Plezy does);
+        // the software texture path below keeps keepaspect=no.
+        api.set_option_string(handle, "keepaspect", "yes");
         const int64_t id = g_next_handle++;
         auto player = std::make_unique<PlayerInstance>(&api, event_dispatch_state, handle, gpu_render_context,
                                                         gpu_context, std::move(plane), id);
@@ -1715,6 +1731,7 @@ FlMethodResponse* Load(FlValue* args) {
         fl_value_set_string_take(result, "ok", fl_value_new_bool(TRUE));
         fl_value_set_string_take(result, "handle", fl_value_new_int(id));
         fl_value_set_string_take(result, "usesNativePlane", fl_value_new_bool(TRUE));
+        fl_value_set_string_take(result, "planeDrawsLetterbox", fl_value_new_bool(TRUE));
         fl_value_set_string_take(result, "display",
                                  fl_value_new_string("Wayland GPU video plane (OpenGL render API)"));
         g_players[id] = std::move(player);
@@ -1867,6 +1884,26 @@ FlMethodResponse* Control(const gchar* method, FlValue* args) {
     player->ReadSnapshotProperties(&snapshot);
     player->ReadTrackLists(&snapshot);
     player->QueueEvent(snapshot);
+  } else if (g_strcmp0(method, "addExternalSubtitle") == 0) {
+    const std::string uri = StringArg(args, "uri");
+    const std::string title = StringArg(args, "title");
+    const std::string language = StringArg(args, "language");
+    if (!uri.empty()) {
+      std::vector<const char*> sub_args = {"sub-add", uri.c_str(), "select"};
+      if (!title.empty()) {
+        sub_args.push_back(title.c_str());
+        if (!language.empty()) sub_args.push_back(language.c_str());
+      }
+      sub_args.push_back(nullptr);
+      player->api->command(player->handle, sub_args.data());
+    }
+    EventSnapshot snapshot;
+    snapshot.handle = player->id;
+    snapshot.sequence = player->sequence.fetch_add(1);
+    snapshot.kind = "PLAYBACK_RESTART";
+    player->ReadSnapshotProperties(&snapshot);
+    player->ReadTrackLists(&snapshot);
+    player->QueueEvent(snapshot);
   } else if (g_strcmp0(method, "setPlaybackSpeed") == 0) {
     FlValue* value = args == nullptr ? nullptr : fl_value_lookup_string(args, "speed");
     const double speed = value != nullptr && fl_value_get_type(value) == FL_VALUE_TYPE_FLOAT
@@ -1875,6 +1912,14 @@ FlMethodResponse* Control(const gchar* method, FlValue* args) {
     const std::string speed_value = std::to_string(speed);
     const char* command[] = {"set", "speed", speed_value.c_str(), nullptr};
     player->api->command(player->handle, command);
+  } else if (g_strcmp0(method, "setSyncOffset") == 0) {
+    // Audio or subtitle sync offset in whole milliseconds; mpv takes seconds.
+    const std::string property = StringArg(args, "property");
+    if (property == "audio-delay" || property == "sub-delay") {
+      const std::string seconds = FormatMillisecondsAsSeconds(IntArg(args, "milliseconds"));
+      const char* command[] = {"set", property.c_str(), seconds.c_str(), nullptr};
+      player->api->command(player->handle, command);
+    }
   } else if (g_strcmp0(method, "setVolume") == 0) {
     FlValue* value = args == nullptr ? nullptr : fl_value_lookup_string(args, "volume");
     const double volume = value != nullptr && fl_value_get_type(value) == FL_VALUE_TYPE_FLOAT

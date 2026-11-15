@@ -18,7 +18,12 @@ import 'package:m3u_tv/playback/player_adapter.dart';
 /// consumers of this FSM, differing only in their method/event channel
 /// names, [PlaybackCapabilities], error codes, and (macOS only) `setVolume`.
 abstract class MpvNativeBackendBase
-    implements PlayerAdapter, SeekWindowProvider, DisplayModeController {
+    implements
+        PlayerAdapter,
+        SeekWindowProvider,
+        DisplayModeController,
+        RuntimeSubtitleProvider,
+        SyncOffsetProvider {
   MpvNativeBackendBase({
     required this.viewId,
     required this._channel,
@@ -61,6 +66,10 @@ abstract class MpvNativeBackendBase
   String get endedBeforeReadyCode;
 
   bool get disposed => _disposed;
+
+  /// Platform-specific `load` arguments a subclass adds.
+  @protected
+  Map<String, Object?> get extraLoadArguments => const <String, Object?>{};
 
   @override
   PlaybackCapabilities get capabilities;
@@ -112,6 +121,7 @@ abstract class MpvNativeBackendBase
         'deinterlace': source.deinterlace,
         // Read by the Apple mpv cores; the Android core ignores it.
         'prebufferLive': source.prebufferLive,
+        ...extraLoadArguments,
         'externalSubtitles': source.externalSubtitles
             .map(
               (subtitle) => <String, Object?>{
@@ -249,9 +259,36 @@ abstract class MpvNativeBackendBase
   }
 
   @override
+  Future<void> addExternalSubtitle(ExternalSubtitle subtitle) async {
+    await _invokeControl('addExternalSubtitle', <String, Object?>{
+      'uri': subtitle.uri,
+      'title': subtitle.title,
+      'language': subtitle.language,
+    });
+  }
+
+  @override
   Future<void> setPlaybackSpeed(double speed) async {
     await _invokeControl('setPlaybackSpeed', <String, Object?>{'speed': speed});
   }
+
+  @override
+  Future<void> setAudioDelay(Duration delay) => _invokeControl(
+    'setSyncOffset',
+    <String, Object?>{
+      'property': 'audio-delay',
+      'milliseconds': delay.inMilliseconds,
+    },
+  );
+
+  @override
+  Future<void> setSubtitleDelay(Duration delay) => _invokeControl(
+    'setSyncOffset',
+    <String, Object?>{
+      'property': 'sub-delay',
+      'milliseconds': delay.inMilliseconds,
+    },
+  );
 
   /// Tears down the native mpv core without closing [onState]/[onError], so
   /// this adapter is still safe to [load] again later. See

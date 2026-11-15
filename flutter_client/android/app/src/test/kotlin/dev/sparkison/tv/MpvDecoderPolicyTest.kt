@@ -10,6 +10,15 @@ import org.junit.runners.JUnit4
 class MpvDecoderPolicyTest {
 
     @Test
+    fun oldCodecsStayInSoftwareAndModernOnesUseHardware() {
+        val codecs = MpvDecoderPolicy.HARDWARE_CODECS.split(",")
+        assertEquals(false, "mpeg4" in codecs)
+        for (codec in listOf("h264", "hevc", "vp9", "av1", "mpeg2video")) {
+            assertEquals(codec, true, codec in codecs)
+        }
+    }
+
+    @Test
     fun asyncDecodeStartsAtAndroid12() {
         assertEquals("ndk_codec=0,priority=0", MpvDecoderPolicy.decoderOptions(sdkInt = 30))
         assertEquals("ndk_codec=0,async=1,priority=0", MpvDecoderPolicy.decoderOptions(sdkInt = 31))

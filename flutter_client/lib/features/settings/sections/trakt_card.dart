@@ -1,21 +1,25 @@
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:m3u_tv/features/settings/sections/device_auth_pending.dart';
+import 'package:m3u_tv/features/settings/sections/server_watch_history_notice.dart';
+import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/trakt_service.dart';
+import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
-import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 // ---------------------------------------------------------------------------
 // Trakt integration card
 // ---------------------------------------------------------------------------
 
 class TraktCard extends StatelessWidget {
-  const TraktCard({super.key, required this.traktService});
+  const TraktCard({super.key, required this.traktService, this.serverAccount});
 
   final TraktService traktService;
+
+  /// M3U Editor's own Trakt account for this login, when one is set up.
+  final ServerWatchHistoryAccount? serverAccount;
 
   @override
   Widget build(BuildContext context) {
@@ -58,8 +62,16 @@ class TraktCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        logo,
+        IntegrationCardHeader(logo: logo, title: l.traktName),
         const SizedBox(height: 16),
+        if (serverAccount case final account?) ...[
+          ServerWatchHistoryNotice(
+            account: account,
+            serviceName: l.traktName,
+            connectedHere: traktService.isConnected,
+          ),
+          const SizedBox(height: 16),
+        ],
         body,
       ],
     );
@@ -107,199 +119,16 @@ class _TraktPending extends StatelessWidget {
   Widget build(BuildContext context) {
     final pending = traktService.pending;
     final url = pending?.verificationUrl ?? 'https://trakt.tv/activate';
-    final userCode = pending?.userCode ?? '------';
-
-    return LayoutBuilder(
-      builder: (context, constraints) => constraints.maxWidth >= 600
-          ? _TraktPendingWide(
-              url: url,
-              userCode: userCode,
-              onCancel: traktService.cancelAuth,
-            )
-          : _TraktPendingNarrow(
-              url: url,
-              userCode: userCode,
-              onCancel: traktService.cancelAuth,
-            ),
-    );
-  }
-}
-
-class _TraktPendingWide extends StatelessWidget {
-  const _TraktPendingWide({
-    required this.url,
-    required this.userCode,
-    required this.onCancel,
-  });
-
-  final String url;
-  final String userCode;
-  final VoidCallback onCancel;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: _TraktPendingInstructions(url: url, userCode: userCode),
-        ),
-        const SizedBox(width: 24),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: QrImageView(
-                data: url,
-                size: 140,
-                backgroundColor: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              AppLocalizations.of(context).traktScanQr,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            AppButton(
-              autofocus: true,
-              label: AppLocalizations.of(context).cancel,
-              onPressed: onCancel,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _TraktPendingNarrow extends StatelessWidget {
-  const _TraktPendingNarrow({
-    required this.url,
-    required this.userCode,
-    required this.onCancel,
-  });
-
-  final String url;
-  final String userCode;
-  final VoidCallback onCancel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _TraktPendingInstructions(
-          url: url,
-          userCode: userCode,
-          urlTappable: true,
-        ),
-        const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          child: AppButton(
-            icon: Icons.open_in_new,
-            label: AppLocalizations.of(context).traktOpenBrowser,
-            onPressed: () => launchUrl(
-              Uri.parse(url),
-              mode: LaunchMode.externalApplication,
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: AppButton(
-            label: AppLocalizations.of(context).cancel,
-            onPressed: onCancel,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _TraktPendingInstructions extends StatelessWidget {
-  const _TraktPendingInstructions({
-    required this.url,
-    required this.userCode,
-    this.urlTappable = false,
-  });
-
-  final String url;
-  final String userCode;
-  final bool urlTappable;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final urlStyle = theme.textTheme.titleMedium?.copyWith(
-      color: theme.colorScheme.primary,
-      fontWeight: FontWeight.bold,
-      decoration: urlTappable ? TextDecoration.underline : null,
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          AppLocalizations.of(context).traktPendingGoTo,
-          style: theme.textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 4),
-        if (urlTappable)
-          GestureDetector(
-            onTap: () => launchUrl(
-              Uri.parse(url),
-              mode: LaunchMode.externalApplication,
-            ),
-            child: Text(url, style: urlStyle),
-          )
-        else
-          Text(url, style: urlStyle),
-        const SizedBox(height: 16),
-        Text(
-          AppLocalizations.of(context).traktPendingEnterCode,
-          style: theme.textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            userCode,
-            style: theme.textTheme.displaySmall?.copyWith(
-              color: theme.colorScheme.onPrimaryContainer,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 8,
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            const SizedBox(
-              width: 16,
-              height: 16,
-              child: AppLoadingIndicator(strokeWidth: 2),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              AppLocalizations.of(context).traktPendingWaiting,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ],
+    return DeviceAuthPendingView(
+      url: url,
+      qrUrl: url,
+      userCode: pending?.userCode ?? '------',
+      onCancel: traktService.cancelAuth,
+      onLeave: () {
+        if (traktService.status == TraktAuthStatus.pending) {
+          traktService.cancelAuth();
+        }
+      },
     );
   }
 }
@@ -318,7 +147,12 @@ class _TraktConnected extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            AppLocalizations.of(context).traktConnected,
+            switch (traktService.accountName) {
+              final name? => AppLocalizations.of(
+                context,
+              ).traktConnectedAs(name),
+              null => AppLocalizations.of(context).traktConnected,
+            },
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w500,
             ),

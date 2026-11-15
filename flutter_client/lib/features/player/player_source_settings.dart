@@ -18,6 +18,8 @@ PlaybackSource applyPlayerSourceSettings(
     matchDisplayRefreshRate: settings?.matchRefreshRateSync ?? false,
     deinterlace: settings?.deinterlaceSync ?? false,
     prebufferLive: settings?.prebufferLiveSync ?? false,
+    preferMpv:
+        !source.isLive && settings?.vodPlayerSync == VodPlayerPreference.mpv,
   );
 }
 

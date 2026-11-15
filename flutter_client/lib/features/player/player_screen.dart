@@ -9,43 +9,48 @@ import 'package:m3u_tv/features/player/catchup_timeline.dart';
 import 'package:m3u_tv/features/player/epg_overlay.dart';
 import 'package:m3u_tv/features/player/episode_picker.dart';
 import 'package:m3u_tv/features/player/now_playing_overlay.dart';
+import 'package:m3u_tv/features/player/online_subtitle_picker.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/features/player/player_diagnostics_panel.dart';
 import 'package:m3u_tv/features/player/player_shortcuts.dart';
 import 'package:m3u_tv/features/player/player_skip_prompts.dart';
 import 'package:m3u_tv/features/player/player_skip_segments.dart';
 import 'package:m3u_tv/features/player/player_source_settings.dart';
+import 'package:m3u_tv/features/player/sync_offset_bar.dart';
 import 'package:m3u_tv/features/player/up_next_overlay.dart';
 import 'package:m3u_tv/features/player/wakelock_controller.dart';
 import 'package:m3u_tv/features/series/episode_player_args.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
+import 'package:m3u_tv/playback/android_playback_adapter.dart';
 import 'package:m3u_tv/playback/native_video_surface.dart';
+import 'package:m3u_tv/playback/now_playing_bridge.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/services/app_log_buffer.dart';
 import 'package:m3u_tv/services/comskip_service.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
-import 'package:m3u_tv/services/trakt_service.dart';
+import 'package:m3u_tv/services/online_subtitle_service.dart';
+import 'package:m3u_tv/services/online_subtitle_settings.dart';
+import 'package:m3u_tv/services/sync_offset_store.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
+import 'package:m3u_tv/services/watch_history_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_icons.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
+import 'package:m3u_tv/shared/background_frame.dart';
 import 'package:m3u_tv/shared/cached_backdrop_image.dart';
 import 'package:m3u_tv/shared/desktop_back_key.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:material_ui/material_ui.dart';
-
-const bool _showPlaybackDiagnostics = bool.fromEnvironment(
-  'M3U_TV_SHOW_PLAYBACK_DIAGNOSTICS',
-);
 
 /// App-level playback volume only applies on desktop -- TV/mobile have their
 /// own hardware/system volume controls and should always play at full
@@ -82,11 +87,14 @@ class PlayerScreen extends StatefulWidget {
     required this.epgService,
     this.xtreamService,
     this.comskipSettings,
+    this.syncOffsetStore,
     this.comskipService,
     this.introDbSettings,
     this.hasDvrFeature = false,
     this.progressReporter,
-    this.traktService,
+    this.watchHistoryServices = const <WatchHistoryService>[],
+    this.onlineSubtitleService,
+    this.onlineSubtitleSettings,
     this.wakelockController = const PlatformWakelockController(),
     this.viewerId = '',
     this.onClose,
@@ -105,6 +113,7 @@ class PlayerScreen extends StatefulWidget {
     this.adoptsPlayingSession = false,
     this.surfaceKey,
     this.releasesOrchestratorOnDispose,
+    this.nowPlayingBridge,
     super.key,
   });
 
@@ -122,9 +131,16 @@ class PlayerScreen extends StatefulWidget {
   /// Asked on dispose whether to stop [orchestrator]; false when it went
   /// back to the EPG preview, which keeps playing it. Null stops it.
   final bool Function()? releasesOrchestratorOnDispose;
+
+  /// The system Now Playing surfaces (lock screen, Control Center). Null
+  /// uses [NowPlayingBridge.instance].
+  final NowPlayingBridge? nowPlayingBridge;
   final EpgService epgService;
   final XtreamService? xtreamService;
   final ComskipSettings? comskipSettings;
+
+  /// Remembers the audio/subtitle sync offsets per channel or title.
+  final SyncOffsetStore? syncOffsetStore;
 
   /// Fetches the recording's commercial-break segments. Defaults to a fresh
   /// [ComskipService]; tests inject one over a fake HTTP client.
@@ -134,7 +150,9 @@ class PlayerScreen extends StatefulWidget {
   final IntroDbSettings? introDbSettings;
   final bool hasDvrFeature;
   final void Function(Progress progress)? progressReporter;
-  final TraktService? traktService;
+  final List<WatchHistoryService> watchHistoryServices;
+  final OnlineSubtitleService? onlineSubtitleService;
+  final OnlineSubtitleSettings? onlineSubtitleSettings;
   final WakelockController wakelockController;
   final String viewerId;
   final ViewSettingsService? viewSettingsService;
@@ -174,9 +192,11 @@ class PlayerScreen extends StatefulWidget {
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends State<PlayerScreen> {
+class _PlayerScreenState extends State<PlayerScreen>
+    with WidgetsBindingObserver {
   static const Duration _loadingTimeout = Duration(seconds: 20);
   static const Duration _progressInterval = Duration(seconds: 10);
+  static const double _kCompletedFraction = 0.9;
   static const Duration _overlayTimeout = Duration(seconds: 8);
 
   PlaybackStatus _status = PlaybackStatus.idle;
@@ -246,6 +266,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _isAudioTrackSelectionKnown = false;
   bool _isSubtitleTrackSelectionKnown = false;
   late bool _hdrEnabled = widget.viewSettingsService?.hdrEnabledSync ?? true;
+
+  /// The sync offsets for what's playing, and the channel or title they're
+  /// saved under (see [syncOffsetKeyFor]).
+  SyncOffsets _syncOffsets = zeroSyncOffsets;
+  String? _syncOffsetKey;
+  bool get _showPlaybackDiagnostics =>
+      widget.viewSettingsService?.showPlaybackDiagnosticsSync ?? false;
   late double _volume = widget.viewSettingsService?.volumeSync ?? 1.0;
 
   EpgCurrentNext? _epgData;
@@ -315,7 +342,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   StreamSubscription<bool>? _nativePlaneSubscription;
 
   bool _disposed = false;
-  bool _traktScrobbleActive = false;
+  bool _scrobbleActive = false;
   bool _failureReported = false;
   double _lastValidProgress = 0;
 
@@ -399,8 +426,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // shouldn't let the screen sleep. Enabled here, disabled in dispose().
     unawaited(widget.wakelockController.enable());
     widget.backController?._handler = _handleBack;
+    HardwareKeyboard.instance.addHandler(_handleTransportKey);
     DesktopFullscreenService.instance?.deferEscape = _defersFullscreenEscape;
-    if (HostPlatform.isAndroid) {
+    if (HostPlatform.isAndroid || HostPlatform.isIOS) {
       _pipChannel.setMethodCallHandler(_handlePipChannelCall);
     }
     if (widget.adoptsPlayingSession) {
@@ -442,6 +470,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }
     });
     _skips.addListener(_onSkipSegmentsChanged);
+    _nowPlaying.attach(this, _handleNowPlayingCommand);
+    WidgetsBinding.instance.addObserver(this);
     _stateSubscription = widget.orchestrator.onState.listen(_handleState);
     _errorSubscription = widget.orchestrator.onError.listen(_handleError);
     // `_isNativePlaneActive` reads the orchestrator directly rather than
@@ -566,8 +596,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
     if (_isSamePlaybackSession(oldWidget.args, widget.args)) return;
 
-    if (_traktScrobbleActive) _scrobbleFor(oldWidget.args, 'stop');
-    _traktScrobbleActive = false;
+    if (_scrobbleActive) _scrobbleFor(oldWidget.args, 'stop');
+    _scrobbleActive = false;
     _failureReported = false;
     _lastValidProgress = 0;
     _stopPositionTimer();
@@ -575,6 +605,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _epgTimer?.cancel();
     _epgFetch = null;
     _liveEndHoldTimer?.cancel();
+    _clearLivePause();
     // Read before _openSource clears the active adapter.
     final keptView =
         widget.orchestrator.activePlatformViewProvider ?? _reopenPlatformView;
@@ -856,11 +887,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return null;
   }
 
-  void _scrobble(String action) => _scrobbleFor(widget.args, action);
+  /// The year may arrive as an int or at the start of a full release date.
+  static int? _yearFrom(Object? value) =>
+      int.tryParse(RegExp(r'^\d{4}').stringMatch('${value ?? ''}') ?? '');
 
-  void _scrobbleFor(PlayerArgs args, String action) {
-    final service = widget.traktService;
-    if (service == null || service.status != TraktAuthStatus.connected) return;
+  void _scrobble(String action, {bool heartbeat = false}) =>
+      _scrobbleFor(widget.args, action, heartbeat: heartbeat);
+
+  void _scrobbleFor(
+    PlayerArgs args,
+    String action, {
+    bool heartbeat = false,
+  }) {
+    final services = widget.watchHistoryServices
+        .where(
+          (service) =>
+              service.isConnected &&
+              (!heartbeat || service.wantsProgressHeartbeat),
+        )
+        .toList(growable: false);
+    if (services.isEmpty) return;
     if (args.type == 'live' || args.type == 'catchup') return;
     final duration = _duration.inSeconds;
     var progress = duration > 0
@@ -874,25 +920,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
       progress = _lastValidProgress;
     }
     if (progress > 0) _lastValidProgress = progress;
-    unawaited(
-      service.scrobble(
-        action: action,
-        title: args.title,
-        seriesTitle: args.type == 'series'
-            ? args.metadata['series_name'] as String?
-            : null,
-        season: args.seasonNumber ?? args.metadata['season_number'] as int?,
-        episode: args.metadata['episode_number'] as int?,
-        tmdbId: args.metadata['tmdb_id'] as int?,
-        imdbId: args.metadata['aio_item_id'] as String?,
-        progress: progress,
-      ),
-    );
+    for (final service in services) {
+      unawaited(
+        service.scrobble(
+          action: action,
+          title: args.title,
+          seriesTitle: args.type == 'series'
+              ? args.metadata['series_name'] as String?
+              : null,
+          season: args.seasonNumber ?? args.metadata['season_number'] as int?,
+          episode: args.metadata['episode_number'] as int?,
+          tmdbId: args.metadata['tmdb_id'] as int?,
+          imdbId: args.metadata['aio_item_id'] as String?,
+          year: _yearFrom(args.metadata['year']),
+          progress: progress,
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
     _disposed = true;
+    HardwareKeyboard.instance.removeHandler(_handleTransportKey);
+    WidgetsBinding.instance.removeObserver(this);
+    _nowPlaying.detach(this);
     // A new session's player can mount before this one unmounts, so only
     // detach what is still ours.
     final backController = widget.backController;
@@ -903,7 +955,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (fullscreen?.deferEscape == _defersFullscreenEscape) {
       fullscreen!.deferEscape = null;
     }
-    if (HostPlatform.isAndroid) {
+    // Back to the EPG preview (or gone): only the full-screen player PiPs.
+    unawaited(_autoPictureInPicture?.setAutoPictureInPicture(enabled: false));
+    _autoPictureInPicture = null;
+    if (HostPlatform.isAndroid || HostPlatform.isIOS) {
       _pipChannel.setMethodCallHandler(null);
     }
     if (widget.isHandheld) {
@@ -911,7 +966,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
       );
     }
-    if (_traktScrobbleActive) _scrobble('stop');
+    if (_scrobbleActive) _scrobble('stop');
     _loadingTimer?.cancel();
     _videoSurfaceSettleTimer?.cancel();
     _videoSurfaceMaxHoldTimer?.cancel();
@@ -921,6 +976,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _epgTimer?.cancel();
     _liveEndHoldTimer?.cancel();
     _skipCommitTimer?.cancel();
+    _livePauseReleaseTimer?.cancel();
     _skips.dispose();
     _screenFocusNode.dispose();
     _controlsFocusNode.dispose();
@@ -978,8 +1034,122 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _duration = _catchup?.duration ?? Duration.zero;
   }
 
+  /// Hands the orchestrator this channel's or title's saved offsets. Called
+  /// without awaiting, so playback never waits on the store: on a change of
+  /// channel or title the previous offsets are cleared before the stream
+  /// opens, and the saved ones apply once read (the orchestrator applies them
+  /// to a backend still loading, or straight to the active one).
+  /// Never throws: a failed read just plays without an offset.
+  Future<void> _prepareSyncOffsets() async {
+    final args = widget.args;
+    final key = syncOffsetKeyFor(
+      type: args.type,
+      streamId: args.streamId,
+      seriesId: args.seriesId,
+    );
+    if (key == _syncOffsetKey) return _applySyncOffsets();
+    _syncOffsetKey = key;
+    _updateSyncOffsets(zeroSyncOffsets);
+    unawaited(_applySyncOffsets());
+    final store = widget.syncOffsetStore;
+    if (key == null || store == null) return;
+    SyncOffsets offsets;
+    try {
+      offsets = await store.read(key);
+    } on Object catch (error) {
+      debugPrint('Sync offsets: read failed: $error');
+      return;
+    }
+    if (_disposed || _syncOffsetKey != key || offsets == zeroSyncOffsets) {
+      return;
+    }
+    _updateSyncOffsets(offsets);
+    await _applySyncOffsets();
+  }
+
+  void _updateSyncOffsets(SyncOffsets offsets) {
+    if (offsets == _syncOffsets) return;
+    if (mounted) {
+      setState(() => _syncOffsets = offsets);
+    } else {
+      _syncOffsets = offsets;
+    }
+  }
+
+  Future<void> _applySyncOffsets() async {
+    try {
+      await widget.orchestrator.setSyncOffsets(
+        audio: _syncOffsets.audio,
+        subtitle: _syncOffsets.subtitle,
+      );
+    } on Object catch (error) {
+      debugPrint('Sync offsets: apply failed: $error');
+    }
+  }
+
+  bool get _supportsSyncOffsets =>
+      widget.orchestrator.activeSyncOffsetProvider != null;
+
+  void _adjustSync(SyncOffsetKind kind) {
+    _handleTrackDialogVisibilityChanged(true);
+    // The bar replaces the OSD while it's open, so the picture stays clear
+    // to judge the sync against. No focus request here: the bar's route
+    // takes focus, and moving it behind the bar would steal it.
+    if (_overlayVisible) setState(() => _overlayVisible = false);
+    unawaited(
+      showSyncOffsetBar(
+        context,
+        kind: kind,
+        initial: kind == SyncOffsetKind.audio
+            ? _syncOffsets.audio
+            : _syncOffsets.subtitle,
+        onChanged: (offset) => _setSyncOffset(kind, offset),
+      ).whenComplete(() {
+        _handleTrackDialogVisibilityChanged(false);
+        _persistSyncOffsets();
+        // Back to the OSD it was opened from, with focus on its controls
+        // (the button that opened the bar was unmounted with the OSD).
+        if (!_disposed && mounted) _showOverlay();
+      }),
+    );
+  }
+
+  void _setSyncOffset(SyncOffsetKind kind, Duration offset) {
+    final isAudio = kind == SyncOffsetKind.audio;
+    setState(
+      () => _syncOffsets = isAudio
+          ? (audio: offset, subtitle: _syncOffsets.subtitle)
+          : (audio: _syncOffsets.audio, subtitle: offset),
+    );
+    unawaited(
+      widget.orchestrator
+          .setSyncOffsets(
+            audio: isAudio ? offset : null,
+            subtitle: isAudio ? null : offset,
+          )
+          .catchError(
+            (Object error) => debugPrint('Sync offsets: set failed: $error'),
+          ),
+    );
+  }
+
+  /// Saved when the bar closes rather than on every step.
+  void _persistSyncOffsets() {
+    final key = _syncOffsetKey;
+    final store = widget.syncOffsetStore;
+    if (key == null || store == null) return;
+    unawaited(
+      store
+          .write(key, _syncOffsets)
+          .catchError(
+            (Object error) => debugPrint('Sync offsets: save failed: $error'),
+          ),
+    );
+  }
+
   Future<void> _openAndSeek(PlaybackSource source) async {
     try {
+      unawaited(_prepareSyncOffsets());
       await widget.orchestrator.open(source);
       applyPlayerOpenedSettings(
         widget.orchestrator,
@@ -1150,7 +1320,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _isPlaying = true;
         _errorMessage = null;
         if (!_isLive) _startPositionTimer();
-        _traktScrobbleActive = true;
+        _scrobbleActive = true;
         // Position ticks resend `playing` many times a second - only
         // scrobble 'start' on the actual transition into playback, not on
         // every tick, or Trakt gets flooded and starts rate-limiting.
@@ -1159,7 +1329,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           state.status == PlaybackStatus.buffering) {
         if (state.status == PlaybackStatus.paused) {
           _isPlaying = false;
-          if (_traktScrobbleActive) _scrobble('pause');
+          if (_scrobbleActive) _scrobble('pause');
         }
         _stopPositionTimer();
       } else if (state.status == PlaybackStatus.completed &&
@@ -1167,8 +1337,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
           !_catchupReopenPending) {
         _isPlaying = false;
         _stopPositionTimer();
-        if (_traktScrobbleActive) {
-          _traktScrobbleActive = false;
+        if (_scrobbleActive) {
+          _scrobbleActive = false;
           _scrobble('stop');
         }
         if (_isLive) {
@@ -1193,6 +1363,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
     _skips.check();
     _checkUpNext();
+    _trackLivePause(state.status);
+    _syncAutoPictureInPicture();
+    _publishNowPlaying();
 
     // Only re-evaluate the hide timer on an actual play/pause transition:
     // pausing cancels it (keeping the overlay up), resuming restarts the
@@ -1253,7 +1426,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       final backend = widget.orchestrator.activeBackend;
       if (backend == PlaybackBackend.serverTranscode) {
         setState(() {
-          _fallbackReason = error.message;
+          _fallbackReason = AppLogBuffer.instance.redact(error.message);
         });
         return;
       }
@@ -1270,7 +1443,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _progressTimer = Timer.periodic(_progressInterval, (_) {
       if (_disposed || !mounted) return;
       _reportProgress(_currentPosition);
-      if (_traktScrobbleActive) _scrobble('start');
+      if (_scrobbleActive) _scrobble('start', heartbeat: true);
     });
   }
 
@@ -1280,6 +1453,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         widget.progressReporter == null) {
       return;
     }
+    final durationSeconds = _duration.inSeconds;
     widget.progressReporter!(
       Progress(
         viewerId: widget.viewerId,
@@ -1288,11 +1462,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
             : ContentType.vod,
         streamId: widget.args.streamId ?? 0,
         positionSeconds: position.inSeconds,
-        durationSeconds: _duration.inSeconds > 0 ? _duration.inSeconds : null,
+        durationSeconds: durationSeconds > 0 ? durationSeconds : null,
+        // Same 90% rule the editor applies on update_progress, so the local
+        // copy drops out of Continue Watching right away instead of sitting
+        // there as a "100%" card until the next server sync.
+        completed:
+            durationSeconds > 0 &&
+            position.inSeconds >= durationSeconds * _kCompletedFraction,
         seriesId: widget.args.seriesId,
         seasonNumber: widget.args.seasonNumber,
       ),
     );
+  }
+
+  /// One last report as the viewer leaves, so the saved position (and with
+  /// it Continue Watching's "up next") reflects where they actually stopped
+  /// rather than the last periodic tick. Skipped when playback never got
+  /// going, so a failed open can't zero an existing resume point.
+  void _reportFinalProgress() {
+    if (!_hasStartedPlayback ||
+        _errorMessage != null ||
+        _currentPosition <= Duration.zero) {
+      return;
+    }
+    _reportProgress(_currentPosition);
   }
 
   void _startEpgRefresh() {
@@ -1309,7 +1502,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (!_isLive || widget.args.epgChannelId == null) return;
     final channelId = widget.args.epgChannelId!;
     final result = widget.epgService.lookup(channelId);
-    if (mounted) setState(() => _epgData = result);
+    if (mounted) {
+      setState(() => _epgData = result);
+      _publishNowPlaying();
+    }
 
     final streamId = widget.args.streamId;
     final xtreamService = widget.xtreamService;
@@ -1345,6 +1541,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       final refreshed = widget.epgService.lookup(channelId);
       if (mounted) {
         setState(() => _epgData = refreshed);
+        _publishNowPlaying();
       }
     } on Object catch (_) {
       widget.epgService.markFetchFailed(
@@ -1393,6 +1590,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (!_screenFocusNode.hasPrimaryFocus) {
       _screenFocusNode.requestFocus();
     }
+    _reportFinalProgress();
     if (widget.onClose != null) {
       widget.onClose!();
     } else {
@@ -1400,12 +1598,249 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
+  NowPlayingBridge get _nowPlaying =>
+      widget.nowPlayingBridge ?? NowPlayingBridge.instance;
+
+  // Set when leaving the app paused playback (background audio off), so
+  // returning resumes it. Cleared by any remote command in between.
+  bool _pausedForBackground = false;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Android pauses natively when the app stops (Media3PlaybackPlugin
+    // .onStop) unless Background audio handed the player to PlaybackService.
+    if (!HostPlatform.isIOS) return;
+    if (state == AppLifecycleState.paused) {
+      // PiP keeps playing whatever the setting; closing it without coming
+      // back applies this then (`pipDismissed`).
+      if (_isInPictureInPicture) return;
+      _enterBackground();
+    } else if (state == AppLifecycleState.resumed) {
+      _nowPlaying.resume(this);
+      _publishNowPlaying();
+      if (_pausedForBackground) {
+        _pausedForBackground = false;
+        _resume();
+      }
+    }
+  }
+
+  /// iOS, leaving the app (or closing PiP without returning to it).
+  void _enterBackground() {
+    final keepsPlaying =
+        widget.viewSettingsService?.backgroundAudioSync ?? false;
+    if (keepsPlaying) return;
+    // iOS suspends the app shortly after, so the lock screen controls
+    // couldn't resume it: take them down until the app is back.
+    _nowPlaying.suspend(this);
+    if (_isPlaying) {
+      _pausedForBackground = true;
+      unawaited(widget.orchestrator.pause());
+    }
+  }
+
+  void _publishNowPlaying() {
+    if (!_nowPlaying.enabled || _disposed || !mounted) return;
+    if (!_hasStartedPlayback) return;
+    final metadata = widget.args.metadata;
+    final String? subtitle;
+    final String? artworkUrl;
+    if (_isLive || widget.args.type == 'catchup') {
+      subtitle = _isLive ? _epgData?.current.title : null;
+      artworkUrl = widget.args.logoUrl;
+    } else {
+      subtitle = _nowPlayingSubtitle(context);
+      artworkUrl =
+          (metadata['poster_url'] as String?) ??
+          (metadata['backdrop_url'] as String?);
+    }
+    _nowPlaying.update(
+      this,
+      NowPlayingInfo(
+        title: _nowPlayingTitle(),
+        subtitle: subtitle,
+        artworkUrl: artworkUrl,
+        isLive: _isLive,
+        // Buffering stops the clock: the system extrapolates the position
+        // from this, and iOS shows Play while no audio is coming out anyway.
+        isPlaying: _isPlaying && _status != PlaybackStatus.buffering,
+        position: _currentPosition,
+        duration: _duration,
+        canSeek: _canSeek,
+        canChangeChannel: _isLive && widget.onNextChannel != null,
+        playerId: _activeExoPlayerId,
+        keepPlayingInBackground:
+            widget.isHandheld &&
+            (widget.viewSettingsService?.backgroundAudioSync ?? false),
+        artworkIsLogo: _isLive || widget.args.type == 'catchup',
+      ),
+    );
+  }
+
+  String? get _activeExoPlayerId {
+    final provider = widget.orchestrator.activePlatformViewProvider;
+    if (provider is! AndroidPlaybackAdapter) return null;
+    if (provider.activeBackend != PlaybackBackend.androidExoPlayer) return null;
+    return provider.playerId;
+  }
+
+  void _handleNowPlayingCommand(NowPlayingCommandEvent event) {
+    if (_disposed || !_hasPlaybackToControl) return;
+    _pausedForBackground = false;
+    switch (event.command) {
+      // iOS shows Play whenever no audio is coming out, including while a
+      // channel tunes or the stream buffers. Playback is already on its way
+      // then, so a (likely repeated) press must neither restart nor pause it.
+      case NowPlayingCommand.play:
+        if (!_isOpeningOrBuffering) _resume();
+      case NowPlayingCommand.pause:
+        unawaited(widget.orchestrator.pause());
+      case NowPlayingCommand.toggle:
+        if (!_isOpeningOrBuffering) _togglePlayPause();
+      case NowPlayingCommand.seek:
+        final position = event.position;
+        if (position != null) _seekTo(position);
+      case NowPlayingCommand.skipForward:
+        _seekTo(_currentPosition + _skipStep);
+      case NowPlayingCommand.skipBackward:
+        _seekTo(_currentPosition - _skipStep);
+      case NowPlayingCommand.next:
+        if (_isLive) _handleNextChannel();
+      case NowPlayingCommand.previous:
+        if (_isLive) _handlePreviousChannel();
+    }
+  }
+
   void _togglePlayPause() {
     if (_isPlaying) {
       unawaited(widget.orchestrator.pause());
     } else {
-      unawaited(widget.orchestrator.play());
+      _resume();
     }
+  }
+
+  bool get _isOpeningOrBuffering =>
+      _status == PlaybackStatus.idle ||
+      _status == PlaybackStatus.loading ||
+      _status == PlaybackStatus.buffering ||
+      (_awaitingFirstFrame && _status == PlaybackStatus.ready);
+
+  /// Also true for a live stream let go of while paused (see
+  /// [_releasePausedLiveStream]): Play reopens it.
+  bool get _hasPlaybackToControl =>
+      widget.orchestrator.activeBackend != null || _liveStreamReleased;
+
+  // Pausing live has no timeshift behind it: the player's buffer only holds a
+  // little, and the proxy drops a connection that stops reading. So a long
+  // pause resumes at the live edge, and a very long one lets go of the stream
+  // (and the provider connection it holds) until Play.
+  static const Duration _liveResumeAtEdgeAfter = Duration(seconds: 30);
+  static const Duration _livePauseReleaseAfter = Duration(minutes: 5);
+  DateTime? _livePausedAt;
+  Timer? _livePauseReleaseTimer;
+  bool _liveStreamReleased = false;
+
+  void _trackLivePause(PlaybackStatus status) {
+    if (!_isLive) return;
+    if (status == PlaybackStatus.paused) {
+      if (_livePausedAt != null) return;
+      _livePausedAt = clock.now();
+      _livePauseReleaseTimer?.cancel();
+      _livePauseReleaseTimer = Timer(
+        _livePauseReleaseAfter,
+        _releasePausedLiveStream,
+      );
+    } else if (status == PlaybackStatus.playing) {
+      _clearLivePause();
+    }
+  }
+
+  void _clearLivePause() {
+    _livePausedAt = null;
+    _liveStreamReleased = false;
+    _livePauseReleaseTimer?.cancel();
+    _livePauseReleaseTimer = null;
+  }
+
+  /// Every Play goes through here (controls, remote, lock screen, returning
+  /// to the app), so a stale live pause always resumes at the live edge.
+  void _resume() {
+    final pausedAt = _livePausedAt;
+    if (_isLive &&
+        pausedAt != null &&
+        (_liveStreamReleased ||
+            clock.now().difference(pausedAt) >= _liveResumeAtEdgeAfter)) {
+      _reopenLiveAtEdge();
+      return;
+    }
+    unawaited(widget.orchestrator.play());
+  }
+
+  /// Keeps the paused screen as it is (native view mounted, controls up)
+  /// while the stream itself is stopped.
+  void _releasePausedLiveStream() {
+    _livePauseReleaseTimer = null;
+    if (_disposed || !mounted || !_isLive || _livePausedAt == null) return;
+    final keptView =
+        widget.orchestrator.activePlatformViewProvider ?? _reopenPlatformView;
+    setState(() {
+      _liveStreamReleased = true;
+      _reopenPlatformView = keptView;
+    });
+    unawaited(widget.orchestrator.stop());
+  }
+
+  /// Opens the same channel again, like a channel change: a fresh connection
+  /// starts at the live edge.
+  void _reopenLiveAtEdge() {
+    _clearLivePause();
+    final keptView =
+        widget.orchestrator.activePlatformViewProvider ?? _reopenPlatformView;
+    setState(() {
+      _status = PlaybackStatus.idle;
+      _errorMessage = null;
+      _awaitingFirstFrame = true;
+      _reopenPlatformView = keptView;
+    });
+    unawaited(_openSwitchedSource(widget.args));
+    _startLoadingTimeout();
+    runFrameIfBackgrounded();
+  }
+
+  /// A remote's Play, Pause, Play/Pause and Stop buttons, wherever focus is.
+  /// Consumes every phase of the press, even with nothing to control yet: a
+  /// key Flutter leaves unhandled goes on to Android's MediaSession, whose
+  /// Stop would stop ExoPlayer underneath this screen.
+  bool _handleTransportKey(KeyEvent event) {
+    final command = playerTransportCommandFor(event.logicalKey);
+    if (command == null) return false;
+    // Only the first press: holding Play/Pause must not flip back and forth.
+    if (event is KeyDownEvent) {
+      final hasBackend = _hasPlaybackToControl;
+      switch (command) {
+        case PlayerTransportCommand.play:
+          if (hasBackend) _resume();
+        case PlayerTransportCommand.pause:
+          if (hasBackend) unawaited(widget.orchestrator.pause());
+        case PlayerTransportCommand.toggle:
+          if (hasBackend) _togglePlayPause();
+        case PlayerTransportCommand.stop:
+          _handleStop();
+      }
+    }
+    return true;
+  }
+
+  /// Leaves the player at once, where Back first hides an open OSD. An open
+  /// track dialog closes first: nothing should vanish from under it.
+  void _handleStop() {
+    if (_trackDialogVisible) {
+      Navigator.of(context, rootNavigator: true).maybePop();
+      return;
+    }
+    _liveEndHoldTimer?.cancel();
+    _liveEndHold = false;
+    _goBack();
   }
 
   // Holding a remote's skip/FF/rewind button (or the arrow keys, when the
@@ -1657,6 +2092,79 @@ class _PlayerScreenState extends State<PlayerScreen> {
     unawaited(widget.orchestrator.setSubtitleTrack(trackId));
   }
 
+  /// The id to search with, for the current movie or episode. The series info
+  /// loads shortly after an episode starts, so its id can arrive late.
+  String? get _onlineSubtitleImdbId {
+    final metadata = widget.args.metadata;
+    for (final candidate in [
+      metadata['imdb_id'],
+      metadata['aio_item_id'],
+      _seriesInfo?.series.imdbId,
+    ]) {
+      if (candidate is String &&
+          OnlineSubtitleService.isSearchableId(candidate)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  bool get _canSearchOnlineSubtitles {
+    final type = widget.args.type;
+    if (type == 'live' || type == 'catchup') return false;
+    if (type == 'series' &&
+        (_onlineSubtitleSeason == null || _onlineSubtitleEpisode == null)) {
+      return false;
+    }
+    return widget.onlineSubtitleService != null &&
+        widget.onlineSubtitleSettings?.enabled == true &&
+        widget.orchestrator.activeRuntimeSubtitleProvider != null &&
+        _onlineSubtitleImdbId != null;
+  }
+
+  int? get _onlineSubtitleSeason =>
+      widget.args.seasonNumber ?? widget.args.metadata['season_number'] as int?;
+
+  int? get _onlineSubtitleEpisode =>
+      widget.args.metadata['episode_number'] as int?;
+
+  void _showOnlineSubtitlePicker() {
+    final service = widget.onlineSubtitleService;
+    final settings = widget.onlineSubtitleSettings;
+    final imdbId = _onlineSubtitleImdbId;
+    if (service == null || settings == null || imdbId == null) return;
+    final isSeries = widget.args.type == 'series';
+    _handleTrackDialogVisibilityChanged(true);
+    unawaited(
+      showOnlineSubtitlePicker(
+        context,
+        lastLanguage: settings.lastLanguage,
+        onLanguagePicked: (language) =>
+            unawaited(settings.setLastLanguage(language)),
+        search: () => service.search(
+          addonUrl: settings.addonUrl,
+          imdbId: imdbId,
+          season: isSeries ? _onlineSubtitleSeason : null,
+          episode: isSeries ? _onlineSubtitleEpisode : null,
+        ),
+        onSelected: (subtitle) async {
+          final path = await service.download(subtitle);
+          final provider = widget.orchestrator.activeRuntimeSubtitleProvider;
+          if (_disposed || provider == null) return;
+          await provider.addExternalSubtitle(
+            ExternalSubtitle(
+              uri: path,
+              title:
+                  '${onlineSubtitleLanguageName(subtitle.language)} - '
+                  '${subtitle.release}',
+              language: subtitle.language,
+            ),
+          );
+        },
+      ).whenComplete(() => _handleTrackDialogVisibilityChanged(false)),
+    );
+  }
+
   bool get _supportsHdrToggle =>
       widget.orchestrator.activeHdrToggleProvider != null;
 
@@ -1675,15 +2183,55 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _handlePipChannelCall(MethodCall call) async {
-    if (call.method != 'pipModeChanged') return;
-    final isInPip = call.arguments as bool;
-    if (!mounted) return;
-    setState(() => _isInPictureInPicture = isInPip);
-    if (isInPip) {
-      _hideOverlay();
-    } else {
-      _showOverlay();
+    if (!mounted || _disposed) return;
+    switch (call.method) {
+      case 'pipModeChanged':
+        final isInPip = call.arguments as bool;
+        setState(() => _isInPictureInPicture = isInPip);
+        if (isInPip) {
+          _hideOverlay();
+        } else {
+          _showOverlay();
+        }
+      // iOS only from here: the PiP window and its buttons belong to the
+      // mpv player there (MpvPipController), not to the whole app.
+      case 'pipDismissed':
+        // Closed without coming back: the app is now simply in the
+        // background, which `paused` skipped while PiP was up.
+        if (WidgetsBinding.instance.lifecycleState !=
+            AppLifecycleState.resumed) {
+          _enterBackground();
+        }
+      case 'pipSetPlaying':
+        // Same rules as the lock screen's Play and Pause.
+        final playing = call.arguments as bool;
+        _handleNowPlayingCommand(
+          NowPlayingCommandEvent(
+            playing ? NowPlayingCommand.play : NowPlayingCommand.pause,
+          ),
+        );
+      case 'pipSkip':
+        final seconds = (call.arguments as num).toDouble();
+        _seekTo(
+          _currentPosition + Duration(milliseconds: (seconds * 1000).round()),
+        );
     }
+  }
+
+  // iOS: the PiP-capable backend the full-screen player has turned automatic
+  // PiP on for (see PictureInPictureProvider).
+  PictureInPictureProvider? _autoPictureInPicture;
+
+  void _syncAutoPictureInPicture() {
+    if (!HostPlatform.isIOS) return;
+    final provider = widget.orchestrator.activePlatformViewProvider;
+    final next = provider is PictureInPictureProvider
+        ? provider! as PictureInPictureProvider
+        : null;
+    if (identical(next, _autoPictureInPicture)) return;
+    unawaited(_autoPictureInPicture?.setAutoPictureInPicture(enabled: false));
+    _autoPictureInPicture = next;
+    unawaited(next?.setAutoPictureInPicture(enabled: true));
   }
 
   void _showOverlay() {
@@ -1769,8 +2317,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
           LogicalKeySet(LogicalKeyboardKey.escape): const PlayerBackIntent(),
           const DesktopBackspaceActivator(): const PlayerBackIntent(),
           LogicalKeySet(LogicalKeyboardKey.goBack): const PlayerBackIntent(),
-          LogicalKeySet(LogicalKeyboardKey.mediaPlayPause):
-              const PlayerPlayPauseIntent(),
           // Channel up/down and skip fwd/back are dedicated remote buttons,
           // distinct from the arrow keys dpad uses for spatial navigation,
           // so they're safe to claim regardless of overlay visibility.
@@ -1792,6 +2338,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
               const PlayerSeekForwardIntent(),
           LogicalKeySet(LogicalKeyboardKey.mediaSkipBackward):
               const PlayerSeekBackIntent(),
+          // Next/Previous mean the next thing to watch on live TV, where
+          // there's usually nothing to skip through.
+          LogicalKeySet(LogicalKeyboardKey.mediaTrackNext): _isLive
+              ? const PlayerChannelUpIntent()
+              : const PlayerSeekForwardIntent(),
+          LogicalKeySet(LogicalKeyboardKey.mediaTrackPrevious): _isLive
+              ? const PlayerChannelDownIntent()
+              : const PlayerSeekBackIntent(),
           // Only claim arrow keys when the overlay is hidden - when visible,
           // let dpad's root Shortcuts handle them for spatial navigation.
           if (!_overlayVisible) ...{
@@ -1804,7 +2358,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
         child: Actions(
           actions: <Type, Action<Intent>>{
             PlayerBackIntent: PlayerBackAction(widget.onBackKey ?? _handleBack),
-            PlayerPlayPauseIntent: PlayerPlayPauseAction(_togglePlayPause),
             PlayerSeekBackIntent: PlayerSeekAction(() => _adjustSkip(-1)),
             PlayerSeekForwardIntent: PlayerSeekAction(() => _adjustSkip(1)),
             PlayerChannelUpIntent: PlayerChannelChangeAction(
@@ -1830,7 +2383,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     key == LogicalKeyboardKey.escape ||
                     key == LogicalKeyboardKey.goBack ||
                     isDesktopBackspaceBack(event, HardwareKeyboard.instance);
-                if (!isBack) _showOverlay();
+                final isStop = key == LogicalKeyboardKey.mediaStop;
+                if (!isBack && !isStop) _showOverlay();
               }
               return KeyEventResult.ignored;
             },
@@ -1881,8 +2435,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 // Must match PlaybackControls' own edgePadding or the
                 // back button and this overlay's top edges drift apart.
                 final overlayTop = mediaQuery.padding.top + edgePadding;
-                // Reserve room on the right for the diagnostics panel (debug
-                // builds only) so the two don't draw on top of each other --
+                // Reserve room on the right for the diagnostics panel (when
+                // turned on) so the two don't draw on top of each other --
                 // on a compact/handheld screen the title overlay would
                 // otherwise stretch to within a few pixels of the right
                 // edge, exactly where the diagnostics panel sits.
@@ -1953,368 +2507,394 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           : const ColoredBox(color: Colors.black),
                     ),
 
-                    // Poster backdrop behind the loading indicator (VOD/series).
-                    // Skipped on Android: `NativeVideoSurface` is already
-                    // mounted as a live Hybrid Composition `AndroidView` by
-                    // this point (`_videoSurfaceReady` flips true before
-                    // `_openSource` runs), and covering one with an opaque
-                    // Flutter overlay and later removing it does not
-                    // reliably restore its visibility - confirmed on a real
-                    // Pixel 7 during the EAC3 fallback work. Android gets the
-                    // same backdrop natively instead - a poster `ImageView`
-                    // living in the *same* native view as the `SurfaceView`
-                    // (see `PosterLoader.kt`/`Media3PlatformView.kt`/
-                    // `MpvPlayerPlatformView.kt`), which composites safely
-                    // where a Flutter-side overlay can't. Desktop/iOS/web
-                    // render through a `Texture`/html view, which doesn't
-                    // have this failure mode and so keeps this Flutter path.
-                    if (_showLoadingOverlay &&
-                        _loadingBackdropUrl != null &&
-                        !HostPlatform.isAndroid)
-                      Positioned.fill(
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            CachedBackdropImage(_loadingBackdropUrl!),
-                            const ColoredBox(color: Colors.black54),
-                          ],
-                        ),
+                    // PiP: just the picture. The window is too small for any of
+                    // the overlays below, and its controls are the system's
+                    // (media notification), not the app's.
+                    if (_isInPictureInPicture && _showLoadingOverlay)
+                      const Center(
+                        child: AppLoadingIndicator(color: Colors.white),
                       ),
-
-                    // Loading indicator
-                    if (_showLoadingOverlay)
-                      Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (widget.args.logoUrl != null)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 20),
-                                child: Container(
-                                  padding: EdgeInsets.all(12 * fontScale),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black38,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: ResilientMediaImage(
-                                    imageUrl: widget.args.logoUrl,
-                                    fallbackIcon: Icons.tv,
-                                    width: 96 * fontScale,
-                                    height: 96 * fontScale,
-                                    fit: BoxFit.contain,
-                                    oversample: 2,
-                                    backgroundColor: Colors.transparent,
-                                  ),
-                                ),
-                              ),
-                            Text(
-                              widget.args.title,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 12),
-                            const AppLoadingIndicator(
-                              color: Colors.white,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              _retryStatusMessage ??
-                                  AppLocalizations.of(
-                                    context,
-                                  ).playerLoadingStream,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    // Error display
-                    if (_liveEndHold)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
+                    if (!_isInPictureInPicture) ...[
+                      // Poster backdrop behind the loading indicator (VOD/series).
+                      // Skipped on Android: `NativeVideoSurface` is already
+                      // mounted as a live Hybrid Composition `AndroidView` by
+                      // this point (`_videoSurfaceReady` flips true before
+                      // `_openSource` runs), and covering one with an opaque
+                      // Flutter overlay and later removing it does not
+                      // reliably restore its visibility - confirmed on a real
+                      // Pixel 7 during the EAC3 fallback work. Android gets the
+                      // same backdrop natively instead - a poster `ImageView`
+                      // living in the *same* native view as the `SurfaceView`
+                      // (see `PosterLoader.kt`/`Media3PlatformView.kt`/
+                      // `MpvPlayerPlatformView.kt`), which composites safely
+                      // where a Flutter-side overlay can't. Desktop/iOS/web
+                      // render through a `Texture`/html view, which doesn't
+                      // have this failure mode and so keeps this Flutter path.
+                      if (_showLoadingOverlay &&
+                          _loadingBackdropUrl != null &&
+                          !HostPlatform.isAndroid)
+                        Positioned.fill(
+                          child: Stack(
+                            fit: StackFit.expand,
                             children: [
-                              Text(
-                                _liveEndReason ??
-                                    AppLocalizations.of(
-                                      context,
-                                    ).playerLiveStreamEnded,
-                                style: Theme.of(context).textTheme.headlineSmall
-                                    ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                AppLocalizations.of(
-                                  context,
-                                ).playerReturningToMenu,
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
+                              CachedBackdropImage(_loadingBackdropUrl!),
+                              const ColoredBox(color: Colors.black54),
                             ],
                           ),
                         ),
-                      ),
-                    if (_errorMessage != null)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
+
+                      // Loading indicator
+                      if (_showLoadingOverlay)
+                        Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                AppLocalizations.of(context).playerErrorTitle,
-                                style: Theme.of(context).textTheme.headlineSmall
-                                    ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
+                              if (widget.args.logoUrl != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 20),
+                                  child: Container(
+                                    padding: EdgeInsets.all(12 * fontScale),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black38,
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
-                              ),
-                              const SizedBox(height: 8),
+                                    child: ResilientMediaImage(
+                                      imageUrl: widget.args.logoUrl,
+                                      fallbackIcon: Icons.tv,
+                                      width: 96 * fontScale,
+                                      height: 96 * fontScale,
+                                      fit: BoxFit.contain,
+                                      oversample: 2,
+                                      backgroundColor: Colors.transparent,
+                                    ),
+                                  ),
+                                ),
                               Text(
-                                _errorMessage!,
+                                widget.args.title,
                                 style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
                                 ),
                                 textAlign: TextAlign.center,
-                                maxLines: 6,
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 24),
-                              AppButton(
-                                focusNode: _errorButtonFocusNode,
-                                autofocus: true,
-                                icon: AppIcons.back(context),
-                                label: AppLocalizations.of(
-                                  context,
-                                ).playerGoBack,
-                                variant: AppButtonVariant.primary,
-                                onPressed: _goBack,
+                              const SizedBox(height: 12),
+                              const AppLoadingIndicator(
+                                color: Colors.white,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                _retryStatusMessage ??
+                                    AppLocalizations.of(
+                                      context,
+                                    ).playerLoadingStream,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
                             ],
                           ),
                         ),
-                      ),
 
-                    // Playback controls overlay
-                    if (_overlayVisible && _errorMessage == null)
-                      Positioned.fill(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.translucent,
-                          onTap: _hideOverlay,
-                          child: PlaybackControls(
-                            isPlaying: _isPlaying,
-                            isLive: _isLive,
-                            canSeek: _canSeek,
-                            seekUnavailableMessage:
-                                !_isLive &&
-                                    _duration > Duration.zero &&
-                                    _seekBlockedByTranscode
-                                ? AppLocalizations.of(
+                      // Error display
+                      if (_liveEndHold)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _liveEndReason ??
+                                      AppLocalizations.of(
+                                        context,
+                                      ).playerLiveStreamEnded,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  AppLocalizations.of(
                                     context,
-                                  ).playerSeekUnavailableTranscoding
-                                : null,
-                            currentPosition:
-                                _skipScrubPosition ?? _currentPosition,
-                            positionListenable: _displayPosition,
-                            duration: _duration,
-                            onPlayPause: _togglePlayPause,
-                            onSeek: _seekTo,
-                            onBack: _goBack,
-                            audioTracks: _audioTracks,
-                            subtitleTracks: _subtitleTracks,
-                            selectedAudioTrackId: _selectedAudioTrackId,
-                            selectedSubtitleTrackId: _selectedSubtitleTrackId,
-                            isAudioTrackSelectionKnown:
-                                _isAudioTrackSelectionKnown,
-                            isSubtitleTrackSelectionKnown:
-                                _isSubtitleTrackSelectionKnown,
-                            onAudioTrackSelected: _handleAudioTrackSelected,
-                            onSubtitleTrackSelected:
-                                _handleSubtitleTrackSelected,
-                            supportsHdrToggle: _supportsHdrToggle,
-                            hdrEnabled: _hdrEnabled,
-                            onHdrEnabledChanged: _handleHdrEnabledChanged,
-                            volume: _volume,
-                            onVolumeChanged: _isDesktop
-                                ? _handleVolumeChanged
-                                : null,
-                            isFullscreen:
-                                desktopFullscreen?.isFullscreen ?? false,
-                            onToggleFullscreen: desktopFullscreen == null
-                                ? null
-                                : () => unawaited(desktopFullscreen.toggle()),
-                            onTrackDialogVisibilityChanged:
-                                _handleTrackDialogVisibilityChanged,
-                            fallbackReason: _showPlaybackDiagnostics
-                                ? _fallbackReason
-                                : null,
-                            playPauseFocusNode: _controlsFocusNode,
-                            onNextChannel: widget.onNextChannel,
-                            onPreviousChannel: widget.onPreviousChannel,
-                            onEpisodePicker:
-                                _seriesInfo != null &&
-                                    pickableSeasons(_seriesInfo!).isNotEmpty
-                                ? _showEpisodePicker
-                                : null,
-                            onRecordNow:
-                                (_isLive &&
-                                    widget.onRecordProgram != null &&
-                                    _epgData?.current != null)
-                                ? () async {
-                                    setState(() => _dvrSchedulePending = true);
-                                    try {
-                                      await widget.onRecordProgram!(
-                                        _epgData!.current,
+                                  ).playerReturningToMenu,
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 14,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      if (_errorMessage != null)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  AppLocalizations.of(context).playerErrorTitle,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _errorMessage!,
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 14,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 6,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 24),
+                                AppButton(
+                                  focusNode: _errorButtonFocusNode,
+                                  autofocus: true,
+                                  icon: AppIcons.back(context),
+                                  label: AppLocalizations.of(
+                                    context,
+                                  ).playerGoBack,
+                                  variant: AppButtonVariant.primary,
+                                  onPressed: _goBack,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                      // Playback controls overlay
+                      if (_overlayVisible && _errorMessage == null)
+                        Positioned.fill(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.translucent,
+                            onTap: _hideOverlay,
+                            child: PlaybackControls(
+                              isPlaying: _isPlaying,
+                              isLive: _isLive,
+                              canSeek: _canSeek,
+                              seekUnavailableMessage:
+                                  !_isLive &&
+                                      _duration > Duration.zero &&
+                                      _seekBlockedByTranscode
+                                  ? AppLocalizations.of(
+                                      context,
+                                    ).playerSeekUnavailableTranscoding
+                                  : null,
+                              currentPosition:
+                                  _skipScrubPosition ?? _currentPosition,
+                              positionListenable: _displayPosition,
+                              duration: _duration,
+                              onPlayPause: _togglePlayPause,
+                              onSeek: _seekTo,
+                              onBack: _goBack,
+                              audioTracks: _audioTracks,
+                              subtitleTracks: _subtitleTracks,
+                              selectedAudioTrackId: _selectedAudioTrackId,
+                              selectedSubtitleTrackId: _selectedSubtitleTrackId,
+                              isAudioTrackSelectionKnown:
+                                  _isAudioTrackSelectionKnown,
+                              isSubtitleTrackSelectionKnown:
+                                  _isSubtitleTrackSelectionKnown,
+                              onAudioTrackSelected: _handleAudioTrackSelected,
+                              onSubtitleTrackSelected:
+                                  _handleSubtitleTrackSelected,
+                              onSearchOnlineSubtitles: _canSearchOnlineSubtitles
+                                  ? _showOnlineSubtitlePicker
+                                  : null,
+                              audioSyncOffset: _syncOffsets.audio,
+                              subtitleSyncOffset: _syncOffsets.subtitle,
+                              onAdjustAudioSync: _supportsSyncOffsets
+                                  ? () => _adjustSync(SyncOffsetKind.audio)
+                                  : null,
+                              onAdjustSubtitleSync: _supportsSyncOffsets
+                                  ? () => _adjustSync(SyncOffsetKind.subtitle)
+                                  : null,
+                              supportsHdrToggle: _supportsHdrToggle,
+                              hdrEnabled: _hdrEnabled,
+                              onHdrEnabledChanged: _handleHdrEnabledChanged,
+                              volume: _volume,
+                              onVolumeChanged: _isDesktop
+                                  ? _handleVolumeChanged
+                                  : null,
+                              isFullscreen:
+                                  desktopFullscreen?.isFullscreen ?? false,
+                              onToggleFullscreen: desktopFullscreen == null
+                                  ? null
+                                  : () => unawaited(desktopFullscreen.toggle()),
+                              onTrackDialogVisibilityChanged:
+                                  _handleTrackDialogVisibilityChanged,
+                              fallbackReason: _showPlaybackDiagnostics
+                                  ? _fallbackReason
+                                  : null,
+                              playPauseFocusNode: _controlsFocusNode,
+                              onNextChannel: widget.onNextChannel,
+                              onPreviousChannel: widget.onPreviousChannel,
+                              onEpisodePicker:
+                                  _seriesInfo != null &&
+                                      pickableSeasons(_seriesInfo!).isNotEmpty
+                                  ? _showEpisodePicker
+                                  : null,
+                              onRecordNow:
+                                  (_isLive &&
+                                      widget.onRecordProgram != null &&
+                                      _epgData?.current != null)
+                                  ? () async {
+                                      setState(
+                                        () => _dvrSchedulePending = true,
                                       );
-                                    } finally {
-                                      // Keep the overlay pinned for a moment
-                                      // so the user can see the stop icon
-                                      // appear (success) or the error SnackBar
-                                      // (failure) before the bar hides.
-                                      await Future<void>.delayed(
-                                        const Duration(seconds: 1),
-                                      );
-                                      if (mounted) {
-                                        setState(
-                                          () => _dvrSchedulePending = false,
+                                      try {
+                                        await widget.onRecordProgram!(
+                                          _epgData!.current,
                                         );
-                                        _scheduleOverlayHide();
+                                      } finally {
+                                        // Keep the overlay pinned for a moment
+                                        // so the user can see the stop icon
+                                        // appear (success) or the error SnackBar
+                                        // (failure) before the bar hides.
+                                        await Future<void>.delayed(
+                                          const Duration(seconds: 1),
+                                        );
+                                        if (mounted) {
+                                          setState(
+                                            () => _dvrSchedulePending = false,
+                                          );
+                                          _scheduleOverlayHide();
+                                        }
                                       }
                                     }
-                                  }
-                                : null,
-                            isRecording: widget.isRecordingCurrentChannel,
-                            skipPrompt: skipPrompt,
-                            upNextPrompt: upNextPrompt,
-                            showControlsBar: _hasStartedPlayback,
-                            // The EPG's programme end; the stream itself has
-                            // no length while live.
-                            liveProgrammeEnd: _isLive
-                                ? _epgData?.current.end.toLocal()
-                                : null,
+                                  : null,
+                              isRecording: widget.isRecordingCurrentChannel,
+                              skipPrompt: skipPrompt,
+                              upNextPrompt: upNextPrompt,
+                              showControlsBar: _hasStartedPlayback,
+                              // The EPG's programme end; the stream itself has
+                              // no length while live.
+                              liveProgrammeEnd: _isLive
+                                  ? _epgData?.current.end.toLocal()
+                                  : null,
+                            ),
                           ),
                         ),
-                      ),
 
-                    if (_showPlaybackDiagnostics &&
-                        _overlayVisible &&
-                        _errorMessage == null)
-                      Positioned(
-                        // Below the header row (back button height + gap),
-                        // so the clock and "Ends at" above it stay visible.
-                        top: overlayTop + 44.0 * fontScale + 12,
-                        right: mediaQuery.padding.right + edgePadding,
-                        child: PlaybackDiagnosticsPanel(
-                          compact: isCompact,
-                          width: diagnosticsWidth,
-                          fontScale: fontScale,
-                          activeBackend: widget.orchestrator.activeBackend,
-                          diagnostics: widget.orchestrator.diagnostics,
-                        ),
-                      ),
-
-                    // Hidden overlay tap area
-                    if (!_overlayVisible && _errorMessage == null)
-                      Positioned.fill(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: _showOverlay,
-                          child: const SizedBox.expand(),
-                        ),
-                      ),
-
-                    // EPG overlay (live only)
-                    if (_isLive && _epgData != null && _overlayVisible)
-                      Positioned(
-                        top: overlayTop,
-                        left: overlayLeft,
-                        width: overlayWidth,
-                        child: GestureDetector(
-                          onTap: _hideOverlay,
-                          child: EpgOverlay(
-                            currentTitle: _epgData!.current.displayTitle,
-                            currentProgress: _epgData!.progress,
-                            nextTitle: _epgData?.next?.displayTitle,
-                            channelName: widget.args.title,
-                            logoUrl: widget.args.logoUrl,
+                      if (_showPlaybackDiagnostics &&
+                          _overlayVisible &&
+                          _errorMessage == null)
+                        Positioned(
+                          // Below the header row (back button height + gap),
+                          // so the clock and "Ends at" above it stay visible.
+                          top: overlayTop + 44.0 * fontScale + 12,
+                          right: mediaQuery.padding.right + edgePadding,
+                          child: PlaybackDiagnosticsPanel(
+                            compact: isCompact,
+                            width: diagnosticsWidth,
+                            fontScale: fontScale,
+                            activeBackend: widget.orchestrator.activeBackend,
+                            diagnostics: widget.orchestrator.diagnostics,
                           ),
                         ),
-                      ),
 
-                    // "Now playing" overlay (VOD/series, including AIOStreams
-                    // on-demand content, which reuses the same 'vod'/'series'
-                    // types once resolved to a stream URL).
-                    if (!_isLive && _overlayVisible)
-                      Positioned(
-                        top: overlayTop,
-                        left: overlayLeft,
-                        width: overlayWidth,
-                        child: GestureDetector(
-                          onTap: _hideOverlay,
-                          child: NowPlayingOverlay(
-                            badgeLabel: _nowPlayingBadgeLabel(context),
-                            title: _nowPlayingTitle(),
-                            subtitle: _nowPlayingSubtitle(context),
-                            description: _nowPlayingDescription(),
+                      // Hidden overlay tap area
+                      if (!_overlayVisible && _errorMessage == null)
+                        Positioned.fill(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: _showOverlay,
+                            child: const SizedBox.expand(),
                           ),
                         ),
-                      ),
 
-                    // Comskip: brief auto-skip indicator (DVR recordings only)
-                    if (_skips.showComskipSkippedBadge)
-                      Positioned(
-                        top: edgePadding,
-                        left: edgePadding,
-                        child: ComskipSkippedBadge(
-                          label: AppLocalizations.of(
-                            context,
-                          ).playerCommercialSkipped,
+                      // EPG overlay (live only)
+                      if (_isLive && _epgData != null && _overlayVisible)
+                        Positioned(
+                          top: overlayTop,
+                          left: overlayLeft,
+                          width: overlayWidth,
+                          child: GestureDetector(
+                            onTap: _hideOverlay,
+                            child: EpgOverlay(
+                              currentTitle: _epgData!.current.displayTitle,
+                              currentProgress: _epgData!.progress,
+                              nextTitle: _epgData?.next?.displayTitle,
+                              channelName: widget.args.title,
+                              logoUrl: widget.args.logoUrl,
+                            ),
+                          ),
                         ),
-                      ),
 
-                    // Comskip/TheIntroDB skip prompt while the OSD is
-                    // hidden — e.g. TheIntroDB's initial one-time countdown,
-                    // which fires the moment a segment is entered regardless
-                    // of OSD state. Once the OSD is up, the very same prompt
-                    // instead renders inside [PlaybackControls] (see
-                    // `skipPrompt:` above) so it's reachable by D-pad
-                    // alongside the back button and seek bar — a `DpadRegion`
-                    // with `stop` edges otherwise can't be entered from an
-                    // external sibling widget like this one. Left/bottom
-                    // match `overlayEdgePadding` so it lines up with the
-                    // controls' own back-button corner once the OSD appears.
-                    if (!_overlayVisible && skipPrompt != null)
-                      Positioned(
-                        left: edgePadding,
-                        bottom: edgePadding,
-                        child: skipPrompt,
-                      ),
+                      // "Now playing" overlay (VOD/series, including AIOStreams
+                      // on-demand content, which reuses the same 'vod'/'series'
+                      // types once resolved to a stream URL).
+                      if (!_isLive && _overlayVisible)
+                        Positioned(
+                          top: overlayTop,
+                          left: overlayLeft,
+                          width: overlayWidth,
+                          child: GestureDetector(
+                            onTap: _hideOverlay,
+                            child: NowPlayingOverlay(
+                              badgeLabel: _nowPlayingBadgeLabel(context),
+                              title: _nowPlayingTitle(),
+                              subtitle: _nowPlayingSubtitle(context),
+                              description: _nowPlayingDescription(),
+                            ),
+                          ),
+                        ),
 
-                    // The "up next" card renders inside [PlaybackControls]
-                    // (see `upNextPrompt:` above) - never as a bare sibling -
-                    // so it sits in the same DpadRegion as the transport bar
-                    // and is reachable / focusable by the remote. `_checkUpNext`
-                    // force-shows the OSD so that path is always live while the
-                    // card is up.
+                      // Comskip: brief auto-skip indicator (DVR recordings only)
+                      if (_skips.showComskipSkippedBadge)
+                        Positioned(
+                          top: edgePadding,
+                          left: edgePadding,
+                          child: ComskipSkippedBadge(
+                            label: AppLocalizations.of(
+                              context,
+                            ).playerCommercialSkipped,
+                          ),
+                        ),
+
+                      // Comskip/TheIntroDB skip prompt while the OSD is
+                      // hidden — e.g. TheIntroDB's initial one-time countdown,
+                      // which fires the moment a segment is entered regardless
+                      // of OSD state. Once the OSD is up, the very same prompt
+                      // instead renders inside [PlaybackControls] (see
+                      // `skipPrompt:` above) so it's reachable by D-pad
+                      // alongside the back button and seek bar — a `DpadRegion`
+                      // with `stop` edges otherwise can't be entered from an
+                      // external sibling widget like this one. Left/bottom
+                      // match `overlayEdgePadding` so it lines up with the
+                      // controls' own back-button corner once the OSD appears.
+                      if (!_overlayVisible && skipPrompt != null)
+                        Positioned(
+                          left: edgePadding,
+                          bottom: edgePadding,
+                          child: skipPrompt,
+                        ),
+
+                      // The "up next" card renders inside [PlaybackControls]
+                      // (see `upNextPrompt:` above) - never as a bare sibling -
+                      // so it sits in the same DpadRegion as the transport bar
+                      // and is reachable / focusable by the remote. `_checkUpNext`
+                      // force-shows the OSD so that path is always live while the
+                      // card is up.
+                    ],
                   ],
                 );
               },

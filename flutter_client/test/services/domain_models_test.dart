@@ -505,6 +505,93 @@ void main() {
     });
   });
 
+  group('ContentRequestSearchResult providers (#137)', () {
+    MediaRequestSummary request({int? integrationId}) => MediaRequestSummary(
+      id: 1,
+      type: 'movie',
+      title: 'The Matrix',
+      status: MediaRequestStatus.approved,
+      externalId: '603',
+      integrationId: integrationId,
+    );
+    const active = <MediaRequestStatus>{MediaRequestStatus.approved};
+
+    test('parses each provider with its own availability and seasons', () {
+      final result = ContentRequestSearchResult.fromJson(<String, Object?>{
+        'type': 'series',
+        'external_id': '81189',
+        'integration_id': 2,
+        'integration_name': 'Sonarr UHD',
+        'title': 'Breaking Bad',
+        'providers': [
+          {
+            'integration_id': 1,
+            'integration_name': 'Sonarr HD',
+            'already_available': true,
+            'seasons': [
+              {'season_number': 1, 'has_file': true},
+            ],
+          },
+          {
+            'integration_id': 2,
+            'integration_name': 'Sonarr UHD',
+            'already_available': false,
+            'seasons': [
+              {'season_number': 1, 'has_file': false},
+            ],
+          },
+        ],
+      });
+
+      expect(result.providers.map((p) => p.integrationName), [
+        'Sonarr HD',
+        'Sonarr UHD',
+      ]);
+      expect(result.providers.first.alreadyAvailable, isTrue);
+      expect(result.providers.first.seasons.single.hasFile, isTrue);
+      expect(result.providers.last.seasons.single.hasFile, isFalse);
+    });
+
+    test('falls back to the top-level integration from older editors', () {
+      final result = ContentRequestSearchResult.fromJson(<String, Object?>{
+        'type': 'movie',
+        'external_id': '603',
+        'integration_id': 5,
+        'integration_name': 'Radarr',
+        'title': 'The Matrix',
+        'already_available': true,
+      });
+
+      final provider = result.providers.single;
+      expect(provider.integrationId, 5);
+      expect(provider.integrationName, 'Radarr');
+      expect(provider.alreadyAvailable, isTrue);
+    });
+
+    test('matches requests to their integration; legacy requests to all', () {
+      const result = ContentRequestSearchResult(
+        type: 'movie',
+        externalId: '603',
+        integrationId: 1,
+        integrationName: 'Radarr HD',
+        title: 'The Matrix',
+        providers: [
+          ContentRequestProvider(integrationId: 1, integrationName: 'HD'),
+          ContentRequestProvider(integrationId: 2, integrationName: 'UHD'),
+        ],
+      );
+
+      final onUhd = [request(integrationId: 2)];
+      expect(
+        result.requestableProviders(onUhd, active).single.integrationId,
+        1,
+      );
+
+      final legacy = [request()];
+      expect(result.requestableProviders(legacy, active), isEmpty);
+    });
+  });
+
   group('ContentRequestSearchResult.fromJson TMDB enrichment fields', () {
     test('parses clearlogo, cast_list, and director', () {
       final result = ContentRequestSearchResult.fromJson(<String, Object?>{

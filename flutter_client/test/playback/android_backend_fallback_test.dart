@@ -3,12 +3,19 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:m3u_tv/playback/android_mpv_backend.dart';
 import 'package:m3u_tv/playback/android_playback_adapter.dart';
 import 'package:m3u_tv/playback/android_tv_player_overlay.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 
 void main() {
+  test('Android mpv has no HDR toggle: HDR stays on, on a TV', () {
+    TestWidgetsFlutterBinding.ensureInitialized();
+
+    expect(AndroidMpvBackend(), isNot(isA<HdrToggleProvider>()));
+  });
+
   group('MethodChannelAndroidMedia3Host', () {
     const channel = MethodChannel('m3u_tv/android_media3_test');
 
@@ -558,8 +565,17 @@ class _FakeAndroidMedia3Host implements AndroidMedia3Host {
       commands.add('setSubtitleTrack:$trackId');
 
   @override
+  Future<void> addExternalSubtitle(ExternalSubtitle subtitle) async {}
+
+  @override
   Future<void> setPlaybackSpeed(double speed) async =>
       commands.add('setPlaybackSpeed:$speed');
+
+  @override
+  Future<void> setSyncOffset({
+    required String property,
+    required int milliseconds,
+  }) async => commands.add('setSyncOffset:$property:$milliseconds');
 
   @override
   Future<void> setVolume(double volume) async =>

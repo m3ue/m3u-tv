@@ -716,6 +716,12 @@ abstract class AppLocalizations {
   /// **'Start from Beginning'**
   String get playerStartFromBeginning;
 
+  /// No description provided for @playerPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get playerPlay;
+
   /// No description provided for @playerResume.
   ///
   /// In en, this message translates to:
@@ -905,7 +911,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsIntegrationsSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Trakt and more'**
+  /// **'SIMKL, TheIntroDB, and more'**
   String get settingsIntegrationsSubtitle;
 
   /// No description provided for @settingsAppearance.
@@ -929,7 +935,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsPlaybackSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Proxy and DVR'**
+  /// **'Player, proxy, and DVR'**
   String get settingsPlaybackSubtitle;
 
   /// No description provided for @settingsReleaseNotesSubtitle.
@@ -1562,6 +1568,18 @@ abstract class AppLocalizations {
   /// **'Update available: {version}'**
   String settingsAppUpdateAvailable(String version);
 
+  /// No description provided for @settingsAppUpdateNoticeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App update available'**
+  String get settingsAppUpdateNoticeTitle;
+
+  /// No description provided for @settingsAppUpdateNoticeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} is ready to install.'**
+  String settingsAppUpdateNoticeBody(String version);
+
   /// No description provided for @settingsAppViewRelease.
   ///
   /// In en, this message translates to:
@@ -2186,11 +2204,95 @@ abstract class AppLocalizations {
   /// **'Connected to Trakt'**
   String get traktConnected;
 
+  /// No description provided for @traktConnectedAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to Trakt as {account}'**
+  String traktConnectedAs(String account);
+
   /// No description provided for @traktDisconnectButton.
   ///
   /// In en, this message translates to:
   /// **'Disconnect Trakt'**
   String get traktDisconnectButton;
+
+  /// No description provided for @traktName.
+  ///
+  /// In en, this message translates to:
+  /// **'Trakt'**
+  String get traktName;
+
+  /// No description provided for @simklName.
+  ///
+  /// In en, this message translates to:
+  /// **'Simkl'**
+  String get simklName;
+
+  /// No description provided for @serverWatchHistoryActive.
+  ///
+  /// In en, this message translates to:
+  /// **'M3U Editor sends this login\'s watch progress to {service}.'**
+  String serverWatchHistoryActive(String service);
+
+  /// No description provided for @serverWatchHistoryActiveAs.
+  ///
+  /// In en, this message translates to:
+  /// **'M3U Editor sends this login\'s watch progress to {service} as {account}.'**
+  String serverWatchHistoryActiveAs(String service, String account);
+
+  /// No description provided for @serverWatchHistoryOverrideHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect here to use your own {service} account on this device instead.'**
+  String serverWatchHistoryOverrideHint(String service);
+
+  /// No description provided for @serverWatchHistoryOverridden.
+  ///
+  /// In en, this message translates to:
+  /// **'This device sends its playback to the account connected here instead. Disconnect to use the server account instead.'**
+  String get serverWatchHistoryOverridden;
+
+  /// No description provided for @simklConnectPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect your Simkl account to automatically track what you watch.'**
+  String get simklConnectPrompt;
+
+  /// No description provided for @simklConnectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect with Simkl'**
+  String get simklConnectButton;
+
+  /// No description provided for @simklConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to Simkl'**
+  String get simklConnected;
+
+  /// No description provided for @simklConnectedAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to Simkl as {account}'**
+  String simklConnectedAs(String account);
+
+  /// No description provided for @simklDisconnectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect Simkl'**
+  String get simklDisconnectButton;
+
+  /// No description provided for @simklNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Simkl client ID is not configured.'**
+  String get simklNotConfigured;
+
+  /// No description provided for @simklNotConfiguredHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Register an app at simkl.com/settings/developer and set the client ID via --dart-define=SIMKL_CLIENT_ID.'**
+  String get simklNotConfiguredHint;
 
   /// No description provided for @vodAllMovies.
   ///
@@ -3314,6 +3416,30 @@ abstract class AppLocalizations {
   /// **'Spotlight'**
   String get settingsHomeScreenStyleRich;
 
+  /// No description provided for @settingsSectionPlayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Player'**
+  String get settingsSectionPlayer;
+
+  /// No description provided for @settingsVodPlayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Movies and series player'**
+  String get settingsVodPlayer;
+
+  /// No description provided for @settingsVodPlayerExoPlayerFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Try ExoPlayer first'**
+  String get settingsVodPlayerExoPlayerFirst;
+
+  /// No description provided for @settingsVodPlayerMpv.
+  ///
+  /// In en, this message translates to:
+  /// **'Use mpv'**
+  String get settingsVodPlayerMpv;
+
   /// No description provided for @settingsHdrMode.
   ///
   /// In en, this message translates to:
@@ -3349,6 +3475,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.'**
   String get settingsDeinterlaceHint;
+
+  /// No description provided for @settingsBackgroundAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Background audio'**
+  String get settingsBackgroundAudio;
+
+  /// No description provided for @settingsBackgroundAudioHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep playing audio, with playback controls on the lock screen and in notifications, when you leave the app or lock the screen.'**
+  String get settingsBackgroundAudioHint;
 
   /// No description provided for @settingsPrebufferLive.
   ///
@@ -3422,6 +3560,18 @@ abstract class AppLocalizations {
   /// **'Display size'**
   String get settingsFontSize;
 
+  /// No description provided for @settingsFontSizeVerySmall.
+  ///
+  /// In en, this message translates to:
+  /// **'Very Small'**
+  String get settingsFontSizeVerySmall;
+
+  /// No description provided for @settingsFontSizeSmall.
+  ///
+  /// In en, this message translates to:
+  /// **'Small'**
+  String get settingsFontSizeSmall;
+
   /// No description provided for @settingsFontSizeNormal.
   ///
   /// In en, this message translates to:
@@ -3487,6 +3637,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Device details and this session\'s logs, for troubleshooting'**
   String get settingsLogsDiagnosticsSubtitle;
+
+  /// No description provided for @settingsPlaybackDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Show playback diagnostics'**
+  String get settingsPlaybackDiagnostics;
+
+  /// No description provided for @settingsPlaybackDiagnosticsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the active player and why it switched in the player\'s controls, for troubleshooting.'**
+  String get settingsPlaybackDiagnosticsHint;
 
   /// No description provided for @diagnosticsUpload.
   ///
@@ -3613,6 +3775,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Off'**
   String get playerTrackSubtitlesOff;
+
+  /// No description provided for @playerOnlineSubtitlesSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search online'**
+  String get playerOnlineSubtitlesSearch;
+
+  /// No description provided for @playerOnlineSubtitlesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Online subtitles'**
+  String get playerOnlineSubtitlesTitle;
+
+  /// No description provided for @playerOnlineSubtitlesSearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching for subtitles…'**
+  String get playerOnlineSubtitlesSearching;
+
+  /// No description provided for @playerOnlineSubtitlesLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading subtitle…'**
+  String get playerOnlineSubtitlesLoading;
+
+  /// No description provided for @playerOnlineSubtitlesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No subtitles found for this title.'**
+  String get playerOnlineSubtitlesEmpty;
+
+  /// No description provided for @playerOnlineSubtitlesFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load subtitles. Check your connection and try again.'**
+  String get playerOnlineSubtitlesFailed;
+
+  /// No description provided for @playerOnlineSubtitlesRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get playerOnlineSubtitlesRetry;
+
+  /// No description provided for @playerOnlineSubtitlesAllLanguages.
+  ///
+  /// In en, this message translates to:
+  /// **'All languages'**
+  String get playerOnlineSubtitlesAllLanguages;
+
+  /// No description provided for @settingsOnlineSubtitles.
+  ///
+  /// In en, this message translates to:
+  /// **'Online subtitles'**
+  String get settingsOnlineSubtitles;
+
+  /// No description provided for @settingsOnlineSubtitlesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Find subtitles for movies and episodes from the player\'s subtitle menu.'**
+  String get settingsOnlineSubtitlesSubtitle;
+
+  /// No description provided for @settingsOnlineSubtitlesAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle source'**
+  String get settingsOnlineSubtitlesAddress;
+
+  /// No description provided for @settingsOnlineSubtitlesAddressHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Stremio subtitle add-on address'**
+  String get settingsOnlineSubtitlesAddressHint;
+
+  /// No description provided for @settingsOnlineSubtitlesAddressInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid http or https address.'**
+  String get settingsOnlineSubtitlesAddressInvalid;
+
+  /// No description provided for @settingsOnlineSubtitlesUseDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Use default'**
+  String get settingsOnlineSubtitlesUseDefault;
 
   /// No description provided for @playerHdrOn.
   ///
@@ -4112,6 +4358,12 @@ abstract class AppLocalizations {
   /// **'Reorder or hide sections in the nav and on Home'**
   String get settingsNavLayoutSubtitle;
 
+  /// No description provided for @settingsManagedByServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Managed by your server. Ask your admin to change it.'**
+  String get settingsManagedByServer;
+
   /// No description provided for @settingsNavLayoutHintRemote.
   ///
   /// In en, this message translates to:
@@ -4153,6 +4405,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reset'**
   String get settingsNavLayoutResetConfirm;
+
+  /// No description provided for @dvrStatusProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing'**
+  String get dvrStatusProcessing;
+
+  /// No description provided for @dvrStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get dvrStatusCompleted;
+
+  /// No description provided for @dvrStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get dvrStatusCancelled;
+
+  /// No description provided for @dvrFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get dvrFilterAll;
+
+  /// No description provided for @dvrFilterWithCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} ({count})'**
+  String dvrFilterWithCount(String label, int count);
+
+  /// No description provided for @dvrFilterEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No recordings match this filter'**
+  String get dvrFilterEmpty;
+
+  /// No description provided for @dvrSortButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort: {option}'**
+  String dvrSortButton(String option);
+
+  /// No description provided for @dvrSortDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort recordings'**
+  String get dvrSortDialogTitle;
+
+  /// No description provided for @dvrSortNewest.
+  ///
+  /// In en, this message translates to:
+  /// **'Newest first'**
+  String get dvrSortNewest;
+
+  /// No description provided for @dvrSortOldest.
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest first'**
+  String get dvrSortOldest;
+
+  /// No description provided for @dvrSortTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title (A-Z)'**
+  String get dvrSortTitle;
+
+  /// No description provided for @dvrLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your recordings. The server returned an error.'**
+  String get dvrLoadError;
+
+  /// No description provided for @dvrLoadOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t reach your server. Check your connection and try again.'**
+  String get dvrLoadOffline;
+
+  /// No description provided for @dvrLoadPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Some older recordings couldn\'t be loaded.'**
+  String get dvrLoadPartial;
+
+  /// No description provided for @dvrLoadRefreshFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t refresh your recordings. Showing the last list loaded.'**
+  String get dvrLoadRefreshFailed;
+
+  /// No description provided for @dvrRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get dvrRetry;
+
+  /// No description provided for @requestsProviderHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Request from'**
+  String get requestsProviderHeading;
+
+  /// No description provided for @playerAudioSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio sync'**
+  String get playerAudioSync;
+
+  /// No description provided for @playerSubtitleSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle sync'**
+  String get playerSubtitleSync;
+
+  /// No description provided for @playerSyncRow.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}: {value}'**
+  String playerSyncRow(String label, String value);
+
+  /// No description provided for @playerSyncMilliseconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} ms'**
+  String playerSyncMilliseconds(String value);
+
+  /// No description provided for @playerSyncSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} s'**
+  String playerSyncSeconds(String value);
+
+  /// No description provided for @playerSyncReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get playerSyncReset;
+
+  /// No description provided for @playerSyncDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get playerSyncDone;
+
+  /// No description provided for @playerAudioSyncHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Plus delays the audio, minus plays it earlier. Saved for this channel or title.'**
+  String get playerAudioSyncHint;
+
+  /// No description provided for @playerSubtitleSyncHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Plus delays the subtitles, minus shows them earlier. Saved for this channel or title.'**
+  String get playerSubtitleSyncHint;
+
+  /// No description provided for @carPlayFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get carPlayFavorites;
+
+  /// No description provided for @carPlayNoFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'No favorite channels yet'**
+  String get carPlayNoFavorites;
+
+  /// No description provided for @carPlayNoFavoritesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite channels in M3U TV on your iPhone to see them here.'**
+  String get carPlayNoFavoritesHint;
+
+  /// No description provided for @carPlaySignInHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Open M3U TV on your iPhone to sign in.'**
+  String get carPlaySignInHint;
 }
 
 class _AppLocalizationsDelegate
