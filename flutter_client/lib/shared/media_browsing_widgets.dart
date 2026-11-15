@@ -1587,7 +1587,7 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
                       ),
                       itemBuilder: (context, index) {
                         if (index == visibleCount) {
-                          return _PreviewViewAllCard(
+                          return PreviewActionCard(
                             item: viewAll!,
                             width: widget.itemBuilder != null
                                 ? customCardWidth
@@ -1703,11 +1703,20 @@ class _PreviewCardSkeleton extends StatelessWidget {
 
 /// [MediaPreviewSection.viewAll]: an icon and label centered on a card the
 /// size of the row's others.
-class _PreviewViewAllCard extends StatelessWidget {
-  const _PreviewViewAllCard({required this.item, required this.width});
+/// A card that leads somewhere rather than showing a title: a row's View all,
+/// or a one-card entry row (DVR, AIOStreams). An icon and a label on a
+/// faint wash of the theme colour, so it reads apart from the artwork cards.
+class PreviewActionCard extends StatelessWidget {
+  const PreviewActionCard({
+    super.key,
+    required this.item,
+    required this.width,
+    this.autofocus = false,
+  });
 
   final MediaPreviewItem item;
   final double width;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -1715,53 +1724,78 @@ class _PreviewViewAllCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final scale = FontSizeScope.scaleOf(context);
     final subtitle = item.subtitle;
+    final radius = BorderRadius.circular(MediaBrowsingMetrics.cardRadius);
+    final primary = colorScheme.primary;
+    final base = colorScheme.surfaceContainerHigh;
     final card = SizedBox(
       width: width,
       child: DpadInkWell(
         onTap: item.onTap,
-        color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
-        child: Padding(
-          padding: const EdgeInsets.all(MediaBrowsingMetrics.chipGap),
-          child: Center(
-            // Scales down rather than overflowing the shorter Live TV tiles
-            // at large font sizes.
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.all(12 * scale),
-                      child: Icon(
-                        item.fallbackIcon,
-                        size: 28 * scale,
-                        color: colorScheme.onSurface,
+        autofocus: autofocus,
+        color: base,
+        borderRadius: radius,
+        // Ink, so the press ripple still shows over the wash.
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color.alphaBlend(primary.withValues(alpha: 0.18), base),
+                base,
+              ],
+            ),
+            border: Border.all(color: primary.withValues(alpha: 0.18)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(MediaBrowsingMetrics.chipGap),
+            child: Center(
+              // Scales down rather than overflowing the shorter Live TV tiles
+              // at large font sizes.
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: primary.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: primary.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(12 * scale),
+                        child: Icon(
+                          item.fallbackIcon,
+                          size: 28 * scale,
+                          color: Color.alphaBlend(
+                            primary.withValues(alpha: 0.55),
+                            colorScheme.onSurface,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: MediaBrowsingMetrics.chipGap),
-                  Text(
-                    item.title,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: MediaBrowsingMetrics.chipGap),
                     Text(
-                      subtitle,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                      item.title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),

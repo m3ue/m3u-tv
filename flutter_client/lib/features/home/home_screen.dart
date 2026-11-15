@@ -1669,21 +1669,29 @@ class _EntryPointRow extends StatelessWidget {
       icon: icon,
       artworkUrls: artworkUrls,
     );
-    return MediaPreviewSection(
+    final item = MediaPreviewItem(
+      title: cardTitle,
+      subtitle: subtitle,
+      fallbackIcon: icon,
+      onTap: onTap,
+      onFocused: spotlight == null ? null : () => spotlight.select(target),
+      onHoverChanged: spotlight?.hoverHandler(target),
+    );
+    // Styled like a View all card: it opens a section, it isn't a title.
+    return MediaPreviewSection.builder(
       title: title,
       titleIcon: icon,
       // Never shown: the row always has its one card.
       emptyLabel: subtitle,
-      items: [
-        MediaPreviewItem(
-          title: cardTitle,
-          subtitle: subtitle,
-          fallbackIcon: icon,
-          onTap: onTap,
-          onFocused: spotlight == null ? null : () => spotlight.select(target),
-          onHoverChanged: spotlight?.hoverHandler(target),
-        ),
-      ],
+      itemCount: 1,
+      baseCardWidth: MediaBrowsingMetrics.previewCardWidth,
+      baseCardHeight: MediaBrowsingMetrics.previewCardHeight,
+      itemBuilder: (context, index, size, {required autofocus}) =>
+          PreviewActionCard(
+            item: item,
+            width: size.width,
+            autofocus: autofocus,
+          ),
       useSidebarLayout: useSidebarLayout,
       onSidebarActivate: onSidebarActivate,
     );

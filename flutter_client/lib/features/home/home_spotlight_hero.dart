@@ -440,7 +440,8 @@ class _SpotlightBackground extends StatefulWidget {
 }
 
 class _SpotlightBackgroundState extends State<_SpotlightBackground> {
-  Color? _tone;
+  /// The art's raw swatch; [build] shapes it into the wash tone.
+  Color? _swatch;
   String? _toneUrl;
 
   @override
@@ -464,14 +465,14 @@ class _SpotlightBackgroundState extends State<_SpotlightBackground> {
     // than flashing to nothing.) Called from initState/didUpdateWidget, so
     // the build that follows picks this up without a setState.
     if (url == null) {
-      _tone = null;
+      _swatch = null;
       return;
     }
     unawaited(
       resolveDominantBackdropColor(url).then((color) {
         // Keep the previous tone on failure rather than snapping to black.
         if (!mounted || _toneUrl != url || color == null) return;
-        setState(() => _tone = deepBackdropTone(color));
+        setState(() => _swatch = color);
       }),
     );
   }
@@ -488,16 +489,17 @@ class _SpotlightBackgroundState extends State<_SpotlightBackground> {
         spotlight.backdropUrl == null &&
         crests.isEmpty &&
         (spotlight.artworkUrls.isNotEmpty || spotlight.icon != null);
-    // Icon-only cards have no image to take a tone from; glow in the theme
-    // colour so the hero isn't left bare.
-    final tone =
-        _tone ??
+    // A showcase has no backdrop to carry the hero, so its wash is the
+    // brighter (vivid) tone. Icon-only cards have no image to take one from
+    // and glow in the theme colour instead.
+    final swatch =
+        _swatch ??
         (showcase && spotlight.toneUrl == null
-            ? deepBackdropTone(
-                Theme.of(context).colorScheme.primary,
-                vivid: true,
-              )
+            ? Theme.of(context).colorScheme.primary
             : null);
+    final tone = swatch == null
+        ? null
+        : deepBackdropTone(swatch, vivid: showcase);
     final backdrop = RepaintBoundary(
       child: _EdgeFade(
         child: _CrossfadeBackdrop(
@@ -576,10 +578,16 @@ class _SpotlightBackgroundState extends State<_SpotlightBackground> {
               child: FractionallySizedBox(
                 widthFactor: 0.6,
                 child: IgnorePointer(
-                  child: _SpotlightShowcase(
-                    key: ValueKey(spotlight.key),
-                    spotlight: spotlight,
-                    height: crestHeight,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _ShowcasePool(color: tone),
+                      _SpotlightShowcase(
+                        key: ValueKey(spotlight.key),
+                        spotlight: spotlight,
+                        height: crestHeight,
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -637,6 +645,46 @@ class _SpotlightCrests extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A soft pool of the art's colour behind a showcase, lifting the fanned
+/// cards or emblem off the dark wash. Lighter than the wash itself so the
+/// two read as depth rather than one flat tint.
+class _ShowcasePool extends StatelessWidget {
+  const _ShowcasePool({required this.color});
+
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final target = color == null
+        ? Colors.transparent
+        : HSLColor.fromColor(color!)
+              .withLightness(
+                (HSLColor.fromColor(color!).lightness + 0.14).clamp(0.0, 0.5),
+              )
+              .toColor();
+    return TweenAnimationBuilder<Color?>(
+      tween: ColorTween(end: target),
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeOut,
+      builder: (context, pool, _) {
+        final glow = pool ?? Colors.transparent;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              colors: [
+                glow.withValues(alpha: glow.a * 0.6),
+                glow.withValues(alpha: glow.a * 0.22),
+                glow.withValues(alpha: 0),
+              ],
+              stops: const [0, 0.5, 1],
+            ),
+          ),
+        );
+      },
     );
   }
 }
