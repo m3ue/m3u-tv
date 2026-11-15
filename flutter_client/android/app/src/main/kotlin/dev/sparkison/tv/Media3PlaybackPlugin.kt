@@ -1019,20 +1019,27 @@ class Media3PlaybackPlugin(
             val customColors = state != null &&
                 !(state.captionTextColor == "white" &&
                     state.captionBackgroundColor == "black")
+            // Pop-on multi-row ads emit one Cue per row (separate CueBuilder
+            // per PAC row). Pinning every cue to line=1f stacks them on top
+            // of each other -- only edge-pin a single cue; multi-cue groups
+            // keep the decoder's distinct rows.
+            val pinToEdge = cueGroup.cues.count { it.text != null } <= 1
             val cues = cueGroup.cues.map { cue ->
                 var builder = cue.buildUpon()
-                if (top) {
-                    // Pin the cue's top edge to the top of the frame.
-                    builder = builder
-                        .setLine(0f, Cue.LINE_TYPE_FRACTION)
-                        .setLineAnchor(Cue.ANCHOR_TYPE_START)
-                } else {
-                    // Pin the cue's bottom edge to the bottom of the frame.
-                    // Without this the decoder's own row placement often
-                    // lands mid-screen ("just below center").
-                    builder = builder
-                        .setLine(1f, Cue.LINE_TYPE_FRACTION)
-                        .setLineAnchor(Cue.ANCHOR_TYPE_END)
+                if (pinToEdge) {
+                    if (top) {
+                        // Pin the cue's top edge to the top of the frame.
+                        builder = builder
+                            .setLine(0f, Cue.LINE_TYPE_FRACTION)
+                            .setLineAnchor(Cue.ANCHOR_TYPE_START)
+                    } else {
+                        // Pin the cue's bottom edge to the bottom of the frame.
+                        // Without this the decoder's own row placement often
+                        // lands mid-screen ("just below center").
+                        builder = builder
+                            .setLine(1f, Cue.LINE_TYPE_FRACTION)
+                            .setLineAnchor(Cue.ANCHOR_TYPE_END)
+                    }
                 }
                 // CEA-608 carries its own start column and left/center/right
                 // justification per caption, so horizontal placement varies
