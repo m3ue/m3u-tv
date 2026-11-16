@@ -754,9 +754,11 @@ void main() {
           expect(upcoming.channel.streamUrl, isNotEmpty);
           expect(onNow.programme?.progress, isNotNull);
           expect(upcoming.programme?.progress, isNull);
+          // timeLabel may prefix "Tomorrow " when now+1h rolls past midnight
+          // (CI runs near 23:00 UTC), so match the time as a suffix.
           expect(
             upcoming.programme?.timeLabel,
-            DateFormat.jm('en').format(futureStart),
+            endsWith(DateFormat.jm('en').format(futureStart)),
           );
         },
       );
