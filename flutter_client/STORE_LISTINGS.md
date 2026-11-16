@@ -8,12 +8,16 @@ Last reviewed against: **v1.3.0** (2026-11-10). Store artwork is generated separ
 
 - **No em or en dashes.** Use a plain hyphen, a colon or a comma.
 - **Every listing says the app has no content.** Both Apple and Google reject "IPTV player" apps that look like they supply streams. Keep the "does not include any channels or content" line in every description.
-- **Apple only:**
-  - Never mention **AIOStreams** (Apple reviewers use it as a rejection keyword).
-  - Never mention other platforms (Android, Google TV, Windows, Linux). Guideline 2.3.10 forbids it, and the old copy did it.
+- **Apple and Google Play:**
+  - Never mention **AIOStreams** (Apple reviewers use it as a rejection keyword, and it reads as an add-on aggregator to Google's IP policy checks).
+  - Never mention other platforms. Apple guideline 2.3.10 forbids it, and on Google Play it only adds noise.
   - Say "Xtream API", never "Xtream Codes" (the name of a service that was shut down for piracy).
+  - Screenshots, previews and header art come only from the demo server (Blender open movies, public-domain films, generated test channels). Never real studio posters, network logos or provider channel names. Apple rejected v1.2.3 under 5.2.1 for exactly this, and on Google Play it is the main signal for IP policy takedowns of "IPTV" apps.
+- **Google Play only:**
+  - Lead with "self-hosted media server", not IPTV. Leave "IPTV" and "Xtream" out of the short and full descriptions entirely: Google Play has been removing IPTV players and suspending developer accounts, and keyword matches are how they get flagged.
+  - Release notes follow the same rules.
+- **Apple only:**
   - Leave "IPTV" and "Xtream" out of the keywords field. Both are fine in context in the description.
-  - Screenshots, previews and header art come only from the demo server (Blender open movies, public-domain films, generated test channels): the `tvos*`, `ios*`, `ipados*` and `macos*` sets in `screenshots/app-screenshots/`. Never real studio posters, network logos or provider channel names. Apple rejected v1.2.3 under 5.2.1 for exactly this.
   - The Support URL must be a real support page, not an issue tracker (rejected under 1.5).
 - **Trakt:** the app syncs **watch history** only. Don't claim watchlist or collection sync.
 - **CarPlay and Android Auto:** write them exactly so (Apple's and Google's names), and keep each to its own store: CarPlay only in the iOS listing and Apple notes, Android Auto only on Google Play.
@@ -368,38 +372,42 @@ M3U TV
 ### Short description (80)
 
 ```
-Self-hosted Live TV, guide, DVR, VOD and AIOStreams client for M3U Editor
+Live TV, guide, DVR, movies and series from your own self-hosted media server
 ```
 
 ### Full description (4000)
 
 ```
-M3U TV is the Android TV, Google TV and Android app for M3U Editor, the open-source, self-hosted platform for managing your IPTV playlists, guides and media. Connect it to your own M3U Editor server and your live channels, movies, series and AIOStreams catalogs come together in one fast, D-pad first interface, with full touch support on phones and tablets.
+M3U TV is the Android TV, Google TV and Android app for M3U Editor, the open-source, self-hosted media server. Connect it to your own M3U Editor server and your live channels, recordings, movies and series come together in one fast interface built for the remote, with full touch support on phones and tablets.
 
 M3U TV does not include any channels, playlists or content. You need your own M3U Editor server and your own lawful sources.
 
 HOME
 • Continue Watching with Up Next episodes, so you can pick up right where you left off.
 • Optional Spotlight home: a full-screen hero with artwork and title logos above your rows.
-• Favorites and quick rows, a choice of start screen, and a nav and Home you can reorder or trim.
+• Favorites and quick rows for Live TV, movies and series. Choose which screen the app opens on.
+• Reorder the nav and Home rows, and hide the sections you don't use.
 
 LIVE TV AND GUIDE
-• A multi-day timeline guide built for D-pad remotes, with a live preview that carries into full screen.
+• A multi-day timeline guide built for the remote, with an optional live preview player.
+• On Now and Upcoming views with station logos.
+• Guide previews carry into full screen without restarting the stream.
 • Catchup playback with seeking on channels that support it.
 • Multiview: watch several channels at once.
-• Pause live TV, and pick back up at the live point after a longer break.
-• Works with Xtream API and standard M3U playlists served by M3U Editor.
+• Pause live TV, and jump back to live after a longer break.
+• Custom channel sorting, favorites-first ordering and grid or list layouts.
 
 SPORTS
 • See each day's games with live scores, for the leagues your server is set up for.
 • Find which of your own channels is showing a game, and start it in one press.
 • Game details with the score by period, key moments and team stats.
 • Follow your teams, with My Teams and a Sports row on Home.
-• Needs M3U Editor 0.14.1+ with Sports turned on.
+• Needs M3U Editor 0.14.1 or later with Sports turned on.
 
 DVR
 • Record a single airing or a whole series straight from the guide or search.
-• Your whole recordings library, with status filters, sorting and storage usage at a glance.
+• Watch, cancel and delete recordings, and see storage usage at a glance.
+• Your whole recordings library, with status filters and sorting.
 • Automatic commercial skipping on recordings that support it.
 
 MOVIES AND SERIES
@@ -409,38 +417,32 @@ MOVIES AND SERIES
 • Sort by recently added, recently updated, title and more.
 • Request new movies and shows through your server, from the service you choose.
 
-AIOSTREAMS
-• Browse and search your AIOStreams catalogs next to your library, with full detail pages and Continue Watching.
-
 SEARCH
-• One search across channels, guide listings, movies, series and catalogs.
+• One search across channels, guide listings, movies and series.
 
 PLAYBACK
 • ExoPlayer (Media3) with an automatic mpv fallback, or mpv first for movies and series.
-• True HDR playback on supported TVs and devices, and picture-in-picture on phones and tablets.
-• Background audio on phones and tablets, with notification and lock screen controls.
-• Audio and subtitle track selection and sync, online subtitle search, and multichannel audio.
+• True HDR playback on supported TVs and devices.
 • Optional automatic frame rate matching on Android TV.
+• Picture-in-picture and background audio on phones and tablets, with notification and lock screen controls.
+• Audio and subtitle track selection and sync, saved for each title, plus multichannel audio.
+• Search for subtitles online for movies and episodes.
 • Remote Play, Pause, Stop, Next and Previous buttons in the player.
 • A built-in Logs and Diagnostics screen for troubleshooting.
 
 ANDROID AUTO
-• Your favorite channels and Live TV categories on your car's screen, with logos and what's on now.
-• Pick a channel in the car, then open the app on your phone and it carries on there.
+• Listen to your favorite channels and Live TV categories from your car's screen.
+• Pick a channel in the car, then open the app on your phone and it carries on playing there.
+• Now Playing shows the channel's logo and what's on, with next and previous channel.
 
 MADE FOR YOUR HOUSEHOLD
 • Multiple viewers, each with their own history and favorites.
 • Keep several playlists on one device, from one server or more, each with its own favorites and guide.
 • Trakt and SIMKL watch history sync, from the device or from your server.
-• Settings and Home layouts set up from your server.
-• A notification center for alerts from your server.
-• Quick setup: pair by scanning a QR code with your phone, even several playlists at once.
+• Settings and Home layouts your server can set up for every device, as defaults or locked.
+• A notification center for alerts from your server, with per-channel subscriptions.
+• Quick setup: pair your TV by scanning a QR code with your phone, and add several playlists in one go.
 • Adjustable display scale, remote button mapping and navigation sounds.
-• Available in English, German, Spanish, French and Simplified Chinese.
-
-PLATFORMS
-• Android TV and Google TV (D-pad remote), Android phones and tablets (touch).
-• Also available on Apple TV, iPhone, iPad, Mac, Windows and Linux.
 
 OPEN SOURCE
 M3U TV and M3U Editor are open source. Bring your own server, your own playlists and your own sources.
