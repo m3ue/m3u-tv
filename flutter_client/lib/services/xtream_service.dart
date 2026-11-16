@@ -286,6 +286,7 @@ class AIOStreamsIntegration {
     required this.name,
     required this.catalogs,
     this.logoUrl,
+    this.actions,
   });
 
   factory AIOStreamsIntegration.fromJson(Map<String, dynamic> json) =>
@@ -297,12 +298,46 @@ class AIOStreamsIntegration {
             .whereType<Map<String, dynamic>>()
             .map(AIOStreamsCatalog.fromJson)
             .toList(growable: false),
+        actions: AIOStreamsActions.fromJson(json['actions']),
       );
 
   final int id;
   final String name;
   final String? logoUrl;
   final List<AIOStreamsCatalog> catalogs;
+
+  /// Null on editors that only serve the path-style
+  /// `/{username}/{password}/aiostreams/` routes.
+  final AIOStreamsActions? actions;
+}
+
+/// m3u-editor's `player_api.php` actions for AIOStreams lookups. Preferred
+/// over the path-style routes, which an auth gateway in front of the server
+/// may not let through when it only allows the Xtream paths.
+class AIOStreamsActions {
+  const AIOStreamsActions({
+    required this.catalog,
+    required this.meta,
+    required this.streams,
+  });
+
+  static AIOStreamsActions? fromJson(Object? json) {
+    if (json is! Map) return null;
+    String? action(String key) {
+      final value = json[key];
+      return value is String && value.isNotEmpty ? value : null;
+    }
+
+    final catalog = action('catalog');
+    final meta = action('meta');
+    final streams = action('streams');
+    if (catalog == null || meta == null || streams == null) return null;
+    return AIOStreamsActions(catalog: catalog, meta: meta, streams: streams);
+  }
+
+  final String catalog;
+  final String meta;
+  final String streams;
 }
 
 class ProxyStreamProfile {
@@ -1791,6 +1826,11 @@ class XtreamService {
       'to': '${to.millisecondsSinceEpoch ~/ 1000}',
     },
   );
+
+  /// An m3u-editor AIOStreams lookup ([AIOStreamsActions]), as the raw
+  /// response.
+  Future<Object?> getAioStreams(String action, Map<String, String> params) =>
+      _request(action, params: params);
 
   /// The settings the editor manages for this login
   /// ([ClientConfigCapability.action]).

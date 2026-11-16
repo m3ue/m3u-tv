@@ -751,6 +751,12 @@ class AppStateController extends ChangeNotifier {
       authNotifier.authResponse?.aiostreamsIntegrations ?? const [];
   late final AIOStreamsApiService aiostreamsApiService = AIOStreamsApiService(
     xtreamService: xtreamService,
+    actionsFor: (integrationId) {
+      for (final integration in aiostreamsIntegrations) {
+        if (integration.id == integrationId) return integration.actions;
+      }
+      return null;
+    },
   );
   String get sourceLabel => switch (_sourceType) {
     AppSourceType.xtream => 'Xtream',
