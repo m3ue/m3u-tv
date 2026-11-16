@@ -272,8 +272,12 @@ class MpvPlayerCore(
                         // stream's access token in its argv.
                         setOption("ytdl", "no")
                         // Builtin Lua scripts nothing in the app reaches;
-                        // see UNUSED_BUILTIN_SCRIPT_OPTIONS.
-                        for (name in UNUSED_BUILTIN_SCRIPT_OPTIONS) setOption(name, "no")
+                        // see UNUSED_BUILTIN_SCRIPT_OPTIONS. Best-effort:
+                        // mpv only defines these with Lua built in, and a
+                        // missing option must not stop the player starting.
+                        for (name in UNUSED_BUILTIN_SCRIPT_OPTIONS) {
+                            runCatching { setOption(name, "no") }
+                        }
                         // Unlike the macOS/Windows/Linux cores, this vendored
                         // Android libmpv build has no font backend at all
                         // (no fontconfig, and no CoreText/DirectWrite

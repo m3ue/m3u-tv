@@ -145,4 +145,20 @@ class DisplayModeSelectorTest {
         val result = DisplayModeSelector.bestMode(listOf(sixty, fortyEight, twentyFour), currentModeId = 1, targetFps = 24.0)
         assertEquals(twentyFour, result)
     }
+
+    @Test
+    fun takesTheOwnRateOverFourTimesWhenThereIsNoDoubledMode() {
+        // 25 and 100 Hz but no 50 Hz: 4:4 only adds HDMI bandwidth over 25 Hz.
+        val twentyFive = Mode(modeId = 8, refreshRate = 25.0, width = 3840, height = 2160)
+        val hundred = Mode(modeId = 11, refreshRate = 100.0, width = 3840, height = 2160)
+        val result = DisplayModeSelector.bestMode(listOf(sixty, twentyFive, hundred), currentModeId = 1, targetFps = 25.0)
+        assertEquals(twentyFive, result)
+    }
+
+    @Test
+    fun keepsAnActiveHundredForTwentyFiveFps() {
+        val activeHundred = Mode(modeId = 11, refreshRate = 100.0, width = 3840, height = 2160)
+        val result = DisplayModeSelector.bestMode(listOf(fifty, activeHundred), currentModeId = 11, targetFps = 25.0)
+        assertEquals(activeHundred, result)
+    }
 }

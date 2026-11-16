@@ -84,20 +84,29 @@ internal object DisplayModeSelector {
 
     /**
      * Ranking for content between [HALF_RATE_MIN_FPS] and [HALF_RATE_MAX_FPS]:
-     * a precise match first, then a multiple over the content's own rate, then
-     * the active mode, then the lowest multiple, then the smaller error.
+     * a precise match first, then the active mode when it already shows the
+     * content as a multiple, then 2x (50/60 Hz), then the content's own rate,
+     * then any other multiple (lowest first), then the smaller error.
      *
      * Precision leads because 60.000 Hz is a 2x of 29.97 fps within tolerance
      * but repeats a frame every ~17 s, where 59.94 Hz (or 29.97 Hz itself, on
      * a panel without a 59.94 mode) presents it evenly. Among equally precise
-     * modes the active one stays, so a panel already at 120 Hz keeps 30 fps at
-     * 4:4 instead of renegotiating down to 60. Otherwise the lowest multiple
-     * wins: 100/120 Hz only adds HDMI bandwidth over 2:2 at 50/60 Hz.
+     * modes the active multiple stays, so a panel already at 120 Hz keeps
+     * 30 fps at 4:4 instead of renegotiating down to 60. Otherwise 2:2 is the
+     * goal; 4x and up only add HDMI bandwidth, so a panel with 25 and 100 Hz
+     * but no 50 Hz takes 25 Hz rather than switching up to 100.
      */
     private fun halfRateRanking(currentModeId: Int): Comparator<Pair<Mode, RateMatch>> =
         compareBy<Pair<Mode, RateMatch>> { it.second.error / it.second.multiple >= PRECISE_RATE_ERROR }
-            .thenBy { it.second.multiple == 1 }
-            .thenBy { it.first.modeId != currentModeId }
+            .thenBy {
+                val multiple = it.second.multiple
+                when {
+                    it.first.modeId == currentModeId && multiple >= 2 -> 0
+                    multiple == 2 -> 1
+                    multiple == 1 -> 2
+                    else -> 3
+                }
+            }
             .thenBy { it.second.multiple }
             .thenBy { it.second.error }
 
