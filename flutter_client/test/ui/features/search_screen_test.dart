@@ -754,9 +754,10 @@ void main() {
           expect(upcoming.channel.streamUrl, isNotEmpty);
           expect(onNow.programme?.progress, isNotNull);
           expect(upcoming.programme?.progress, isNull);
+          // An hour out can cross midnight, which adds a "Tomorrow" prefix.
           expect(
             upcoming.programme?.timeLabel,
-            DateFormat.jm('en').format(futureStart),
+            endsWith(DateFormat.jm('en').format(futureStart)),
           );
         },
       );
