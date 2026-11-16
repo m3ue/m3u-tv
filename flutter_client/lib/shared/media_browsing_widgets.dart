@@ -1413,6 +1413,10 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
       }
     }
     final targetRegion = DpadRegion.ofNode(nearest.$1);
+    // dpad 3.3 marks resolveEnter @internal with no public equivalent; it is
+    // the only way to honor the target region's enter/restore memory the
+    // same way dpad's own cross-region move does.
+    // ignore: invalid_use_of_internal_member
     (targetRegion?.resolveEnter(nearest.$1, [
               for (final entry in row) entry.$1,
             ]) ??
