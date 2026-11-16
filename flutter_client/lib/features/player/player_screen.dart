@@ -431,7 +431,6 @@ class _PlayerScreenState extends State<PlayerScreen>
     unawaited(widget.wakelockController.enable());
     widget.backController?._handler = _handleBack;
     HardwareKeyboard.instance.addHandler(_handleTransportKey);
-    DesktopFullscreenService.instance?.deferEscape = _defersFullscreenEscape;
     if (HostPlatform.isAndroid || HostPlatform.isIOS) {
       _pipChannel.setMethodCallHandler(_handlePipChannelCall);
     }
@@ -954,10 +953,6 @@ class _PlayerScreenState extends State<PlayerScreen>
     final backController = widget.backController;
     if (backController?._handler == _handleBack) {
       backController!._handler = null;
-    }
-    final fullscreen = DesktopFullscreenService.instance;
-    if (fullscreen?.deferEscape == _defersFullscreenEscape) {
-      fullscreen!.deferEscape = null;
     }
     // Back to the EPG preview (or gone): only the full-screen player PiPs.
     unawaited(_autoPictureInPicture?.setAutoPictureInPicture(enabled: false));
@@ -2266,9 +2261,6 @@ class _PlayerScreenState extends State<PlayerScreen>
       if (mounted && !_overlayVisible) _screenFocusNode.requestFocus();
     });
   }
-
-  /// Escape hides an open OSD before it leaves desktop fullscreen.
-  bool _defersFullscreenEscape() => _overlayVisible && _errorMessage == null;
 
   void _handleBack() {
     if (_trackDialogVisible) {

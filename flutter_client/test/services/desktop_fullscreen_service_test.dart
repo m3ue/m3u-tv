@@ -84,51 +84,25 @@ void main() {
 
     await tester.sendKeyEvent(LogicalKeyboardKey.f11);
     await tester.sendKeyEvent(LogicalKeyboardKey.f11);
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
 
     expect(window.requests, [true]);
-    expect(backCount, 0);
 
     // Let the pending transition settle so no timer outlives the test.
     await tester.pump(const Duration(seconds: 2));
   });
 
-  testWidgets('Escape leaves fullscreen without going Back', (tester) async {
-    await pumpPage(tester);
-    unawaited(service.toggle());
-    service.onWindowEnterFullScreen();
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-
-    expect(window.requests, [true, false]);
-    expect(backCount, 0);
-
-    // Let the pending transition settle so no timer outlives the test.
-    await tester.pump(const Duration(seconds: 2));
-  });
-
-  testWidgets('Escape is Back while fullscreen when deferEscape claims it', (
+  testWidgets('Escape is Back while fullscreen and stays fullscreen', (
     tester,
   ) async {
     await pumpPage(tester);
     unawaited(service.toggle());
     service.onWindowEnterFullScreen();
-    var osdVisible = true;
-    service.deferEscape = () => osdVisible;
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
 
     expect(window.requests, [true]);
+    expect(service.isFullscreen, isTrue);
     expect(backCount, 1);
-
-    osdVisible = false;
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-
-    expect(window.requests, [true, false]);
-    expect(backCount, 1);
-
-    // Let the pending transition settle so no timer outlives the test.
-    await tester.pump(const Duration(seconds: 2));
   });
 
   testWidgets('Escape is Back when not fullscreen', (tester) async {
