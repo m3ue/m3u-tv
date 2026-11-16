@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:m3u_tv/services/desktop_window.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -16,11 +17,13 @@ class _WindowManagerFullscreenWindow implements FullscreenWindow {
   const _WindowManagerFullscreenWindow();
 
   @override
-  Future<bool> isFullScreen() => windowManager.isFullScreen();
+  Future<bool> isFullScreen() async =>
+      currentDesktopWindow()?.isFullScreen ?? false;
 
   @override
-  Future<void> setFullScreen({required bool fullscreen}) =>
-      windowManager.setFullScreen(fullscreen);
+  Future<void> setFullScreen({required bool fullscreen}) async {
+    currentDesktopWindow()?.isFullScreen = fullscreen;
+  }
 }
 
 /// Desktop (macOS/Windows/Linux) fullscreen state and shortcuts.
@@ -34,7 +37,7 @@ class _WindowManagerFullscreenWindow implements FullscreenWindow {
 /// Toggles are ignored while a transition is in flight. macOS animates into
 /// its own Space for most of a second, and a second `toggleFullScreen` during
 /// that animation leaves the window (and the mpv surface inside it) mid-resize.
-class DesktopFullscreenService extends ChangeNotifier with WindowListener {
+class DesktopFullscreenService extends ChangeNotifier {
   DesktopFullscreenService({
     this.window = const _WindowManagerFullscreenWindow(),
     bool? altEnterToggles,
@@ -56,6 +59,7 @@ class DesktopFullscreenService extends ChangeNotifier with WindowListener {
 
   bool _isFullscreen = false;
   bool _transitioning = false;
+  ListenerId? _windowListenerId;
   Timer? _transitionTimer;
   final Set<PhysicalKeyboardKey> _swallowedKeys = <PhysicalKeyboardKey>{};
 
@@ -65,10 +69,10 @@ class DesktopFullscreenService extends ChangeNotifier with WindowListener {
   bool get isTransitioning => _transitioning;
 
   /// Registers the window listener and key handler and makes this the app-wide
-  /// [instance]. Call once after `windowManager.ensureInitialized()`.
+  /// [instance]. Call once at desktop startup.
   Future<void> install() async {
     _instance = this;
-    windowManager.addListener(this);
+    _windowListenerId = currentDesktopWindow()?.addListener(_onWindowEvent);
     FocusManager.instance.addEarlyKeyEventHandler(handleKeyEvent);
     _setFullscreen(await window.isFullScreen());
   }
@@ -116,10 +120,21 @@ class DesktopFullscreenService extends ChangeNotifier with WindowListener {
     notifyListeners();
   }
 
-  @override
+  void _onWindowEvent(WindowEvent event) {
+    switch (event) {
+      case WindowEnteredFullScreenEvent():
+        onWindowEnterFullScreen();
+      case WindowExitedFullScreenEvent():
+        onWindowLeaveFullScreen();
+      default:
+        break;
+    }
+  }
+
+  @visibleForTesting
   void onWindowEnterFullScreen() => _finishTransition(true);
 
-  @override
+  @visibleForTesting
   void onWindowLeaveFullScreen() => _finishTransition(false);
 
   /// Early key handler, so a handled key never reaches the focus tree. A
@@ -158,7 +173,9 @@ class DesktopFullscreenService extends ChangeNotifier with WindowListener {
   @override
   void dispose() {
     _transitionTimer?.cancel();
-    windowManager.removeListener(this);
+    final listenerId = _windowListenerId;
+    if (listenerId != null) currentDesktopWindow()?.removeListener(listenerId);
+    _windowListenerId = null;
     FocusManager.instance.removeEarlyKeyEventHandler(handleKeyEvent);
     if (identical(_instance, this)) _instance = null;
     super.dispose();

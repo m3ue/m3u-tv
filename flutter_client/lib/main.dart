@@ -25,6 +25,7 @@ import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/desktop_fullscreen_service.dart';
+import 'package:m3u_tv/services/desktop_window.dart';
 import 'package:m3u_tv/services/device_performance.dart';
 import 'package:m3u_tv/services/persistent_store.dart';
 import 'package:m3u_tv/services/production_storage.dart';
@@ -243,23 +244,21 @@ bool get _isDesktop => HostPlatform.isDesktop;
 Future<DesktopFullscreenService> _configureDesktopWindow(
   AppStateController appState,
 ) async {
-  await windowManager.ensureInitialized();
-  final windowOptions = HostPlatform.isMacOS
-      ? const WindowOptions(
-          titleBarStyle: TitleBarStyle.hidden,
-          windowButtonVisibility: true,
-        )
-      : const WindowOptions();
-  final windowState = WindowStateService(appState.viewSettingsService);
-  await windowManager.waitUntilReadyToShow(windowOptions, () async {
+  final window = currentDesktopWindow();
+  if (window != null) {
     if (HostPlatform.isMacOS) {
-      await windowManager.setTitle('');
+      window
+        ..titleBarStyle = TitleBarStyle.hidden
+        ..isWindowControlButtonsVisible = true
+        ..title = '';
     }
-    await windowState.restore();
-    await windowManager.show();
-    await windowManager.focus();
-  });
-  windowManager.addListener(windowState);
+    final windowState = WindowStateService(appState.viewSettingsService);
+    await windowState.restore(window);
+    window
+      ..show()
+      ..focus();
+    windowState.attach(window);
+  }
   final fullscreen = DesktopFullscreenService();
   await fullscreen.install();
   return fullscreen;
