@@ -430,6 +430,7 @@ class AIOStreamsHomeScreen extends StatefulWidget {
 }
 
 class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
+  final ScrollController _scrollController = ScrollController();
   List<AIOStreamsFavoriteItem> _favorites = const [];
 
   Set<String> get _favoriteIds => _favorites.map((f) => f.id).toSet();
@@ -458,6 +459,7 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
   @override
   void dispose() {
     widget.favoritesService?.removeListener(_onFavoritesChanged);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -466,6 +468,31 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
   Future<void> _loadFavorites() async {
     final favs = await widget.favoritesService?.all() ?? const [];
     if (mounted) setState(() => _favorites = favs);
+  }
+
+  /// Focus entering the top row snaps the page all the way up so the search
+  /// entry above it is back in view. The focused card's own reveal scroll
+  /// starts in a post-frame callback and, coming down from search, would
+  /// nudge the page down first. A microtask after that frame runs once every
+  /// post-frame callback has, but before the reveal's first tick, so this
+  /// replaces the reveal before it moves anything. It must run even when the
+  /// page is already at the top: `animateTo` to the current offset becomes a
+  /// `jumpTo`, which is what cancels the pending reveal.
+  void _onTopRowFocusChange(bool hasFocus) {
+    if (!hasFocus) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      scheduleMicrotask(() {
+        if (!mounted || !_scrollController.hasClients) return;
+        final position = _scrollController.position;
+        unawaited(
+          position.animateTo(
+            position.minScrollExtent,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          ),
+        );
+      });
+    });
   }
 
   Future<void> _playContinueWatching(
@@ -594,6 +621,7 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
     final continueWatching = widget.progressList
         .where((p) => p.aioItemId != null && isContinueWatchingEligible(p))
         .toList(growable: false);
+    final rows = _buildRows(context, l, continueWatching);
 
     return Scaffold(
       body: DpadRegion(
@@ -604,147 +632,175 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
           }
         },
         child: ListView(
+          controller: _scrollController,
           padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
           children: [
             if (_hasSearchableCatalog) ...[
-              _AIOStreamsSearchEntry(
-                hintText: l.aiostreamsSearchHint,
-                onTap: widget.onSearchSelect,
+              // Its own region: in the page's region, Down would find
+              // nothing there (each row is a nested region), so dpad would
+              // scroll the page most of a viewport looking for more before
+              // settling on the top row.
+              DpadRegion(
+                horizontalEdge: DpadEdgeBehavior.stop,
+                onEdge: (direction) {
+                  if (direction == TraversalDirection.left) {
+                    widget.onSidebarActivate?.call();
+                  }
+                },
+                child: _AIOStreamsSearchEntry(
+                  hintText: l.aiostreamsSearchHint,
+                  onTap: widget.onSearchSelect,
+                ),
               ),
               const SizedBox(height: MediaBrowsingMetrics.pagePadding),
             ],
-
-            // Continue Watching row (landscape style to match home screen)
-            if (continueWatching.isNotEmpty)
-              MediaPreviewSection(
-                title: l.aiostreamsContinueWatching,
-                titleIcon: Icons.history,
-                emptyLabel: '',
-                landscapeStyle: true,
-                useSidebarLayout: widget.useSidebarLayout,
-                items: continueWatching
-                    .map((p) {
-                      final fraction =
-                          (p.durationSeconds != null && p.durationSeconds! > 0)
-                          ? (p.positionSeconds / p.durationSeconds!).clamp(
-                              0.0,
-                              1.0,
-                            )
-                          : null;
-                      final isSeries =
-                          p.seasonNumber != null || p.episodeNumber != null;
-                      final itemId = p.aioItemId!;
-                      final integrationId = p.aioIntegrationId ?? 0;
-                      final seOverlay = p.seasonNumber != null
-                          ? 'S${p.seasonNumber}${p.episodeNumber != null ? ' E${p.episodeNumber}' : ''}'
-                          : null;
-                      return MediaPreviewItem(
-                        title: p.title ?? itemId,
-                        imageUrl: p.thumbnailUrl ?? p.backdropUrl,
-                        subtitle: p.episodeTitle,
-                        overlayLabel: seOverlay ?? p.year,
-                        fallbackIcon: isSeries ? Icons.tv : Icons.movie,
-                        fallbackTitle: p.title ?? itemId,
-                        progressFraction: p.upNext ? null : fraction,
-                        upNextLabel: p.upNext ? l.homeUpNext : null,
-                        isFavorite: _favoriteIds.contains(itemId),
-                        overlayBadges: <String>[
-                          ?formatRatingText(p.rating),
-                          if (p.runtime != null) p.runtime!,
-                        ],
-                        onTap: () => _playContinueWatching(
-                          context,
-                          progress: p,
-                          itemId: itemId,
-                          integrationId: integrationId,
-                          isSeries: isSeries,
-                        ),
-                        onLongTap: widget.favoritesService == null
-                            ? null
-                            : () => unawaited(
-                                widget.favoritesService!.toggle(
-                                  AIOStreamsFavoriteItem(
-                                    id: itemId,
-                                    type: isSeries ? 'series' : 'movie',
-                                    name: p.title ?? itemId,
-                                    integrationId: integrationId,
-                                    poster: p.thumbnailUrl,
-                                  ),
-                                ),
-                              ),
-                      );
-                    })
-                    .toList(growable: false),
-                onSidebarActivate: widget.onSidebarActivate,
-              ),
-
-            // My Favorites row
-            if (_favorites.isNotEmpty)
-              MediaPreviewSection(
-                title: l.aiostreamsMyFavorites,
-                emptyLabel: '',
-                posterStyle: true,
-                useSidebarLayout: widget.useSidebarLayout,
-                items: _favorites
-                    .map(
-                      (fav) => MediaPreviewItem(
-                        title: fav.name,
-                        imageUrl: fav.poster,
-                        subtitle: fav.type,
-                        fallbackIcon: fav.type == 'series'
-                            ? Icons.tv
-                            : Icons.movie,
-                        fallbackTitle: fav.name,
-                        isFavorite: true,
-                        onTap: () => widget.onItemSelect(
-                          AIOStreamsItem(
-                            id: fav.id,
-                            type: fav.type,
-                            name: fav.name,
-                            poster: fav.poster,
-                          ),
-                          fav.integrationId,
-                        ),
-                        onLongTap: widget.favoritesService == null
-                            ? null
-                            : () => unawaited(
-                                widget.favoritesService!.toggle(
-                                  AIOStreamsFavoriteItem(
-                                    id: fav.id,
-                                    type: fav.type,
-                                    name: fav.name,
-                                    integrationId: fav.integrationId,
-                                    poster: fav.poster,
-                                  ),
-                                ),
-                              ),
-                      ),
-                    )
-                    .toList(growable: false),
-                onSidebarActivate: widget.onSidebarActivate,
-              ),
-
-            // Catalog rows
-            for (final integration in widget.integrations)
-              for (final catalog in integration.catalogs)
-                AIOStreamsCatalogRow(
-                  catalog: catalog,
-                  integrationId: integration.id,
-                  apiService: widget.apiService,
-                  favoritesService: widget.favoritesService,
-                  favoriteIds: _favoriteIds,
-                  useSidebarLayout: widget.useSidebarLayout,
-                  onItemSelect: (item) =>
-                      widget.onItemSelect(item, integration.id),
-                  onViewAll: widget.onCatalogSelect == null
-                      ? null
-                      : () => widget.onCatalogSelect!(catalog, integration.id),
-                  onSidebarActivate: widget.onSidebarActivate,
-                ),
+            for (final (index, row) in rows.indexed)
+              if (index == 0)
+                Focus(
+                  canRequestFocus: false,
+                  skipTraversal: true,
+                  onFocusChange: _onTopRowFocusChange,
+                  child: row,
+                )
+              else
+                row,
           ],
         ),
       ),
     );
+  }
+
+  List<Widget> _buildRows(
+    BuildContext context,
+    AppLocalizations l,
+    List<Progress> continueWatching,
+  ) {
+    return [
+      // Continue Watching row (landscape style to match home screen)
+      if (continueWatching.isNotEmpty)
+        MediaPreviewSection(
+          title: l.aiostreamsContinueWatching,
+          titleIcon: Icons.history,
+          emptyLabel: '',
+          landscapeStyle: true,
+          useSidebarLayout: widget.useSidebarLayout,
+          items: continueWatching
+              .map((p) {
+                final fraction =
+                    (p.durationSeconds != null && p.durationSeconds! > 0)
+                    ? (p.positionSeconds / p.durationSeconds!).clamp(
+                        0.0,
+                        1.0,
+                      )
+                    : null;
+                final isSeries =
+                    p.seasonNumber != null || p.episodeNumber != null;
+                final itemId = p.aioItemId!;
+                final integrationId = p.aioIntegrationId ?? 0;
+                final seOverlay = p.seasonNumber != null
+                    ? 'S${p.seasonNumber}${p.episodeNumber != null ? ' E${p.episodeNumber}' : ''}'
+                    : null;
+                return MediaPreviewItem(
+                  title: p.title ?? itemId,
+                  imageUrl: p.thumbnailUrl ?? p.backdropUrl,
+                  subtitle: p.episodeTitle,
+                  overlayLabel: seOverlay ?? p.year,
+                  fallbackIcon: isSeries ? Icons.tv : Icons.movie,
+                  fallbackTitle: p.title ?? itemId,
+                  progressFraction: p.upNext ? null : fraction,
+                  upNextLabel: p.upNext ? l.homeUpNext : null,
+                  isFavorite: _favoriteIds.contains(itemId),
+                  overlayBadges: <String>[
+                    ?formatRatingText(p.rating),
+                    if (p.runtime != null) p.runtime!,
+                  ],
+                  onTap: () => _playContinueWatching(
+                    context,
+                    progress: p,
+                    itemId: itemId,
+                    integrationId: integrationId,
+                    isSeries: isSeries,
+                  ),
+                  onLongTap: widget.favoritesService == null
+                      ? null
+                      : () => unawaited(
+                          widget.favoritesService!.toggle(
+                            AIOStreamsFavoriteItem(
+                              id: itemId,
+                              type: isSeries ? 'series' : 'movie',
+                              name: p.title ?? itemId,
+                              integrationId: integrationId,
+                              poster: p.thumbnailUrl,
+                            ),
+                          ),
+                        ),
+                );
+              })
+              .toList(growable: false),
+          onSidebarActivate: widget.onSidebarActivate,
+        ),
+
+      // My Favorites row
+      if (_favorites.isNotEmpty)
+        MediaPreviewSection(
+          title: l.aiostreamsMyFavorites,
+          emptyLabel: '',
+          posterStyle: true,
+          useSidebarLayout: widget.useSidebarLayout,
+          items: _favorites
+              .map(
+                (fav) => MediaPreviewItem(
+                  title: fav.name,
+                  imageUrl: fav.poster,
+                  subtitle: fav.type,
+                  fallbackIcon: fav.type == 'series' ? Icons.tv : Icons.movie,
+                  fallbackTitle: fav.name,
+                  isFavorite: true,
+                  onTap: () => widget.onItemSelect(
+                    AIOStreamsItem(
+                      id: fav.id,
+                      type: fav.type,
+                      name: fav.name,
+                      poster: fav.poster,
+                    ),
+                    fav.integrationId,
+                  ),
+                  onLongTap: widget.favoritesService == null
+                      ? null
+                      : () => unawaited(
+                          widget.favoritesService!.toggle(
+                            AIOStreamsFavoriteItem(
+                              id: fav.id,
+                              type: fav.type,
+                              name: fav.name,
+                              integrationId: fav.integrationId,
+                              poster: fav.poster,
+                            ),
+                          ),
+                        ),
+                ),
+              )
+              .toList(growable: false),
+          onSidebarActivate: widget.onSidebarActivate,
+        ),
+
+      // Catalog rows
+      for (final integration in widget.integrations)
+        for (final catalog in integration.catalogs)
+          AIOStreamsCatalogRow(
+            catalog: catalog,
+            integrationId: integration.id,
+            apiService: widget.apiService,
+            favoritesService: widget.favoritesService,
+            favoriteIds: _favoriteIds,
+            useSidebarLayout: widget.useSidebarLayout,
+            onItemSelect: (item) => widget.onItemSelect(item, integration.id),
+            onViewAll: widget.onCatalogSelect == null
+                ? null
+                : () => widget.onCatalogSelect!(catalog, integration.id),
+            onSidebarActivate: widget.onSidebarActivate,
+          ),
+    ];
   }
 }
 
