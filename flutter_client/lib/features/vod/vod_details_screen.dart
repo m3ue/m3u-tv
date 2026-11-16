@@ -1,10 +1,13 @@
 import 'dart:async';
 
+import 'package:intl/intl.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
+import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
@@ -22,6 +25,7 @@ class VodDetailsScreen extends StatefulWidget {
     this.onSidebarActivate,
     this.onOpenRelated,
     this.onTapMember,
+    this.onDeleteRecording,
   });
 
   final VodItem item;
@@ -37,6 +41,11 @@ class VodDetailsScreen extends StatefulWidget {
   /// Opens a cast member's filmography screen. Null leaves cast
   /// non-interactive.
   final ValueChanged<CastMember>? onTapMember;
+
+  /// Deletes the DVR recording a movie came from (by uuid). Offered only for
+  /// a recording the viewer may manage (the server sends its `dvr_uuid`);
+  /// null hides it.
+  final Future<void> Function(String uuid)? onDeleteRecording;
 
   @override
   State<VodDetailsScreen> createState() => _VodDetailsScreenState();
@@ -109,6 +118,7 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
               onPlay: widget.onPlay,
               onOpenRelated: widget.onOpenRelated,
               onTapMember: widget.onTapMember,
+              onDeleteRecording: widget.onDeleteRecording,
               dominantColor: _dominantColor,
               colorMatchReady: _colorMatchResolved,
             )
@@ -126,6 +136,7 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
                   onPlay: widget.onPlay,
                   onOpenRelated: widget.onOpenRelated,
                   onTapMember: widget.onTapMember,
+                  onDeleteRecording: widget.onDeleteRecording,
                   dominantColor: _dominantColor,
                   // A failed info fetch means no backdrop and no palette step
                   // will run - reveal the (surface) hero rather than holding.
@@ -146,6 +157,7 @@ class _VodDetailsBody extends StatelessWidget {
     this.onPlay,
     this.onOpenRelated,
     this.onTapMember,
+    this.onDeleteRecording,
     this.dominantColor,
     this.colorMatchReady = false,
   });
@@ -157,6 +169,7 @@ class _VodDetailsBody extends StatelessWidget {
   final void Function(PlayerArgs)? onPlay;
   final ValueChanged<RelatedItem>? onOpenRelated;
   final ValueChanged<CastMember>? onTapMember;
+  final Future<void> Function(String uuid)? onDeleteRecording;
 
   /// Passed straight to the shared body's colour-match reveal - true once the
   /// palette extraction has resolved.
@@ -183,6 +196,7 @@ class _VodDetailsBody extends StatelessWidget {
       year: details.year,
       contentRating: details.contentRating,
       chips: [
+        if (details.isDvrRecording) l.detailDvrBadge,
         if (details.genre != null) details.genre!,
         ?formatRuntimeText(details.duration),
         if (details.rating != null) formatRating(details.rating!),
@@ -203,6 +217,16 @@ class _VodDetailsBody extends StatelessWidget {
             label: AppLocalizations.of(context).vodCast,
             value: details.cast!,
           ),
+        if (details.recordedAt case final recordedAt?)
+          MetaCreditLine(
+            label: l.vodRecorded,
+            value: [
+              DateFormat.yMMMEd(
+                Localizations.localeOf(context).toLanguageTag(),
+              ).add_jm().format(recordedAt.toLocal()),
+              ?details.recordedChannelName,
+            ].join(' · '),
+          ),
       ],
       richCast: richCast,
       castSemanticLabel: l.vodCast,
@@ -218,12 +242,36 @@ class _VodDetailsBody extends StatelessWidget {
       extraActions: [
         if (details.trailerUrl case final trailerUrl?)
           TrailerButton(url: trailerUrl),
+        if ((onDeleteRecording, details.dvrUuid) case (
+          final delete?,
+          final uuid?,
+        ))
+          AppButton(
+            icon: Icons.delete_outline,
+            label: l.dvrDeleteConfirm,
+            autoScroll: false,
+            onPressed: () => unawaited(_deleteRecording(context, uuid, delete)),
+          ),
       ],
       progressValue: _progressValue(progress),
       isLoading: isLoading,
       dominantColor: dominantColor,
       colorMatchReady: colorMatchReady,
     );
+  }
+
+  /// The movie goes with its recording, so a deleted one closes the page.
+  Future<void> _deleteRecording(
+    BuildContext context,
+    String uuid,
+    Future<void> Function(String uuid) delete,
+  ) async {
+    final deleted = await confirmDeleteRecording(
+      context,
+      uuid: uuid,
+      onDelete: delete,
+    );
+    if (deleted && context.mounted) await Navigator.of(context).maybePop();
   }
 
   Progress? get _resumeProgress {
@@ -313,4 +361,8 @@ class _ResolvedVodDetails {
   int? get tmdbId => info?.tmdbId;
   String? get edlUrl => nullIfBlank(info?.edlUrl);
   String? get trailerUrl => info?.trailerUrl;
+  DateTime? get recordedAt => info?.recordedAt;
+  bool get isDvrRecording => info?.isDvrRecording ?? false;
+  String? get recordedChannelName => nullIfBlank(info?.recordedChannelName);
+  String? get dvrUuid => nullIfBlank(info?.dvrUuid);
 }

@@ -279,6 +279,7 @@ class _AsyncVodDetails extends StatelessWidget {
               xtreamService: actions.xtreamService,
               onPlay: _playOnTopLevelRoute(context, actions),
               progressList: actions.progressList,
+              onDeleteRecording: actions.appState.deleteDvrRecording,
               onOpenRelated: (related) => _openRelated(actions, related),
               onTapMember: (member) => context.push(
                 RouteNames.personDetailsFor(
@@ -341,6 +342,7 @@ class _AsyncSeriesDetails extends StatelessWidget {
               onPlay: _playOnTopLevelRoute(context, actions),
               progressList: actions.progressList,
               onMarkEpisodeWatched: actions.onMarkEpisodeWatched,
+              onDeleteRecording: actions.appState.deleteDvrRecording,
               onOpenRelated: (related) => _openRelated(actions, related),
               onTapMember: (member) => context.push(
                 RouteNames.personDetailsFor(
@@ -640,6 +642,7 @@ GoRouter createGoRouter({
                     xtreamService: actions.xtreamService,
                     onPlay: _playOnTopLevelRoute(context, actions),
                     progressList: actions.progressList,
+                    onDeleteRecording: actions.appState.deleteDvrRecording,
                     onOpenRelated: (related) => _openRelated(actions, related),
                     onTapMember: (member) => context.push(
                       RouteNames.personDetailsFor(
@@ -786,6 +789,7 @@ GoRouter createGoRouter({
                     onPlay: _playOnTopLevelRoute(context, actions),
                     progressList: actions.progressList,
                     onMarkEpisodeWatched: actions.onMarkEpisodeWatched,
+                    onDeleteRecording: actions.appState.deleteDvrRecording,
                     onOpenRelated: (related) => _openRelated(actions, related),
                     onTapMember: (member) => context.push(
                       RouteNames.personDetailsFor(

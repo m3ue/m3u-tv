@@ -271,6 +271,7 @@ class ViewSettingsService extends ChangeNotifier {
   static const liveTvFavoritesFirstKey = 'm3ue_tv_live_tv_favorites_first';
   static const matchRefreshRateKey = 'm3ue_tv_match_refresh_rate';
   static const deinterlaceKey = 'm3ue_tv_deinterlace';
+  static const hideOverlayOnStartKey = 'm3ue_tv_hide_overlay_on_start';
   static const prebufferLiveKey = 'm3ue_tv_prebuffer_live';
   static const backgroundAudioKey = 'm3ue_tv_background_audio';
   static const captionsDefaultKey = 'm3ue_tv_captions_default';
@@ -932,6 +933,26 @@ class ViewSettingsService extends ChangeNotifier {
     bool enabled,
   ) async {
     await _write(deinterlaceKey, enabled);
+    notifyListeners();
+  }
+
+  /// Whether the player starts with its controls and info overlay hidden,
+  /// so a stream opens on just the picture. Any key press or tap still
+  /// brings the overlay up. Defaults off (the overlay shows on start).
+  Future<bool> hideOverlayOnStart() async {
+    final raw = await _readResolved(hideOverlayOnStartKey);
+    return raw as bool? ?? false;
+  }
+
+  /// Synchronous access to the in-memory cached hide-overlay-on-start setting.
+  bool get hideOverlayOnStartSync =>
+      (_cached(hideOverlayOnStartKey) as bool?) ?? false;
+
+  Future<void> setHideOverlayOnStart(
+    // ignore: avoid_positional_boolean_parameters
+    bool enabled,
+  ) async {
+    await _write(hideOverlayOnStartKey, enabled);
     notifyListeners();
   }
 

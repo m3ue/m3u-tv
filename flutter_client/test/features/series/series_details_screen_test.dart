@@ -44,6 +44,7 @@ Widget _app(
   String? viewerId,
   void Function(PlayerArgs)? onPlay,
   MarkEpisodeWatched? onMarkEpisodeWatched,
+  Future<void> Function(String uuid)? onDeleteRecording,
 }) => MaterialApp(
   theme: ThemeData.dark(useMaterial3: true),
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -56,6 +57,7 @@ Widget _app(
     progressList: progressList,
     onPlay: onPlay,
     onMarkEpisodeWatched: onMarkEpisodeWatched,
+    onDeleteRecording: onDeleteRecording,
   ),
 );
 
@@ -178,6 +180,36 @@ void main() {
     // Runtime shows on the card overlay and as an average chip in the meta.
     expect(find.text('45m'), findsOneWidget);
     expect(find.text('~45m'), findsOneWidget);
+  });
+
+  testWidgets('tags a DVR series and its recorded episodes', (tester) async {
+    const info = SeriesInfo(
+      series: Series(id: 7, name: 'Recorded Show'),
+      seasons: [Season(number: 1, name: 'Season 1')],
+      isDvrRecording: true,
+      episodesBySeason: {
+        1: [
+          Episode(
+            id: '101',
+            episodeNumber: 1,
+            title: 'Recorded Episode',
+            containerExtension: 'ts',
+            seasonNumber: 1,
+            duration: '00:02:00',
+            streamUrl: 'http://example.com/s1/e1.ts',
+            isDvrRecording: true,
+          ),
+        ],
+      },
+    );
+
+    await tester.pumpWidget(_app(info));
+    await tester.pumpAndSettle();
+
+    // The series chip plus the episode card's pill.
+    expect(find.text('DVR'), findsNWidgets(2));
+    expect(find.text('2m'), findsOneWidget);
+    expect(find.text('00:02:00'), findsNothing);
   });
 
   testWidgets('a bare-seconds duration reads as seconds, not minutes', (
@@ -787,6 +819,62 @@ void main() {
     expect(calls, isNotEmpty);
     expect(calls.first.streamId, 101);
     expect(calls.first.watched, isTrue);
+  });
+
+  testWidgets('long-pressing a recorded episode deletes its recording', (
+    tester,
+  ) async {
+    Episode recorded(int number) => Episode(
+      id: '10$number',
+      episodeNumber: number,
+      title: 'S1E$number Title',
+      containerExtension: 'ts',
+      seasonNumber: 1,
+      streamUrl: 'http://example.com/s1/e$number.ts',
+      isDvrRecording: true,
+      dvrUuid: 'rec-$number',
+    );
+    final deleted = <String>[];
+    await tester.pumpWidget(
+      _app(
+        SeriesInfo(
+          series: const Series(id: 7, name: 'Recorded Show'),
+          seasons: const [Season(number: 1, name: 'Season 1')],
+          isDvrRecording: true,
+          episodesBySeason: {
+            1: [recorded(1), recorded(2)],
+          },
+        ),
+        onDeleteRecording: (uuid) async => deleted.add(uuid),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final card = find.textContaining('S1E1 Title', findRichText: true).first;
+    await tester.ensureVisible(card);
+    await tester.pumpAndSettle();
+    await tester.longPress(card, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    // Past the dialog's arm delay (it ignores the long-press release).
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // No viewer, so nothing to mark: only the delete is offered.
+    expect(find.text('Mark watched'), findsNothing);
+    await tester.tap(find.text('Delete recording'));
+    await tester.pumpAndSettle();
+    // The standard delete confirmation follows.
+    await tester.tap(find.text('Delete recording').last);
+    await tester.pumpAndSettle();
+
+    expect(deleted, ['rec-1']);
+    expect(
+      find.textContaining('S1E1 Title', findRichText: true),
+      findsNothing,
+    );
+    expect(
+      find.textContaining('S1E2 Title', findRichText: true),
+      findsWidgets,
+    );
   });
 
   testWidgets('mark-season reports partial sync failure', (tester) async {

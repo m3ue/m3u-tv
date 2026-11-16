@@ -62,6 +62,12 @@ void main() {
       expect(formatRuntimeText('  '), isNull);
       expect(formatRuntimeText(null), isNull);
     });
+
+    test('drops an all-zero runtime, which panels send for unknown', () {
+      expect(formatRuntimeText('00:00:00'), isNull);
+      expect(formatRuntimeText('0'), isNull);
+      expect(formatRuntimeText('0:00'), isNull);
+    });
   });
 
   group('formatBytes', () {

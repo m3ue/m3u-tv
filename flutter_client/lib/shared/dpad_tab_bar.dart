@@ -234,6 +234,11 @@ class _DpadTabState extends State<_DpadTab> {
                 : Colors.transparent,
             child: InkWell(
               onTap: _onTap,
+              // Focus belongs to DpadFocusable's node, which draws the
+              // highlight. A focusable InkWell sits on the same rect, so
+              // directional traversal could land on it and leave no tab
+              // looking focused.
+              canRequestFocus: false,
               // Suppress InkWell's own overlay — background color is handled above.
               overlayColor: WidgetStateProperty.all(Colors.transparent),
               child: child,

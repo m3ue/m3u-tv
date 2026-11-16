@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show IconData;
 
 import 'package:m3u_tv/features/sports/sports_fixture_card.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
@@ -70,17 +71,30 @@ class SportsSpotlightTarget extends HomeSpotlightTarget {
   String get key => 'sports:${fixture.league.id}:${fixture.id}';
 }
 
-/// A non-media card (DVR shortcut, "See all"): title and a line of text.
+/// How [StaticSpotlightTarget.artworkUrls] are drawn in the hero.
+enum SpotlightArtworkShape { poster, landscape, logo }
+
+/// A non-media card (DVR shortcut, "View all"): title and a line of text,
+/// shown with a preview of what it leads to ([artworkUrls]) or, without any,
+/// a large [icon].
 class StaticSpotlightTarget extends HomeSpotlightTarget {
   const StaticSpotlightTarget({
     required this.id,
     required this.title,
     this.description,
+    this.kicker,
+    this.icon,
+    this.artworkUrls = const [],
+    this.artworkShape = SpotlightArtworkShape.poster,
   });
 
   final String id;
   final String title;
   final String? description;
+  final String? kicker;
+  final IconData? icon;
+  final List<String> artworkUrls;
+  final SpotlightArtworkShape artworkShape;
 
   @override
   String get key => 'static:$id';
@@ -108,6 +122,10 @@ class HomeSpotlight {
     this.endsAt,
     this.playLength,
     this.crestUrls = const [],
+    this.icon,
+    this.artworkUrls = const [],
+    this.artworkShape = SpotlightArtworkShape.poster,
+    this.largeTitle = false,
   });
 
   final String key;
@@ -152,6 +170,19 @@ class HomeSpotlight {
   /// Team crests shown large where backdrop art would be (a game has none),
   /// in the matchup's order.
   final List<String> crestUrls;
+
+  /// Emblem shown large where backdrop art would be, for a non-media card
+  /// with no [artworkUrls].
+  final IconData? icon;
+
+  /// A fanned preview of what a non-media card leads to (a row's posters),
+  /// shown where backdrop art would be.
+  final List<String> artworkUrls;
+  final SpotlightArtworkShape artworkShape;
+
+  /// Draws [title] as a large wordmark, sized like a clearlogo, for cards
+  /// that never have one (a section name such as "Movies").
+  final bool largeTitle;
 }
 
 /// Debounces focus changes into the hero. A D-pad held down steps through a
@@ -421,10 +452,28 @@ HomeSpotlight resolveHomeSpotlight(
     case SportsSpotlightTarget():
       return _sportsSpotlight(target, format);
 
-    case StaticSpotlightTarget(:final title, :final description):
-      return HomeSpotlight(key: target.key, title: title, plot: description);
+    case StaticSpotlightTarget():
+      final artwork = target.artworkUrls
+          .map(nullIfBlank)
+          .nonNulls
+          .take(_maxStaticArtwork)
+          .toList(growable: false);
+      return HomeSpotlight(
+        key: target.key,
+        title: target.title,
+        kicker: target.kicker,
+        plot: target.description,
+        toneUrl: artwork.firstOrNull,
+        icon: target.icon,
+        artworkUrls: artwork,
+        artworkShape: target.artworkShape,
+        largeTitle: true,
+      );
   }
 }
+
+/// Most cards a non-media spotlight fans out.
+const int _maxStaticArtwork = 5;
 
 HomeSpotlight _sportsSpotlight(
   SportsSpotlightTarget target,

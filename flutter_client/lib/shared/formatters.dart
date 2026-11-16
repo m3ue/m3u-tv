@@ -65,10 +65,11 @@ Duration? parseRuntimeText(String? text) {
 
 /// Normalises free-form runtime text (see [parseRuntimeText]) to the
 /// [formatRuntime] style, keeping the trimmed original when it can't be
-/// parsed. Null when [text] is blank.
+/// parsed. Null when [text] is blank or all zeros (`00:00:00`, `0`), which
+/// Xtream panels send for an unknown runtime.
 String? formatRuntimeText(String? text) {
   final value = nullIfBlank(text);
-  if (value == null) return null;
+  if (value == null || RegExp(r'^[0:.\s]+$').hasMatch(value)) return null;
   final duration = parseRuntimeText(value);
   return duration == null ? value : formatRuntime(duration);
 }

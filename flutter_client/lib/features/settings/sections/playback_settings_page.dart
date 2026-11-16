@@ -68,12 +68,7 @@ class PlaybackSettingsPage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (viewSettings != null &&
-            (_showVodPlayer ||
-                _showHdrToggle ||
-                _showRefreshRateToggle ||
-                _showDeinterlaceToggle ||
-                _showBackgroundAudioToggle)) ...[
+        if (viewSettings != null) ...[
           SettingsSectionHeader(l.settingsSectionPlayer),
           ListenableBuilder(
             listenable: viewSettings,
@@ -328,6 +323,13 @@ class PlayerSettingsGroup extends StatelessWidget {
             value: service.deinterlaceSync,
             onChanged: service.setDeinterlace,
           ),
+        SettingsSwitchRow(
+          title: l.settingsHideOverlayOnStart,
+          subtitle: l.settingsHideOverlayOnStartHint,
+          icon: Icons.visibility_off_outlined,
+          value: service.hideOverlayOnStartSync,
+          onChanged: service.setHideOverlayOnStart,
+        ),
         if (showBackgroundAudio)
           SettingsSwitchRow(
             title: l.settingsBackgroundAudio,

@@ -872,6 +872,12 @@ abstract class AppLocalizations {
   /// **'Series'**
   String get searchSectionSeries;
 
+  /// No description provided for @searchSectionRecordings.
+  ///
+  /// In en, this message translates to:
+  /// **'Recordings'**
+  String get searchSectionRecordings;
+
   /// No description provided for @vodSearchHint.
   ///
   /// In en, this message translates to:
@@ -1934,6 +1940,12 @@ abstract class AppLocalizations {
   /// **'Browse every series'**
   String get homeBrowseSeries;
 
+  /// Rich Home hero line for View all on a custom category row
+  ///
+  /// In en, this message translates to:
+  /// **'Everything in {category}'**
+  String homeBrowseCategory(String category);
+
   /// No description provided for @homeNothingToShow.
   ///
   /// In en, this message translates to:
@@ -2294,6 +2306,54 @@ abstract class AppLocalizations {
   /// **'Register an app at simkl.com/settings/developer and set the client ID via --dart-define=SIMKL_CLIENT_ID.'**
   String get simklNotConfiguredHint;
 
+  /// No description provided for @mdblistName.
+  ///
+  /// In en, this message translates to:
+  /// **'MDBList'**
+  String get mdblistName;
+
+  /// No description provided for @mdblistConnectPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect your MDBList account to automatically track what you watch.'**
+  String get mdblistConnectPrompt;
+
+  /// No description provided for @mdblistConnectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect with MDBList'**
+  String get mdblistConnectButton;
+
+  /// No description provided for @mdblistConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to MDBList'**
+  String get mdblistConnected;
+
+  /// No description provided for @mdblistConnectedAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to MDBList as {account}'**
+  String mdblistConnectedAs(String account);
+
+  /// No description provided for @mdblistDisconnectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect MDBList'**
+  String get mdblistDisconnectButton;
+
+  /// No description provided for @mdblistNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'MDBList client ID is not configured.'**
+  String get mdblistNotConfigured;
+
+  /// No description provided for @mdblistNotConfiguredHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Register an app at mdblist.com/developer and set the client ID via --dart-define=MDBLIST_CLIENT_ID.'**
+  String get mdblistNotConfiguredHint;
+
   /// No description provided for @vodAllMovies.
   ///
   /// In en, this message translates to:
@@ -2341,6 +2401,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Director'**
   String get vodDirector;
+
+  /// No description provided for @vodRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded'**
+  String get vodRecorded;
+
+  /// No description provided for @detailDvrBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'DVR'**
+  String get detailDvrBadge;
 
   /// No description provided for @castShowAll.
   ///
@@ -3475,6 +3547,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.'**
   String get settingsDeinterlaceHint;
+
+  /// No description provided for @settingsHideOverlayOnStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide player overlay on start'**
+  String get settingsHideOverlayOnStart;
+
+  /// No description provided for @settingsHideOverlayOnStartHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Open streams on just the picture, without the controls and channel info. Press any button or tap the screen to show them.'**
+  String get settingsHideOverlayOnStartHint;
 
   /// No description provided for @settingsBackgroundAudio.
   ///

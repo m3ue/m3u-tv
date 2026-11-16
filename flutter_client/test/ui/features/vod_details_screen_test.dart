@@ -54,6 +54,115 @@ void main() {
       await tester.pump(const Duration(seconds: 16));
     });
 
+    testWidgets('shows when and where a DVR recording was made', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          service: _VodDetailsXtreamService(
+            info: VodInfo(
+              id: 201,
+              name: 'Fairfield vs. Seton Hall',
+              duration: '00:00:00',
+              recordedAt: DateTime.utc(2026, 11, 13, 2),
+              recordedChannelName: 'ESPN+ 58',
+              isDvrRecording: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Recorded', findRichText: true),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining(' · ESPN+ 58', findRichText: true),
+        findsOneWidget,
+      );
+      expect(find.text('00:00:00'), findsNothing);
+      expect(find.text('DVR'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 16));
+    });
+
+    testWidgets(
+      'deletes the recording behind a DVR movie, then leaves the page',
+      (tester) async {
+        final deleted = <String>[];
+        final navigator = GlobalKey<NavigatorState>();
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(useMaterial3: true),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            navigatorKey: navigator,
+            home: const Scaffold(body: Text('Library')),
+          ),
+        );
+        navigator.currentState!.push(
+          MaterialPageRoute<void>(
+            builder: (_) => VodDetailsScreen(
+              item: const VodItem(
+                id: 201,
+                name: 'Fixture Movie',
+                streamUrl: 'http://example.com/movie/201.mp4',
+                containerExtension: 'mp4',
+              ),
+              xtreamService: _VodDetailsXtreamService(
+                info: const VodInfo(
+                  id: 201,
+                  name: 'Fixture Movie',
+                  isDvrRecording: true,
+                  dvrUuid: 'rec-uuid',
+                ),
+              ),
+              onDeleteRecording: (uuid) async => deleted.add(uuid),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Delete recording'));
+        await tester.pumpAndSettle();
+        // The confirm dialog's own "Delete recording" action.
+        await tester.tap(find.text('Delete recording').last);
+        await tester.pumpAndSettle();
+
+        expect(deleted, ['rec-uuid']);
+        expect(find.text('Library'), findsOneWidget);
+        expect(find.byType(VodDetailsScreen), findsNothing);
+
+        await tester.pump(const Duration(seconds: 16));
+      },
+    );
+
+    testWidgets('offers no delete for a movie the viewer cannot manage', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          service: _VodDetailsXtreamService(
+            // A DVR movie someone else recorded: no dvr_uuid is sent.
+            info: const VodInfo(
+              id: 201,
+              name: 'Fixture Movie',
+              isDvrRecording: true,
+            ),
+          ),
+          onDeleteRecording: (_) async {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('DVR'), findsOneWidget);
+      expect(find.text('Delete recording'), findsNothing);
+
+      await tester.pump(const Duration(seconds: 16));
+    });
+
     testWidgets('paints session-cached info without the loading bar', (
       tester,
     ) async {
@@ -361,11 +470,13 @@ class _TestApp extends StatelessWidget {
     required this.service,
     this.progressList = const <Progress>[],
     this.onPlay,
+    this.onDeleteRecording,
   });
 
   final XtreamService service;
   final List<Progress> progressList;
   final void Function(PlayerArgs)? onPlay;
+  final Future<void> Function(String uuid)? onDeleteRecording;
 
   @override
   Widget build(BuildContext context) {
@@ -384,6 +495,7 @@ class _TestApp extends StatelessWidget {
         xtreamService: service,
         progressList: progressList,
         onPlay: onPlay,
+        onDeleteRecording: onDeleteRecording,
       ),
     );
   }

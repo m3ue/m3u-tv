@@ -202,6 +202,10 @@ class VodInfo {
     this.edlUrl,
     this.related,
     this.trailerUrl,
+    this.recordedAt,
+    this.recordedChannelName,
+    this.isDvrRecording = false,
+    this.dvrUuid,
   });
 
   final int id;
@@ -240,6 +244,19 @@ class VodInfo {
   /// YouTube trailer watch URL (`youtube_trailer`), opened externally - see
   /// `openTrailer`.
   final String? trailerUrl;
+
+  /// When and from which channel a DVR recording in the library was made
+  /// (`dvr_recorded_at` / `dvr_channel_name`). Null for ordinary movies.
+  final DateTime? recordedAt;
+  final String? recordedChannelName;
+
+  /// Added to the library from a DVR recording (`dvr_recording`), sent for
+  /// every viewer even when [recordedAt] is withheld.
+  final bool isDvrRecording;
+
+  /// The DVR recording behind this movie (`dvr_uuid`), present only for the
+  /// viewer who may manage it (e.g. delete it).
+  final String? dvrUuid;
 
   factory VodInfo.fromXtream(Map<String, Object?> json) {
     final info = _asMap(json['info']);
@@ -293,6 +310,11 @@ class VodInfo {
       edlUrl: _asNullableString(pick(['edl_url'])),
       related: _parseRelatedList(pick(['related'])),
       trailerUrl: _youtubeTrailerUrl(pick(['youtube_trailer'])),
+      recordedAt: _asDateTimeOrNull(pick(['dvr_recorded_at'])),
+      recordedChannelName: _asNullableString(pick(['dvr_channel_name'])),
+      isDvrRecording:
+          _asBool(pick(['dvr_recording'])) || pick(['dvr_recorded_at']) != null,
+      dvrUuid: _asNullableString(pick(['dvr_uuid'])),
     );
   }
 }
@@ -692,6 +714,8 @@ class Episode {
     this.releaseDate,
     this.streamUrl,
     this.edlUrl,
+    this.isDvrRecording = false,
+    this.dvrUuid,
   });
 
   final String id;
@@ -706,6 +730,13 @@ class Episode {
   final String? releaseDate;
   final String? streamUrl;
   final String? edlUrl;
+
+  /// Added to the library from a DVR recording (`dvr_recording`).
+  final bool isDvrRecording;
+
+  /// The DVR recording behind this episode (`dvr_uuid`), present only for the
+  /// viewer who may manage it (e.g. delete it).
+  final String? dvrUuid;
 
   factory Episode.fromXtream(Map<String, Object?> json, {String? streamUrl}) {
     final info =
@@ -738,6 +769,8 @@ class Episode {
       ),
       streamUrl: streamUrl,
       edlUrl: _asNullableString(pick(['edl_url'])),
+      isDvrRecording: _asBool(json['dvr_recording']),
+      dvrUuid: _asNullableString(json['dvr_uuid']),
     );
   }
 }
@@ -747,11 +780,16 @@ class SeriesInfo {
     required this.series,
     required this.seasons,
     required this.episodesBySeason,
+    this.isDvrRecording = false,
   });
 
   final Series series;
   final List<Season> seasons;
   final Map<int, List<Episode>> episodesBySeason;
+
+  /// A series the DVR created from recordings (`dvr_recording`). Kept here
+  /// rather than on [Series], which the catalog stores.
+  final bool isDvrRecording;
 }
 
 enum DvrRecordingStatus {
@@ -853,6 +891,7 @@ class DvrRecording {
     this.channelId,
     this.channelName,
     this.channelIconUrl,
+    this.posterUrl,
     this.scheduledStart,
     this.scheduledEnd,
     this.actualStart,
@@ -875,6 +914,10 @@ class DvrRecording {
   final int? channelId;
   final String? channelName;
   final String? channelIconUrl;
+
+  /// The library item's poster (the movie poster, or the series cover for
+  /// an episode). Null until the recording is added to the library.
+  final String? posterUrl;
   final DateTime? scheduledStart;
   final DateTime? scheduledEnd;
   final DateTime? actualStart;
@@ -924,6 +967,7 @@ class DvrRecording {
       channelIconUrl: _asNullableString(
         pick(['channel_icon', 'channel_logo', 'stream_icon']),
       ),
+      posterUrl: _asNullableString(pick(['poster', 'cover'])),
       scheduledStart: _asDateTimeOrNull(
         pick(['scheduled_start', 'start_time', 'starts_at']),
       ),

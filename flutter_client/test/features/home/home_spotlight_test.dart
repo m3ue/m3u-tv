@@ -358,6 +358,41 @@ void main() {
         'Utah Mammoth at Toronto Maple Leafs',
       );
     });
+
+    test('a static card previews its artwork, tinted by the first', () {
+      final spotlight = resolve(
+        const StaticSpotlightTarget(
+          id: 'movies-view-all',
+          title: 'Movies',
+          description: 'Browse all movies',
+          kicker: 'View all',
+          icon: IconData(0xe02c),
+          artworkUrls: ['', 'a', ' ', 'b', 'c', 'd', 'e', 'f'],
+          artworkShape: SpotlightArtworkShape.landscape,
+        ),
+      );
+      expect(spotlight.title, 'Movies');
+      expect(spotlight.kicker, 'View all');
+      expect(spotlight.plot, 'Browse all movies');
+      expect(spotlight.artworkUrls, ['a', 'b', 'c', 'd', 'e']);
+      expect(spotlight.artworkShape, SpotlightArtworkShape.landscape);
+      expect(spotlight.toneUrl, 'a');
+      expect(spotlight.backdropUrl, isNull);
+      expect(spotlight.largeTitle, isTrue);
+    });
+
+    test('a static card without artwork keeps its icon', () {
+      final spotlight = resolve(
+        const StaticSpotlightTarget(
+          id: 'dvr',
+          title: 'DVR Recordings',
+          icon: IconData(0xe02c),
+        ),
+      );
+      expect(spotlight.icon, const IconData(0xe02c));
+      expect(spotlight.artworkUrls, isEmpty);
+      expect(spotlight.toneUrl, isNull);
+    });
   });
 
   group('HomeSpotlightController', () {

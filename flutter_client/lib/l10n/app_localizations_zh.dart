@@ -431,6 +431,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchSectionSeries => '剧集';
 
   @override
+  String get searchSectionRecordings => '录制';
+
+  @override
   String get vodSearchHint => '搜索…';
 
   @override
@@ -1027,6 +1030,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeBrowseSeries => '浏览所有剧集';
 
   @override
+  String homeBrowseCategory(String category) {
+    return '$category 中的全部内容';
+  }
+
+  @override
   String get homeNothingToShow => '暂无内容';
 
   @override
@@ -1246,6 +1254,33 @@ class AppLocalizationsZh extends AppLocalizations {
       '请在 simkl.com/settings/developer 注册应用，并通过 --dart-define=SIMKL_CLIENT_ID 设置客户端 ID。';
 
   @override
+  String get mdblistName => 'MDBList';
+
+  @override
+  String get mdblistConnectPrompt => '连接你的 MDBList 账户，自动记录你观看的内容。';
+
+  @override
+  String get mdblistConnectButton => '连接 MDBList';
+
+  @override
+  String get mdblistConnected => '已连接到 MDBList';
+
+  @override
+  String mdblistConnectedAs(String account) {
+    return '已以 $account 身份连接到 MDBList';
+  }
+
+  @override
+  String get mdblistDisconnectButton => '断开 MDBList';
+
+  @override
+  String get mdblistNotConfigured => '未配置 MDBList 客户端 ID。';
+
+  @override
+  String get mdblistNotConfiguredHint =>
+      '请在 mdblist.com/developer 注册应用，并通过 --dart-define=MDBLIST_CLIENT_ID 设置客户端 ID。';
+
+  @override
   String get vodAllMovies => '全部电影';
 
   @override
@@ -1270,6 +1305,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vodDirector => '导演';
+
+  @override
+  String get vodRecorded => '录制时间';
+
+  @override
+  String get detailDvrBadge => '录像';
 
   @override
   String get castShowAll => '查看全部演员';
@@ -1928,6 +1969,13 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get settingsDeinterlaceHint =>
       '消除隔行扫描频道（如 1080i 和 576i）的梳状条纹。会占用更多 CPU。';
+
+  @override
+  String get settingsHideOverlayOnStart => '开始播放时隐藏播放器叠加层';
+
+  @override
+  String get settingsHideOverlayOnStartHint =>
+      '播放开始时只显示画面，不显示控制栏和频道信息。按任意按键或轻触屏幕即可显示。';
 
   @override
   String get settingsBackgroundAudio => '后台音频';

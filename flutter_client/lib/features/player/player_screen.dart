@@ -274,6 +274,8 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool get _showPlaybackDiagnostics =>
       widget.viewSettingsService?.showPlaybackDiagnosticsSync ?? false;
   late double _volume = widget.viewSettingsService?.volumeSync ?? 1.0;
+  bool get _hideOverlayOnStart =>
+      widget.viewSettingsService?.hideOverlayOnStartSync ?? false;
 
   EpgCurrentNext? _epgData;
 
@@ -306,7 +308,9 @@ class _PlayerScreenState extends State<PlayerScreen>
   /// transport bar.
   final FocusNode _upNextFocusNode = FocusNode(debugLabel: 'playerUpNext');
 
-  bool _overlayVisible = true;
+  // Starts hidden when the user opted to open streams on just the picture;
+  // any key or tap still brings it up.
+  late bool _overlayVisible = !_hideOverlayOnStart;
   bool _trackDialogVisible = false;
   bool _dvrSchedulePending = false;
 
@@ -628,7 +632,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       _selectedAudioTrackId = null;
       _selectedSubtitleTrackId = null;
       _epgData = null;
-      _overlayVisible = true;
+      _overlayVisible = !_hideOverlayOnStart;
       _skips.reset();
       _upNextVisible = false;
       _upNextDismissed = false;

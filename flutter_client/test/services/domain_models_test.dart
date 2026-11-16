@@ -426,6 +426,37 @@ void main() {
       );
     });
 
+    test('VodInfo.fromXtream parses when a DVR recording was made', () {
+      final info = VodInfo.fromXtream(<String, Object?>{
+        'info': {
+          'dvr_recorded_at': '2026-11-12T19:00:00-07:00',
+          'dvr_channel_name': 'ESPN+ 58',
+        },
+        'movie_data': {'stream_id': 1, 'name': 'Fairfield vs. Seton Hall'},
+      });
+
+      expect(info.recordedAt, DateTime.utc(2026, 11, 13, 2));
+      expect(info.recordedChannelName, 'ESPN+ 58');
+      expect(info.isDvrRecording, isTrue);
+    });
+
+    test('Episode.fromXtream reads the dvr_recording flag', () {
+      final episode = Episode.fromXtream(<String, Object?>{
+        'id': '1',
+        'episode_num': 1,
+        'title': 'Recorded',
+        'dvr_recording': true,
+      });
+      final ordinary = Episode.fromXtream(<String, Object?>{
+        'id': '2',
+        'episode_num': 2,
+        'title': 'Provider',
+      });
+
+      expect(episode.isDvrRecording, isTrue);
+      expect(ordinary.isDvrRecording, isFalse);
+    });
+
     test('VodInfo.fromXtream parses the related array', () {
       final info = VodInfo.fromXtream(<String, Object?>{
         'info': {

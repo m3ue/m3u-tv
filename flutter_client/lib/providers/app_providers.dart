@@ -147,6 +147,13 @@ final recordingChannelIdsProvider = Provider<Set<int>>((ref) {
   return ref.watch(appStateControllerProvider).appState.recordingChannelIds;
 });
 
+/// Changes when a DVR recording lands in, or is deleted from, the movie or
+/// series catalog. Rows that read a catalog page once include it in their
+/// fetch key so they read again.
+final dvrContentRevisionProvider = Provider<int>((ref) {
+  return ref.watch(appStateControllerProvider).appState.dvrContentRevision;
+});
+
 final sourceLabelProvider = Provider<String>((ref) {
   return ref.watch(appStateControllerProvider).appState.sourceLabel;
 });
@@ -267,6 +274,15 @@ final applyProxyPlaybackProvider =
 /// AppShell leaves that channel's proxy stream running on close (see
 /// `PlaybackOrchestrator.detachStreamSession`) so the preview rejoins it warm.
 final epgPreviewHandoffProvider = StateProvider<Channel?>((ref) => null);
+
+/// A section screen (Live TV, Movies, Series) asked to open on one category:
+/// Home's View all on a server category row. The section screen applies it
+/// when it is for its route, then clears it.
+typedef CategoryOpenRequest = ({String route, String categoryId});
+
+final categoryOpenRequestProvider = StateProvider<CategoryOpenRequest?>(
+  (ref) => null,
+);
 
 // ---------------------------------------------------------------------------
 // Multiview: standalone session state, not backed by AppStateController (it

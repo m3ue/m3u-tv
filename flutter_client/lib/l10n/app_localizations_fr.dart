@@ -440,6 +440,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get searchSectionSeries => 'Série';
 
   @override
+  String get searchSectionRecordings => 'Enregistrements';
+
+  @override
   String get vodSearchHint => 'Rechercher…';
 
   @override
@@ -1084,6 +1087,11 @@ class AppLocalizationsFr extends AppLocalizations {
   String get homeBrowseSeries => 'Parcourir toutes les séries';
 
   @override
+  String homeBrowseCategory(String category) {
+    return 'Tout dans $category';
+  }
+
+  @override
   String get homeNothingToShow => 'Rien à afficher pour le moment';
 
   @override
@@ -1313,6 +1321,35 @@ class AppLocalizationsFr extends AppLocalizations {
       'Enregistrez une application sur simkl.com/settings/developer et définissez l\'identifiant client avec --dart-define=SIMKL_CLIENT_ID.';
 
   @override
+  String get mdblistName => 'MDBList';
+
+  @override
+  String get mdblistConnectPrompt =>
+      'Connectez votre compte MDBList pour suivre automatiquement ce que vous regardez.';
+
+  @override
+  String get mdblistConnectButton => 'Se connecter avec MDBList';
+
+  @override
+  String get mdblistConnected => 'Connecté à MDBList';
+
+  @override
+  String mdblistConnectedAs(String account) {
+    return 'Connecté à MDBList en tant que $account';
+  }
+
+  @override
+  String get mdblistDisconnectButton => 'Déconnecter MDBList';
+
+  @override
+  String get mdblistNotConfigured =>
+      'L\'identifiant client MDBList n\'est pas configuré.';
+
+  @override
+  String get mdblistNotConfiguredHint =>
+      'Enregistrez une application sur mdblist.com/developer et définissez l\'identifiant client avec --dart-define=MDBLIST_CLIENT_ID.';
+
+  @override
   String get vodAllMovies => 'Tous les films';
 
   @override
@@ -1337,6 +1374,12 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get vodDirector => 'Réalisateur';
+
+  @override
+  String get vodRecorded => 'Enregistré';
+
+  @override
+  String get detailDvrBadge => 'DVR';
 
   @override
   String get castShowAll => 'Voir tout le casting';
@@ -2013,6 +2056,14 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsDeinterlaceHint =>
       'Atténue les lignes en peigne des chaînes entrelacées (comme 1080i et 576i). Utilise davantage le processeur.';
+
+  @override
+  String get settingsHideOverlayOnStart =>
+      'Masquer l\'overlay du lecteur au démarrage';
+
+  @override
+  String get settingsHideOverlayOnStartHint =>
+      'Les flux s\'ouvrent uniquement sur l\'image, sans les commandes ni les infos de la chaîne. Appuyez sur n\'importe quel bouton ou touchez l\'écran pour les afficher.';
 
   @override
   String get settingsBackgroundAudio => 'Audio en arrière-plan';
