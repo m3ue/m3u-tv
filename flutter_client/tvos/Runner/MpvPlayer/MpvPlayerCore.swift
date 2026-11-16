@@ -169,6 +169,10 @@ final class MpvPlayerCore {
       // ordering avoids a freeze on player exit specific to this VO on tvOS.
       mpv_set_option_string(handle, "avfoundation-composite-osd", "yes")
       mpv_set_option_string(handle, "vo", "avfoundation")
+      // mpv's default title expands media-title on every OSD update, to name
+      // a window and audio stream nothing here uses: a constant one saves
+      // about 2% of player CPU. macOS keeps the default.
+      mpv_set_option_string(handle, "title", "mpv")
       mpv_set_option_string(handle, "hwdec", "videotoolbox")
       mpv_set_option_string(handle, "hwdec-codecs", "all")
       mpv_set_option_string(handle, "hwdec-software-fallback", "yes")

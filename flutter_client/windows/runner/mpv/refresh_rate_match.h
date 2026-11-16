@@ -21,15 +21,16 @@ inline double EffectiveRefreshRate(uint32_t rate) {
   return static_cast<double>(rate);
 }
 
-// The best of `rates` (whole-hertz values as Windows reports them) for
-// `video_fps`: the lowest whole multiple of it within 0.5%, and of those the
-// closest, so 23.976 fps content takes a 23 (23.976) Hz mode over 24 Hz and an
-// exact rate beats any multiple. 0 when no rate is within tolerance.
-inline uint32_t FindBestRefreshRate(double video_fps, const std::vector<uint32_t>& rates) {
-  if (!(video_fps > 0.0)) return 0;
-  uint32_t best_rate = 0;
+struct RateMatch {
+  uint32_t rate = 0;
+  double deviation = 0.0;
+};
+
+// The lowest whole multiple of `video_fps` among `rates` within 0.5%, and of
+// those the closest. rate is 0 when no rate is within tolerance.
+inline RateMatch LowestMultiple(double video_fps, const std::vector<uint32_t>& rates) {
+  RateMatch best;
   int best_multiplier = 0;
-  double best_deviation = 0.0;
   for (const uint32_t rate : rates) {
     if (rate == 0) continue;
     const double ratio = EffectiveRefreshRate(rate) / video_fps;
@@ -38,16 +39,43 @@ inline uint32_t FindBestRefreshRate(double video_fps, const std::vector<uint32_t
     const int multiplier = static_cast<int>(rounded);
     const double deviation = std::fabs(ratio - rounded) / rounded;
     if (deviation > 0.005) continue;
-    const bool better = best_rate == 0 || multiplier < best_multiplier ||
+    const bool better = best.rate == 0 || multiplier < best_multiplier ||
                         (multiplier == best_multiplier &&
-                         (deviation < best_deviation || (deviation == best_deviation && rate > best_rate)));
+                         (deviation < best.deviation || (deviation == best.deviation && rate > best.rate)));
     if (better) {
-      best_rate = rate;
+      best = {rate, deviation};
       best_multiplier = multiplier;
-      best_deviation = deviation;
     }
   }
-  return best_rate;
+  return best;
+}
+
+// 25 and 29.97/30 fps-class content, which a 50/60 Hz mode shows at exactly
+// twice its rate.
+constexpr double kHalfRateMinFps = 24.5;
+constexpr double kHalfRateMaxFps = 30.5;
+
+// Relative rate error below which two matches count as equally precise: above
+// the rounding in reported rates, below the 0.1% NTSC mismatch.
+constexpr double kPreciseDeviation = 0.0002;
+
+// The best of `rates` (whole-hertz values as Windows reports them) for
+// `video_fps`: the lowest whole multiple of it within 0.5%, and of those the
+// closest, so 23.976 fps content takes a 23 (23.976) Hz mode over 24 Hz and an
+// exact rate beats any multiple. 25 and 30 fps-class content takes 50/60 Hz
+// over its own 25/30 Hz modes unless they are more precise, as the Android
+// DisplayModeSelector does: 2:2 has no judder, and a 25/30 Hz desktop drags
+// the UI down with it. 0 when no rate is within tolerance.
+inline uint32_t FindBestRefreshRate(double video_fps, const std::vector<uint32_t>& rates) {
+  if (!(video_fps > 0.0)) return 0;
+  const RateMatch own = LowestMultiple(video_fps, rates);
+  if (video_fps >= kHalfRateMinFps && video_fps <= kHalfRateMaxFps) {
+    const RateMatch doubled = LowestMultiple(video_fps * 2.0, rates);
+    if (doubled.rate != 0 && (own.rate == 0 || doubled.deviation - own.deviation < kPreciseDeviation)) {
+      return doubled.rate;
+    }
+  }
+  return own.rate;
 }
 
 }  // namespace refresh_rate_match

@@ -95,4 +95,54 @@ class DisplayModeSelectorTest {
         val result = DisplayModeSelector.bestMode(listOf(sixty, twentyFour), currentModeId = 99, targetFps = 24.0)
         assertNull(result)
     }
+
+    @Test
+    fun takesFiftyHertzOverTwentyFiveForBroadcastPal() {
+        val twentyFive = Mode(modeId = 8, refreshRate = 25.0, width = 3840, height = 2160)
+        val result = DisplayModeSelector.bestMode(listOf(sixty, fifty, twentyFive), currentModeId = 1, targetFps = 25.0)
+        assertEquals(fifty, result)
+    }
+
+    @Test
+    fun takesFiftyNineNinetyFourOverTheActiveSixtyForNtscVideo() {
+        // 60.000 Hz is a 2x of 29.97 within tolerance but repeats a frame every
+        // ~17 s; 59.94 Hz is the precise doubled rate, and beats 29.97 Hz.
+        val ntscSixty = Mode(modeId = 7, refreshRate = 59.94006, width = 3840, height = 2160)
+        val ntscThirty = Mode(modeId = 9, refreshRate = 29.97003, width = 3840, height = 2160)
+        val result = DisplayModeSelector.bestMode(
+            listOf(sixty, ntscSixty, ntscThirty),
+            currentModeId = 1,
+            targetFps = 30000.0 / 1001.0,
+        )
+        assertEquals(ntscSixty, result)
+    }
+
+    @Test
+    fun keepsAPreciseOwnRateWhenNoPreciseMultipleExists() {
+        // No 59.94 mode: 29.97 Hz is precise, 60.000 Hz is not.
+        val ntscThirty = Mode(modeId = 9, refreshRate = 29.97003, width = 3840, height = 2160)
+        val result = DisplayModeSelector.bestMode(listOf(sixty, ntscThirty), currentModeId = 1, targetFps = 30000.0 / 1001.0)
+        assertEquals(ntscThirty, result)
+    }
+
+    @Test
+    fun keepsAnActiveOneTwentyForThirtyFps() {
+        val activeOneTwenty = Mode(modeId = 3, refreshRate = 120.0, width = 3840, height = 2160)
+        val result = DisplayModeSelector.bestMode(listOf(sixty, activeOneTwenty), currentModeId = 3, targetFps = 30.0)
+        assertEquals(activeOneTwenty, result)
+    }
+
+    @Test
+    fun takesSixtyOverOneTwentyFromAnotherModeForThirtyFps() {
+        val thirty = Mode(modeId = 10, refreshRate = 30.0, width = 3840, height = 2160)
+        val result = DisplayModeSelector.bestMode(listOf(fifty, sixty, oneTwenty, thirty), currentModeId = 2, targetFps = 30.0)
+        assertEquals(sixty, result)
+    }
+
+    @Test
+    fun doesNotDoubleFilmRates() {
+        val fortyEight = Mode(modeId = 6, refreshRate = 48.0, width = 3840, height = 2160)
+        val result = DisplayModeSelector.bestMode(listOf(sixty, fortyEight, twentyFour), currentModeId = 1, targetFps = 24.0)
+        assertEquals(twentyFour, result)
+    }
 }
