@@ -40,8 +40,12 @@ String _catalogDisplayTitle(AppLocalizations l, AIOStreamsCatalog catalog) {
 IconData _catalogTypeIcon(AIOStreamsCatalog catalog) =>
     catalog.type == 'series' ? Icons.tv : Icons.movie;
 
-/// Full-screen catalog browser for a single AIOStreams catalog.
-/// Supports lazy pagination and optional text search.
+/// Full-screen "View All" browser for a single AIOStreams catalog, opened
+/// from the View All card at the end of its row on the AIOStreams tab.
+///
+/// Pages through the catalog with the Stremio `skip` extra (an item offset)
+/// as focus or scroll nears the end of the grid, or on the Load more button,
+/// and searches it when the catalog is searchable.
 class AIOStreamsCatalogScreen extends StatefulWidget {
   const AIOStreamsCatalogScreen({
     super.key,
@@ -49,6 +53,7 @@ class AIOStreamsCatalogScreen extends StatefulWidget {
     required this.catalog,
     required this.apiService,
     required this.onItemSelect,
+    this.favoritesService,
     this.onSidebarActivate,
   });
 
@@ -56,6 +61,7 @@ class AIOStreamsCatalogScreen extends StatefulWidget {
   final AIOStreamsCatalog catalog;
   final AIOStreamsApiService apiService;
   final void Function(AIOStreamsItem) onItemSelect;
+  final AIOStreamsFavoritesService? favoritesService;
   final VoidCallback? onSidebarActivate;
 
   @override
@@ -64,31 +70,52 @@ class AIOStreamsCatalogScreen extends StatefulWidget {
 }
 
 class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
-  static const int _pageSize = 20;
+  /// Focusing a card within this many of the last one fetches the next page,
+  /// so D-pad browsing rarely has to wait on the Load more button.
+  static const int _prefetchThreshold = 12;
 
   final List<AIOStreamsItem> _items = [];
+  final Set<String> _itemIds = {};
   final ScrollController _scrollController = ScrollController();
-  final TextEditingController _searchController = TextEditingController();
 
   bool _loading = false;
   bool _hasMore = true;
+
+  /// Offset of the next page, counted in items the addon has returned
+  /// (before de-duplication), since that is what `skip` pages by.
   int _skip = 0;
   String _search = '';
   Timer? _searchDebounce;
+
+  /// Bumped when the search changes so a page still in flight for the old
+  /// query is dropped instead of appended to the new results.
+  int _generation = 0;
+  Set<String> _favoriteIds = const {};
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    widget.favoritesService?.addListener(_onFavoritesChanged);
+    unawaited(_loadFavorites());
     unawaited(_loadPage());
   }
 
   @override
   void dispose() {
+    widget.favoritesService?.removeListener(_onFavoritesChanged);
     _scrollController.dispose();
-    _searchController.dispose();
     _searchDebounce?.cancel();
     super.dispose();
+  }
+
+  void _onFavoritesChanged() => unawaited(_loadFavorites());
+
+  Future<void> _loadFavorites() async {
+    final favorites = await widget.favoritesService?.all() ?? const [];
+    if (mounted) {
+      setState(() => _favoriteIds = favorites.map((f) => f.id).toSet());
+    }
   }
 
   void _onScroll() {
@@ -100,6 +127,7 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
 
   Future<void> _loadPage() async {
     if (_loading) return;
+    final generation = _generation;
     setState(() => _loading = true);
 
     final results = await widget.apiService.getCatalog(
@@ -110,14 +138,28 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
       search: _search.isEmpty ? null : _search,
     );
 
-    if (mounted) {
-      setState(() {
-        _items.addAll(results);
-        _skip += results.length;
-        _hasMore = results.length >= _pageSize;
-        _loading = false;
-      });
+    if (!mounted) return;
+    if (generation != _generation) {
+      // The search changed while this page was loading; start the new
+      // query's first page now that the old request is out of the way.
+      setState(() => _loading = false);
+      unawaited(_loadPage());
+      return;
     }
+
+    // A page that is empty or adds nothing new ends paging. Addon page
+    // sizes vary, so a short page alone isn't proof of the end, and a
+    // catalog that ignores `skip` would otherwise repeat its first page
+    // forever.
+    final newItems = results
+        .where((item) => _itemIds.add(item.id))
+        .toList(growable: false);
+    setState(() {
+      _items.addAll(newItems);
+      _skip += results.length;
+      _hasMore = newItems.isNotEmpty;
+      _loading = false;
+    });
   }
 
   Future<void> _loadMore() async {
@@ -131,7 +173,9 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
       if (mounted && query != _search) {
         setState(() {
           _search = query;
+          _generation++;
           _items.clear();
+          _itemIds.clear();
           _skip = 0;
           _hasMore = true;
         });
@@ -140,11 +184,18 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
     });
   }
 
+  void _onCardFocused(int index) {
+    if (index >= _items.length - _prefetchThreshold) {
+      unawaited(_loadMore());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scale = FontSizeScope.scaleOf(context);
+    final favoritesService = widget.favoritesService;
 
     return DpadRegion(
       horizontalEdge: DpadEdgeBehavior.stop,
@@ -191,19 +242,13 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
                     ),
                     if (widget.catalog.searchable) ...[
                       const SizedBox(height: 16),
-                      TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: l.aiostreamsSearchHint,
-                          prefixIcon: Icon(Icons.search, size: 24 * scale),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 12 * scale,
-                            vertical: 16 * scale,
-                          ),
-                        ),
+                      // activateOnSelect: D-padding down to the grid passes
+                      // over this field, so it must not grab the keyboard
+                      // until Select is pressed on it.
+                      InlineMediaSearchField(
+                        query: _search,
+                        hintText: l.aiostreamsSearchHint,
+                        activateOnSelect: true,
                         onChanged: _onSearchChanged,
                       ),
                     ],
@@ -242,7 +287,22 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
                               ? Icons.tv
                               : Icons.movie,
                           fallbackTitle: item.name,
+                          isFavorite: _favoriteIds.contains(item.id),
                           onTap: () => widget.onItemSelect(item),
+                          onFocused: () => _onCardFocused(index),
+                          onLongTap: favoritesService == null
+                              ? null
+                              : () => unawaited(
+                                  favoritesService.toggle(
+                                    AIOStreamsFavoriteItem(
+                                      id: item.id,
+                                      type: item.type,
+                                      name: item.name,
+                                      integrationId: widget.integrationId,
+                                      poster: item.poster,
+                                    ),
+                                  ),
+                                ),
                         ),
                       );
                     },
@@ -333,6 +393,7 @@ class AIOStreamsHomeScreen extends StatefulWidget {
     required this.onItemSelect,
     required this.onPlay,
     required this.onSearchSelect,
+    this.onCatalogSelect,
     this.favoritesService,
     this.progressList = const [],
     this.onSidebarActivate,
@@ -345,6 +406,11 @@ class AIOStreamsHomeScreen extends StatefulWidget {
   final void Function(AIOStreamsItem, int integrationId) onItemSelect;
   final void Function(PlayerArgs) onPlay;
   final VoidCallback onSearchSelect;
+
+  /// Opens a catalog's full "View All" grid. Null hides the rows' View All
+  /// cards.
+  final void Function(AIOStreamsCatalog catalog, int integrationId)?
+  onCatalogSelect;
   final AIOStreamsFavoritesService? favoritesService;
   final List<Progress> progressList;
   final VoidCallback? onSidebarActivate;
@@ -670,6 +736,9 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
                   useSidebarLayout: widget.useSidebarLayout,
                   onItemSelect: (item) =>
                       widget.onItemSelect(item, integration.id),
+                  onViewAll: widget.onCatalogSelect == null
+                      ? null
+                      : () => widget.onCatalogSelect!(catalog, integration.id),
                   onSidebarActivate: widget.onSidebarActivate,
                 ),
           ],
@@ -687,6 +756,7 @@ class AIOStreamsCatalogRow extends StatefulWidget {
     required this.integrationId,
     required this.apiService,
     required this.onItemSelect,
+    this.onViewAll,
     this.favoritesService,
     this.favoriteIds = const {},
     this.onSidebarActivate,
@@ -697,6 +767,10 @@ class AIOStreamsCatalogRow extends StatefulWidget {
   final int integrationId;
   final AIOStreamsApiService apiService;
   final void Function(AIOStreamsItem) onItemSelect;
+
+  /// Opens the catalog's full grid from a View All card after the row's
+  /// items, since the row itself only previews the first page.
+  final VoidCallback? onViewAll;
   final AIOStreamsFavoritesService? favoritesService;
   final Set<String> favoriteIds;
   final VoidCallback? onSidebarActivate;
@@ -721,6 +795,7 @@ class _AIOStreamsCatalogRowState extends State<AIOStreamsCatalogRow> {
       future: _future,
       builder: (context, snapshot) {
         final items = snapshot.data ?? const [];
+        final onViewAll = widget.onViewAll;
         return MediaPreviewSection(
           title: _catalogDisplayTitle(l, widget.catalog),
           titleIcon: _catalogTypeIcon(widget.catalog),
@@ -728,7 +803,15 @@ class _AIOStreamsCatalogRowState extends State<AIOStreamsCatalogRow> {
           posterStyle: true,
           isLoading: snapshot.connectionState == ConnectionState.waiting,
           useSidebarLayout: widget.useSidebarLayout,
+          viewAll: onViewAll == null || items.isEmpty
+              ? null
+              : MediaPreviewItem(
+                  title: l.homeViewAll,
+                  fallbackIcon: Icons.arrow_forward,
+                  onTap: onViewAll,
+                ),
           items: items
+              .take(MediaPreviewSection.maxVisibleItems)
               .map(
                 (item) => MediaPreviewItem(
                   title: item.name,

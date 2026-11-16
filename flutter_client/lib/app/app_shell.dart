@@ -43,6 +43,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/dvr_actions.dart';
 import 'package:m3u_tv/services/memory_watchdog.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
+import 'package:m3u_tv/services/xtream_service.dart' show AIOStreamsCatalog;
 import 'package:m3u_tv/shared/app_background.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/app_modal.dart';
@@ -1516,6 +1517,20 @@ class AppShellState extends ConsumerState<AppShell>
     );
   }
 
+  void _openAioCatalog(AIOStreamsCatalog catalog, int integrationId) {
+    unawaited(
+      _pushDetail(
+        RouteNames.aiostreamsCatalogFor(
+          integrationId,
+          catalog.type,
+          catalog.id,
+        ),
+        extra: catalog,
+        fullScreen: true,
+      ),
+    );
+  }
+
   void _openShow(EpgShow show) {
     // No `fullScreen: true` - the show details route is top-level too (see
     // _openVod), so it already covers the whole screen by painting above
@@ -1752,6 +1767,7 @@ class AppShellState extends ConsumerState<AppShell>
           onItemSelect: _openAioStreamsItem,
           onPlay: _openPlayerFromActions,
           onSearchSelect: _openAioSearch,
+          onCatalogSelect: _openAioCatalog,
           favoritesService: _appState.aioFavoritesService,
           progressList: _appState.progressList,
           onSidebarActivate: _activateSidebar,
