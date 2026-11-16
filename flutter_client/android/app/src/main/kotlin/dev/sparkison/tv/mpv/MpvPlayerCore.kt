@@ -271,6 +271,13 @@ class MpvPlayerCore(
                         // cost and, on a failed open, a yt-dlp spawn with the
                         // stream's access token in its argv.
                         setOption("ytdl", "no")
+                        // Builtin Lua scripts nothing in the app reaches;
+                        // see UNUSED_BUILTIN_SCRIPT_OPTIONS. Best-effort:
+                        // mpv only defines these with Lua built in, and a
+                        // missing option must not stop the player starting.
+                        for (name in UNUSED_BUILTIN_SCRIPT_OPTIONS) {
+                            runCatching { setOption(name, "no") }
+                        }
                         // Unlike the macOS/Windows/Linux cores, this vendored
                         // Android libmpv build has no font backend at all
                         // (no fontconfig, and no CoreText/DirectWrite
@@ -885,6 +892,26 @@ class MpvPlayerCore(
     }
 
     companion object {
+        /**
+         * mpv's builtin Lua scripts that nothing in the app reaches: the stats
+         * overlay, console, selection menus, drag-to-pan, the `open` prompt and
+         * the context menu answer key bindings and script messages this app
+         * never sends, and auto-profiles serves a config file the player never
+         * reads. Each is a Lua state started by `mpv_initialize`, most keep a
+         * thread for the life of the player, and the first `loadfile` waits
+         * for all of them: about 50 ms to first frame and 4-6 MB of native
+         * heap per player. Options, so set before init.
+         */
+        private val UNUSED_BUILTIN_SCRIPT_OPTIONS = listOf(
+            "load-stats-overlay",
+            "load-console",
+            "load-auto-profiles",
+            "load-select",
+            "load-positioning",
+            "load-commands",
+            "load-context-menu",
+        )
+
         private const val TAG = "MpvPlayerCore"
 
         // How long surfaceDestroyed blocks waiting for the queued handoff to

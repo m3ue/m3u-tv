@@ -246,7 +246,7 @@ bool DisplayModeManager::MatchRefreshRate(HWND window, double target_fps) {
   for (const DisplayMode& mode : EnumerateDisplayModes(window)) {
     if (mode.width == current.width && mode.height == current.height) rates.push_back(mode.refresh_rate);
   }
-  const uint32_t best_rate = refresh_rate_match::FindBestRefreshRate(target_fps, rates);
+  const uint32_t best_rate = refresh_rate_match::FindBestRefreshRate(target_fps, rates, current.refresh_rate);
   if (best_rate == 0 || best_rate == current.refresh_rate) return false;
   // A copy: the enumerated modes are a temporary that ends with the loop.
   const DisplayMode best_mode{current.width, current.height, best_rate};
