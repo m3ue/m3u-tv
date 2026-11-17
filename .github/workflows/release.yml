@@ -533,7 +533,10 @@ jobs:
   # ── Linux ─────────────────────────────────────────────────────────────────
   build-linux:
     name: Build Linux ZIP
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: the Linux ZIP links against the build
+    # host's glibc/GTK/ffmpeg, so building on a newer Ubuntu drops support
+    # for older distros. Bump deliberately, with ALLOWED_SYSTEM_LIBS.
+    runs-on: ubuntu-24.04
     needs: validate
     defaults:
       run:
