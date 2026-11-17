@@ -825,7 +825,18 @@ void main() {
     final linuxJob = ciWorkflow.substring(linuxJobIdx, windowsJobIdx);
     final windowsJob = ciWorkflow.substring(windowsJobIdx);
 
-    expect(linuxJob, contains('runs-on: ubuntu-latest'));
+    // Pinned: a Linux build links against the host's glibc/GTK/ffmpeg, so
+    // ubuntu-latest moving to a newer release breaks older distros.
+    expect(linuxJob, contains('runs-on: ubuntu-24.04'));
+    expect(linuxJob, isNot(contains('runs-on: ubuntu-latest')));
+    final releaseWorkflow = readFile(releaseWorkflowPath);
+    final releaseLinuxIdx = releaseWorkflow.indexOf('  build-linux:');
+    expect(releaseLinuxIdx, greaterThan(-1));
+    final releaseLinuxHeader = releaseWorkflow.substring(
+      releaseLinuxIdx,
+      releaseWorkflow.indexOf('steps:', releaseLinuxIdx),
+    );
+    expect(releaseLinuxHeader, contains('runs-on: ubuntu-24.04'));
     expect(linuxJob, contains('flutter build linux --release'));
     expect(linuxJob, isNot(contains('upload-artifact')));
     expect(windowsJob, contains('runs-on: windows-latest'));
