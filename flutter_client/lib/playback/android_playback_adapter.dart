@@ -434,7 +434,6 @@ abstract class AndroidMedia3Host {
 
   /// See [DisplayModeController].
   Future<void> setAllowDisplayModeChanges(
-    // ignore: avoid_positional_boolean_parameters
     bool allowed,
   );
 

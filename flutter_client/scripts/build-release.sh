@@ -19,7 +19,10 @@
 #   --upload       Upload Apple builds to App Store Connect with altool. Needs
 #                  ASC_API_KEY_ID and ASC_API_ISSUER_ID set, and the key file
 #                  AuthKey_<id>.p8 in ~/.appstoreconnect/private_keys/.
-#                  Without them, the build is opened in Transporter instead.
+#                  Without them, the build is offered to Transporter instead.
+#                  Apple builds that aren't uploaded are offered to Transporter
+#                  in one prompt after every platform has finished, so a
+#                  multi-platform run doesn't stop between builds.
 #   --xcode        Apple builds: stop after archiving and open the archive in
 #                  Xcode's Organizer (Distribute App) instead of exporting.
 #   --clean        Run `flutter clean` before building.
@@ -208,7 +211,12 @@ zip_dir() {
     info "${GREEN}-> build/release/v$VERSION/$(basename "$zip_path")${RESET}"
 }
 
-# Uploads an exported Apple package, or hands it to Transporter.
+# Apple packages waiting for Transporter. Each platform builds in its own
+# subshell, so they're queued in a file rather than an array.
+TRANSPORTER_QUEUE="$(mktemp)"
+trap 'rm -f "$TRANSPORTER_QUEUE"' EXIT
+
+# Uploads an exported Apple package, or queues it for Transporter.
 deliver_apple() {
     local package="$1" platform="$2"
     if $UPLOAD; then
@@ -220,8 +228,22 @@ deliver_apple() {
         fi
         warn "ASC_API_KEY_ID / ASC_API_ISSUER_ID not set; opening Transporter instead."
     fi
-    if [[ -d "/Applications/Transporter.app" ]] && confirm "    Open $(basename "$package") in Transporter?"; then
-        run open -a Transporter "$package"
+    if [[ -d "/Applications/Transporter.app" ]]; then
+        echo "$package" >>"$TRANSPORTER_QUEUE"
+        info "Will offer $(basename "$package") to Transporter once all builds finish."
+    fi
+}
+
+offer_transporter() {
+    local packages=()
+    while IFS= read -r package; do
+        [[ -n "$package" ]] && packages+=("$package")
+    done <"$TRANSPORTER_QUEUE"
+    [[ ${#packages[@]} -gt 0 ]] || return 0
+    step "Transporter"
+    for package in "${packages[@]}"; do info "$(basename "$package")"; done
+    if confirm "    Open ${#packages[@]} build(s) in Transporter?"; then
+        run open -a Transporter "${packages[@]}"
     fi
 }
 
@@ -260,7 +282,13 @@ build_ios() {
 
 build_tvos() {
     require flutter-tvos "Install it per the tvOS section of the root README."
-    local archive=build/tvos/Runner.xcarchive export_dir=build/tvos/export
+    # Not under build/tvos: flutter-tvos uses that folder as its asset output
+    # and copies all of it (bar Xcode's *-appletvos dirs) into
+    # tvos/Flutter/flutter_assets, so an archive left there ships inside the
+    # next build's app. Clear what older runs of this script left behind.
+    local archive=build/tvos-release/Runner.xcarchive export_dir=build/tvos-release/export
+    rm -rf build/tvos/Runner.xcarchive build/tvos/export \
+        tvos/Flutter/flutter_assets/Runner.xcarchive tvos/Flutter/flutter_assets/export
 
     # flutter-tvos always forces Automatic signing on its internal xcodebuild
     # call, which fails against this project's Manual signing. The Dart AOT
@@ -413,4 +441,5 @@ if [[ -d "$OUT_DIR" ]]; then
         [[ -e "$artifact" ]] && info "  $(basename "$artifact")"
     done
 fi
+offer_transporter
 [[ ${#FAILED[@]} -eq 0 ]]

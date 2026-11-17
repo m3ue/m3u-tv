@@ -45,7 +45,7 @@ void main() {
   test('every workflow job pins the same Flutter SDK', () {
     // Bumping Flutter means changing every pin; a missed one would ship
     // release artifacts built by mixed SDKs.
-    const pinnedFlutterVersion = '3.47.7';
+    const pinnedFlutterVersion = '3.50.0';
     final pin = RegExp(r'''flutter-version:\s*['"]?([^'"\s]+)''');
     for (final path in <String>[ciWorkflowPath, releaseWorkflowPath]) {
       final versions = pin

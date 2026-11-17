@@ -104,7 +104,6 @@ abstract class PictureInPictureProvider {
 // ignore: one_member_abstracts
 abstract class HdrToggleProvider {
   Future<void> setHdrEnabled(
-    // ignore: avoid_positional_boolean_parameters
     bool enabled,
   );
 }
@@ -134,7 +133,6 @@ abstract class RuntimeSubtitleProvider {
 // ignore: one_member_abstracts
 abstract class DisplayModeController {
   Future<void> setAllowDisplayModeChanges(
-    // ignore: avoid_positional_boolean_parameters
     bool allowed,
   );
 }

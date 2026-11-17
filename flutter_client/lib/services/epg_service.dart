@@ -62,7 +62,6 @@ class EpgService extends ChangeNotifier {
   /// if catchup isn't supported, otherwise [catchupDays] or
   /// [kCatchupFallbackDays] when unspecified.
   static int effectiveCatchupRetentionDays(
-    // ignore: avoid_positional_boolean_parameters
     bool catchupSupported,
     int? catchupDays,
   ) {
