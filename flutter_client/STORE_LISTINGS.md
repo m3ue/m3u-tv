@@ -2,7 +2,7 @@
 
 Source of truth for the copy pasted into App Store Connect, Google Play Console and Microsoft Partner Center. Update this file first, then copy into the stores, so the listings never live only in a store dashboard again.
 
-Last reviewed against: **v1.3.0** (2026-11-10). Store artwork is generated separately by `scripts/generate-store-assets.sh` (headers and banners) and `scripts/generate-screenshots.sh` (screenshots).
+Last reviewed against: **v1.3.1** (2026-11-17). Store artwork is generated separately by `scripts/generate-store-assets.sh` (headers and banners) and `scripts/generate-screenshots.sh` (screenshots).
 
 ## Rules for every listing
 
@@ -73,7 +73,7 @@ Self-hosted live TV and movies
 #### Promotional text (170)
 
 ```
-New: settings and Home layouts set up from your server, SIMKL sync, online subtitles, and audio and subtitle sync. Your server, built for the big screen.
+New: MDBList sync, DVR recordings you can manage right from movie and episode pages, and recordings in Search. Your server, built for the big screen.
 ```
 
 #### Keywords (100)
@@ -126,7 +126,7 @@ MOVIES AND SERIES
 • Request new movies and shows through your server, and pick which service handles it when there's more than one.
 
 SEARCH
-• One search across channels, guide listings, movies and series.
+• One search across channels, guide listings, movies, series and recordings.
 
 PLAYBACK
 • Native mpv playback with an automatic AVKit fallback.
@@ -138,7 +138,7 @@ PLAYBACK
 MADE FOR YOUR HOUSEHOLD
 • Multiple viewers, each with their own history and favorites.
 • Keep several playlists on one device, from one server or more, each with its own favorites and guide.
-• Trakt and SIMKL watch history sync, from the device or from your server.
+• Trakt, SIMKL and MDBList watch history sync, from the device or from your server.
 • Settings and Home layouts your server can set up for every device, as defaults or locked.
 • Quick setup: pair your Apple TV by scanning a QR code with your phone, and add several playlists in one go.
 • Adjustable display scale, remote button mapping and navigation sounds.
@@ -174,6 +174,7 @@ OPTIONAL THIRD-PARTY SERVICES
 These are contacted only when you use the related feature:
 • Trakt (trakt.tv): if you connect a Trakt account, your watch history is synced with Trakt. Access tokens are stored in the Keychain, and you can disconnect at any time in Settings. Trakt privacy policy: trakt.tv/privacy
 • SIMKL (simkl.com): if you connect a SIMKL account, your watch history is synced with SIMKL. Access tokens are stored in the Keychain, and you can disconnect at any time in Settings. SIMKL privacy policy: simkl.com/privacy
+• MDBList (mdblist.com): if you connect an MDBList account, your watch history is synced with MDBList. Access tokens are stored in the Keychain, and you can disconnect at any time in Settings. MDBList privacy policy: mdblist.com/privacy
 • TheIntroDB (theintrodb.org): when Skip Intro and Skip Credits are enabled, the app sends the public TMDB or IMDb ID, season and episode number of what you are watching to look up intro and credits timestamps. No personal information is sent. You can turn this off in Settings.
 • OpenSubtitles (through its public Stremio add-on, opensubtitles-v3.strem.io): when you choose Search online in the player's subtitle menu, the app sends the public IMDb ID, season and episode number of what you are watching to find subtitles. No personal information is sent. You can turn this off, or choose another subtitle source, in Settings.
 • GitHub (github.com): the app reads M3U TV's public release information from GitHub to show release notes and tell you when a new version is out. Nothing about you is sent beyond what any web request includes.
@@ -182,7 +183,7 @@ Artwork and metadata are provided by your own server, which may source them from
 
 DATA RETENTION AND CONTROL
 
-Log out, disconnect Trakt or SIMKL, or delete the app to remove all data stored on your Apple TV. Data on your own server, such as watch history, registered devices and uploaded logs, is controlled by that server's administrator and can be deleted there.
+Log out, disconnect Trakt, SIMKL or MDBList, or delete the app to remove all data stored on your Apple TV. Data on your own server, such as watch history, registered devices and uploaded logs, is controlled by that server's administrator and can be deleted there.
 
 CHILDREN
 
@@ -251,7 +252,7 @@ MOVIES AND SERIES
 • Request new movies and shows through your server, and pick which service handles it when there's more than one.
 
 SEARCH
-• One search across channels, guide listings, movies and series.
+• One search across channels, guide listings, movies, series and recordings.
 
 PLAYBACK
 • Native mpv playback with an automatic AVKit fallback.
@@ -269,7 +270,7 @@ CARPLAY
 MADE FOR YOUR HOUSEHOLD
 • Multiple viewers, each with their own history and favorites.
 • Keep several playlists on one device, from one server or more, each with its own favorites and guide.
-• Trakt and SIMKL watch history sync, from the device or from your server.
+• Trakt, SIMKL and MDBList watch history sync, from the device or from your server.
 • Settings and Home layouts your server can set up for every device, as defaults or locked.
 • A notification center for alerts from your server, with per-channel subscriptions.
 • Adjustable display scale.
@@ -338,7 +339,7 @@ MOVIES AND SERIES
 • Request new movies and shows through your server, and pick which service handles it when there's more than one.
 
 SEARCH
-• One search across channels, guide listings, movies and series.
+• One search across channels, guide listings, movies, series and recordings.
 
 PLAYBACK
 • Native mpv playback that handles a wide range of formats and codecs.
@@ -351,7 +352,7 @@ PLAYBACK
 MADE FOR YOUR HOUSEHOLD
 • Multiple viewers, each with their own history and favorites.
 • Keep several playlists on one device, from one server or more, each with its own favorites and guide.
-• Trakt and SIMKL watch history sync, from the device or from your server.
+• Trakt, SIMKL and MDBList watch history sync, from the device or from your server.
 • Settings and Home layouts your server can set up for every device, as defaults or locked.
 • Adjustable display scale and navigation sounds.
 
@@ -418,7 +419,7 @@ MOVIES AND SERIES
 • Request new movies and shows through your server, from the service you choose.
 
 SEARCH
-• One search across channels, guide listings, movies and series.
+• One search across channels, guide listings, movies, series and recordings.
 
 PLAYBACK
 • ExoPlayer (Media3) with an automatic mpv fallback, or mpv first for movies and series.
@@ -438,7 +439,7 @@ ANDROID AUTO
 MADE FOR YOUR HOUSEHOLD
 • Multiple viewers, each with their own history and favorites.
 • Keep several playlists on one device, from one server or more, each with its own favorites and guide.
-• Trakt and SIMKL watch history sync, from the device or from your server.
+• Trakt, SIMKL and MDBList watch history sync, from the device or from your server.
 • Settings and Home layouts your server can set up for every device, as defaults or locked.
 • A notification center for alerts from your server, with per-channel subscriptions.
 • Quick setup: pair your TV by scanning a QR code with your phone, and add several playlists in one go.
@@ -544,7 +545,7 @@ AIOSTREAMS
 • Full movie and series detail pages, Continue Watching and Up Next for catalog titles.
 
 SEARCH
-• One search across channels, guide listings, movies, series and catalogs.
+• One search across channels, guide listings, movies, series, recordings and catalogs.
 
 PLAYBACK
 • Built-in libmpv playback that handles a wide range of formats and codecs.
@@ -557,7 +558,7 @@ PLAYBACK
 MADE FOR YOUR HOUSEHOLD
 • Multiple viewers, each with their own history and favorites.
 • Keep several playlists on one device, from one server or more, each with its own favorites and guide.
-• Trakt and SIMKL watch history sync, from the device or from your server.
+• Trakt, SIMKL and MDBList watch history sync, from the device or from your server.
 • Settings and Home layouts your server can set up for every device, as defaults or locked.
 • Adjustable display scale and navigation sounds.
 • Available in English, German, Spanish, French and Simplified Chinese.
@@ -585,10 +586,10 @@ Reorder the nav and Home rows, and hide what you don't use
 Movie and series detail pages with cast, trailers and related titles
 Skip Intro and Skip Credits prompts powered by TheIntroDB
 Browse and search AIOStreams catalogs alongside your library
-One search across channels, guide listings, movies and series
+One search across channels, guide listings, movies, series and recordings
 Request new movies and shows through your server, from the service you choose
 Multiple viewers with their own history and favorites
-Trakt and SIMKL watch history sync, from the device or from your server
+Trakt, SIMKL and MDBList watch history sync, from the device or from your server
 Several playlists on one device, each with its own favorites and guide
 libmpv playback with track selection, audio and subtitle sync, and online subtitle search
 Fullscreen with F11 or Alt+Enter, and full keyboard navigation
@@ -628,7 +629,7 @@ M three U TV
 Shown on Xbox and in some Store layouts in place of the full description.
 
 ```
-The Windows app for M3U Editor, the open-source, self-hosted IPTV and media platform. Watch live TV with a multi-day guide, catchup and Multiview, follow each day's games with live scores, record with the DVR, and browse movies, series and AIOStreams catalogs with Continue Watching, Up Next and Trakt or SIMKL sync. M3U TV does not include any content: you need your own M3U Editor server and your own lawful sources.
+The Windows app for M3U Editor, the open-source, self-hosted IPTV and media platform. Watch live TV with a multi-day guide, catchup and Multiview, follow each day's games with live scores, record with the DVR, and browse movies, series and AIOStreams catalogs with Continue Watching, Up Next and Trakt, SIMKL or MDBList sync. M3U TV does not include any content: you need your own M3U Editor server and your own lawful sources.
 ```
 
 ### Developed by (255)
@@ -694,7 +695,7 @@ Sign in on the iPhone first, as above. Until then, CarPlay shows "Open M3U TV on
 2. Favorites lists channels favorited in the app on the iPhone. It is empty until you favorite a channel there.
 3. Opening the app on the iPhone while a channel plays in the car carries it on in the full-screen player.
 
-Third-party services used via their public APIs: Trakt and SIMKL (optional watch history sync), TheIntroDB (optional skip intro timestamps), OpenSubtitles (optional subtitle search), YouTube (trailer links open externally).
+Third-party services used via their public APIs: Trakt, SIMKL and MDBList (optional watch history sync), TheIntroDB (optional skip intro timestamps), OpenSubtitles (optional subtitle search), YouTube (trailer links open externally).
 
 Support: https://m3ue.sparkison.dev/support
 ```
@@ -724,7 +725,7 @@ Server URL: https://api-tester-fcn5.onrender.com
 Username: testuser
 Password: testpass
 
-The demo server only serves public-domain and freely licensed content. Optional third-party services used via their public APIs: Trakt and SIMKL (watch history sync), TheIntroDB (skip intro timestamps), OpenSubtitles (subtitle search), YouTube (trailer links open in the browser).
+The demo server only serves public-domain and freely licensed content. Optional third-party services used via their public APIs: Trakt, SIMKL and MDBList (watch history sync), TheIntroDB (skip intro timestamps), OpenSubtitles (subtitle search), YouTube (trailer links open in the browser).
 ```
 
 ---
@@ -742,6 +743,46 @@ Add a new subsection at the top for each release, built from the GitHub release 
 The Apple notes follow the Apple rules above (no AIOStreams, no other platforms). Leave out desktop-only items such as fullscreen shortcuts.
 
 macOS: the first Mac App Store version has no What's New field. From the next release on, add an `#### Apple (macOS)` block: the Apple notes minus iPhone and iPad items (CarPlay, Picture in Picture, background audio), plus any desktop items such as fullscreen.
+
+### v1.3.1
+
+#### Apple (tvOS, iOS and iPadOS)
+
+```
+• MDBList watch history sync. Connect it in Settings, or let it work alongside an MDBList account connected on your server (M3U Editor 0.14.4 or later).
+• Manage DVR recordings from movie and episode pages: see when and on which channel each one was recorded, and delete it. Needs M3U Editor 0.14.3 or later.
+• Search now includes your DVR recordings, in a cleaner layout that matches the rest of the app.
+• New Playback setting to open streams with the player overlay hidden.
+• View all on a Home row set up by your server now opens that category directly, and Home's shortcut tiles preview what's inside.
+• Fixes focus jumping between Home rows, scrolling on screens with a search bar, and more.
+```
+
+#### Google Play
+
+```
+• MDBList watch history sync.
+• Manage and delete DVR recordings from movie and episode pages (M3U Editor 0.14.3+).
+• DVR recordings in Search, with a cleaner layout.
+• Option to hide the player overlay on start.
+• Home View all opens the row's own category.
+• Match display refresh rate uses 50 or 60 Hz for 25 and 30 fps video.
+• Captions on more over-the-air channels.
+• Faster player start and focus fixes.
+```
+
+#### Microsoft Store
+
+```
+• MDBList watch history sync. Connect it in Settings, or let it work alongside an MDBList account connected on your server (M3U Editor 0.14.4 or later).
+• Manage DVR recordings from movie and episode pages: see when and on which channel each one was recorded, and delete it. Needs M3U Editor 0.14.3 or later.
+• Search now includes your DVR recordings, in a cleaner layout that matches the rest of the app.
+• View all on an AIOStreams catalog row opens the whole catalog, loading more as you scroll.
+• New Playback setting to open streams with the player overlay hidden.
+• View all on a Home row set up by your server now opens that category directly, and Home's shortcut tiles preview what's inside.
+• Match display refresh rate now uses 50 or 60 Hz for 25 and 30 fps video instead of switching the display down.
+• Escape now always goes Back, in fullscreen too. Use F11 or Alt+Enter to leave fullscreen.
+• Fixes focus jumping between Home rows, scrolling on screens with a search bar, and more.
+```
 
 ### v1.3.0
 
