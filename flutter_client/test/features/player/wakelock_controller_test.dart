@@ -39,13 +39,22 @@ void main() {
       expect(platform.calls, ['enable', 'disable']);
     });
 
-    test('full-screen player closing over Multiview keeps it on', () async {
-      await wakelock.enable(); // Multiview grid opens
-      await wakelock.enable(); // full-screen player opens over it
-      await wakelock.disable(); // full-screen player closes
+    test(
+      'Multiview handing off to the full-screen player keeps it on',
+      () async {
+        // "Full screen" pops the grid and opens the player at once; the
+        // grid's route is only disposed after its exit transition, so its
+        // release lands after the player has already taken the wakelock.
+        await wakelock.enable(); // Multiview grid opens
+        await wakelock.enable(); // full-screen player opens
+        await wakelock.disable(); // grid route disposed after its transition
 
-      expect(platform.calls, ['enable']);
-    });
+        expect(platform.calls, ['enable']);
+
+        await wakelock.disable(); // full-screen player closes
+        expect(platform.calls, ['enable', 'disable']);
+      },
+    );
 
     test('an unbalanced release does not corrupt the count', () async {
       await wakelock.disable();

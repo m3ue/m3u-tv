@@ -148,6 +148,7 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
       _chromeVisible || _reorderingIndex != null || _tiles.isEmpty;
 
   bool _handleKeyActivity(KeyEvent event) {
+    if (event is KeyUpEvent) return false;
     // Deferred so the press that reveals the chrome is still handled against
     // the hidden state: Up from the top row must not jump to a back button
     // that wasn't on screen when the button was pressed.
@@ -155,19 +156,28 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     return false;
   }
 
+  // False while the tile menu (or anything else) is on top, or while the
+  // grid is on its way out. Rebuilding focusable content under a dialog can
+  // pull focus out of it, so the chrome is left alone until this is current.
+  bool get _isCurrentRoute => ModalRoute.of(context)?.isCurrent ?? true;
+
   void _restartChromeHideTimer() {
     _chromeHideTimer?.cancel();
     _chromeHideTimer = Timer(_chromeHideDelay, _hideChrome);
   }
 
   void _showChrome() {
-    if (!mounted) return;
+    if (!mounted || !_isCurrentRoute) return;
     _restartChromeHideTimer();
     if (!_chromeVisible) setState(() => _chromeVisible = true);
   }
 
   void _hideChrome() {
     if (!mounted || !_chromeVisible) return;
+    if (!_isCurrentRoute) {
+      _restartChromeHideTimer();
+      return;
+    }
     if (_backFocusNode.hasFocus && _tiles.isNotEmpty) {
       _tiles[_focusedIndex].focusNode.requestFocus();
     }
@@ -178,7 +188,9 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
     _LayoutMode.grid => index < multiviewGridColumns(_tiles.length),
     _LayoutMode.featured =>
       index == _primaryIndex || index == (_primaryIndex == 0 ? 1 : 0),
-    _LayoutMode.pip => true,
+    // PiP only exists with two tiles, and _handleDirection toggles between
+    // them on every direction before this is consulted.
+    _LayoutMode.pip => false,
   };
 
   // Same rationale as app_shell.dart's _closePlayer: a platform-view-backed
@@ -519,67 +531,73 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
 
   Widget _buildHeader(AppLocalizations l10n, double scale) {
     final visible = _showsChrome;
-    return IgnorePointer(
-      ignoring: !visible,
-      child: ExcludeFocus(
-        excluding: !visible,
-        child: AnimatedOpacity(
-          opacity: visible ? 1 : 0,
-          duration: _chromeFadeDuration,
-          child: Stack(
-            children: [
-              const Positioned.fill(
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Color(0xCC000000), Color(0x00000000)],
+    // While hidden, a tap on the header strip only brings it back instead of
+    // landing on the tile underneath (or on the invisible back button).
+    return GestureDetector(
+      behavior: visible ? HitTestBehavior.deferToChild : HitTestBehavior.opaque,
+      onTap: visible ? null : _showChrome,
+      child: IgnorePointer(
+        ignoring: !visible,
+        child: ExcludeFocus(
+          excluding: !visible,
+          child: AnimatedOpacity(
+            opacity: visible ? 1 : 0,
+            duration: _chromeFadeDuration,
+            child: Stack(
+              children: [
+                const Positioned.fill(
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0xCC000000), Color(0x00000000)],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  24 * scale,
-                  16 * scale,
-                  24 * scale,
-                  24 * scale,
-                ),
-                child: Row(
-                  children: [
-                    DpadFocusable(
-                      focusNode: _backFocusNode,
-                      onSelect: () => Navigator.of(context).pop(),
-                      onDirection: (direction) {
-                        if (direction != TraversalDirection.down ||
-                            _tiles.isEmpty) {
-                          return false;
-                        }
-                        _tiles[_focusedIndex].focusNode.requestFocus();
-                        return true;
-                      },
-                      effects: const [
-                        GradientBorderEffect(
-                          borderRadius: BorderRadius.all(Radius.circular(50)),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    24 * scale,
+                    16 * scale,
+                    24 * scale,
+                    24 * scale,
+                  ),
+                  child: Row(
+                    children: [
+                      DpadFocusable(
+                        focusNode: _backFocusNode,
+                        onSelect: () => Navigator.of(context).pop(),
+                        onDirection: (direction) {
+                          if (direction != TraversalDirection.down ||
+                              _tiles.isEmpty) {
+                            return false;
+                          }
+                          _tiles[_focusedIndex].focusNode.requestFocus();
+                          return true;
+                        },
+                        effects: const [
+                          GradientBorderEffect(
+                            borderRadius: BorderRadius.all(Radius.circular(50)),
+                          ),
+                        ],
+                        child: Padding(
+                          padding: EdgeInsets.all(8 * scale),
+                          child: Icon(AppIcons.back(context), size: 24 * scale),
                         ),
-                      ],
-                      child: Padding(
-                        padding: EdgeInsets.all(8 * scale),
-                        child: Icon(AppIcons.back(context), size: 24 * scale),
                       ),
-                    ),
-                    SizedBox(width: 16 * scale),
-                    Text(
-                      l10n.multiviewTitle,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ],
+                      SizedBox(width: 16 * scale),
+                      Text(
+                        l10n.multiviewTitle,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -773,18 +791,26 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                 left: 8 * scale,
                 right: 8 * scale,
                 bottom: 8 * scale,
-                child: AnimatedOpacity(
-                  opacity: _showsChrome ? 1 : 0,
-                  duration: _chromeFadeDuration,
-                  child: Row(
-                    children: [
-                      Icon(
+                child: Row(
+                  children: [
+                    // The audible tile keeps its speaker icon while the
+                    // chrome is hidden, so it's still clear where the sound
+                    // is coming from.
+                    AnimatedOpacity(
+                      opacity: _showsChrome || isFocused ? 1 : 0,
+                      duration: _chromeFadeDuration,
+                      child: Icon(
                         isFocused ? Icons.volume_up : Icons.volume_off,
                         size: 16 * scale,
                         color: Colors.white,
+                        shadows: const [Shadow(blurRadius: 4)],
                       ),
-                      SizedBox(width: 6 * scale),
-                      Expanded(
+                    ),
+                    SizedBox(width: 6 * scale),
+                    Expanded(
+                      child: AnimatedOpacity(
+                        opacity: _showsChrome ? 1 : 0,
+                        duration: _chromeFadeDuration,
                         child: Text(
                           tile.channel.name,
                           maxLines: 1,
@@ -795,8 +821,8 @@ class _MultiviewScreenState extends ConsumerState<MultiviewScreen> {
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ],

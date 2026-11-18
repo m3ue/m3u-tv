@@ -13,10 +13,12 @@ abstract class WakelockController {
 /// Counts holders and only reaches [inner] when the first one arrives or the
 /// last one leaves.
 ///
-/// The platform wakelock is a single on/off switch, but more than one screen
-/// can be playing at once: the full-screen player opens over the Multiview
-/// grid, and closing it must not let the Apple TV screensaver or sleep timer
-/// kick in while the grid is still playing underneath.
+/// The platform wakelock is a single on/off switch, but holders overlap:
+/// "Full screen" from Multiview pops the grid and opens the player in the
+/// same frame, and the grid's route is only disposed after its exit
+/// transition, by which point the player has already taken the wakelock.
+/// Without counting, the grid's release would let the screensaver and sleep
+/// timer run over the player.
 class RefCountedWakelock implements WakelockController {
   RefCountedWakelock(this.inner);
 
