@@ -62,6 +62,26 @@ class PlayerArgs {
     headers: channel.headers,
   );
 
+  /// Playback of a DVR [recording]: the live HLS window while it is still
+  /// recording, otherwise the finished file. Shared by the DVR Recordings
+  /// screen and Search. Only call for a [DvrRecording.isPlayable] recording.
+  factory PlayerArgs.dvrRecording(DvrRecording recording) => PlayerArgs(
+    streamUrl: recording.playbackUrl!,
+    title: recording.title,
+    type: recording.isInProgress ? 'live' : 'vod',
+    metadata: <String, Object?>{
+      'dvr_uuid': recording.uuid,
+      'dvr_status': recording.status.name,
+      if (recording.subtitle != null) 'subtitle': recording.subtitle,
+      if (recording.channelName != null) 'channel_name': recording.channelName,
+      if (recording.seasonNumber != null)
+        'season_number': recording.seasonNumber,
+      if (recording.episodeNumber != null)
+        'episode_number': recording.episodeNumber,
+      if (recording.edlUrl != null) 'edl_url': recording.edlUrl,
+    },
+  );
+
   final String streamUrl;
   final String title;
   final String type; // 'live' | 'vod' | 'series' | 'catchup'

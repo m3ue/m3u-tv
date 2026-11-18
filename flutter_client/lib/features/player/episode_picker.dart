@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:dpad/dpad.dart';
-import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:m3u_tv/features/player/playback_controls.dart'
     show isHandheldLayout;
 import 'package:m3u_tv/l10n/app_localizations.dart';

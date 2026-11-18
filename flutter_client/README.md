@@ -106,6 +106,8 @@ Release builds work with no extra setup — the app ships with a built-in public
 client id. See the [Trakt setup](#trakt-setup) note at the end of this section if
 you're maintaining a fork and want to use your own client id instead.
 
+`scripts/build-release.sh` runs the steps below for you. Pass platforms (`android`, `ios`, `tvos`, `macos`, `linux`, `windows` or `all`), or run it with none to pick from a menu of what the current machine can build. Artifacts land in `build/release/v<version>/` with the GitHub Release file names. `--upload` sends Apple builds to App Store Connect (needs `ASC_API_KEY_ID`, `ASC_API_ISSUER_ID` and the `.p8` key in `~/.appstoreconnect/private_keys/`; otherwise it offers them to Transporter). Apple builds that aren't uploaded are offered to Transporter in a single prompt after every platform finishes, so an `all` run doesn't stop between builds, and `--xcode` stops after archiving and opens the archive in Xcode's Organizer. Run `./scripts/build-release.sh --help` for every option.
+
 ### Android TV / Android (release APK / App Bundle)
 
 ```bash
@@ -469,6 +471,6 @@ See [../docs/release/platform-release-matrix.md](../docs/release/platform-releas
 
 | Tool | Version |
 |---|---|
-| Flutter SDK | 3.47.7 (pinned in `.github/workflows`) |
-| flutter-tvos | 1.11.3 (Flutter 3.47.7) |
+| Flutter SDK | 3.50.0 (pinned in `.github/workflows`) |
+| flutter-tvos | 1.12.0 (Flutter 3.50.0) |
 | Dart | `^3.12.0` |

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/vod/vod_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
@@ -469,6 +470,71 @@ void main() {
       expect(find.text('Tears of Steel'), findsOneWidget);
       expect(find.text('Big Buck Bunny'), findsNothing);
       expect(find.text('Sintel'), findsNothing);
+    });
+
+    group('a category request from Home', () {
+      ProviderContainer container(WidgetTester tester) =>
+          ProviderScope.containerOf(tester.element(find.byType(VodScreen)));
+
+      testWidgets('opens the mounted screen on it, clearing the search', (
+        tester,
+      ) async {
+        final repo = await _buildRepo(tester, testVodItems);
+        await tester.pumpWidget(
+          _TestApp(catalogRepository: repo, categories: testCategories),
+        );
+        await _settle(tester);
+        await tester.tap(find.byIcon(Icons.search));
+        await _settle(tester);
+        await tester.enterText(find.byType(TextField), 'bunny');
+        await _settle(tester);
+
+        container(tester).read(categoryOpenRequestProvider.notifier).state = (
+          route: RouteNames.vod,
+          categoryId: '21',
+        );
+        await _settle(tester);
+
+        expect(find.text('Sintel'), findsOneWidget);
+        expect(find.text('Big Buck Bunny'), findsNothing);
+        expect(find.text('Tears of Steel'), findsNothing);
+        expect(container(tester).read(categoryOpenRequestProvider), isNull);
+      });
+
+      testWidgets('opens a screen built for it on it', (tester) async {
+        final repo = await _buildRepo(tester, testVodItems);
+        await tester.pumpWidget(
+          _TestApp(
+            catalogRepository: repo,
+            categories: testCategories,
+            categoryRequest: (route: RouteNames.vod, categoryId: '21'),
+          ),
+        );
+        await _settle(tester);
+
+        expect(find.text('Sintel'), findsOneWidget);
+        expect(find.text('Big Buck Bunny'), findsNothing);
+        expect(container(tester).read(categoryOpenRequestProvider), isNull);
+      });
+
+      testWidgets("leaves another screen's request alone", (tester) async {
+        final repo = await _buildRepo(tester, testVodItems);
+        await tester.pumpWidget(
+          _TestApp(
+            catalogRepository: repo,
+            categories: testCategories,
+            categoryRequest: (route: RouteNames.series, categoryId: '21'),
+          ),
+        );
+        await _settle(tester);
+
+        expect(find.text('Big Buck Bunny'), findsOneWidget);
+        expect(find.text('Sintel'), findsOneWidget);
+        expect(
+          container(tester).read(categoryOpenRequestProvider)?.route,
+          RouteNames.series,
+        );
+      });
     });
 
     testWidgets('tapping movie triggers onVodSelect callback', (tester) async {
@@ -1308,6 +1374,7 @@ class _TestApp extends StatelessWidget {
     this.viewSettingsService,
     this.favoritesService,
     this.categoriesState,
+    this.categoryRequest,
   });
 
   final CatalogRepository catalogRepository;
@@ -1321,6 +1388,9 @@ class _TestApp extends StatelessWidget {
   /// When set, the categories come from here, so a test can swap them while
   /// the screen stays mounted (a catalog reload).
   final StateProvider<List<Category>>? categoriesState;
+
+  /// A category request already pending when the screen is built.
+  final CategoryOpenRequest? categoryRequest;
 
   @override
   Widget build(BuildContext context) {
@@ -1336,6 +1406,8 @@ class _TestApp extends StatelessWidget {
         ),
         viewSettingsServiceProvider.overrideWith((_) => service),
         catalogRepositoryProvider.overrideWith((_) => catalogRepository),
+        if (categoryRequest != null)
+          categoryOpenRequestProvider.overrideWith((_) => categoryRequest),
       ],
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,

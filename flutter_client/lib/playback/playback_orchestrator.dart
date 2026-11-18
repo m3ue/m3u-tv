@@ -292,7 +292,6 @@ class PlaybackOrchestrator {
   /// [PlaybackSource.allowDisplayModeChanges] for every later [open] (a
   /// channel change) too.
   Future<void> setAllowDisplayModeChanges(
-    // ignore: avoid_positional_boolean_parameters
     bool allowed,
   ) async {
     if (_disposed || _allowDisplayModeChanges == allowed) return;

@@ -6,6 +6,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
+import 'package:m3u_tv/shared/channel_grid_tile.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:material_ui/material_ui.dart';
@@ -148,9 +149,13 @@ class ShowResultChannelLookup {
     if (identical(shows, _shows)) return _channelsById;
     _shows = shows;
     final generation = ++_generation;
+    // Upcoming airings' channels too, so those results show the channel's
+    // logo rather than a placeholder.
     final ids = {
-      for (final show in shows)
+      for (final show in shows) ...[
         for (final episode in show.airingNow) episode.channelId,
+        for (final episode in show.recentEpisodes) episode.channelId,
+      ],
     };
     if (ids.isEmpty) return _channelsById = const <int, Channel>{};
     unawaited(
@@ -204,7 +209,7 @@ class ShowResultRow extends StatelessWidget {
     final String? subtitle;
     final String trailingText;
     if (entry.isOnNow) {
-      subtitle = _formatOnNowSubtitle(firstEpisode, channelName);
+      subtitle = formatOnNowSubtitle(firstEpisode, channelName);
       trailingText = l10n.liveTvAiringUntil(
         DateFormat.jm(languageTag).format(firstEpisode.endTime.toLocal()),
       );
@@ -212,7 +217,7 @@ class ShowResultRow extends StatelessWidget {
       subtitle = channelName;
       final times = <String>[];
       for (final episode in entry.episodes.take(3)) {
-        times.add(_formatUpcomingTime(episode.startTime, languageTag, l10n));
+        times.add(formatUpcomingAiring(episode.startTime, languageTag, l10n));
       }
       final remainder = entry.episodes.length - times.length;
       if (remainder > 0) {
@@ -313,7 +318,7 @@ class ShowResultRow extends StatelessWidget {
 ///
 /// Returns null (not empty string) when both are absent - empty string
 /// would render a phantom 11px row in the result row.
-String? _formatOnNowSubtitle(EpgShowEpisode episode, String? channelName) {
+String? formatOnNowSubtitle(EpgShowEpisode episode, String? channelName) {
   final ep = episode.subtitle;
   final hasEp = ep != null && ep.trim().isNotEmpty;
   final hasCh = channelName != null && channelName.trim().isNotEmpty;
@@ -323,7 +328,7 @@ String? _formatOnNowSubtitle(EpgShowEpisode episode, String? channelName) {
   return null;
 }
 
-String _formatUpcomingTime(
+String formatUpcomingAiring(
   DateTime startTime,
   String languageTag,
   AppLocalizations l10n,
@@ -337,4 +342,53 @@ String _formatUpcomingTime(
   if (sameDay(local, now)) return time;
   if (sameDay(local, tomorrow)) return l10n.liveTvAiringTomorrow(time);
   return DateFormat.MMMd(languageTag).add_jm().format(local);
+}
+
+/// The time a result card leads with: when an On Now airing ends, or when an
+/// Upcoming show next airs.
+String showResultAiringLabel(
+  ShowResultEntry entry,
+  String languageTag,
+  AppLocalizations l10n,
+) {
+  final firstEpisode = entry.episodes.first;
+  if (entry.isOnNow) {
+    return l10n.liveTvAiringUntil(
+      DateFormat.jm(languageTag).format(firstEpisode.endTime.toLocal()),
+    );
+  }
+  return formatUpcomingAiring(firstEpisode.startTime, languageTag, l10n);
+}
+
+/// A show result on its channel's Live TV tile: an On Now airing with its
+/// time span and progress, as the tile shows the guide's current programme;
+/// an Upcoming one with when it next airs and how many more airings follow.
+ChannelTileProgramme showResultTileProgramme(
+  ShowResultEntry entry,
+  String languageTag,
+  AppLocalizations l10n,
+) {
+  final firstEpisode = entry.episodes.first;
+  if (entry.isOnNow) {
+    final timeFormat = DateFormat.jm(languageTag);
+    final start = firstEpisode.startTime;
+    final end = firstEpisode.endTime;
+    final length = end.difference(start).inSeconds;
+    final elapsed = DateTime.now().toUtc().difference(start).inSeconds;
+    return ChannelTileProgramme(
+      title: entry.show.displayTitle,
+      timeLabel:
+          '${timeFormat.format(start.toLocal())} - '
+          '${timeFormat.format(end.toLocal())}',
+      progress: length > 0 ? (elapsed / length).clamp(0.0, 1.0) : null,
+    );
+  }
+  final moreAirings = entry.episodes.length - 1;
+  return ChannelTileProgramme(
+    title: entry.show.displayTitle,
+    timeLabel: [
+      formatUpcomingAiring(firstEpisode.startTime, languageTag, l10n),
+      if (moreAirings > 0) l10n.liveTvMoreAirings(moreAirings),
+    ].join(' · '),
+  );
 }

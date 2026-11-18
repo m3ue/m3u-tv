@@ -59,6 +59,7 @@ class HomeScreen extends ConsumerStatefulWidget {
     this.onSportsMore,
     required this.onMoviesMore,
     required this.onSeriesMore,
+    this.onCategoryMore,
     required this.onRecordingsSelect,
     this.onAioStreamsSelect,
     this.onRequestsSelect,
@@ -84,6 +85,10 @@ class HomeScreen extends ConsumerStatefulWidget {
   final bool Function()? onHandleTopLevelBack;
   final VoidCallback onMoviesMore;
   final VoidCallback onSeriesMore;
+
+  /// View all on a server category row: opens that route's screen on the
+  /// category. Null opens the plain section, like the built-in rows.
+  final void Function(String route, String categoryId)? onCategoryMore;
   final VoidCallback onRecordingsSelect;
 
   /// Open the AIOStreams and Requests screens from their opt-in Home rows.
@@ -420,6 +425,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 : HomeRowKind.category)) {
       return const SizedBox.shrink();
     }
+    final categoryId = custom?.categoryId;
+    final onCategoryMore = widget.onCategoryMore;
+    VoidCallback viewAll(VoidCallback section) =>
+        categoryId == null || onCategoryMore == null
+        ? section
+        : () => onCategoryMore(route, categoryId);
     ValueChanged<bool> loaded(_CatalogRow catalogRow) => custom == null
         ? (hasItems) => _onCatalogRowLoaded(catalogRow, hasItems)
         : (hasItems) => _onCustomRowLoaded(custom.id, hasItems);
@@ -433,7 +444,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onChannelContextChanged: widget.onChannelContextChanged,
         onToggleFavorite: (channel) => _liveFavoritesService.toggle(channel.id),
         rowItemLimit: _rowItemLimit,
-        onViewAll: widget.onLiveTvMore,
+        onViewAll: viewAll(widget.onLiveTvMore),
         onLoaded: loaded(_CatalogRow.live),
         useSidebarLayout: widget.useSidebarLayout,
         onSidebarActivate: widget.onSidebarActivate,
@@ -460,7 +471,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onVodSelect: widget.onVodSelect,
         onToggleFavorite: (item) => _vodFavoritesService.toggle(item.id),
         rowItemLimit: _rowItemLimit,
-        onViewAll: widget.onMoviesMore,
+        onViewAll: viewAll(widget.onMoviesMore),
         onLoaded: loaded(_CatalogRow.movies),
         useSidebarLayout: widget.useSidebarLayout,
         onSidebarActivate: widget.onSidebarActivate,
@@ -474,7 +485,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onSeriesSelect: widget.onSeriesSelect,
         onToggleFavorite: (series) => _seriesFavoritesService.toggle(series.id),
         rowItemLimit: _rowItemLimit,
-        onViewAll: widget.onSeriesMore,
+        onViewAll: viewAll(widget.onSeriesMore),
         onLoaded: loaded(_CatalogRow.series),
         useSidebarLayout: widget.useSidebarLayout,
         onSidebarActivate: widget.onSidebarActivate,
@@ -752,6 +763,14 @@ class _ContinueWatchingRowState extends ConsumerState<_ContinueWatchingRow> {
       id: 'continue-watching-more',
       title: l.homeContinueWatching,
       description: l.homeContinueWatchingMoreCount(continueWatchingOverflow),
+      kicker: l.homeViewAll,
+      icon: Icons.history,
+      // The ones the row doesn't have room for
+      artworkUrls: [
+        for (final item in _items.skip(continueWatchingRowLimit))
+          ?item.imageUrl,
+      ],
+      artworkShape: SpotlightArtworkShape.landscape,
     );
     return MediaPreviewSection(
       title: l.homeContinueWatching,
@@ -928,8 +947,14 @@ class _LiveRowState extends ConsumerState<_LiveRow> {
         l,
         target: StaticSpotlightTarget(
           id: _viewAllId('live', custom),
-          title: l.navLiveTv,
-          description: l.homeBrowseLiveTv,
+          title: custom?.title ?? l.navLiveTv,
+          description: custom == null
+              ? l.homeBrowseLiveTv
+              : l.homeBrowseCategory(custom.title ?? l.navLiveTv),
+          kicker: l.homeViewAll,
+          icon: Icons.live_tv,
+          artworkUrls: [for (final channel in rowChannels) ?channel.logoUrl],
+          artworkShape: SpotlightArtworkShape.logo,
         ),
         onTap: widget.onViewAll,
         spotlight: spotlight,
@@ -1242,6 +1267,13 @@ class _SportsRowState extends ConsumerState<_SportsRow> {
                 id: _viewAllId('sports', custom),
                 title: l.navSports,
                 description: l.homeBrowseSports,
+                kicker: l.homeViewAll,
+                icon: Icons.stadium_rounded,
+                artworkUrls: {
+                  for (final fixture in rowFixtures)
+                    for (final side in fixture.displayOrder) ?side.team.logoUrl,
+                }.toList(growable: false),
+                artworkShape: SpotlightArtworkShape.logo,
               ),
               onTap: onViewAll,
               spotlight: spotlight,
@@ -1329,23 +1361,30 @@ class _MoviesRow extends ConsumerStatefulWidget {
 }
 
 class _MoviesRowState extends ConsumerState<_MoviesRow> {
-  (List<Category>, MediaBrowseOrder, Set<int>, String?)? _fetchedFor;
+  (List<Category>, MediaBrowseOrder, Set<int>, String?, int)? _fetchedFor;
 
   /// Null until the first page loads. A reload keeps these on screen.
   List<VodItem>? _items;
 
-  (List<Category>, MediaBrowseOrder, Set<int>, String?) _fetchKey(
+  (List<Category>, MediaBrowseOrder, Set<int>, String?, int) _fetchKey(
     List<Category> categories,
+    int dvrContentRevision,
   ) => (
     categories,
     widget.order,
     // Only a change in the favorites the order leads with moves the row.
     widget.order.favoritesFirst ? widget.favoriteVodIds : const <int>{},
     widget.custom?.categoryId,
+    // A DVR recording added or deleted rewrites the catalog under the row.
+    dvrContentRevision,
   );
 
-  void _fetch(List<Category> categories, CatalogRepository repo) {
-    final key = _fetchKey(categories);
+  void _fetch(
+    List<Category> categories,
+    int dvrContentRevision,
+    CatalogRepository repo,
+  ) {
+    final key = _fetchKey(categories, dvrContentRevision);
     _fetchedFor = key;
     unawaited(() async {
       List<VodItem> items;
@@ -1374,8 +1413,13 @@ class _MoviesRowState extends ConsumerState<_MoviesRow> {
   @override
   Widget build(BuildContext context) {
     final categories = ref.watch(vodCategoriesProvider);
-    if (_fetchKey(categories) != _fetchedFor) {
-      _fetch(categories, ref.read(catalogRepositoryProvider));
+    final dvrContentRevision = ref.watch(dvrContentRevisionProvider);
+    if (_fetchKey(categories, dvrContentRevision) != _fetchedFor) {
+      _fetch(
+        categories,
+        dvrContentRevision,
+        ref.read(catalogRepositoryProvider),
+      );
     }
     final items = _items;
     if (items != null && items.isEmpty) return const SizedBox.shrink();
@@ -1392,8 +1436,15 @@ class _MoviesRowState extends ConsumerState<_MoviesRow> {
         l,
         target: StaticSpotlightTarget(
           id: _viewAllId('movies', custom),
-          title: l.navVod,
-          description: l.homeBrowseMovies,
+          title: custom?.title ?? l.navVod,
+          description: custom == null
+              ? l.homeBrowseMovies
+              : l.homeBrowseCategory(custom.title ?? l.navVod),
+          kicker: l.homeViewAll,
+          icon: Icons.movie,
+          artworkUrls: [
+            for (final item in items ?? const <VodItem>[]) ?item.logoUrl,
+          ],
         ),
         onTap: widget.onViewAll,
         spotlight: spotlight,
@@ -1461,23 +1512,30 @@ class _SeriesRow extends ConsumerStatefulWidget {
 }
 
 class _SeriesRowState extends ConsumerState<_SeriesRow> {
-  (List<Category>, MediaBrowseOrder, Set<int>, String?)? _fetchedFor;
+  (List<Category>, MediaBrowseOrder, Set<int>, String?, int)? _fetchedFor;
 
   /// Null until the first page loads. A reload keeps these on screen.
   List<Series>? _items;
 
-  (List<Category>, MediaBrowseOrder, Set<int>, String?) _fetchKey(
+  (List<Category>, MediaBrowseOrder, Set<int>, String?, int) _fetchKey(
     List<Category> categories,
+    int dvrContentRevision,
   ) => (
     categories,
     widget.order,
     // Only a change in the favorites the order leads with moves the row.
     widget.order.favoritesFirst ? widget.favoriteSeriesIds : const <int>{},
     widget.custom?.categoryId,
+    // A DVR recording added or deleted rewrites the catalog under the row.
+    dvrContentRevision,
   );
 
-  void _fetch(List<Category> categories, CatalogRepository repo) {
-    final key = _fetchKey(categories);
+  void _fetch(
+    List<Category> categories,
+    int dvrContentRevision,
+    CatalogRepository repo,
+  ) {
+    final key = _fetchKey(categories, dvrContentRevision);
     _fetchedFor = key;
     unawaited(() async {
       List<Series> items;
@@ -1506,8 +1564,13 @@ class _SeriesRowState extends ConsumerState<_SeriesRow> {
   @override
   Widget build(BuildContext context) {
     final categories = ref.watch(seriesCategoriesProvider);
-    if (_fetchKey(categories) != _fetchedFor) {
-      _fetch(categories, ref.read(catalogRepositoryProvider));
+    final dvrContentRevision = ref.watch(dvrContentRevisionProvider);
+    if (_fetchKey(categories, dvrContentRevision) != _fetchedFor) {
+      _fetch(
+        categories,
+        dvrContentRevision,
+        ref.read(catalogRepositoryProvider),
+      );
     }
     final items = _items;
     if (items != null && items.isEmpty) return const SizedBox.shrink();
@@ -1524,8 +1587,15 @@ class _SeriesRowState extends ConsumerState<_SeriesRow> {
         l,
         target: StaticSpotlightTarget(
           id: _viewAllId('series', custom),
-          title: l.navSeries,
-          description: l.homeBrowseSeries,
+          title: custom?.title ?? l.navSeries,
+          description: custom == null
+              ? l.homeBrowseSeries
+              : l.homeBrowseCategory(custom.title ?? l.navSeries),
+          kicker: l.homeViewAll,
+          icon: Icons.tv,
+          artworkUrls: [
+            for (final series in items ?? const <Series>[]) ?series.coverUrl,
+          ],
         ),
         onTap: widget.onViewAll,
         spotlight: spotlight,
@@ -1573,11 +1643,15 @@ class _EntryPointRow extends StatelessWidget {
     required this.useSidebarLayout,
     required this.onSidebarActivate,
     required this.spotlight,
+    this.artworkUrls = const [],
   });
 
   final String targetId;
   final String title;
   final IconData icon;
+
+  /// Previewed in the rich hero; the [icon] stands in without any.
+  final List<String> artworkUrls;
   final String cardTitle;
   final String subtitle;
   final VoidCallback onTap;
@@ -1592,22 +1666,33 @@ class _EntryPointRow extends StatelessWidget {
       id: targetId,
       title: cardTitle,
       description: subtitle,
+      icon: icon,
+      artworkUrls: artworkUrls,
     );
-    return MediaPreviewSection(
+    final item = MediaPreviewItem(
+      title: cardTitle,
+      subtitle: subtitle,
+      fallbackIcon: icon,
+      onTap: onTap,
+      onFocused: spotlight == null ? null : () => spotlight.select(target),
+      onHoverChanged: spotlight?.hoverHandler(target),
+    );
+    // Continue Watching's size, so the entry rows line up with it.
+    return MediaPreviewSection.builder(
       title: title,
       titleIcon: icon,
       // Never shown: the row always has its one card.
       emptyLabel: subtitle,
-      items: [
-        MediaPreviewItem(
-          title: cardTitle,
-          subtitle: subtitle,
-          fallbackIcon: icon,
-          onTap: onTap,
-          onFocused: spotlight == null ? null : () => spotlight.select(target),
-          onHoverChanged: spotlight?.hoverHandler(target),
-        ),
-      ],
+      itemCount: 1,
+      baseCardWidth: MediaBrowsingMetrics.landscapeCardWidth,
+      baseCardHeight: MediaBrowsingMetrics.landscapeCardHeight,
+      itemBuilder: (context, index, size, {required autofocus}) =>
+          PreviewEntryTile(
+            item: item,
+            width: size.width,
+            artworkUrls: artworkUrls,
+            autofocus: autofocus,
+          ),
       useSidebarLayout: useSidebarLayout,
       onSidebarActivate: onSidebarActivate,
     );
@@ -1642,6 +1727,9 @@ class _RecordingsRow extends ConsumerWidget {
       subtitle: dvrRecordings.isEmpty
           ? l.homeDvrRecordingsBrowse
           : l.dvrStorageRecordingCount(dvrRecordings.length),
+      artworkUrls: [
+        for (final recording in dvrRecordings) ?recording.posterUrl,
+      ],
       onTap: onRecordingsSelect,
       useSidebarLayout: useSidebarLayout,
       onSidebarActivate: onSidebarActivate,

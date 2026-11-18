@@ -286,6 +286,7 @@ class AIOStreamsIntegration {
     required this.name,
     required this.catalogs,
     this.logoUrl,
+    this.actions,
   });
 
   factory AIOStreamsIntegration.fromJson(Map<String, dynamic> json) =>
@@ -297,12 +298,46 @@ class AIOStreamsIntegration {
             .whereType<Map<String, dynamic>>()
             .map(AIOStreamsCatalog.fromJson)
             .toList(growable: false),
+        actions: AIOStreamsActions.fromJson(json['actions']),
       );
 
   final int id;
   final String name;
   final String? logoUrl;
   final List<AIOStreamsCatalog> catalogs;
+
+  /// Null on editors that only serve the path-style
+  /// `/{username}/{password}/aiostreams/` routes.
+  final AIOStreamsActions? actions;
+}
+
+/// m3u-editor's `player_api.php` actions for AIOStreams lookups. Preferred
+/// over the path-style routes, which an auth gateway in front of the server
+/// may not let through when it only allows the Xtream paths.
+class AIOStreamsActions {
+  const AIOStreamsActions({
+    required this.catalog,
+    required this.meta,
+    required this.streams,
+  });
+
+  static AIOStreamsActions? fromJson(Object? json) {
+    if (json is! Map) return null;
+    String? action(String key) {
+      final value = json[key];
+      return value is String && value.isNotEmpty ? value : null;
+    }
+
+    final catalog = action('catalog');
+    final meta = action('meta');
+    final streams = action('streams');
+    if (catalog == null || meta == null || streams == null) return null;
+    return AIOStreamsActions(catalog: catalog, meta: meta, streams: streams);
+  }
+
+  final String catalog;
+  final String meta;
+  final String streams;
 }
 
 class ProxyStreamProfile {
@@ -376,9 +411,9 @@ class RequestsCapability {
   bool supports(String type) => contentTypes.contains(type);
 }
 
-/// A Trakt or SIMKL account M3U Editor already sends this login's watch
-/// progress to (Integrations > Trakt & SIMKL). [account] is the account's
-/// display name, when the server knows it.
+/// A Trakt, SIMKL or MDBList account M3U Editor already sends this login's
+/// watch progress to (Integrations > Watch Tracking). [account] is the
+/// account's display name, when the server knows it.
 class ServerWatchHistoryAccount {
   const ServerWatchHistoryAccount({required this.provider, this.account});
 
@@ -388,7 +423,7 @@ class ServerWatchHistoryAccount {
         account: _stringOrNull(json['account']),
       );
 
-  /// `trakt` or `simkl`.
+  /// `trakt`, `simkl` or `mdblist`.
   final String provider;
   final String? account;
 }
@@ -423,7 +458,7 @@ class XtreamAuthResponse {
 
   bool hasFeature(String feature) => features.contains(feature);
 
-  /// The server-side account for [provider] (`trakt` or `simkl`), if any.
+  /// The server-side account for [provider] (`trakt`, `simkl` or `mdblist`), if any.
   ServerWatchHistoryAccount? serverWatchHistory(String provider) {
     for (final account in watchHistory) {
       if (account.provider == provider) return account;
@@ -1206,6 +1241,8 @@ class XtreamService {
               releaseDate: episode.releaseDate,
               streamUrl: episode.streamUrl,
               edlUrl: episode.edlUrl,
+              isDvrRecording: episode.isDvrRecording,
+              dvrUuid: episode.dvrUuid,
             );
           })
           .toList(growable: false);
@@ -1225,6 +1262,7 @@ class XtreamService {
       series: series,
       seasons: resolvedSeasons,
       episodesBySeason: episodeMap,
+      isDvrRecording: _asMap(json['info'])['dvr_recording'] == true,
     );
   }
 
@@ -1266,9 +1304,9 @@ class XtreamService {
     return Progress.fromJson(_asMap(response), viewerId: viewerId);
   }
 
-  /// The watch-history providers (`trakt`, `simkl`) this device scrobbles to
-  /// itself. Sent with every progress save so the server skips sending the
-  /// same playback to its own account for that provider.
+  /// The watch-history providers (`trakt`, `simkl`, `mdblist`) this device
+  /// scrobbles to itself. Sent with every progress save so the server skips
+  /// sending the same playback to its own account for that provider.
   List<String> Function()? clientScrobblers;
 
   Future<void> updateProgress(Progress progress) async {
@@ -1788,6 +1826,11 @@ class XtreamService {
       'to': '${to.millisecondsSinceEpoch ~/ 1000}',
     },
   );
+
+  /// An m3u-editor AIOStreams lookup ([AIOStreamsActions]), as the raw
+  /// response.
+  Future<Object?> getAioStreams(String action, Map<String, String> params) =>
+      _request(action, params: params);
 
   /// The settings the editor manages for this login
   /// ([ClientConfigCapability.action]).

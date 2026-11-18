@@ -84,6 +84,16 @@ class RouteNames {
     String id,
   ) => '/aiostreams/details/$integrationId/$type/$id';
 
+  /// Builds a path to an AIOStreams catalog's full "View All" grid. The
+  /// catalog id is addon-defined, so it is encoded as one path segment.
+  static String aiostreamsCatalogFor(
+    int integrationId,
+    String type,
+    String catalogId,
+  ) =>
+      '/aiostreams/catalog/$integrationId/$type/'
+      '${Uri.encodeComponent(catalogId)}';
+
   /// Builds a path to a content-request search result's detail screen.
   static String requestsDetailsFor(
     int integrationId,

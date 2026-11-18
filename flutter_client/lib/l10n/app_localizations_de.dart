@@ -440,6 +440,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get searchSectionSeries => 'Serien';
 
   @override
+  String get searchSectionRecordings => 'Aufnahmen';
+
+  @override
   String get vodSearchHint => 'Suchen …';
 
   @override
@@ -1078,6 +1081,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get homeBrowseSeries => 'Alle Serien durchsuchen';
 
   @override
+  String homeBrowseCategory(String category) {
+    return 'Alles in $category';
+  }
+
+  @override
   String get homeNothingToShow => 'Noch nichts anzuzeigen';
 
   @override
@@ -1306,6 +1314,35 @@ class AppLocalizationsDe extends AppLocalizations {
       'Registriere eine App auf simkl.com/settings/developer und setze die Client-ID über --dart-define=SIMKL_CLIENT_ID.';
 
   @override
+  String get mdblistName => 'MDBList';
+
+  @override
+  String get mdblistConnectPrompt =>
+      'Verbinde deinen MDBList-Account, um automatisch zu verfolgen, was du schaust.';
+
+  @override
+  String get mdblistConnectButton => 'Mit MDBList verbinden';
+
+  @override
+  String get mdblistConnected => 'Mit MDBList verbunden';
+
+  @override
+  String mdblistConnectedAs(String account) {
+    return 'Mit MDBList verbunden als $account';
+  }
+
+  @override
+  String get mdblistDisconnectButton => 'MDBList trennen';
+
+  @override
+  String get mdblistNotConfigured =>
+      'MDBList-Client-ID ist nicht konfiguriert.';
+
+  @override
+  String get mdblistNotConfiguredHint =>
+      'Registriere eine App auf mdblist.com/developer und setze die Client-ID über --dart-define=MDBLIST_CLIENT_ID.';
+
+  @override
   String get vodAllMovies => 'Alle Filme';
 
   @override
@@ -1330,6 +1367,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get vodDirector => 'Regie';
+
+  @override
+  String get vodRecorded => 'Aufgenommen';
+
+  @override
+  String get detailDvrBadge => 'DVR';
 
   @override
   String get castShowAll => 'Alle Darsteller anzeigen';
@@ -2005,6 +2048,14 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsDeinterlaceHint =>
       'Glättet die Kammlinien bei Interlaced-Sendern (z. B. 1080i und 576i). Benötigt mehr CPU-Leistung.';
+
+  @override
+  String get settingsHideOverlayOnStart =>
+      'Player-Overlay beim Start ausblenden';
+
+  @override
+  String get settingsHideOverlayOnStartHint =>
+      'Streams starten nur mit dem Bild, ohne Steuerelemente und Senderinfos. Drücke eine beliebige Taste oder tippe auf den Bildschirm, um sie einzublenden.';
 
   @override
   String get settingsBackgroundAudio => 'Audio im Hintergrund';

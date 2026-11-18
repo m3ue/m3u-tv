@@ -87,4 +87,22 @@ void main() {
     expect(service.matchRefreshRateSync, isTrue);
     expect(service.deinterlaceSync, isTrue);
   });
+
+  testWidgets('hide overlay on start shows on every platform and toggles', (
+    tester,
+  ) async {
+    final l = await pump(
+      tester,
+      showVodPlayer: false,
+      showHdr: false,
+      showRefreshRate: false,
+      showDeinterlace: false,
+    );
+    expect(service.hideOverlayOnStartSync, isFalse);
+
+    await tester.tap(find.text(l.settingsHideOverlayOnStart));
+    await tester.pumpAndSettle();
+
+    expect(service.hideOverlayOnStartSync, isTrue);
+  });
 }

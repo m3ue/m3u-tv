@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/services/api_client.dart';
 import 'package:m3u_tv/services/domain_models.dart'
     show CastMember, RelatedItem, Season;
@@ -238,6 +239,10 @@ List<RelatedItem>? _parseRelatedList(dynamic raw) {
 
 const _kCacheTtl = Duration(minutes: 10);
 
+// Longer than the default: catalog pages are proxied through the editor to
+// the addon, which can be slow to build them.
+const _kRequestTimeout = Duration(seconds: 30);
+
 class _AioCacheEntry<T> {
   _AioCacheEntry(this.data) : _fetchedAt = DateTime.now();
   final T data;
@@ -247,13 +252,22 @@ class _AioCacheEntry<T> {
 
 /// Proxies AIOStreams Stremio addon requests via m3u-editor's proxy endpoints.
 /// Auth tokens stay on the server — clients authenticate with playlist credentials.
+///
+/// Lookups go through the editor's `player_api.php` actions when the login
+/// payload advertises them ([actionsFor]), else the older path-style
+/// `/{username}/{password}/aiostreams/` routes.
 class AIOStreamsApiService {
-  AIOStreamsApiService({required this.xtreamService, ApiClient? apiClient})
-    : _api = apiClient ?? ApiClient(timeout: const Duration(seconds: 30));
+  AIOStreamsApiService({
+    required this.xtreamService,
+    this.actionsFor,
+    ApiClient? apiClient,
+  }) : _api = apiClient ?? ApiClient(timeout: _kRequestTimeout);
 
   final XtreamService xtreamService;
-  // Longer than the default: catalog pages are proxied through the editor to
-  // the addon, which can be slow to build them.
+
+  /// The `player_api.php` actions an integration's login payload advertised,
+  /// or null to use the path-style routes.
+  final AIOStreamsActions? Function(int integrationId)? actionsFor;
   final ApiClient _api;
   final Map<String, _AioCacheEntry<List<AIOStreamsItem>>> _catalogCache = {};
   final Map<String, _AioCacheEntry<AIOStreamsItem>> _metaCache = {};
@@ -269,13 +283,58 @@ class AIOStreamsApiService {
     return '${c.server}/${c.username}/${c.password}/aiostreams';
   }
 
-  Future<Map<String, dynamic>?> _get(Uri uri) async {
+  /// One AIOStreams lookup, or null when it failed. Failures are logged
+  /// (action or path and status only, never credentials) so a broken lookup
+  /// shows up in Logs & Diagnostics instead of only as an empty row.
+  Future<Map<String, dynamic>?> _lookup(
+    int integrationId, {
+    required String Function(AIOStreamsActions actions) action,
+    required Map<String, String> params,
+    required String legacyPath,
+    Map<String, String> query = const {},
+  }) async {
+    final actions = actionsFor?.call(integrationId);
+    if (actions == null) {
+      final uri = Uri.parse(
+        '$_base/$integrationId/$legacyPath',
+      ).replace(queryParameters: query.isEmpty ? null : query);
+      return _get(uri, legacyPath);
+    }
+
+    final name = action(actions);
+    try {
+      final json = await xtreamService
+          .getAioStreams(name, {
+            'integration_id': '$integrationId',
+            ...params,
+            ...query,
+          })
+          .timeout(_kRequestTimeout);
+      if (json is Map) return Map<String, dynamic>.from(json);
+      debugPrint('[AIOStreams] $name: unexpected response');
+      return null;
+    } on XtreamHttpException catch (error) {
+      debugPrint('[AIOStreams] $name: HTTP ${error.statusCode}');
+      return null;
+    } on Exception catch (error) {
+      debugPrint('[AIOStreams] $name: ${error.runtimeType}');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _get(Uri uri, String path) async {
     try {
       final response = await _api.send('GET', uri);
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) {
+        debugPrint('[AIOStreams] $path: HTTP ${response.statusCode}');
+        return null;
+      }
       final decoded = await response.json();
-      return decoded is Map<String, dynamic> ? decoded : null;
-    } on Exception catch (_) {
+      if (decoded is Map<String, dynamic>) return decoded;
+      debugPrint('[AIOStreams] $path: unexpected response');
+      return null;
+    } on Exception catch (error) {
+      debugPrint('[AIOStreams] $path: ${error.runtimeType}');
       return null;
     }
   }
@@ -300,11 +359,13 @@ class AIOStreamsApiService {
     if (search != null && search.isNotEmpty) params['search'] = search;
     if (genre != null && genre.isNotEmpty) params['genre'] = genre;
 
-    final uri = Uri.parse(
-      '$_base/$integrationId/catalog/$type/$catalogId.json',
-    ).replace(queryParameters: params.isEmpty ? null : params);
-
-    final json = await _get(uri);
+    final json = await _lookup(
+      integrationId,
+      action: (actions) => actions.catalog,
+      params: {'type': type, 'catalog_id': catalogId},
+      legacyPath: 'catalog/$type/$catalogId.json',
+      query: params,
+    );
     if (json == null) return cached?.data ?? const [];
 
     final metas = json['metas'];
@@ -325,8 +386,12 @@ class AIOStreamsApiService {
     String type,
     String id,
   ) async {
-    final uri = Uri.parse('$_base/$integrationId/stream/$type/$id.json');
-    final json = await _get(uri);
+    final json = await _lookup(
+      integrationId,
+      action: (actions) => actions.streams,
+      params: {'type': type, 'id': id},
+      legacyPath: 'stream/$type/$id.json',
+    );
     if (json == null) return const [];
 
     final streams = json['streams'];
@@ -349,8 +414,12 @@ class AIOStreamsApiService {
     final cached = _metaCache[cacheKey];
     if (cached != null && !cached.isExpired) return cached.data;
 
-    final uri = Uri.parse('$_base/$integrationId/meta/$type/$id.json');
-    final json = await _get(uri);
+    final json = await _lookup(
+      integrationId,
+      action: (actions) => actions.meta,
+      params: {'type': type, 'id': id},
+      legacyPath: 'meta/$type/$id.json',
+    );
     if (json == null) return cached?.data;
 
     final meta = json['meta'];

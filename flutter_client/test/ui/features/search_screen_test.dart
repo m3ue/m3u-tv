@@ -1,14 +1,20 @@
+import 'package:dpad/dpad.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:m3u_tv/features/search/search_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/epg_service.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
+import 'package:m3u_tv/shared/channel_grid_tile.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:material_ui/material_ui.dart';
@@ -431,6 +437,127 @@ void main() {
 
     // --- EPG show search wiring (#227) ---
 
+    group('D-pad', () {
+      Future<void> focusCard(WidgetTester tester, String title) async {
+        final card = find
+            .ancestor(
+              of: find.text(title),
+              matching: find.byType(DpadFocusable),
+            )
+            .first;
+        tester
+            .widget<Focus>(
+              find.descendant(of: card, matching: find.byType(Focus)).first,
+            )
+            .focusNode!
+            .requestFocus();
+        await tester.pump();
+      }
+
+      String? focusedLabel() => FocusManager.instance.primaryFocus?.debugLabel;
+
+      for (final (tabLabel, tabIndex, title) in [
+        ('All', 0, 'The Matrix'),
+        ('Movies', 2, 'The Matrix'),
+      ]) {
+        testWidgets('Up from the top row of $tabLabel reaches the tab bar', (
+          tester,
+        ) async {
+          await tester.pumpWidget(
+            _TestApp(catalogRepository: testRepo, dpad: true),
+          );
+          await tester.pumpAndSettle();
+          await tester.enterText(find.byType(TextField), 'matrix');
+          await tester.pumpAndSettle();
+          if (tabIndex != 0) {
+            await tester.tap(
+              find.descendant(
+                of: find.byType(DpadTabBar),
+                matching: find.text(tabLabel),
+              ),
+            );
+            await tester.pumpAndSettle();
+          }
+
+          await focusCard(tester, title);
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+          await tester.pumpAndSettle();
+
+          expect(focusedLabel(), 'DpadTabBar tab $tabIndex');
+        });
+      }
+
+      testWidgets('Down from the tab bar enters the All rows', (tester) async {
+        await tester.pumpWidget(
+          _TestApp(catalogRepository: testRepo, dpad: true),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'matrix');
+        await tester.pumpAndSettle();
+
+        tester.state<DpadTabBarState>(find.byType(DpadTabBar)).requestFocus();
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        await tester.pumpAndSettle();
+
+        expect(
+          FocusManager.instance.primaryFocus?.context
+              ?.findAncestorWidgetOfExactType<MediaPreviewCard>(),
+          isNotNull,
+        );
+      });
+
+      testWidgets('results appearing leave focus in the search field', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          _TestApp(catalogRepository: testRepo, dpad: true),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'm');
+        await tester.pumpAndSettle();
+        // Keep typing through the IME, without the refocus enterText does.
+        tester.testTextInput.enterText('ma');
+        await tester.pumpAndSettle();
+        tester.testTextInput.enterText('matrix');
+        await tester.pumpAndSettle();
+
+        expect(find.text('Matrix Reloaded'), findsOneWidget);
+        expect(
+          FocusManager.instance.primaryFocus?.context
+              ?.findAncestorWidgetOfExactType<EditableText>(),
+          isNotNull,
+        );
+      });
+
+      testWidgets('Right at the end of a row does not page to the next tab', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          _TestApp(catalogRepository: testRepo, dpad: true),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'matrix');
+        await tester.pumpAndSettle();
+
+        await focusCard(tester, 'Matrix Reloaded');
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pumpAndSettle();
+
+        // No swipeable page above the results for a focused card's reveal
+        // to nudge toward the next tab.
+        expect(
+          find.ancestor(
+            of: find.text('Matrix Reloaded'),
+            matching: find.byType(PageView),
+          ),
+          findsNothing,
+        );
+        expect(find.text('Matrix Reloaded'), findsOneWidget);
+      });
+    });
+
     group('EPG show search', () {
       // Now/future-relative fixtures: `airingNow` must be within [start,
       // end]; `recentEpisodes` for the Upcoming row must be in the future.
@@ -482,8 +609,7 @@ void main() {
       }
 
       testWidgets(
-        'Live TV tab replaces channel list with On Now/Upcoming sub-tabs on '
-        'qualifying query',
+        'Live TV tab shows Live TV and Upcoming rows on a qualifying query',
         (tester) async {
           await tester.pumpWidget(
             _TestApp(
@@ -498,8 +624,6 @@ void main() {
           await tester.pump(const Duration(milliseconds: 400));
           await tester.pumpAndSettle();
 
-          // On the Live TV tab, the channel-name-filter list is gone,
-          // replaced by the All/On Now/Upcoming sub-tab view.
           await tester.tap(
             find.descendant(
               of: find.byType(DpadTabBar),
@@ -508,22 +632,26 @@ void main() {
           );
           await tester.pumpAndSettle();
 
-          // The outer SearchScreen DpadTabBar still has its 4 tabs
-          // (All / Live TV / Movies / Series); ShowSearchResultsView
-          // contributes a nested DpadTabBar for the sub-tabs.
-          expect(find.byType(DpadTabBar), findsNWidgets(2));
-          expect(find.text('All'), findsWidgets);
-          expect(find.text('On Now'), findsOneWidget);
-          expect(find.text('Upcoming'), findsOneWidget);
-          // The channel-tile list is gone (ShowSearchResultsView replaced
-          // it). ScrollbarListView is the new view's scroll container;
-          // the old Live TV tab used a plain ListView.builder.
-          expect(find.byType(ScrollbarListView), findsOneWidget);
+          // Rows like the All tab's top ones, not a second set of tabs. "be"
+          // matches no channel name; the Live TV row holds the channel
+          // airing the matching show now.
+          expect(find.byType(DpadTabBar), findsOneWidget);
+          final sections = tester
+              .widgetList<MediaPreviewSection>(find.byType(MediaPreviewSection))
+              .map((section) => section.title);
+          expect(sections, ['Live TV', 'Upcoming']);
+          expect(find.text('On Now'), findsNothing);
+          // Every card is a Live TV channel tile, and a full list: no View
+          // All card leading off the tab.
+          expect(find.byType(MediaPreviewCard), findsNothing);
+          expect(find.text('Nightly Report'), findsOneWidget);
+          expect(find.text('Bear'), findsOneWidget);
+          expect(find.text('View All'), findsNothing);
         },
       );
 
       testWidgets(
-        'Live TV tab renders EPG sub-tabs even when no channel name matches '
+        'Live TV tab renders show results even when no channel name matches '
         'the query (regression guard for channel-list-source bug)',
         (tester) async {
           // Query "bear" matches no channel name (BBC News, CNN), no VOD
@@ -552,8 +680,9 @@ void main() {
           );
           await tester.pumpAndSettle();
 
-          // ShowSearchResultsView's nested DpadTabBar must be present.
-          expect(find.text('On Now'), findsOneWidget);
+          // The show results are there without any channel name matching:
+          // the channel airing one now, and the upcoming one.
+          expect(find.text('Nightly Report'), findsOneWidget);
           expect(find.text('Upcoming'), findsOneWidget);
           // The "Bear" show still appears in the upcoming results.
           expect(find.text('Bear'), findsOneWidget);
@@ -563,8 +692,8 @@ void main() {
       );
 
       testWidgets(
-        'All tab renders On Now + Upcoming sections above the Live TV '
-        'channel-match section for a qualifying query',
+        'All tab leads with the Live TV and Upcoming rows, as the Live TV tab '
+        'does',
         (tester) async {
           await tester.pumpWidget(
             _TestApp(
@@ -578,11 +707,58 @@ void main() {
           await tester.pump(const Duration(milliseconds: 400));
           await tester.pumpAndSettle();
 
-          // We're on All by default.
+          // We're on All by default. A show airing now is on its channel's
+          // tile in the Live TV row; there is no On Now row.
+          final sections = tester
+              .widgetList<MediaPreviewSection>(find.byType(MediaPreviewSection))
+              .map((section) => section.title);
+          expect(sections.take(2), ['Live TV', 'Upcoming']);
+          expect(find.text('On Now'), findsNothing);
           expect(find.text('Nightly Report'), findsOneWidget);
           expect(find.text('Bear'), findsOneWidget);
-          // Channel-name matches still appear below the EPG sections.
           expect(find.text('BBC News'), findsOneWidget);
+        },
+      );
+
+      testWidgets(
+        'shows airing now and later use the Live TV tile with the matched '
+        'airing',
+        (tester) async {
+          await tester.pumpWidget(
+            _TestApp(
+              catalogRepository: testRepo,
+              onSearchShows: staticShows(showResults),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          await tester.enterText(find.byType(TextField), 'be');
+          await tester.pump(const Duration(milliseconds: 400));
+          await tester.pumpAndSettle();
+
+          ChannelGridTile tileFor(String show) => tester.widget(
+            find.ancestor(
+              of: find.text(show),
+              matching: find.byType(ChannelGridTile),
+            ),
+          );
+          final onNow = tileFor('Nightly Report');
+          final upcoming = tileFor('Bear');
+
+          // One airing now carries its progress, as Live TV's current
+          // programme does; an upcoming one has none, and says when it airs.
+          expect(onNow.channel.id, 1);
+          // The upcoming show's channel is resolved from the catalog, logo
+          // and all, not stood in for by its name.
+          expect(upcoming.channel.id, 2);
+          expect(upcoming.channel.streamUrl, isNotEmpty);
+          expect(onNow.programme?.progress, isNotNull);
+          expect(upcoming.programme?.progress, isNull);
+          // An hour out can cross midnight, which adds a "Tomorrow" prefix.
+          expect(
+            upcoming.programme?.timeLabel,
+            endsWith(DateFormat.jm('en').format(futureStart)),
+          );
         },
       );
 
@@ -616,8 +792,8 @@ void main() {
       );
 
       testWidgets(
-        'tapping an On Now row calls onChannelContextChanged then '
-        'onChannelSelect with the right channel',
+        'tapping a channel airing a matching show calls '
+        'onChannelContextChanged then onChannelSelect with the right channel',
         (tester) async {
           List<Channel>? reportedContext;
           Channel? selectedChannel;
@@ -745,6 +921,231 @@ void main() {
         },
       );
     });
+
+    group('DVR recordings', () {
+      final recordings = [
+        const DvrRecording(
+          uuid: 'done-1',
+          title: 'Catfish: The TV Show',
+          subtitle: 'Kyle & Karisma',
+          status: DvrRecordingStatus.completed,
+          channelName: 'MTV',
+          channelIconUrl: 'http://example.com/mtv.png',
+          posterUrl: 'http://example.com/catfish-poster.jpg',
+          seasonNumber: 6,
+          episodeNumber: 7,
+          streamUrl: 'http://example.com/dvr/done-1.ts',
+          edlUrl: 'http://example.com/dvr/done-1/edl',
+        ),
+        const DvrRecording(
+          uuid: 'scheduled-1',
+          title: 'Catfish: Unplayable',
+          status: DvrRecordingStatus.scheduled,
+        ),
+        const DvrRecording(
+          uuid: 'done-2',
+          title: 'Evening Report',
+          status: DvrRecordingStatus.completed,
+          channelName: 'Catfish Network',
+          channelIconUrl: 'http://example.com/catfish-network.png',
+          streamUrl: 'http://example.com/dvr/done-2.ts',
+        ),
+      ];
+
+      Finder tab(String label) => find.descendant(
+        of: find.byType(DpadTabBar),
+        matching: find.text(label),
+      );
+
+      testWidgets('hidden when the DVR feature is off', (tester) async {
+        await tester.pumpWidget(
+          _TestApp(
+            catalogRepository: testRepo,
+            dvrRecordings: recordings,
+            onRecordingPlay: (_) {},
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'catfish');
+        await tester.pumpAndSettle();
+
+        expect(tab('Recordings'), findsNothing);
+        expect(find.text('Catfish: The TV Show'), findsNothing);
+      });
+
+      testWidgets(
+        'All tab lists playable matches by title, episode or channel',
+        (tester) async {
+          await tester.pumpWidget(
+            _TestApp(
+              catalogRepository: testRepo,
+              hasDvrFeature: true,
+              dvrRecordings: recordings,
+              onRecordingPlay: (_) {},
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tab('Recordings'), findsOneWidget);
+
+          await tester.enterText(find.byType(TextField), 'catfish');
+          await tester.pumpAndSettle();
+
+          expect(find.text('Catfish: The TV Show'), findsOneWidget);
+          expect(find.text('S06E07 · Kyle & Karisma · MTV'), findsOneWidget);
+          // Matched on its channel name.
+          expect(find.text('Evening Report'), findsOneWidget);
+          // Scheduled: nothing to play yet.
+          expect(find.text('Catfish: Unplayable'), findsNothing);
+
+          await tester.enterText(find.byType(TextField), 'karisma');
+          await tester.pump(const Duration(milliseconds: 400));
+          await tester.pumpAndSettle();
+          expect(find.text('Catfish: The TV Show'), findsOneWidget);
+          expect(find.text('Evening Report'), findsNothing);
+        },
+      );
+
+      testWidgets(
+        'recordings show their library poster, or the channel logo before one exists',
+        (tester) async {
+          await tester.pumpWidget(
+            _TestApp(
+              catalogRepository: testRepo,
+              hasDvrFeature: true,
+              dvrRecordings: recordings,
+              onRecordingPlay: (_) {},
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.enterText(find.byType(TextField), 'catfish');
+          await tester.pumpAndSettle();
+
+          MediaPreviewItem itemFor(String title) => tester
+              .widget<MediaPreviewCard>(
+                find.ancestor(
+                  of: find.text(title),
+                  matching: find.byType(MediaPreviewCard),
+                ),
+              )
+              .item;
+
+          final poster = itemFor('Catfish: The TV Show');
+          expect(poster.imageUrl, 'http://example.com/catfish-poster.jpg');
+          expect(poster.imageFit, BoxFit.cover);
+          final logo = itemFor('Evening Report');
+          expect(logo.imageUrl, 'http://example.com/catfish-network.png');
+          expect(logo.imageFit, BoxFit.contain);
+        },
+      );
+
+      testWidgets(
+        'Up climbs back through All rows scrolled out of view, then to the tabs',
+        (tester) async {
+          // Short enough that the top rows leave the list's cache on the way
+          // down, so Up has to scroll them back in.
+          tester.view.physicalSize = const Size(1280, 520);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+
+          await tester.pumpWidget(
+            _TestApp(
+              catalogRepository: testRepo,
+              hasDvrFeature: true,
+              dvrRecordings: recordings,
+              onRecordingPlay: (_) {},
+              dpad: true,
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.enterText(find.byType(TextField), 'a');
+          await tester.pumpAndSettle();
+
+          final firstCard = find
+              .ancestor(
+                of: find.text('Catfish: The TV Show'),
+                matching: find.byType(DpadFocusable),
+              )
+              .first;
+          tester
+              .widget<Focus>(
+                find
+                    .descendant(of: firstCard, matching: find.byType(Focus))
+                    .first,
+              )
+              .focusNode!
+              .requestFocus();
+          await tester.pumpAndSettle();
+
+          // Recordings -> Movies -> Series.
+          for (var i = 0; i < 2; i++) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+            await tester.pumpAndSettle();
+          }
+          expect(find.text('Catfish: The TV Show'), findsNothing);
+
+          for (var i = 0; i < 2; i++) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+            await tester.pumpAndSettle();
+          }
+          final focused = FocusManager.instance.primaryFocus!.context!;
+          expect(
+            find.descendant(
+              of: find.byWidget(
+                focused.findAncestorWidgetOfExactType<MediaPreviewCard>()!,
+              ),
+              matching: find.text('Catfish: The TV Show'),
+            ),
+            findsOneWidget,
+          );
+
+          // Up to the Live TV row at the top, then to the tabs.
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+          await tester.pumpAndSettle();
+          expect(
+            FocusManager.instance.primaryFocus?.context
+                ?.findAncestorWidgetOfExactType<ChannelGridTile>(),
+            isNotNull,
+          );
+
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+          await tester.pumpAndSettle();
+          expect(
+            FocusManager.instance.primaryFocus?.debugLabel,
+            'DpadTabBar tab 0',
+          );
+        },
+      );
+
+      testWidgets('Recordings tab plays the selected recording', (
+        tester,
+      ) async {
+        PlayerArgs? played;
+        await tester.pumpWidget(
+          _TestApp(
+            catalogRepository: testRepo,
+            hasDvrFeature: true,
+            dvrRecordings: recordings,
+            onRecordingPlay: (args) => played = args,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'catfish');
+        await tester.pumpAndSettle();
+
+        await tester.tap(tab('Recordings'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Catfish: The TV Show'));
+        await tester.pumpAndSettle();
+
+        expect(played?.streamUrl, 'http://example.com/dvr/done-1.ts');
+        expect(played?.type, 'vod');
+        expect(played?.metadata['dvr_uuid'], 'done-1');
+        expect(
+          played?.metadata['edl_url'],
+          'http://example.com/dvr/done-1/edl',
+        );
+      });
+    });
   });
 }
 
@@ -760,6 +1161,10 @@ class _TestApp extends StatelessWidget {
     this.onShowSelect,
     this.categoriesState,
     this.playlistKeyState,
+    this.hasDvrFeature = false,
+    this.dvrRecordings = const <DvrRecording>[],
+    this.onRecordingPlay,
+    this.dpad = false,
   });
 
   final CatalogRepository catalogRepository;
@@ -778,6 +1183,13 @@ class _TestApp extends StatelessWidget {
   /// When set, a test can switch the shown playlist.
   final StateProvider<String?>? playlistKeyState;
 
+  final bool hasDvrFeature;
+  final List<DvrRecording> dvrRecordings;
+  final void Function(PlayerArgs)? onRecordingPlay;
+
+  /// Wraps the app in [Dpad] so arrow keys use its directional traversal.
+  final bool dpad;
+
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
@@ -795,10 +1207,15 @@ class _TestApp extends StatelessWidget {
               ? 'playlist'
               : ref.watch(playlistKeyState!),
         ),
+        hasDvrFeatureProvider.overrideWith((_) => hasDvrFeature),
+        dvrRecordingsProvider.overrideWith((_) => dvrRecordings),
+        epgServiceProvider.overrideWith((_) => EpgService()),
+        recordingChannelIdsProvider.overrideWith((_) => const <int>{}),
       ],
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         theme: ThemeData.dark(useMaterial3: true),
+        builder: dpad ? (context, child) => Dpad(child: child!) : null,
         home: SearchScreen(
           onChannelSelect: onChannelSelect ?? (_) {},
           onChannelContextChanged: onChannelContextChanged == null
@@ -810,6 +1227,7 @@ class _TestApp extends StatelessWidget {
           onSeriesSelect: onSeriesSelect ?? (_) {},
           onSearchShows: onSearchShows,
           onShowSelect: onShowSelect,
+          onRecordingPlay: onRecordingPlay,
         ),
       ),
     );

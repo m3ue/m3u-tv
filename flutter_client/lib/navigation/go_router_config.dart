@@ -6,6 +6,7 @@ import 'package:m3u_tv/app/app_shell.dart'
     show AppShell, AppShellState, DeviceType;
 import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
+import 'package:m3u_tv/features/aiostreams/aiostreams_catalog_screen.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_detail_screen.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_search_screen.dart';
 import 'package:m3u_tv/features/continue_watching/continue_watching_screen.dart';
@@ -24,6 +25,7 @@ import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
     show kCatalogKindSeries, kCatalogKindVod;
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/xtream_service.dart' show AIOStreamsCatalog;
 import 'package:m3u_tv/shared/app_background.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/app_page_route.dart';
@@ -279,6 +281,7 @@ class _AsyncVodDetails extends StatelessWidget {
               xtreamService: actions.xtreamService,
               onPlay: _playOnTopLevelRoute(context, actions),
               progressList: actions.progressList,
+              onDeleteRecording: actions.appState.deleteDvrRecording,
               onOpenRelated: (related) => _openRelated(actions, related),
               onTapMember: (member) => context.push(
                 RouteNames.personDetailsFor(
@@ -341,6 +344,7 @@ class _AsyncSeriesDetails extends StatelessWidget {
               onPlay: _playOnTopLevelRoute(context, actions),
               progressList: actions.progressList,
               onMarkEpisodeWatched: actions.onMarkEpisodeWatched,
+              onDeleteRecording: actions.appState.deleteDvrRecording,
               onOpenRelated: (related) => _openRelated(actions, related),
               onTapMember: (member) => context.push(
                 RouteNames.personDetailsFor(
@@ -556,6 +560,54 @@ GoRouter createGoRouter({
                       );
                     },
                   ),
+                  // A catalog row's View All grid. `extra` carries the
+                  // catalog; without it (a deep link) the catalog is looked
+                  // up from the integration, falling back to its id.
+                  GoRoute(
+                    path: 'catalog/:integrationId/:type/:catalogId',
+                    pageBuilder: (context, state) {
+                      final actions = ContentActions.of(context);
+                      final integrationId = int.parse(
+                        state.pathParameters['integrationId']!,
+                      );
+                      final type = state.pathParameters['type']!;
+                      final catalogId = state.pathParameters['catalogId']!;
+                      final catalog =
+                          state.extra as AIOStreamsCatalog? ??
+                          actions.appState.aiostreamsIntegrations
+                              .where((i) => i.id == integrationId)
+                              .expand((i) => i.catalogs)
+                              .where((c) => c.id == catalogId && c.type == type)
+                              .firstOrNull ??
+                          AIOStreamsCatalog(
+                            id: catalogId,
+                            type: type,
+                            name: catalogId,
+                          );
+                      return _slidePage(
+                        AIOStreamsCatalogScreen(
+                          integrationId: integrationId,
+                          catalog: catalog,
+                          apiService: actions.appState.aiostreamsApiService,
+                          favoritesService:
+                              actions.appState.aioFavoritesService,
+                          onItemSelect: (item) {
+                            unawaited(
+                              context.push(
+                                RouteNames.aiostreamsDetailsFor(
+                                  integrationId,
+                                  item.type,
+                                  item.id,
+                                ),
+                                extra: item,
+                              ),
+                            );
+                          },
+                          onSidebarActivate: actions.onSidebarActivate,
+                        ),
+                      );
+                    },
+                  ),
                 ],
               ),
             ],
@@ -640,6 +692,7 @@ GoRouter createGoRouter({
                     xtreamService: actions.xtreamService,
                     onPlay: _playOnTopLevelRoute(context, actions),
                     progressList: actions.progressList,
+                    onDeleteRecording: actions.appState.deleteDvrRecording,
                     onOpenRelated: (related) => _openRelated(actions, related),
                     onTapMember: (member) => context.push(
                       RouteNames.personDetailsFor(
@@ -786,6 +839,7 @@ GoRouter createGoRouter({
                     onPlay: _playOnTopLevelRoute(context, actions),
                     progressList: actions.progressList,
                     onMarkEpisodeWatched: actions.onMarkEpisodeWatched,
+                    onDeleteRecording: actions.appState.deleteDvrRecording,
                     onOpenRelated: (related) => _openRelated(actions, related),
                     onTapMember: (member) => context.push(
                       RouteNames.personDetailsFor(

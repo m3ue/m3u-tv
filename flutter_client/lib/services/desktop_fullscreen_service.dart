@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:m3u_tv/shared/desktop_back_key.dart';
+import 'package:m3u_tv/services/desktop_window.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -17,25 +17,27 @@ class _WindowManagerFullscreenWindow implements FullscreenWindow {
   const _WindowManagerFullscreenWindow();
 
   @override
-  Future<bool> isFullScreen() => windowManager.isFullScreen();
+  Future<bool> isFullScreen() async =>
+      currentDesktopWindow()?.isFullScreen ?? false;
 
   @override
-  Future<void> setFullScreen({required bool fullscreen}) =>
-      windowManager.setFullScreen(fullscreen);
+  Future<void> setFullScreen({required bool fullscreen}) async {
+    currentDesktopWindow()?.isFullScreen = fullscreen;
+  }
 }
 
 /// Desktop (macOS/Windows/Linux) fullscreen state and shortcuts.
 ///
 /// State follows the window manager's enter/leave events, so the macOS green
 /// button and View > Enter Full Screen (Ctrl+Cmd+F) stay in sync with the
-/// in-app toggle. Shortcuts: F11 everywhere, Alt+Enter on Windows/Linux, and
-/// Escape leaves fullscreen before it is treated as Back (unless
-/// [deferEscape] claims it).
+/// in-app toggle. Shortcuts: F11 everywhere and Alt+Enter on Windows/Linux.
+/// Escape (and Backspace) deliberately stay Back, so keyboard navigation
+/// works the same in fullscreen as windowed.
 ///
 /// Toggles are ignored while a transition is in flight. macOS animates into
 /// its own Space for most of a second, and a second `toggleFullScreen` during
 /// that animation leaves the window (and the mpv surface inside it) mid-resize.
-class DesktopFullscreenService extends ChangeNotifier with WindowListener {
+class DesktopFullscreenService extends ChangeNotifier {
   DesktopFullscreenService({
     this.window = const _WindowManagerFullscreenWindow(),
     bool? altEnterToggles,
@@ -57,23 +59,20 @@ class DesktopFullscreenService extends ChangeNotifier with WindowListener {
 
   bool _isFullscreen = false;
   bool _transitioning = false;
+  ListenerId? _windowListenerId;
   Timer? _transitionTimer;
   final Set<PhysicalKeyboardKey> _swallowedKeys = <PhysicalKeyboardKey>{};
 
   bool get isFullscreen => _isFullscreen;
 
-  /// Returns true while something on screen should get Escape as Back before
-  /// fullscreen does - the player sets it so an open OSD is hidden first.
-  bool Function()? deferEscape;
-
   /// True between a toggle request and the window confirming it.
   bool get isTransitioning => _transitioning;
 
   /// Registers the window listener and key handler and makes this the app-wide
-  /// [instance]. Call once after `windowManager.ensureInitialized()`.
+  /// [instance]. Call once at desktop startup.
   Future<void> install() async {
     _instance = this;
-    windowManager.addListener(this);
+    _windowListenerId = currentDesktopWindow()?.addListener(_onWindowEvent);
     FocusManager.instance.addEarlyKeyEventHandler(handleKeyEvent);
     _setFullscreen(await window.isFullScreen());
   }
@@ -121,15 +120,26 @@ class DesktopFullscreenService extends ChangeNotifier with WindowListener {
     notifyListeners();
   }
 
-  @override
+  void _onWindowEvent(WindowEvent event) {
+    switch (event) {
+      case WindowEnteredFullScreenEvent():
+        onWindowEnterFullScreen();
+      case WindowExitedFullScreenEvent():
+        onWindowLeaveFullScreen();
+      default:
+        break;
+    }
+  }
+
+  @visibleForTesting
   void onWindowEnterFullScreen() => _finishTransition(true);
 
-  @override
+  @visibleForTesting
   void onWindowLeaveFullScreen() => _finishTransition(false);
 
   /// Early key handler, so a handled key never reaches the focus tree. A
-  /// plain `HardwareKeyboard` handler can't do that (every handler runs), which
-  /// let Escape both leave fullscreen and pop the player mid-transition.
+  /// plain `HardwareKeyboard` handler can't do that (every handler runs), so a
+  /// toggle key would also reach the focused page.
   @visibleForTesting
   KeyEventResult handleKeyEvent(KeyEvent event) {
     final key = event.physicalKey;
@@ -152,13 +162,6 @@ class DesktopFullscreenService extends ChangeNotifier with WindowListener {
         HardwareKeyboard.instance.isAltPressed) {
       unawaited(toggle());
       consume = true;
-    } else if ((logical == LogicalKeyboardKey.escape ||
-            isDesktopBackspaceBack(event, HardwareKeyboard.instance)) &&
-        (_isFullscreen || _transitioning) &&
-        !_dialogHasFocus() &&
-        !(deferEscape?.call() ?? false)) {
-      unawaited(setFullscreen(fullscreen: false));
-      consume = true;
     } else {
       consume = false;
     }
@@ -167,18 +170,12 @@ class DesktopFullscreenService extends ChangeNotifier with WindowListener {
     return KeyEventResult.handled;
   }
 
-  /// Escape still closes an open dialog or popup first; fullscreen only
-  /// claims it on a regular page.
-  bool _dialogHasFocus() {
-    final focusContext = FocusManager.instance.primaryFocus?.context;
-    if (focusContext == null || !focusContext.mounted) return false;
-    return ModalRoute.of(focusContext) is PopupRoute;
-  }
-
   @override
   void dispose() {
     _transitionTimer?.cancel();
-    windowManager.removeListener(this);
+    final listenerId = _windowListenerId;
+    if (listenerId != null) currentDesktopWindow()?.removeListener(listenerId);
+    _windowListenerId = null;
     FocusManager.instance.removeEarlyKeyEventHandler(handleKeyEvent);
     if (identical(_instance, this)) _instance = null;
     super.dispose();

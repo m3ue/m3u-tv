@@ -438,6 +438,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchSectionSeries => 'Series';
 
   @override
+  String get searchSectionRecordings => 'Recordings';
+
+  @override
   String get vodSearchHint => 'Search...';
 
   @override
@@ -1070,6 +1073,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeBrowseSeries => 'Browse every series';
 
   @override
+  String homeBrowseCategory(String category) {
+    return 'Everything in $category';
+  }
+
+  @override
   String get homeNothingToShow => 'Nothing to show yet';
 
   @override
@@ -1297,6 +1305,34 @@ class AppLocalizationsEn extends AppLocalizations {
       'Register an app at simkl.com/settings/developer and set the client ID via --dart-define=SIMKL_CLIENT_ID.';
 
   @override
+  String get mdblistName => 'MDBList';
+
+  @override
+  String get mdblistConnectPrompt =>
+      'Connect your MDBList account to automatically track what you watch.';
+
+  @override
+  String get mdblistConnectButton => 'Connect with MDBList';
+
+  @override
+  String get mdblistConnected => 'Connected to MDBList';
+
+  @override
+  String mdblistConnectedAs(String account) {
+    return 'Connected to MDBList as $account';
+  }
+
+  @override
+  String get mdblistDisconnectButton => 'Disconnect MDBList';
+
+  @override
+  String get mdblistNotConfigured => 'MDBList client ID is not configured.';
+
+  @override
+  String get mdblistNotConfiguredHint =>
+      'Register an app at mdblist.com/developer and set the client ID via --dart-define=MDBLIST_CLIENT_ID.';
+
+  @override
   String get vodAllMovies => 'All Movies';
 
   @override
@@ -1321,6 +1357,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vodDirector => 'Director';
+
+  @override
+  String get vodRecorded => 'Recorded';
+
+  @override
+  String get detailDvrBadge => 'DVR';
 
   @override
   String get castShowAll => 'Show all cast';
@@ -1991,6 +2033,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsDeinterlaceHint =>
       'Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.';
+
+  @override
+  String get settingsHideOverlayOnStart => 'Hide player overlay on start';
+
+  @override
+  String get settingsHideOverlayOnStartHint =>
+      'Open streams on just the picture, without the controls and channel info. Press any button or tap the screen to show them.';
 
   @override
   String get settingsBackgroundAudio => 'Background audio';

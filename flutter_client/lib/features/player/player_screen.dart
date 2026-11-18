@@ -274,6 +274,8 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool get _showPlaybackDiagnostics =>
       widget.viewSettingsService?.showPlaybackDiagnosticsSync ?? false;
   late double _volume = widget.viewSettingsService?.volumeSync ?? 1.0;
+  bool get _hideOverlayOnStart =>
+      widget.viewSettingsService?.hideOverlayOnStartSync ?? false;
 
   EpgCurrentNext? _epgData;
 
@@ -306,7 +308,9 @@ class _PlayerScreenState extends State<PlayerScreen>
   /// transport bar.
   final FocusNode _upNextFocusNode = FocusNode(debugLabel: 'playerUpNext');
 
-  bool _overlayVisible = true;
+  // Starts hidden when the user opted to open streams on just the picture;
+  // any key or tap still brings it up.
+  late bool _overlayVisible = !_hideOverlayOnStart;
   bool _trackDialogVisible = false;
   bool _dvrSchedulePending = false;
 
@@ -427,7 +431,6 @@ class _PlayerScreenState extends State<PlayerScreen>
     unawaited(widget.wakelockController.enable());
     widget.backController?._handler = _handleBack;
     HardwareKeyboard.instance.addHandler(_handleTransportKey);
-    DesktopFullscreenService.instance?.deferEscape = _defersFullscreenEscape;
     if (HostPlatform.isAndroid || HostPlatform.isIOS) {
       _pipChannel.setMethodCallHandler(_handlePipChannelCall);
     }
@@ -628,7 +631,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       _selectedAudioTrackId = null;
       _selectedSubtitleTrackId = null;
       _epgData = null;
-      _overlayVisible = true;
+      _overlayVisible = !_hideOverlayOnStart;
       _skips.reset();
       _upNextVisible = false;
       _upNextDismissed = false;
@@ -950,10 +953,6 @@ class _PlayerScreenState extends State<PlayerScreen>
     final backController = widget.backController;
     if (backController?._handler == _handleBack) {
       backController!._handler = null;
-    }
-    final fullscreen = DesktopFullscreenService.instance;
-    if (fullscreen?.deferEscape == _defersFullscreenEscape) {
-      fullscreen!.deferEscape = null;
     }
     // Back to the EPG preview (or gone): only the full-screen player PiPs.
     unawaited(_autoPictureInPicture?.setAutoPictureInPicture(enabled: false));
@@ -2262,9 +2261,6 @@ class _PlayerScreenState extends State<PlayerScreen>
       if (mounted && !_overlayVisible) _screenFocusNode.requestFocus();
     });
   }
-
-  /// Escape hides an open OSD before it leaves desktop fullscreen.
-  bool _defersFullscreenEscape() => _overlayVisible && _errorMessage == null;
 
   void _handleBack() {
     if (_trackDialogVisible) {

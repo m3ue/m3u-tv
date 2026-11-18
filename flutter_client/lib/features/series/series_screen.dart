@@ -4,6 +4,7 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
     show kCatalogKindSeries;
@@ -15,6 +16,7 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/catalog_window.dart';
 import 'package:m3u_tv/shared/catalog_window_grid.dart';
+import 'package:m3u_tv/shared/category_open_request.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
@@ -62,7 +64,8 @@ class SeriesScreen extends ConsumerStatefulWidget {
   ConsumerState<SeriesScreen> createState() => _SeriesScreenState();
 }
 
-class _SeriesScreenState extends ConsumerState<SeriesScreen> {
+class _SeriesScreenState extends ConsumerState<SeriesScreen>
+    with CategoryOpenRequestListener {
   static const double _minPosterCardWidth = 120;
   static const double _maxPosterCardWidth = 220;
   static const _kFavoritesCategoryId = '__FAVORITES__';
@@ -106,6 +109,27 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
     widget.favoritesService?.addListener(_onFavoritesChanged);
     unawaited(_loadFavorites());
     _reconfigureWindow();
+    listenForCategoryRequests();
+  }
+
+  @override
+  String get categoryRoute => RouteNames.series;
+
+  /// Home's View all on a category row: that category, with no search
+  /// narrowing it further.
+  @override
+  void openRequestedCategory(String categoryId) {
+    if (isCategorySelectionGone(
+      categoryId,
+      ref.read(seriesCategoriesProvider),
+      favoritesId: _kFavoritesCategoryId,
+    )) {
+      return;
+    }
+    _debounce?.cancel();
+    _query = '';
+    _appliedQuery = '';
+    _onCategorySelected(categoryId);
   }
 
   /// The sort to open with: the persisted Series sort when the user has

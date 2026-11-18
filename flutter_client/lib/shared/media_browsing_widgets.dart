@@ -49,6 +49,24 @@ class MediaBrowsingMetrics {
   static const double interstitialNavWidth = 200;
 }
 
+/// Columns for a vertical poster grid (the Movies/Series pages' layout): as
+/// few as keep each card at most [maxCardWidth] wide, but never so many that
+/// a card drops below [minCardWidth]. Both are unscaled; [scale] is
+/// `FontSizeScope.scaleOf`.
+int posterGridColumnCount(
+  double availableWidth,
+  double scale, {
+  double minCardWidth = 120,
+  double maxCardWidth = 220,
+}) {
+  const gap = MediaBrowsingMetrics.itemGap;
+  final minimumColumns = ((availableWidth + gap) / (maxCardWidth * scale + gap))
+      .ceil();
+  final maximumColumns = ((availableWidth + gap) / (minCardWidth * scale + gap))
+      .floor();
+  return minimumColumns.clamp(1, maximumColumns.clamp(1, 100));
+}
+
 /// Small icon + label header used above a detail-page row (Cast, Related).
 /// Mirrors [MediaPreviewSection]'s own title-row styling so a header reads
 /// consistently whether the row sits inside a preview section or a locked
@@ -1208,6 +1226,9 @@ class MediaPreviewSection extends StatefulWidget {
     this.viewAll,
     this.useSidebarLayout = false,
     this.onSidebarActivate,
+    this.onTopEdge,
+    this.maxItems = maxVisibleItems,
+    this.autofocusFirst = true,
     super.key,
   }) : itemCount = null,
        itemBuilder = null,
@@ -1231,6 +1252,9 @@ class MediaPreviewSection extends StatefulWidget {
     this.viewAll,
     this.useSidebarLayout = false,
     this.onSidebarActivate,
+    this.onTopEdge,
+    this.maxItems = maxVisibleItems,
+    this.autofocusFirst = true,
     super.key,
   }) : items = const [],
        posterStyle = false,
@@ -1264,12 +1288,29 @@ class MediaPreviewSection extends StatefulWidget {
   final bool useSidebarLayout;
   final VoidCallback? onSidebarActivate;
 
+  /// Up pressed in this row. Null lets directional traversal move focus to
+  /// whatever sits above; a row under a tab bar sets this to land on the
+  /// selected tab instead.
+  final VoidCallback? onTopEdge;
+
   /// A preview row renders at most this many cards regardless of how many
   /// [items] it is handed. Callers building [items] from a large catalog
   /// should `.take(MediaPreviewSection.maxVisibleItems)` before mapping so a
   /// provider tick doesn't allocate a [MediaPreviewItem] per catalog entry on
   /// every rebuild.
   static const int maxVisibleItems = 12;
+
+  /// The most cards this row renders: [maxVisibleItems] for a preview row
+  /// with a [viewAll] card; a row that is itself the full list (no View All)
+  /// passes its item count.
+  final int maxItems;
+
+  /// Whether the first card asks for focus when the row is built. Off for a
+  /// row in its own `FocusScope` that appears while focus is elsewhere (e.g.
+  /// search results arriving while the user types): autofocus applies
+  /// whenever the row's scope has nothing focused, so the card would take
+  /// focus from the search field.
+  final bool autofocusFirst;
 
   @override
   State<MediaPreviewSection> createState() => _MediaPreviewSectionState();
@@ -1284,6 +1325,119 @@ const double kSidebarRailInset = 64;
 
 class _MediaPreviewSectionState extends State<MediaPreviewSection> {
   final ScrollController _controller = ScrollController();
+  final GlobalKey<DpadRegionState> _regionKey = GlobalKey<DpadRegionState>();
+
+  /// Up/Down out of the row lands on the nearest row in that direction.
+  ///
+  /// dpad's own pick favours anything directly under the focused card
+  /// ("in the beam") over anything off to the side, however close. Focused
+  /// far along a long row, a short row next to it (two cards and View all)
+  /// has nothing under the card, so focus jumped over it to the row after.
+  /// Here the beam is the whole row's width, so the closest row wins and
+  /// then the card nearest across (or the one remembered) inside it.
+  void _onVerticalEdge(TraversalDirection direction) {
+    if (_focusAdjacentRow(direction)) return;
+    // The next row may not be built yet in a lazy list: reveal it, retry.
+    final scrollable = Scrollable.maybeOf(context, axis: Axis.vertical);
+    final position = scrollable?.position;
+    if (position == null) return;
+    final down = direction == TraversalDirection.down;
+    final target =
+        (position.pixels + (down ? 1 : -1) * position.viewportDimension * 0.6)
+            .clamp(position.minScrollExtent, position.maxScrollExtent);
+    if ((target - position.pixels).abs() < 1) return;
+    position.jumpTo(target);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusAdjacentRow(direction);
+    });
+  }
+
+  bool _focusAdjacentRow(TraversalDirection direction) {
+    final region = _regionKey.currentState;
+    final regionRect = region == null ? null : _globalRect(region.context);
+    final current = FocusManager.instance.primaryFocus;
+    final source = current == null ? null : _nodeRect(current);
+    final scope = current?.nearestScope;
+    if (region == null ||
+        regionRect == null ||
+        source == null ||
+        scope == null) {
+      return false;
+    }
+    final down = direction == TraversalDirection.down;
+    // Candidates beyond this row that share its horizontal span, so the
+    // sidebar or a side panel never counts as the row below.
+    final byRegion = <Object, List<(FocusNode, Rect)>>{};
+    double? nearestGap;
+    for (final node in scope.traversalDescendants) {
+      if (!node.canRequestFocus) continue;
+      final targetRegion = DpadRegion.ofNode(node);
+      if (identical(targetRegion, region)) continue;
+      final rect = _nodeRect(node);
+      // Off-screen lazy children can report NaN geometry, which would slip
+      // past every comparison below.
+      if (rect == null || !rect.isFinite || rect.isEmpty) continue;
+      if (rect.right <= regionRect.left || rect.left >= regionRect.right) {
+        continue;
+      }
+      final gap = down
+          ? rect.top - regionRect.bottom
+          : regionRect.top - rect.bottom;
+      if (gap < -1) continue;
+      (byRegion[targetRegion ?? node] ??= []).add((node, rect));
+      if (nearestGap == null || gap < nearestGap) nearestGap = gap;
+    }
+    if (nearestGap == null) return false;
+    // The closest row: the group holding the smallest gap.
+    List<(FocusNode, Rect)>? row;
+    for (final group in byRegion.values) {
+      final gap = group
+          .map(
+            (entry) => down
+                ? entry.$2.top - regionRect.bottom
+                : regionRect.top - entry.$2.bottom,
+          )
+          .reduce(math.min);
+      if (gap == nearestGap) {
+        row = group;
+        break;
+      }
+    }
+    if (row == null) return false;
+    // Inside it, the card closest across to the one focused now.
+    var nearest = row.first;
+    for (final entry in row.skip(1)) {
+      if ((entry.$2.center.dx - source.center.dx).abs() <
+          (nearest.$2.center.dx - source.center.dx).abs()) {
+        nearest = entry;
+      }
+    }
+    final targetRegion = DpadRegion.ofNode(nearest.$1);
+    // dpad 3.3 marks resolveEnter @internal with no public equivalent; it is
+    // the only way to honor the target region's enter/restore memory the
+    // same way dpad's own cross-region move does.
+    // ignore: invalid_use_of_internal_member
+    (targetRegion?.resolveEnter(nearest.$1, [
+              for (final entry in row) entry.$1,
+            ]) ??
+            nearest.$1)
+        .requestFocus();
+    return true;
+  }
+
+  static Rect? _nodeRect(FocusNode node) {
+    final context = node.context;
+    return context == null || !context.mounted ? null : _globalRect(context);
+  }
+
+  static Rect? _globalRect(BuildContext context) {
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return null;
+    return MatrixUtils.transformRect(
+      box.getTransformTo(null),
+      Offset.zero & box.size,
+    );
+  }
 
   @override
   void dispose() {
@@ -1295,10 +1449,10 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
   Widget build(BuildContext context) {
     final fontScale = FontSizeScope.scaleOf(context);
     final visibleItems = widget.items
-        .take(MediaPreviewSection.maxVisibleItems)
+        .take(widget.maxItems)
         .toList(growable: false);
     final visibleCount = widget.itemBuilder != null
-        ? widget.itemCount!.clamp(0, MediaPreviewSection.maxVisibleItems)
+        ? widget.itemCount!.clamp(0, widget.maxItems)
         : visibleItems.length;
     final double baseWidth;
     final double baseHeight;
@@ -1405,11 +1559,21 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
               // when scrolling quickly.
               child: ExcludeSemantics(
                 child: DpadRegion(
+                  key: _regionKey,
                   memoryKey: 'preview-row/${widget.title}',
                   horizontalEdge: DpadEdgeBehavior.stop,
+                  verticalEdge: DpadEdgeBehavior.stop,
                   onEdge: (direction) {
-                    if (direction == TraversalDirection.left) {
-                      widget.onSidebarActivate?.call();
+                    switch (direction) {
+                      case TraversalDirection.left:
+                        widget.onSidebarActivate?.call();
+                      case TraversalDirection.up when widget.onTopEdge != null:
+                        widget.onTopEdge!.call();
+                      case TraversalDirection.up:
+                      case TraversalDirection.down:
+                        _onVerticalEdge(direction);
+                      case TraversalDirection.right:
+                        break;
                     }
                   },
                   // No Scrollbar, matching the detail screens' episode + cast
@@ -1427,7 +1591,7 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
                       ),
                       itemBuilder: (context, index) {
                         if (index == visibleCount) {
-                          return _PreviewViewAllCard(
+                          return PreviewActionCard(
                             item: viewAll!,
                             width: widget.itemBuilder != null
                                 ? customCardWidth
@@ -1440,14 +1604,14 @@ class _MediaPreviewSectionState extends State<MediaPreviewSection> {
                             context,
                             index,
                             Size(customCardWidth, cardHeight),
-                            autofocus: index == 0,
+                            autofocus: widget.autofocusFirst && index == 0,
                           );
                         }
                         return MediaPreviewCard(
                           item: visibleItems[index],
                           posterStyle: widget.posterStyle,
                           landscapeStyle: widget.landscapeStyle,
-                          autofocus: index == 0,
+                          autofocus: widget.autofocusFirst && index == 0,
                           cardWidth: cardWidth,
                         );
                       },
@@ -1543,11 +1707,20 @@ class _PreviewCardSkeleton extends StatelessWidget {
 
 /// [MediaPreviewSection.viewAll]: an icon and label centered on a card the
 /// size of the row's others.
-class _PreviewViewAllCard extends StatelessWidget {
-  const _PreviewViewAllCard({required this.item, required this.width});
+/// A card that leads somewhere rather than showing a title: a row's View all,
+/// or a one-card entry row (DVR, AIOStreams). An icon and a label on a
+/// faint wash of the theme colour, so it reads apart from the artwork cards.
+class PreviewActionCard extends StatelessWidget {
+  const PreviewActionCard({
+    super.key,
+    required this.item,
+    required this.width,
+    this.autofocus = false,
+  });
 
   final MediaPreviewItem item;
   final double width;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -1555,53 +1728,78 @@ class _PreviewViewAllCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final scale = FontSizeScope.scaleOf(context);
     final subtitle = item.subtitle;
+    final radius = BorderRadius.circular(MediaBrowsingMetrics.cardRadius);
+    final primary = colorScheme.primary;
+    final base = colorScheme.surfaceContainerHigh;
     final card = SizedBox(
       width: width,
       child: DpadInkWell(
         onTap: item.onTap,
-        color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
-        child: Padding(
-          padding: const EdgeInsets.all(MediaBrowsingMetrics.chipGap),
-          child: Center(
-            // Scales down rather than overflowing the shorter Live TV tiles
-            // at large font sizes.
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.all(12 * scale),
-                      child: Icon(
-                        item.fallbackIcon,
-                        size: 28 * scale,
-                        color: colorScheme.onSurface,
+        autofocus: autofocus,
+        color: base,
+        borderRadius: radius,
+        // Ink, so the press ripple still shows over the wash.
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color.alphaBlend(primary.withValues(alpha: 0.18), base),
+                base,
+              ],
+            ),
+            border: Border.all(color: primary.withValues(alpha: 0.18)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(MediaBrowsingMetrics.chipGap),
+            child: Center(
+              // Scales down rather than overflowing the shorter Live TV tiles
+              // at large font sizes.
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: primary.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: primary.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(12 * scale),
+                        child: Icon(
+                          item.fallbackIcon,
+                          size: 28 * scale,
+                          color: Color.alphaBlend(
+                            primary.withValues(alpha: 0.55),
+                            colorScheme.onSurface,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: MediaBrowsingMetrics.chipGap),
-                  Text(
-                    item.title,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: MediaBrowsingMetrics.chipGap),
                     Text(
-                      subtitle,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                      item.title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),
@@ -1614,6 +1812,256 @@ class _PreviewViewAllCard extends StatelessWidget {
       onHoverChanged: item.onHoverChanged,
       contentKey: (item.title, item.subtitle),
       child: card,
+    );
+  }
+}
+
+/// A one-card entry row's card (DVR, AIOStreams, Requests): Continue
+/// Watching's landscape size and text, so the rows line up, with a styled
+/// 16:9 face in place of a thumbnail - a tinted wash, the section's icon,
+/// and either a fan of [artworkUrls] (recording posters) or the icon again,
+/// large and faint.
+class PreviewEntryTile extends StatelessWidget {
+  const PreviewEntryTile({
+    super.key,
+    required this.item,
+    required this.width,
+    this.artworkUrls = const [],
+    this.accent,
+    this.autofocus = false,
+  });
+
+  final MediaPreviewItem item;
+  final double width;
+  final List<String> artworkUrls;
+
+  /// Tint for the face. Defaults to the theme's primary colour.
+  final Color? accent;
+  final bool autofocus;
+
+  static const int _maxArtwork = 3;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final artHeight = width * 9 / 16;
+    final card = SizedBox(
+      width: width,
+      child: DpadInkWell(
+        onTap: item.onTap,
+        autofocus: autofocus,
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(MediaBrowsingMetrics.cardRadius),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: width,
+              height: artHeight,
+              child: _EntryTileFace(
+                icon: item.fallbackIcon,
+                accent: accent ?? colorScheme.primary,
+                artworkUrls: artworkUrls
+                    .where((url) => url.trim().isNotEmpty)
+                    .take(_maxArtwork)
+                    .toList(growable: false),
+                height: artHeight,
+              ),
+            ),
+            // Same text block as a landscape MediaPreviewCard.
+            Padding(
+              padding: const EdgeInsets.all(MediaBrowsingMetrics.chipGap),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (item.subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      item.subtitle!,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (item.onFocused == null && item.onHoverChanged == null) return card;
+    return PreviewFocusAnchor(
+      onFocused: item.onFocused,
+      onHoverChanged: item.onHoverChanged,
+      contentKey: (item.title, item.subtitle),
+      child: card,
+    );
+  }
+}
+
+class _EntryTileFace extends StatelessWidget {
+  const _EntryTileFace({
+    required this.icon,
+    required this.accent,
+    required this.artworkUrls,
+    required this.height,
+  });
+
+  final IconData icon;
+  final Color accent;
+  final List<String> artworkUrls;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final base = Theme.of(context).colorScheme.surfaceContainerHigh;
+    final scale = FontSizeScope.scaleOf(context);
+    final badge = 40 * scale;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Ink, so the press ripple still shows over the wash.
+        Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color.alphaBlend(accent.withValues(alpha: 0.34), base),
+                Color.alphaBlend(accent.withValues(alpha: 0.08), base),
+              ],
+            ),
+          ),
+        ),
+        if (artworkUrls.isEmpty)
+          Positioned(
+            right: -height * 0.12,
+            bottom: -height * 0.18,
+            child: Transform.rotate(
+              angle: -0.18,
+              child: Icon(
+                icon,
+                size: height * 0.95,
+                color: accent.withValues(alpha: 0.16),
+              ),
+            ),
+          )
+        else
+          Positioned(
+            top: 0,
+            bottom: 0,
+            right: 0,
+            width: height * 1.15,
+            child: _EntryTileArtwork(urls: artworkUrls, height: height),
+          ),
+        Positioned(
+          left: MediaBrowsingMetrics.chipGap * 1.5,
+          top: MediaBrowsingMetrics.chipGap * 1.5,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.24),
+              borderRadius: BorderRadius.circular(10 * scale),
+              border: Border.all(color: accent.withValues(alpha: 0.45)),
+            ),
+            child: SizedBox.square(
+              dimension: badge,
+              child: Icon(
+                icon,
+                size: badge * 0.55,
+                color: Color.alphaBlend(
+                  accent.withValues(alpha: 0.45),
+                  Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ),
+        // A soft top edge light, like the sheen on the other cards' art.
+        IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.white.withValues(alpha: 0.06),
+                  Colors.white.withValues(alpha: 0),
+                ],
+                stops: const [0, 0.4],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Up to three posters fanned against the tile's right edge, dissolving to
+/// the left so they sit behind the badge rather than crowd it.
+class _EntryTileArtwork extends StatelessWidget {
+  const _EntryTileArtwork({required this.urls, required this.height});
+
+  final List<String> urls;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final cardHeight = height * 0.78;
+    final cardWidth = cardHeight * 2 / 3;
+    final step = cardWidth * 0.42;
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (bounds) => const LinearGradient(
+        colors: [Color(0x00FFFFFF), Color(0xFFFFFFFF)],
+        stops: [0, 0.45],
+      ).createShader(bounds),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Back to front: the first poster ends up on top, at the right.
+          for (var i = urls.length - 1; i >= 0; i--)
+            Positioned(
+              right: height * 0.1 + i * step,
+              top: (height - cardHeight) / 2 + i * height * 0.03,
+              child: Transform.rotate(
+                angle: 0.06 - i * 0.05,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x73000000),
+                        blurRadius: 12,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ResilientMediaImage(
+                    imageUrl: urls[i],
+                    fallbackIcon: Icons.movie_outlined,
+                    width: cardWidth,
+                    height: cardHeight,
+                    borderRadius: 6,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -271,6 +271,7 @@ class ViewSettingsService extends ChangeNotifier {
   static const liveTvFavoritesFirstKey = 'm3ue_tv_live_tv_favorites_first';
   static const matchRefreshRateKey = 'm3ue_tv_match_refresh_rate';
   static const deinterlaceKey = 'm3ue_tv_deinterlace';
+  static const hideOverlayOnStartKey = 'm3ue_tv_hide_overlay_on_start';
   static const prebufferLiveKey = 'm3ue_tv_prebuffer_live';
   static const backgroundAudioKey = 'm3ue_tv_background_audio';
   static const vodPlayerKey = 'm3ue_tv_vod_player';
@@ -640,7 +641,6 @@ class ViewSettingsService extends ChangeNotifier {
   bool get hdrEnabledSync => (_cached(hdrEnabledKey) as bool?) ?? true;
 
   Future<void> setHdrEnabled(
-    // ignore: avoid_positional_boolean_parameters
     bool enabled,
   ) async {
     await _write(hdrEnabledKey, enabled);
@@ -663,7 +663,6 @@ class ViewSettingsService extends ChangeNotifier {
       (_cached(rememberMediaSortKey) as bool?) ?? true;
 
   Future<void> setRememberMediaSort(
-    // ignore: avoid_positional_boolean_parameters
     bool value,
   ) async {
     // Flipping this only changes what the next launch starts with: the
@@ -795,7 +794,6 @@ class ViewSettingsService extends ChangeNotifier {
       (_cached(vodFavoritesFirstKey) as bool?) ?? true;
 
   Future<void> setVodFavoritesFirst(
-    // ignore: avoid_positional_boolean_parameters
     bool value,
   ) async {
     final order = _vodBrowseOrder;
@@ -817,7 +815,6 @@ class ViewSettingsService extends ChangeNotifier {
       (_cached(seriesFavoritesFirstKey) as bool?) ?? true;
 
   Future<void> setSeriesFavoritesFirst(
-    // ignore: avoid_positional_boolean_parameters
     bool value,
   ) async {
     final order = _seriesBrowseOrder;
@@ -839,7 +836,6 @@ class ViewSettingsService extends ChangeNotifier {
       (_cached(liveTvFavoritesFirstKey) as bool?) ?? true;
 
   Future<void> setLiveTvFavoritesFirst(
-    // ignore: avoid_positional_boolean_parameters
     bool value,
   ) async {
     final order = _liveTvBrowseOrder;
@@ -870,7 +866,6 @@ class ViewSettingsService extends ChangeNotifier {
   static bool get _defaultMatchRefreshRate => HostPlatform.isTvOS;
 
   Future<void> setMatchRefreshRate(
-    // ignore: avoid_positional_boolean_parameters
     bool enabled,
   ) async {
     await _write(matchRefreshRateKey, enabled);
@@ -889,7 +884,6 @@ class ViewSettingsService extends ChangeNotifier {
       (_cached(showPlaybackDiagnosticsKey) as bool?) ?? false;
 
   Future<void> setShowPlaybackDiagnostics(
-    // ignore: avoid_positional_boolean_parameters
     bool enabled,
   ) async {
     await _write(showPlaybackDiagnosticsKey, enabled);
@@ -924,10 +918,28 @@ class ViewSettingsService extends ChangeNotifier {
   bool get deinterlaceSync => (_cached(deinterlaceKey) as bool?) ?? false;
 
   Future<void> setDeinterlace(
-    // ignore: avoid_positional_boolean_parameters
     bool enabled,
   ) async {
     await _write(deinterlaceKey, enabled);
+    notifyListeners();
+  }
+
+  /// Whether the player starts with its controls and info overlay hidden,
+  /// so a stream opens on just the picture. Any key press or tap still
+  /// brings the overlay up. Defaults off (the overlay shows on start).
+  Future<bool> hideOverlayOnStart() async {
+    final raw = await _readResolved(hideOverlayOnStartKey);
+    return raw as bool? ?? false;
+  }
+
+  /// Synchronous access to the in-memory cached hide-overlay-on-start setting.
+  bool get hideOverlayOnStartSync =>
+      (_cached(hideOverlayOnStartKey) as bool?) ?? false;
+
+  Future<void> setHideOverlayOnStart(
+    bool enabled,
+  ) async {
+    await _write(hideOverlayOnStartKey, enabled);
     notifyListeners();
   }
 
@@ -945,7 +957,6 @@ class ViewSettingsService extends ChangeNotifier {
   bool get prebufferLiveSync => (_cached(prebufferLiveKey) as bool?) ?? false;
 
   Future<void> setPrebufferLive(
-    // ignore: avoid_positional_boolean_parameters
     bool enabled,
   ) async {
     await _write(prebufferLiveKey, enabled);
@@ -971,7 +982,6 @@ class ViewSettingsService extends ChangeNotifier {
       HostPlatform.isAndroid || HostPlatform.isIOS;
 
   Future<void> setBackgroundAudio(
-    // ignore: avoid_positional_boolean_parameters
     bool enabled,
   ) async {
     await _write(backgroundAudioKey, enabled);
@@ -1051,7 +1061,6 @@ class ViewSettingsService extends ChangeNotifier {
       (_cached(navigationSoundEnabledKey) as bool?) ?? true;
 
   Future<void> setNavigationSoundEnabled(
-    // ignore: avoid_positional_boolean_parameters
     bool enabled,
   ) async {
     await _write(navigationSoundEnabledKey, enabled);

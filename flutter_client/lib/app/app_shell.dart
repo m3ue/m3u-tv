@@ -43,6 +43,7 @@ import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/dvr_actions.dart';
 import 'package:m3u_tv/services/memory_watchdog.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
+import 'package:m3u_tv/services/xtream_service.dart' show AIOStreamsCatalog;
 import 'package:m3u_tv/shared/app_background.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/app_modal.dart';
@@ -720,6 +721,18 @@ class AppShellState extends ConsumerState<AppShell>
         }),
       );
     }
+  }
+
+  /// Opens [route]'s screen on one category (Home's View all on a server
+  /// category row). The screen picks the request up whether it is already
+  /// alive in its branch or built by this navigation.
+  void _openCategory(String route, String categoryId) {
+    if (!_appState.availableMainRoutes.contains(route)) return;
+    ref.read(categoryOpenRequestProvider.notifier).state = (
+      route: route,
+      categoryId: categoryId,
+    );
+    _navigateToRoute(route);
   }
 
   void _activateSidebar() {
@@ -1504,6 +1517,20 @@ class AppShellState extends ConsumerState<AppShell>
     );
   }
 
+  void _openAioCatalog(AIOStreamsCatalog catalog, int integrationId) {
+    unawaited(
+      _pushDetail(
+        RouteNames.aiostreamsCatalogFor(
+          integrationId,
+          catalog.type,
+          catalog.id,
+        ),
+        extra: catalog,
+        fullScreen: true,
+      ),
+    );
+  }
+
   void _openShow(EpgShow show) {
     // No `fullScreen: true` - the show details route is top-level too (see
     // _openVod), so it already covers the whole screen by painting above
@@ -1657,6 +1684,7 @@ class AppShellState extends ConsumerState<AppShell>
         onSportsMore: () => _navigateToRoute(RouteNames.sports),
         onMoviesMore: () => _navigateToRoute(RouteNames.vod),
         onSeriesMore: () => _navigateToRoute(RouteNames.series),
+        onCategoryMore: _openCategory,
         onRecordingsSelect: () => _navigateToRoute(RouteNames.dvr),
         onAioStreamsSelect: () => _navigateToRoute(RouteNames.aiostreams),
         onRequestsSelect: () => _navigateToRoute(RouteNames.requests),
@@ -1673,6 +1701,9 @@ class AppShellState extends ConsumerState<AppShell>
         onSidebarActivate: _activateSidebar,
         onSearchShows: _dvrActions.searchEpgShows,
         onShowSelect: _openShow,
+        onRecordingPlay: _openPlayerDirect,
+        onEnsureEpg: _appState.ensureEpgForChannels,
+        useSidebarLayout: shouldUseSidebar(widget.deviceType),
       ),
       RouteNames.liveTv => LiveTvScreen(
         favoritesService: _appState.favoritesService,
@@ -1736,6 +1767,7 @@ class AppShellState extends ConsumerState<AppShell>
           onItemSelect: _openAioStreamsItem,
           onPlay: _openPlayerFromActions,
           onSearchSelect: _openAioSearch,
+          onCatalogSelect: _openAioCatalog,
           favoritesService: _appState.aioFavoritesService,
           progressList: _appState.progressList,
           onSidebarActivate: _activateSidebar,
@@ -1820,6 +1852,7 @@ class AppShellState extends ConsumerState<AppShell>
           isConfiguredOverride: _appState.isConfigured,
           traktService: _appState.traktService,
           simklService: _appState.simklService,
+          mdblistService: _appState.mdblistService,
           onlineSubtitleSettings: _appState.onlineSubtitleSettings,
           devicePairingService: _appState.devicePairingService,
           // A saved playlist that is still stored opens at once, as a
@@ -2139,6 +2172,7 @@ class AppShellState extends ConsumerState<AppShell>
                     watchHistoryServices: [
                       _appState.simklService,
                       _appState.traktService,
+                      _appState.mdblistService,
                     ],
                     onlineSubtitleService: _appState.onlineSubtitleService,
                     onlineSubtitleSettings: _appState.onlineSubtitleSettings,

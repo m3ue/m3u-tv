@@ -944,6 +944,30 @@ void main() {
       },
     );
   });
+
+  test(
+    'deleting a recording refreshes the content lists its library item left',
+    () async {
+      final fixture = _Fixture();
+      addTearDown(fixture.dispose);
+      expect(await fixture.controller.connectXtream(_testCredentials), isTrue);
+      await fixture.reverb.connected.future;
+
+      // The server removed the recording's movie with it.
+      fixture.transport.setVodItems(<VodItem>[_postPushVod]);
+      fixture.transport.setSeries(<Series>[_postPushSeries]);
+
+      await fixture.controller.deleteDvrRecording('rec-deleted');
+      await _waitForDebounce();
+
+      final counts = fixture.transport.actionCounts;
+      expect(counts['delete_dvr_recording'], 1);
+      // Not in the local list, so both lists are refreshed.
+      expect(counts['get_vod_streams'], 2);
+      expect(counts['get_series'], 2);
+      expect((await fixture.vodItems).single.name, 'New Recording Movie');
+    },
+  );
 }
 
 class _Fixture {
@@ -1180,6 +1204,8 @@ class _RecordingXtreamTransport {
           return <String, Object?>{..._nextDvrDetails.removeAt(0)};
         }
         return <String, Object?>{..._defaultDvrDetail};
+      case 'delete_dvr_recording':
+        return <String, Object?>{'success': true};
       case 'get_epg_batch':
         return <String, Object?>{};
       case 'get_dvr_storage':

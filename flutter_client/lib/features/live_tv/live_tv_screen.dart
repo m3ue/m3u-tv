@@ -15,6 +15,7 @@ import 'package:m3u_tv/features/player/player_source_settings.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart'
     show PlayerArgs, buildPlaybackOrchestrator;
+import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
@@ -28,6 +29,7 @@ import 'package:m3u_tv/shared/app_menu_dialog.dart';
 import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/app_page_route.dart';
 import 'package:m3u_tv/shared/catalog_window.dart';
+import 'package:m3u_tv/shared/category_open_request.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/channel_grid_tile.dart';
 import 'package:m3u_tv/shared/channel_rows.dart';
@@ -170,9 +172,16 @@ class LiveTvScreen extends ConsumerStatefulWidget {
 }
 
 class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with
+        SingleTickerProviderStateMixin,
+        WidgetsBindingObserver,
+        CategoryOpenRequestListener {
   static const _favoritesCategoryId = '__FAVORITES__';
   String? _selectedCategory;
+
+  /// Another screen opened this one on a category, which the stored last
+  /// category (restored asynchronously) must not then replace.
+  bool _categoryRequested = false;
   String _query = '';
   Set<int> _favoriteIds = {};
 
@@ -251,6 +260,39 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
     _showSearchController.addListener(_onShowSearchChanged);
     WidgetsBinding.instance.addObserver(this);
     _window.addListener(_onWindowChanged);
+    listenForCategoryRequests();
+  }
+
+  @override
+  String get categoryRoute => RouteNames.liveTv;
+
+  /// Home's View all on a category row: that category, with no search
+  /// narrowing it further.
+  @override
+  void openRequestedCategory(String categoryId) {
+    if (isCategorySelectionGone(
+      categoryId,
+      ref.read(liveCategoriesProvider),
+      favoritesId: _favoritesCategoryId,
+    )) {
+      return;
+    }
+    _categoryRequested = true;
+    _searchDebounce?.cancel();
+    _query = '';
+    _appliedQuery = '';
+    _showSearchController.onQueryChanged('', widget.onSearchShows);
+    _selectCategory(categoryId);
+  }
+
+  void _selectCategory(String id) {
+    setState(() => _selectedCategory = id);
+    _reconfigureWindow();
+    // The list/grid views reset via the ValueKey below, but
+    // TimelineEpgView is addressed by a fixed GlobalKey (see
+    // _timelineEpgViewKey) so its state - and vertical scroll offset -
+    // survives the switch; reset it explicitly.
+    _timelineEpgViewKey.currentState?.resetVerticalScroll();
   }
 
   // A plain observer rather than AppLifecycleListener, which asserts on
@@ -568,7 +610,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       final loaded = await _loadViewSettings();
       if (mounted && generation == _viewSettingsGeneration) {
         setState(() {
-          _selectedCategory = lastCat;
+          if (!_categoryRequested) _selectedCategory = lastCat;
           if (loaded != null) {
             _viewMode = _layoutToViewMode(loaded.layout);
             _epgStartView = loaded.epgStartView;
@@ -583,7 +625,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       final lastMode = await widget.favoritesService.getLastViewMode();
       if (mounted) {
         setState(() {
-          _selectedCategory = lastCat;
+          if (!_categoryRequested) _selectedCategory = lastCat;
           if (lastMode != null) {
             _viewMode = _ViewMode.values.firstWhere(
               (m) => m.name == lastMode,
@@ -997,15 +1039,7 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
       searchHint: l.liveTvSearchHint,
       tabs: _categoryTabs(categories),
       selectedId: _selectedCategory ?? '',
-      onSelected: (id) {
-        setState(() => _selectedCategory = id);
-        _reconfigureWindow();
-        // The list/grid views reset via the ValueKey below, but
-        // TimelineEpgView is addressed by a fixed GlobalKey (see
-        // _timelineEpgViewKey) so its state - and vertical scroll offset -
-        // survives the switch; reset it explicitly.
-        _timelineEpgViewKey.currentState?.resetVerticalScroll();
-      },
+      onSelected: _selectCategory,
       filterButtonLabel: l.mediaCategoryFilterButton,
       filterScreenTitle: l.mediaCategoryFilterScreenTitle,
       leading: _buildViewModeToggle(),

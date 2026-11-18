@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:m3u_tv/features/settings/sections/mdblist_card.dart';
 import 'package:m3u_tv/features/settings/sections/online_subtitle_settings_group.dart';
 import 'package:m3u_tv/features/settings/sections/simkl_card.dart';
 import 'package:m3u_tv/features/settings/sections/trakt_card.dart';
@@ -7,6 +8,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/introdb_settings.dart';
+import 'package:m3u_tv/services/mdblist_service.dart';
 import 'package:m3u_tv/services/online_subtitle_settings.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
@@ -40,6 +42,7 @@ void main() {
     late AuthNotifier authNotifier;
     late TraktService traktService;
     late SimklService simklService;
+    late MdblistService mdblistService;
     late ProxyPlaybackSettings proxyPlaybackSettings;
     late ComskipSettings comskipSettings;
     late IntroDbSettings introDbSettings;
@@ -53,6 +56,7 @@ void main() {
       );
       traktService = TraktService(storage: secureStorage);
       simklService = SimklService(storage: secureStorage);
+      mdblistService = MdblistService(storage: secureStorage);
       proxyPlaybackSettings = ProxyPlaybackSettings();
       comskipSettings = ComskipSettings();
       introDbSettings = IntroDbSettings();
@@ -62,6 +66,7 @@ void main() {
       authNotifier.dispose();
       traktService.dispose();
       simklService.dispose();
+      mdblistService.dispose();
       viewSettingsService.dispose();
       proxyPlaybackSettings.dispose();
       comskipSettings.dispose();
@@ -77,6 +82,7 @@ void main() {
             authNotifier: authNotifier,
             traktService: traktService,
             simklService: simklService,
+            mdblistService: mdblistService,
             onlineSubtitleSettings: OnlineSubtitleSettings(),
             sourceLabel: 'Test',
             isConfiguredOverride: true,
@@ -101,7 +107,9 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('Integrations lists Simkl above Trakt', (tester) async {
+    testWidgets('Integrations lists Simkl, Trakt, then MDBList', (
+      tester,
+    ) async {
       await pumpSettingsScreen(tester);
       final l = AppLocalizations.of(
         tester.element(find.byType(SettingsScreen)),
@@ -114,6 +122,11 @@ void main() {
         tester.getTopLeft(find.byType(SimklCard)).dy,
         lessThan(tester.getTopLeft(find.byType(TraktCard)).dy),
       );
+      expect(
+        tester.getTopLeft(find.byType(TraktCard)).dy,
+        lessThan(tester.getTopLeft(find.byType(MdblistCard)).dy),
+      );
+      expect(find.text(l.mdblistName), findsOneWidget);
       expect(find.text(l.simklName), findsOneWidget);
       expect(find.text(l.traktName), findsOneWidget);
       expect(

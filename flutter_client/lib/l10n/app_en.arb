@@ -284,6 +284,7 @@
   "searchSectionLiveTv": "Live TV",
   "searchSectionMovies": "Movies",
   "searchSectionSeries": "Series",
+  "searchSectionRecordings": "Recordings",
   "vodSearchHint": "Search...",
   "seriesSearchHint": "Search...",
   "settingsTitle": "Settings",
@@ -592,6 +593,15 @@
   },
   "homeBrowseMovies": "Browse every movie",
   "homeBrowseSeries": "Browse every series",
+  "homeBrowseCategory": "Everything in {category}",
+  "@homeBrowseCategory": {
+    "description": "Rich Home hero line for View all on a custom category row",
+    "placeholders": {
+      "category": {
+        "type": "String"
+      }
+    }
+  },
   "homeNothingToShow": "Nothing to show yet",
   "notificationsTitle": "Notifications",
   "notificationsTabNotifications": "Notifications",
@@ -766,6 +776,21 @@
   "simklDisconnectButton": "Disconnect Simkl",
   "simklNotConfigured": "Simkl client ID is not configured.",
   "simklNotConfiguredHint": "Register an app at simkl.com/settings/developer and set the client ID via --dart-define=SIMKL_CLIENT_ID.",
+  "mdblistName": "MDBList",
+  "mdblistConnectPrompt": "Connect your MDBList account to automatically track what you watch.",
+  "mdblistConnectButton": "Connect with MDBList",
+  "mdblistConnected": "Connected to MDBList",
+  "mdblistConnectedAs": "Connected to MDBList as {account}",
+  "@mdblistConnectedAs": {
+    "placeholders": {
+      "account": {
+        "type": "String"
+      }
+    }
+  },
+  "mdblistDisconnectButton": "Disconnect MDBList",
+  "mdblistNotConfigured": "MDBList client ID is not configured.",
+  "mdblistNotConfiguredHint": "Register an app at mdblist.com/developer and set the client ID via --dart-define=MDBLIST_CLIENT_ID.",
   "vodAllMovies": "All Movies",
   "seriesAllSeries": "All Series",
   "homeConnectedSource": "Connected source: {label}",
@@ -781,6 +806,8 @@
   "vodContinueMovie": "Continue movie",
   "vodCast": "Cast",
   "vodDirector": "Director",
+  "vodRecorded": "Recorded",
+  "detailDvrBadge": "DVR",
   "castShowAll": "Show all cast",
   "vodTimeLeftMinutes": "{minutes, plural, =1{1 min left} other{{minutes} min left}}",
   "@vodTimeLeftMinutes": {
@@ -1169,6 +1196,8 @@
   "settingsMatchRefreshRateHint": "Switch the display to the video's frame rate when playback starts. Can briefly flash or blank the screen.",
   "settingsDeinterlace": "Deinterlace video",
   "settingsDeinterlaceHint": "Smooth out the comb lines on interlaced channels (such as 1080i and 576i). Uses more CPU.",
+  "settingsHideOverlayOnStart": "Hide player overlay on start",
+  "settingsHideOverlayOnStartHint": "Open streams on just the picture, without the controls and channel info. Press any button or tap the screen to show them.",
   "settingsBackgroundAudio": "Background audio",
   "settingsBackgroundAudioHint": "Keep playing audio, with playback controls on the lock screen and in notifications, when you leave the app or lock the screen.",
   "settingsPrebufferLive": "Buffer live streams before playing",

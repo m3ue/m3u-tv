@@ -440,6 +440,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get searchSectionSeries => 'Serie';
 
   @override
+  String get searchSectionRecordings => 'Grabaciones';
+
+  @override
   String get vodSearchHint => 'Buscar…';
 
   @override
@@ -1080,6 +1083,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get homeBrowseSeries => 'Explorar todas las series';
 
   @override
+  String homeBrowseCategory(String category) {
+    return 'Todo en $category';
+  }
+
+  @override
   String get homeNothingToShow => 'Aún no hay nada que mostrar';
 
   @override
@@ -1309,6 +1317,35 @@ class AppLocalizationsEs extends AppLocalizations {
       'Registra una aplicación en simkl.com/settings/developer y define el ID de cliente con --dart-define=SIMKL_CLIENT_ID.';
 
   @override
+  String get mdblistName => 'MDBList';
+
+  @override
+  String get mdblistConnectPrompt =>
+      'Conecta tu cuenta de MDBList para registrar automáticamente lo que ves.';
+
+  @override
+  String get mdblistConnectButton => 'Conectar con MDBList';
+
+  @override
+  String get mdblistConnected => 'Conectado a MDBList';
+
+  @override
+  String mdblistConnectedAs(String account) {
+    return 'Conectado a MDBList como $account';
+  }
+
+  @override
+  String get mdblistDisconnectButton => 'Desconectar MDBList';
+
+  @override
+  String get mdblistNotConfigured =>
+      'El ID de cliente de MDBList no está configurado.';
+
+  @override
+  String get mdblistNotConfiguredHint =>
+      'Registra una aplicación en mdblist.com/developer y define el ID de cliente con --dart-define=MDBLIST_CLIENT_ID.';
+
+  @override
   String get vodAllMovies => 'Todo el cine';
 
   @override
@@ -1333,6 +1370,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get vodDirector => 'Director';
+
+  @override
+  String get vodRecorded => 'Grabado';
+
+  @override
+  String get detailDvrBadge => 'DVR';
 
   @override
   String get castShowAll => 'Ver todo el reparto';
@@ -2009,6 +2052,14 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsDeinterlaceHint =>
       'Suaviza las líneas de peine en los canales entrelazados (como 1080i y 576i). Usa más CPU.';
+
+  @override
+  String get settingsHideOverlayOnStart =>
+      'Ocultar la superposición del reproductor al iniciar';
+
+  @override
+  String get settingsHideOverlayOnStartHint =>
+      'Las transmisiones se abren solo con la imagen, sin los controles ni la información del canal. Pulsa cualquier botón o toca la pantalla para mostrarlos.';
 
   @override
   String get settingsBackgroundAudio => 'Audio en segundo plano';

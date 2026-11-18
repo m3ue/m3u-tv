@@ -21,7 +21,7 @@
 #                                             first desktop screenshot.
 #
 # Everything but the tile icon is rendered from scripts/store-assets/art.html
-# with headless Chrome, using tv1/tablet3/mobile5 from
+# with headless Chrome, using tv1/tablet3/mobile2 from
 # screenshots/app-screenshots/ (the Apple art uses the Apple-only set,
 # tvos1/ipados3/ios2 by default, matching generate-screenshots.sh), so
 # refreshing those screenshots and re-running this is all an update needs. The template adapts to each output's aspect
@@ -61,7 +61,7 @@ apple_shot() {
 }
 APPLE_DEVICES="tv=$(apple_shot "${APPLE_TV:-tvos1}" tv1)"
 APPLE_DEVICES+="&tablet=$(apple_shot "${APPLE_TABLET:-ipados3}" tablet3)"
-APPLE_DEVICES+="&phone=$(apple_shot "${APPLE_PHONE:-ios2}" mobile5)"
+APPLE_DEVICES+="&phone=$(apple_shot "${APPLE_PHONE:-ios2}" mobile2)"
 
 [[ -x "$CHROME" ]] || {
     echo "Error: Chrome not found at: $CHROME"

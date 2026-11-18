@@ -1147,6 +1147,8 @@ void main() {
         expect(find.text('Retry connection'), findsOneWidget);
         expect(find.text('Edit server settings'), findsOneWidget);
         expect(find.text('Server URL'), findsNothing);
+
+        await _drainAppUpdateChecks(tester);
       },
     );
 
@@ -1229,6 +1231,7 @@ void main() {
         expect(find.text('Xtream'), findsOneWidget);
         // The username names the playlist; the password never shows.
         expect(_visibleText(tester), isNot(contains('fixture-password')));
+        await _drainAppUpdateChecks(tester);
 
         final restarted = _controller(
           storage: storage,
@@ -2733,6 +2736,19 @@ Future<void> _pumpAppState(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 250));
   await tester.pump();
+}
+
+/// The app update check (AppShell at startup, AppVersionCard in Settings >
+/// General) reads the bundled pubspec.yaml with real file I/O before its HTTP
+/// request, so under the fake clock the request can still be in flight when
+/// the test ends, leaving its 8s timeout timer pending. Unmount the app, let
+/// that I/O land, then run the clock past the timeout so the check gives up.
+Future<void> _drainAppUpdateChecks(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.runAsync(
+    () => Future<void>.delayed(const Duration(milliseconds: 100)),
+  );
+  await tester.pump(const Duration(seconds: 9));
 }
 
 /// Polls [condition] every 50ms until it is true or [timeout] elapses,

@@ -8,6 +8,7 @@ import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/auth_notifier.dart';
 import 'package:m3u_tv/services/device_pairing_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/mdblist_service.dart';
 import 'package:m3u_tv/services/saved_playlists_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/simkl_service.dart';
@@ -231,6 +232,7 @@ void main() {
             authNotifier: auth,
             traktService: TraktService(storage: InMemorySecureStorage()),
             simklService: SimklService(storage: InMemorySecureStorage()),
+            mdblistService: MdblistService(storage: InMemorySecureStorage()),
             devicePairingService: pairing,
             isConfiguredOverride: false,
             onConnect: (credentials) async {

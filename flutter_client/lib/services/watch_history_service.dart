@@ -1,4 +1,5 @@
-/// A watch-history tracker the player reports playback to (Trakt, Simkl).
+/// A watch-history tracker the player reports playback to (Trakt, Simkl,
+/// MDBList).
 abstract interface class WatchHistoryService {
   /// Whether a signed-in account can currently receive scrobbles.
   bool get isConnected;

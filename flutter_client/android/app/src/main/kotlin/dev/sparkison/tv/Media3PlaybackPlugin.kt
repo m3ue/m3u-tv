@@ -382,8 +382,10 @@ class Media3PlaybackPlugin(
             .setTrackSelector(trackSelector)
             .setMediaSourceFactory(
                 // DefaultDataSource passes web URLs to the HTTP factory and also reads
-                // the local files online subtitles are downloaded to.
-                DefaultMediaSourceFactory(context)
+                // the local files online subtitles are downloaded to. The extractors
+                // factory adds caption tracks to OTA MPEG-2 streams whose PMT omits
+                // the ATSC caption descriptor.
+                DefaultMediaSourceFactory(context, AtscCaptionExtractorsFactory())
                     .setDataSourceFactory(DefaultDataSource.Factory(context, httpDataSourceFactory))
             )
             .setAudioAttributes(audioAttributes, handleAudioFocus)
