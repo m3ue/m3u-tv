@@ -18,10 +18,10 @@ EXTERNAL SOURCES:
     :path: "/Users/shaunparkison/.pub-cache/hosted/pub.dev/wakelock_plus-1.8.2/ios"
 
 SPEC CHECKSUMS:
-  Flutter: d8701521ffbbba1aa9b5e6d9e96573026affa27e
+  Flutter: 68bf6d81b6c67f2e91075f69cacafa02643227ac
   sqflite_tvos: ad70d2fd9909389a6ce3bc252d24390b287db14d
   wakelock_plus: 4d70a9769dc8dad95ca6131e70c46b2d5a5de261
 
-PODFILE CHECKSUM: 9b47ab2f529db9888e44f9c4a9ca79c2a569416f
+PODFILE CHECKSUM: 0d98f188e13697431f8cff76468fd8545019b097
 
 COCOAPODS: 1.16.2
