@@ -171,7 +171,7 @@ void main() {
       wrapperProperties,
       contains(
         'distributionSha256Sum='
-        '17f277867f6914d61b1aa02efab1ba7bb439ad652ca485cd8ca6842fccec6e43',
+        'f20c816177c0ff192881874852260771b462903aef3e794b0dac4759d1fda284',
       ),
     );
   });
