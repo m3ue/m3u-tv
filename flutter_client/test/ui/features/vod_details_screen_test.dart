@@ -43,7 +43,8 @@ void main() {
       expect(find.text('Animation'), findsOneWidget);
       expect(find.text('2008'), findsOneWidget);
       expect(find.text('9m'), findsOneWidget);
-      expect(find.text('★ 4.5'), findsOneWidget);
+      expect(find.text('4.5'), findsOneWidget);
+      expect(find.byIcon(Icons.star_rounded), findsOneWidget);
       expect(find.text('MKV'), findsOneWidget);
       expect(find.text('Movie details'), findsNothing);
       expect(find.text('Ready to play in-app.'), findsNothing);

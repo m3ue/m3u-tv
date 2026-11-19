@@ -10,7 +10,6 @@ import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
-import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
 import 'package:m3u_tv/shared/movie_detail_body.dart';
@@ -274,10 +273,10 @@ class _MovieBody extends StatelessWidget {
       backdropUrl: item.background,
       clearLogoUrl: item.clearLogoUrl,
       chips: [
-        if (item.year != null) item.year!,
-        ?formatRatingText(item.imdbRating),
-        ?formatRuntimeText(item.runtime),
-        ...item.genres.take(3),
+        if (item.year != null) MetaChipData.year(item.year!),
+        ?MetaChipData.ratingText(item.imdbRating),
+        ?MetaChipData.runtimeText(item.runtime),
+        for (final genre in item.genres.take(3)) MetaChipData.genre(genre),
       ],
       plot: item.description,
       credits: [
@@ -542,10 +541,11 @@ class _SeriesBodyState extends State<_SeriesBody> {
         item.background!,
     ];
 
-    final chips = <String>[
-      if (seasons.isNotEmpty) '${seasons.length} ${l.seriesSeasons}',
-      ?formatRatingText(item.imdbRating),
-      ?formatRuntimeText(item.runtime),
+    final chips = <MetaChipData>[
+      if (seasons.isNotEmpty)
+        MetaChipData.seasons('${seasons.length} ${l.seriesSeasons}'),
+      ?MetaChipData.ratingText(item.imdbRating),
+      ?MetaChipData.runtimeText(item.runtime),
     ];
 
     final meta = ItemMetaInfo(

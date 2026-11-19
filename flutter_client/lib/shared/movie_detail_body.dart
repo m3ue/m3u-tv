@@ -59,7 +59,7 @@ class MovieDetailBody extends StatefulWidget {
   /// See [ItemMetaInfo.year] / [ItemMetaInfo.contentRating].
   final String? year;
   final String? contentRating;
-  final List<String> chips;
+  final List<MetaChipData> chips;
   final String? plot;
   final List<MetaCreditLine> credits;
   final List<CastMember>? richCast;

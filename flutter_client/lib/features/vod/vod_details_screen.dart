@@ -196,12 +196,12 @@ class _VodDetailsBody extends StatelessWidget {
       year: details.year,
       contentRating: details.contentRating,
       chips: [
-        if (details.isDvrRecording) l.detailDvrBadge,
-        if (details.genre != null) details.genre!,
-        ?formatRuntimeText(details.duration),
-        if (details.rating != null) formatRating(details.rating!),
+        if (details.isDvrRecording) MetaChipData.recording(l.detailDvrBadge),
+        if (details.genre != null) MetaChipData.genre(details.genre!),
+        ?MetaChipData.runtimeText(details.duration),
+        if (details.rating != null) MetaChipData.rating(details.rating!),
         if (details.containerExtension != null)
-          details.containerExtension!.toUpperCase(),
+          MetaChipData.format(details.containerExtension!.toUpperCase()),
       ],
       plot: details.plot ?? AppLocalizations.of(context).vodNoSynopsis,
       credits: [

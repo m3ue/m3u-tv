@@ -1135,8 +1135,10 @@ class _SpotlightDetails extends StatelessWidget {
               Wrap(
                 spacing: MediaBrowsingMetrics.chipGap,
                 runSpacing: MediaBrowsingMetrics.chipGap,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  for (final chip in spotlight.chips) MetadataChip(label: chip),
+                  for (final chip in spotlight.chips)
+                    MetadataChip.fromData(chip),
                 ],
               ),
             ],

@@ -45,7 +45,7 @@ void main() {
             name: 'Inception',
             year: '2010',
             contentRating: 'PG-13',
-            chips: ['Sci-Fi'],
+            chips: [MetaChipData.genre('Sci-Fi')],
             hidePrimaryAction: true,
             buttonLabel: '',
             onPlay: null,

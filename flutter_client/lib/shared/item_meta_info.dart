@@ -5,8 +5,11 @@ import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
+import 'package:m3u_tv/shared/meta_chip_data.dart';
 import 'package:m3u_tv/shared/sized_image_url.dart';
 import 'package:material_ui/material_ui.dart';
+
+export 'package:m3u_tv/shared/meta_chip_data.dart';
 
 /// A single "Label: value" credit row (e.g. Director, Cast).
 class MetaCreditLine {
@@ -58,7 +61,7 @@ class ItemMetaInfo extends StatelessWidget {
   /// Certification (e.g. "PG-13", "TV-MA"), rendered as a chip after [year]
   /// and before the remaining [chips].
   final String? contentRating;
-  final List<String> chips;
+  final List<MetaChipData> chips;
 
   /// Primary button's label. When [progressValue] is set, this is the
   /// trailing text next to the inline progress bar (e.g. "33 min left")
@@ -151,9 +154,10 @@ class ItemMetaInfo extends StatelessWidget {
           );
     final hasPlot = plot != null && plot!.trim().isNotEmpty;
     final chipWidgets = <Widget>[
-      if (year != null) MetadataChip(label: year!),
-      if (contentRating != null) MetadataChip(label: contentRating!),
-      for (final label in chips) MetadataChip(label: label),
+      if (year != null) MetadataChip(label: year!, kind: MetaChipKind.year),
+      if (contentRating != null)
+        MetadataChip(label: contentRating!, kind: MetaChipKind.certification),
+      for (final chip in chips) MetadataChip.fromData(chip),
     ];
 
     return Column(
@@ -163,7 +167,8 @@ class ItemMetaInfo extends StatelessWidget {
         const SizedBox(height: MediaBrowsingMetrics.itemGap),
         if (chipWidgets.isNotEmpty)
           Wrap(
-            spacing: MediaBrowsingMetrics.itemGap,
+            spacing: MediaBrowsingMetrics.chipGap,
+            crossAxisAlignment: WrapCrossAlignment.center,
             runSpacing: MediaBrowsingMetrics.chipGap,
             children: chipWidgets,
           ),
@@ -320,32 +325,166 @@ class MetaCreditLineText extends StatelessWidget {
   }
 }
 
-/// Metadata chip used across item detail screens (year, genre, rating, …)
+/// Metadata chip used across item detail screens (year, genre, rating, ...)
 /// and on the Sports game cards, where its opaque surface keeps the label
-/// readable over any team-colour wash.
+/// readable over any team-color wash. [kind] picks the treatment: ratings get
+/// a gold star, certifications a bordered box, runtime/seasons a leading
+/// icon, and highlights (NEW, PREMIERE) the primary container color.
 class MetadataChip extends StatelessWidget {
-  const MetadataChip({super.key, required this.label, this.icon});
+  const MetadataChip({
+    super.key,
+    required this.label,
+    this.icon,
+    this.kind = MetaChipKind.plain,
+    this.detail,
+  });
+
+  MetadataChip.fromData(MetaChipData data, {super.key})
+    : label = data.label,
+      icon = null,
+      kind = data.kind,
+      detail = data.detail;
 
   final String label;
 
-  /// A small leading icon, e.g. the channel-count chip's TV.
+  /// A small leading icon, e.g. the channel-count chip's TV. Overrides the
+  /// [kind]'s default icon.
   final IconData? icon;
+  final MetaChipKind kind;
+
+  /// Muted trailing text (a rating's source).
+  final String? detail;
+
+  static const Color _ratingGold = Color(0xFFF5C518);
+  static const Color _recordingRed = Color(0xFFE53935);
+
+  IconData? get _defaultIcon => switch (kind) {
+    MetaChipKind.rating => Icons.star_rounded,
+    MetaChipKind.runtime || MetaChipKind.schedule => Icons.schedule_rounded,
+    MetaChipKind.seasons => Icons.video_library_outlined,
+    MetaChipKind.recording => Icons.fiber_manual_record,
+    MetaChipKind.channel => Icons.live_tv_rounded,
+    _ => null,
+  };
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final icon = this.icon;
-    return Chip(
-      avatar: icon == null
-          ? null
-          : Icon(
-              icon,
-              size: 18 * FontSizeScope.scaleOf(context),
-              color: colorScheme.primary,
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final scale = FontSizeScope.scaleOf(context);
+    final baseStyle = theme.textTheme.labelLarge;
+
+    var background = colorScheme.surfaceContainerHighest;
+    var foreground = colorScheme.onSurface;
+    var iconColor = colorScheme.onSurfaceVariant;
+    var border = BorderSide(
+      color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+    );
+    var radius = 8.0;
+    var padding = const EdgeInsets.symmetric(horizontal: 10, vertical: 5);
+    var textStyle = baseStyle?.copyWith(fontWeight: FontWeight.w600);
+
+    switch (kind) {
+      case MetaChipKind.certification:
+        background = Colors.transparent;
+        border = BorderSide(
+          color: colorScheme.onSurface.withValues(alpha: 0.7),
+          width: 1.5,
+        );
+        radius = 4;
+        padding = const EdgeInsets.symmetric(horizontal: 8, vertical: 4);
+        textStyle = baseStyle?.copyWith(
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.6,
+        );
+      case MetaChipKind.rating:
+        background = Color.alphaBlend(
+          _ratingGold.withValues(alpha: 0.14),
+          colorScheme.surfaceContainerHighest,
+        );
+        border = BorderSide(color: _ratingGold.withValues(alpha: 0.45));
+        iconColor = _ratingGold;
+        textStyle = baseStyle?.copyWith(fontWeight: FontWeight.w800);
+      case MetaChipKind.year:
+      case MetaChipKind.genre:
+        foreground = colorScheme.onSurfaceVariant;
+      case MetaChipKind.format:
+        background = Colors.transparent;
+        border = BorderSide(color: colorScheme.outline);
+        radius = 4;
+        padding = const EdgeInsets.symmetric(horizontal: 7, vertical: 5);
+        foreground = colorScheme.onSurfaceVariant;
+        textStyle = theme.textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
+        );
+      case MetaChipKind.highlight:
+        background = colorScheme.primaryContainer;
+        foreground = colorScheme.onPrimaryContainer;
+        iconColor = colorScheme.onPrimaryContainer;
+        border = BorderSide.none;
+        textStyle = baseStyle?.copyWith(
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.4,
+        );
+      case MetaChipKind.recording:
+        iconColor = _recordingRed;
+        border = BorderSide(color: _recordingRed.withValues(alpha: 0.5));
+        textStyle = baseStyle?.copyWith(fontWeight: FontWeight.w700);
+      case MetaChipKind.plain:
+        // Callers passing their own icon (Sports) keep today's accent.
+        iconColor = colorScheme.primary;
+      case MetaChipKind.runtime:
+      case MetaChipKind.seasons:
+      case MetaChipKind.schedule:
+      case MetaChipKind.channel:
+        break;
+    }
+
+    final icon = this.icon ?? _defaultIcon;
+    final iconSize = (kind == MetaChipKind.recording ? 12 : 16) * scale;
+    final detail = this.detail;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(radius),
+        border: border == BorderSide.none
+            ? null
+            : Border.fromBorderSide(border),
+      ),
+      child: Padding(
+        padding: padding,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: iconSize, color: iconColor),
+              SizedBox(width: 5 * scale),
+            ],
+            Flexible(
+              child: Text.rich(
+                TextSpan(
+                  text: label,
+                  children: [
+                    if (detail != null)
+                      TextSpan(
+                        text: '  $detail',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                  ],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textStyle?.copyWith(color: foreground),
+              ),
             ),
-      label: Text(label),
-      backgroundColor: colorScheme.surfaceContainerHighest,
-      side: BorderSide(color: colorScheme.outlineVariant),
+          ],
+        ),
+      ),
     );
   }
 }

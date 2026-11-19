@@ -5,6 +5,7 @@ import 'package:m3u_tv/features/home/home_spotlight.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/sports_models.dart';
+import 'package:m3u_tv/shared/meta_chip_data.dart';
 
 void main() {
   final l10n = lookupAppLocalizations(const Locale('en'));
@@ -53,7 +54,10 @@ void main() {
       expect(spotlight.title, 'Heat');
       expect(spotlight.backdropUrl, isNull);
       expect(spotlight.toneUrl, 'http://img/poster.jpg');
-      expect(spotlight.chips, ['1995', '★ 8.3']);
+      expect(spotlight.chips, [
+        const MetaChipData.year('1995'),
+        MetaChipData.rating(8.3),
+      ]);
       expect(spotlight.plot, isNull);
     });
 
@@ -82,7 +86,13 @@ void main() {
         expect(spotlight.backdropUrl, 'http://img/backdrop.jpg');
         expect(spotlight.toneUrl, 'http://img/backdrop.jpg');
         expect(spotlight.clearLogoUrl, 'http://img/logo.png');
-        expect(spotlight.chips, ['1995', 'R', 'Crime', '2h 50m', '★ 8.3']);
+        expect(spotlight.chips, [
+          const MetaChipData.year('1995'),
+          const MetaChipData.certification('R'),
+          const MetaChipData.genre('Crime'),
+          const MetaChipData.runtime('2h 50m'),
+          MetaChipData.rating(8.3),
+        ]);
         expect(spotlight.plot, 'A crew of thieves.');
         expect(spotlight.playLength, const Duration(hours: 2, minutes: 50));
         expect(spotlight.endsAt, isNull);
@@ -108,7 +118,13 @@ void main() {
 
       expect(spotlight.backdropUrl, 'http://img/sev.jpg');
       expect(spotlight.clearLogoUrl, 'http://img/sev-logo.png');
-      expect(spotlight.chips, ['2022', 'TV-MA', 'Drama', '55m', '★ 8.7']);
+      expect(spotlight.chips, [
+        const MetaChipData.year('2022'),
+        const MetaChipData.certification('TV-MA'),
+        const MetaChipData.genre('Drama'),
+        const MetaChipData.runtime('55m'),
+        MetaChipData.rating(8.7),
+      ]);
       expect(spotlight.plot, 'Work-life balance.');
     });
 
@@ -146,7 +162,10 @@ void main() {
       expect(spotlight.kickerLogoUrl, 'http://img/bbc.png');
       expect(spotlight.secondaryTitle, 'S14 E3 - The Giggle');
       expect(spotlight.backdropUrl, 'http://img/dw-backdrop.jpg');
-      expect(spotlight.chips, ['NEW', 'Drama']);
+      expect(spotlight.chips, const [
+        MetaChipData.highlight('NEW'),
+        MetaChipData.genre('Drama'),
+      ]);
       expect(spotlight.progress, 0.25);
       expect(spotlight.progressLabel, contains('45 min left'));
       expect(spotlight.plot, 'The Doctor returns.');
@@ -240,7 +259,11 @@ void main() {
         expect(spotlight.secondaryTitle, 'S1 E4 - The You You Are');
         expect(spotlight.clearLogoUrl, 'http://img/sev-logo.png');
         expect(spotlight.backdropUrl, 'http://img/sev.jpg');
-        expect(spotlight.chips, ['2022', 'TV-MA', '50m']);
+        expect(spotlight.chips, const [
+          MetaChipData.year('2022'),
+          MetaChipData.certification('TV-MA'),
+          MetaChipData.runtime('50m'),
+        ]);
         expect(spotlight.progress, closeTo(0.2, 1e-9));
         expect(spotlight.progressLabel, '40 min left');
         expect(spotlight.badge, isNull);
@@ -308,7 +331,10 @@ void main() {
         spotlight.secondaryTitle,
         'Utah Mammoth 1  ·  Toronto Maple Leafs 2',
       );
-      expect(spotlight.chips, ['2nd - 12:34', 'ESPN+']);
+      expect(spotlight.chips, const [
+        MetaChipData.highlight('2nd - 12:34'),
+        MetaChipData.channel('ESPN+'),
+      ]);
       expect(spotlight.crestUrls, ['http://img/uta.png', 'http://img/tor.png']);
       expect(spotlight.footnote, 'On NHL 05, ESPN+ 53');
 
@@ -327,7 +353,7 @@ void main() {
       );
       expect(later.badge, isNull);
       expect(later.secondaryTitle, isNull);
-      expect(later.chips, ['Starts 19:00']);
+      expect(later.chips, const [MetaChipData.schedule('Starts 19:00')]);
 
       // With the league's logo standing in for the title, the matchup reads
       // under it and the kicker drops the league name the logo already shows

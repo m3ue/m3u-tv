@@ -758,12 +758,13 @@ class _SeriesDetailsBody extends StatelessWidget {
         ? info.seasons.length
         : info.episodesBySeason.length;
     final avgRuntime = _averageRuntimeLabel;
-    final chips = <String>[
-      if (info.isDvrRecording) l.detailDvrBadge,
-      ?info.series.genre,
-      if (seasonCount > 0) '$seasonCount ${l.seriesSeasons}',
-      if (info.series.rating != null) formatRating(info.series.rating!),
-      ?avgRuntime,
+    final chips = <MetaChipData>[
+      if (info.isDvrRecording) MetaChipData.recording(l.detailDvrBadge),
+      if (info.series.genre case final genre?) MetaChipData.genre(genre),
+      if (seasonCount > 0)
+        MetaChipData.seasons('$seasonCount ${l.seriesSeasons}'),
+      if (info.series.rating != null) MetaChipData.rating(info.series.rating!),
+      if (avgRuntime != null) MetaChipData.runtime(avgRuntime),
     ];
 
     // The play / start-over buttons are rendered separately (on the season

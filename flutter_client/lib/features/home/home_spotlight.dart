@@ -11,6 +11,7 @@ import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart'
     show HoverIntentCallback;
+import 'package:m3u_tv/shared/meta_chip_data.dart';
 
 /// What the rich Home's spotlight hero is currently describing: the card
 /// that last took focus in one of the rows below it.
@@ -149,7 +150,7 @@ class HomeSpotlight {
 
   /// Line under the title: episode numbering and name.
   final String? secondaryTitle;
-  final List<String> chips;
+  final List<MetaChipData> chips;
 
   /// 0-1 bar under the chips (live programme or watch progress).
   final double? progress;
@@ -407,11 +408,14 @@ HomeSpotlight resolveHomeSpotlight(
         backdropUrl: backdrop,
         toneUrl: backdrop ?? nullIfBlank(info?.coverUrl) ?? item.logoUrl,
         chips: [
-          ?(nullIfBlank(info?.year) ?? item.year),
-          ?nullIfBlank(info?.contentRating),
-          ?nullIfBlank(info?.genre),
-          ?formatRuntimeText(info?.duration),
-          if (rating != null && rating > 0) formatRating(rating),
+          if (nullIfBlank(info?.year) ?? item.year case final year?)
+            MetaChipData.year(year),
+          if (nullIfBlank(info?.contentRating) case final certification?)
+            MetaChipData.certification(certification),
+          if (nullIfBlank(info?.genre) case final genre?)
+            MetaChipData.genre(genre),
+          ?MetaChipData.runtimeText(info?.duration),
+          if (rating != null && rating > 0) MetaChipData.rating(rating),
         ],
         plot: nullIfBlank(info?.plot),
         playLength: parseRuntimeText(info?.duration),
@@ -427,12 +431,13 @@ HomeSpotlight resolveHomeSpotlight(
         backdropUrl: backdrop,
         toneUrl: backdrop ?? series.coverUrl,
         chips: [
-          ?series.year,
-          ?nullIfBlank(series.contentRating),
-          ?series.genre,
+          if (series.year case final year?) MetaChipData.year(year),
+          if (nullIfBlank(series.contentRating) case final certification?)
+            MetaChipData.certification(certification),
+          if (series.genre case final genre?) MetaChipData.genre(genre),
           if (series.episodeRunTime case final minutes?)
-            formatRuntime(Duration(minutes: minutes)),
-          if (rating != null && rating > 0) formatRating(rating),
+            MetaChipData.runtime(formatRuntime(Duration(minutes: minutes))),
+          if (rating != null && rating > 0) MetaChipData.rating(rating),
         ],
         plot: nullIfBlank(series.plot),
       );
@@ -508,11 +513,15 @@ HomeSpotlight _sportsSpotlight(
     kicker: leagueLogo == null ? fixture.league.name : null,
     secondaryTitle: scoreLine ?? (leagueLogo == null ? null : title),
     chips: [
-      if (fixture.state == SportsFixtureState.live)
-        ?nullIfBlank(fixture.statusDetail)
+      if (nullIfBlank(fixture.statusDetail) case final status?
+          when fixture.state == SportsFixtureState.live)
+        MetaChipData.highlight(status)
       else if (fixture.state == SportsFixtureState.scheduled)
-        l.homeSportsStartsAt(format.timeOfDay(fixture.start.toLocal())),
-      ...fixture.broadcasts.take(3),
+        MetaChipData.schedule(
+          l.homeSportsStartsAt(format.timeOfDay(fixture.start.toLocal())),
+        ),
+      for (final broadcast in fixture.broadcasts.take(3))
+        MetaChipData.channel(broadcast),
     ],
     footnote: target.channelNames.isEmpty
         ? null
@@ -560,11 +569,13 @@ HomeSpotlight _channelSpotlight(
     kickerLogoUrl: channel.logoUrl,
     secondaryTitle: secondary.isEmpty ? null : secondary,
     chips: [
-      if (program.isNew) l.epgBadgeNew,
-      if (program.isPremiere) l.epgBadgePremiere,
-      ?nullIfBlank(program.category),
-      if (program.year != null) '${program.year}',
-      ?nullIfBlank(program.rating),
+      if (program.isNew) MetaChipData.highlight(l.epgBadgeNew),
+      if (program.isPremiere) MetaChipData.highlight(l.epgBadgePremiere),
+      if (nullIfBlank(program.category) case final category?)
+        MetaChipData.genre(category),
+      if (program.year != null) MetaChipData.year('${program.year}'),
+      if (nullIfBlank(program.rating) case final certification?)
+        MetaChipData.certification(certification),
     ],
     progress: epg.progress,
     progressLabel:
@@ -640,11 +651,12 @@ HomeSpotlight _progressSpotlight(
       badge: progress.upNext ? l.homeUpNext : null,
       secondaryTitle: secondary.isEmpty ? null : secondary,
       chips: [
-        ?series?.year,
-        ?nullIfBlank(series?.contentRating),
-        ?genre,
-        ?runtime,
-        ?formatRatingText(rating),
+        if (series?.year case final year?) MetaChipData.year(year),
+        if (nullIfBlank(series?.contentRating) case final certification?)
+          MetaChipData.certification(certification),
+        if (genre != null) MetaChipData.genre(genre),
+        if (runtime != null) MetaChipData.runtime(runtime),
+        ?MetaChipData.ratingText(rating),
       ],
       progress: fraction,
       progressLabel: timeLeft,
@@ -667,14 +679,19 @@ HomeSpotlight _progressSpotlight(
         nullIfBlank(progress.thumbnailUrl) ??
         nullIfBlank(info?.coverUrl),
     chips: [
-      ?(nullIfBlank(info?.year) ?? nullIfBlank(progress.year)),
-      ?nullIfBlank(info?.contentRating),
-      ?(genre ?? nullIfBlank(info?.genre)),
-      ?(runtime ?? formatRuntimeText(info?.duration)),
+      if (nullIfBlank(info?.year) ?? nullIfBlank(progress.year)
+          case final year?)
+        MetaChipData.year(year),
+      if (nullIfBlank(info?.contentRating) case final certification?)
+        MetaChipData.certification(certification),
+      if (genre ?? nullIfBlank(info?.genre) case final genre?)
+        MetaChipData.genre(genre),
+      if (runtime ?? formatRuntimeText(info?.duration) case final runtime?)
+        MetaChipData.runtime(runtime),
       if (rating != null)
-        formatRatingText(rating)!
+        MetaChipData.ratingText(rating)!
       else if (infoRating != null && infoRating > 0)
-        formatRating(infoRating),
+        MetaChipData.rating(infoRating),
     ],
     progress: fraction,
     progressLabel: timeLeft,

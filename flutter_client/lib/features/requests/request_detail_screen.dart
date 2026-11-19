@@ -207,12 +207,16 @@ class _RequestDetailScreenState extends ConsumerState<RequestDetailScreen> {
         !available;
     final rating = result.rating;
     final chips = [
-      if (result.year != null) result.year!,
-      if (result.certification != null) result.certification!,
-      if (rating != null) formatRating(rating.value, source: rating.source),
+      if (result.year != null) MetaChipData.year(result.year!),
+      if (result.certification != null)
+        MetaChipData.certification(result.certification!),
+      if (rating != null)
+        MetaChipData.rating(rating.value, source: rating.source),
       if (result.runtimeMinutes != null)
-        formatRuntime(Duration(minutes: result.runtimeMinutes!)),
-      ...result.genres.take(3),
+        MetaChipData.runtime(
+          formatRuntime(Duration(minutes: result.runtimeMinutes!)),
+        ),
+      for (final genre in result.genres.take(3)) MetaChipData.genre(genre),
     ];
 
     return ItemDetailScaffold(
