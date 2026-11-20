@@ -5,6 +5,7 @@ import 'package:m3u_tv/shared/frosted_surface.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
+import 'package:m3u_tv/shared/immersive_top.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Screen space [ItemDetailScaffold]'s floating AppBar actually occupies
@@ -47,7 +48,7 @@ const double _kMacTrafficLightInset = 72;
 /// itself from initState/dispose, which is unavoidably a frame (or more)
 /// behind the moment navigation was requested and reads as a layout snap
 /// mid-transition rather than one smooth motion.
-class ItemDetailScaffold extends StatelessWidget {
+class ItemDetailScaffold extends StatefulWidget {
   const ItemDetailScaffold({
     super.key,
     required this.title,
@@ -67,12 +68,84 @@ class ItemDetailScaffold extends StatelessWidget {
   final VoidCallback? onBackButtonFocused;
 
   @override
+  State<ItemDetailScaffold> createState() => _ItemDetailScaffoldState();
+}
+
+class _ItemDetailScaffoldState extends State<ItemDetailScaffold> {
+  final GlobalKey _titleKey = GlobalKey();
+
+  /// The title pill's measured horizontal extent, for
+  /// [immersiveHeaderTop]. Null until the first layout, which counts the
+  /// whole title slot as the header instead.
+  (double, double)? _titleSpan;
+
+  @override
+  void initState() {
+    super.initState();
+    ImmersiveTopController.instance.acquire();
+  }
+
+  @override
+  void dispose() {
+    ImmersiveTopController.instance.release();
+    super.dispose();
+  }
+
+  void _measureTitleSpan() {
+    if (!mounted) return;
+    final box = _titleKey.currentContext?.findRenderObject();
+    final page = context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize || page is! RenderBox) return;
+    // Relative to this page, not the screen: mid slide-in the page itself
+    // is still offset.
+    final left = box.localToGlobal(Offset.zero, ancestor: page).dx;
+    final span = (left, left + box.size.width);
+    if (span != _titleSpan) setState(() => _titleSpan = span);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scale = FontSizeScope.scaleOf(context);
     final macInset =
         _isMacDesktopWindow && !DesktopFullscreenScope.isFullscreenOf(context)
         ? _kMacTrafficLightInset
         : 0.0;
+    return ValueListenableBuilder<ImmersiveTopRegions?>(
+      valueListenable: ImmersiveTopController.instance.regions,
+      builder: (context, regions, _) {
+        final scaffold = _buildScaffold(context, scale, macInset);
+        final leadingWidth = (56 * scale) + macInset;
+        final width = MediaQuery.sizeOf(context).width;
+        final immersiveTop = immersiveHeaderTop(
+          regions: regions,
+          headerSpans: [
+            (0, leadingWidth),
+            _titleSpan ?? (leadingWidth, width - leadingWidth),
+          ],
+          headerHeight: kToolbarHeight * scale,
+        );
+        if (immersiveTop == null) return scaffold;
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _measureTitleSpan(),
+        );
+        // The status bar is hidden (see RunnerFlutterViewController), so the
+        // header only has to clear the camera: hand the AppBar and
+        // detailAppBarHeight that top instead of the system's band.
+        final mediaQuery = MediaQuery.of(context);
+        return MediaQuery(
+          data: mediaQuery.copyWith(
+            padding: mediaQuery.padding.copyWith(top: immersiveTop),
+            viewPadding: mediaQuery.viewPadding.copyWith(top: immersiveTop),
+          ),
+          child: scaffold,
+        );
+      },
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context, double scale, double macInset) {
+    final onSidebarActivate = widget.onSidebarActivate;
+    final onBackButtonFocused = widget.onBackButtonFocused;
     return DpadRegion(
       horizontalEdge: DpadEdgeBehavior.stop,
       onEdge: (direction) {
@@ -87,7 +160,7 @@ class ItemDetailScaffold extends StatelessWidget {
         // clipped by a padded container short of it.
         extendBodyBehindAppBar: true,
         appBar: AppBar(
-          title: _GlassTitle(title: title, scale: scale),
+          title: _GlassTitle(key: _titleKey, title: widget.title, scale: scale),
           automaticallyImplyLeading: false,
           backgroundColor: Colors.transparent,
           scrolledUnderElevation: 0,
@@ -127,7 +200,7 @@ class ItemDetailScaffold extends StatelessWidget {
             ),
           ),
         ),
-        body: body,
+        body: widget.body,
       ),
     );
   }
@@ -142,7 +215,7 @@ class ItemDetailScaffold extends StatelessWidget {
 /// with the page's own transition animation for frame budget, for a look
 /// that's barely different from "always on".
 class _GlassTitle extends StatelessWidget {
-  const _GlassTitle({required this.title, required this.scale});
+  const _GlassTitle({super.key, required this.title, required this.scale});
 
   final String title;
   final double scale;

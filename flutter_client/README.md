@@ -335,7 +335,7 @@ Apple listings use their own source sets, so Apple-specific screenshots stay out
 | `tvos*.png` | tvOS screenshots (source: 1920 × 1080 or 3840 × 2160) |
 | `ios*.png` | iPhone screenshots (source: 1206 × 2622) |
 | `ipados*.png` | iPad screenshots (source: 1668 × 2420) |
-| `duo*.png` | iPhone Duo screenshots (source: a Duo simulator capture, inner 2007 × 2853 or outer 1398 × 2034, portrait or landscape) |
+| `duo*.png` | iPhone Duo screenshots (source: a Duo simulator capture, inner 2007 × 2853 or outer 1398 × 2034, portrait or landscape; each capture goes to its own display's folder, other sizes are resized into both) |
 | `macos*.png` | Mac App Store screenshots (source: a Cmd+Shift+5 window capture, window sized close to 16:10) |
 | `tv*.png` | Android TV screenshots (source: 1920 × 1080 or 3840 × 2160) |
 | `mobile*.png` | Android Phone screenshots (source: 1206 × 2622) |

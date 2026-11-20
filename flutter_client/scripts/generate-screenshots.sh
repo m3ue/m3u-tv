@@ -208,9 +208,11 @@ echo "--- Apple iOS (iPhone Duo) ---"
 # iPhone Duo has its own App Store Connect slot, which takes either display:
 #   inner  2007×2853  (unfolded)
 #   outer  1398×2034  (folded cover display)
-# Both are ~1.42-1.45 ratio, so one simulator capture of either display feeds
-# both with only a sliver of crop. Landscape sources (wider than tall) get the
-# landscape sizes (2853×2007, 2034×1398).
+# Name every capture duo<N>.png; the display is read from its pixel size. A
+# simulator capture of one display (portrait or landscape) goes only to that
+# display's folder, as-is. Anything else (an edited or exported image) is
+# resized into both, matching its orientation; the ~1.42-1.45 ratios mean
+# only a sliver of crop.
 #
 # No fallback: the phone sets are ~2.17 ratio and would lose a third of the
 # frame. Without duo*.png this step is skipped.
@@ -225,18 +227,31 @@ duo_sources=$(sources_for duo)
 while IFS= read -r src; do
     [[ -n "$src" ]] || continue
     name=$(basename "$src")
-    read -r src_w src_h < <(magick identify -format "%w %h" "$src")
-    if (( src_w > src_h )); then
-        echo "  [Duo inner 2853×2007] $name"
-        resize_fill "$src" "$DUO_INNER/$name" 2853 2007
-        echo "  [Duo outer 2034×1398] $name"
-        resize_fill "$src" "$DUO_OUTER/$name" 2034 1398
-    else
-        echo "  [Duo inner 2007×2853] $name"
-        resize_fill "$src" "$DUO_INNER/$name" 2007 2853
-        echo "  [Duo outer 1398×2034] $name"
-        resize_fill "$src" "$DUO_OUTER/$name" 1398 2034
-    fi
+    # Trailing newline matters: without it `read` hits EOF, returns non-zero
+    # and `set -e` silently ends the script.
+    read -r src_w src_h < <(magick identify -format "%w %h\n" "$src")
+    case "${src_w}x${src_h}" in
+        2007x2853 | 2853x2007) targets=("inner:$src_w:$src_h") ;;
+        1398x2034 | 2034x1398) targets=("outer:$src_w:$src_h") ;;
+        *)
+            if (( src_w > src_h )); then
+                targets=("inner:2853:2007" "outer:2034:1398")
+            else
+                targets=("inner:2007:2853" "outer:1398:2034")
+            fi
+            ;;
+    esac
+    for target in "${targets[@]}"; do
+        IFS=: read -r display w h <<< "$target"
+        dir="$DUO_OUTER"
+        [[ "$display" == inner ]] && dir="$DUO_INNER"
+        echo "  [Duo $display ${w}×${h}] $name"
+        resize_fill "$src" "$dir/$name" "$w" "$h"
+        # Simulator captures carry an alpha channel (for the display's
+        # rounded corners) even when fully opaque; App Store Connect rejects
+        # any.
+        magick mogrify -background black -alpha remove -alpha off "$dir/$name"
+    done
 done <<< "$duo_sources"
 
 
@@ -331,8 +346,8 @@ echo "                     apple/ios/6.3in-1206x2622/     (6.1\"/6.3\" slot)"
 echo "                     apple/ios/6.7in-1290x2796/     (also accepted in 6.9\" slot)"
 echo "                     apple/ios/6.5in-1242x2688/     (required for older iPhones)"
 echo "                     apple/ios/5.5in-1242x2208/     (optional legacy)"
-echo "  Apple iPhone Duo → apple/duo/inner/               (unfolded, either set fills the Duo slot)"
-echo "                     apple/duo/outer/               (folded cover display)"
+echo "  Apple iPhone Duo → apple/duo/inner/               (unfolded captures; the Duo slot takes either)"
+echo "                     apple/duo/outer/               (folded cover display captures)"
 echo "  Apple macOS      → apple/macos/1440x900/"
 echo "  Android TV       → google/android-tv/1920x1080/   (required)"
 echo "                     google/android-tv/1280x720/    (optional legacy)"
