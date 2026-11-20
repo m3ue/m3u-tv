@@ -8,7 +8,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_locales.dart';
-import 'package:m3u_tv/app/app_shell.dart' show DeviceType, shouldUseSidebar;
+import 'package:m3u_tv/app/app_shell.dart'
+    show DeviceType, isTouchDeviceType, shouldUseSidebar;
 import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/app/launch_splash.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
@@ -37,6 +38,7 @@ import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
 import 'package:m3u_tv/shared/notification_toast.dart';
+import 'package:m3u_tv/shared/touch_input_scope.dart';
 import 'package:m3u_tv/shared/tv_remote_input_governor_scope.dart';
 import 'package:m3u_tv/shared/tvos_scroll_semantics.dart';
 import 'package:material_ui/material_ui.dart';
@@ -605,33 +607,37 @@ class _MyAppState extends State<MyApp> {
               optimizeFor: optimizeFor,
               child: FontSizeScope(
                 fontSize: fontSize,
-                child: Builder(
-                  builder: (context) {
-                    final scale = FontSizeScope.scaleOf(context);
-                    // Floating snackbars span the screen by default; on wide
-                    // screens cap them to the push toasts' width.
-                    final theme = Theme.of(context);
-                    final themedChild = MediaQuery.sizeOf(context).width >= 720
-                        ? Theme(
-                            data: theme.copyWith(
-                              snackBarTheme: theme.snackBarTheme.copyWith(
-                                width: 480 * scale,
+                child: TouchInputScope(
+                  isTouch: isTouchDeviceType(deviceType),
+                  child: Builder(
+                    builder: (context) {
+                      final scale = FontSizeScope.scaleOf(context);
+                      // Floating snackbars span the screen by default; on wide
+                      // screens cap them to the push toasts' width.
+                      final theme = Theme.of(context);
+                      final themedChild =
+                          MediaQuery.sizeOf(context).width >= 720
+                          ? Theme(
+                              data: theme.copyWith(
+                                snackBarTheme: theme.snackBarTheme.copyWith(
+                                  width: 480 * scale,
+                                ),
                               ),
-                            ),
-                            child: routerChild,
-                          )
-                        : routerChild;
-                    final messengerChild = SnackBarTrackingMessenger(
-                      child: themedChild,
-                    );
-                    if (scale == 1) return messengerChild;
-                    return MediaQuery(
-                      data: MediaQuery.of(
-                        context,
-                      ).copyWith(textScaler: TextScaler.linear(scale)),
-                      child: messengerChild,
-                    );
-                  },
+                              child: routerChild,
+                            )
+                          : routerChild;
+                      final messengerChild = SnackBarTrackingMessenger(
+                        child: themedChild,
+                      );
+                      if (scale == 1) return messengerChild;
+                      return MediaQuery(
+                        data: MediaQuery.of(
+                          context,
+                        ).copyWith(textScaler: TextScaler.linear(scale)),
+                        child: messengerChild,
+                      );
+                    },
+                  ),
                 ),
               ),
             ),

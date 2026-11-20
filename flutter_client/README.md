@@ -335,13 +335,14 @@ Apple listings use their own source sets, so Apple-specific screenshots stay out
 | `tvos*.png` | tvOS screenshots (source: 1920 × 1080 or 3840 × 2160) |
 | `ios*.png` | iPhone screenshots (source: 1206 × 2622) |
 | `ipados*.png` | iPad screenshots (source: 1668 × 2420) |
+| `duo*.png` | iPhone Duo screenshots (source: a Duo simulator capture, inner 2007 × 2853 or outer 1398 × 2034, portrait or landscape) |
 | `macos*.png` | Mac App Store screenshots (source: a Cmd+Shift+5 window capture, window sized close to 16:10) |
 | `tv*.png` | Android TV screenshots (source: 1920 × 1080 or 3840 × 2160) |
 | `mobile*.png` | Android Phone screenshots (source: 1206 × 2622) |
 | `tablet*.png` | Android Tablet screenshots (source: 1668 × 2420) |
 | `desktop*.png` | Generic desktop set for the docs (source: 1712 × 1115); macOS falls back to it |
 
-Only `<prefix><number>.png` matches, so `tv*` never picks up `tvos*` files. If an Apple set has no files, the generator falls back to its generic set (`tvos` → `tv`, `ios` → `mobile`, `ipados` → `tablet`, `macos` → `desktop`). Each run clears the PNGs it previously generated in its output folders, so renamed or removed sources don't linger. Mac screenshots (`macos*`, or `desktop*` as the fallback) are expected to be window captures: the generator crops off the transparent drop-shadow margin and the 1px window outline, fills the rounded corners with the window's edge colour, and writes an opaque PNG with no alpha channel, which App Store Connect requires.
+Only `<prefix><number>.png` matches, so `tv*` never picks up `tvos*` files. If an Apple set has no files, the generator falls back to its generic set (`tvos` → `tv`, `ios` → `mobile`, `ipados` → `tablet`, `macos` → `desktop`). `duo` has no fallback (the phone sets are too tall to crop to the Duo's ratio), so the Duo step is skipped until `duo*.png` files exist. Each run clears the PNGs it previously generated in its output folders, so renamed or removed sources don't linger. Mac screenshots (`macos*`, or `desktop*` as the fallback) are expected to be window captures: the generator crops off the transparent drop-shadow margin and the 1px window outline, fills the rounded corners with the window's edge colour, and writes an opaque PNG with no alpha channel, which App Store Connect requires.
 
 ## Trakt setup
 

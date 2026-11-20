@@ -51,7 +51,13 @@ Widget _withGradient(Widget screen) => DecoratedBox(
 /// AppShell applies to its own content.
 bool get _isTvOS => HostPlatform.isTvOS;
 
-Widget _topLevelSafeArea(Widget screen) => Builder(
+/// [edgeToEdge] leaves the top inset to the screen itself, for
+/// `ItemDetailScaffold` routes: their transparent AppBar adds the status bar
+/// inset on its own and `detailAppBarHeight` reserves it inside the scrolled
+/// content, so the backdrop runs up behind the status bar. Wrapping them in
+/// a top `SafeArea` zeroed that inset and clipped the hero (and the scrolling
+/// title/clearlogo) at a hard edge below the status bar.
+Widget _topLevelSafeArea(Widget screen, {bool edgeToEdge = false}) => Builder(
   builder: (context) => _isTvOS
       ? MediaQuery.removePadding(
           context: context,
@@ -61,17 +67,19 @@ Widget _topLevelSafeArea(Widget screen) => Builder(
           removeRight: true,
           child: screen,
         )
-      : SafeArea(bottom: false, child: screen),
+      : SafeArea(top: !edgeToEdge, bottom: false, child: screen),
 );
 
-CustomTransitionPage<void> _slidePage(Widget screen) =>
-    CustomTransitionPage<void>(
-      child: ColoredBox(
-        color: kAppPageBackground,
-        child: _topLevelSafeArea(screen),
-      ),
-      transitionsBuilder: appSlideTransition,
-    );
+CustomTransitionPage<void> _slidePage(
+  Widget screen, {
+  bool edgeToEdge = false,
+}) => CustomTransitionPage<void>(
+  child: ColoredBox(
+    color: kAppPageBackground,
+    child: _topLevelSafeArea(screen, edgeToEdge: edgeToEdge),
+  ),
+  transitionsBuilder: appSlideTransition,
+);
 
 /// Hardware Back/Escape for the top-level VOD/Series detail routes.
 ///
@@ -703,6 +711,7 @@ GoRouter createGoRouter({
                   ),
                 ),
               ),
+              edgeToEdge: true,
             );
           }
           // No object in hand (deep link / push notification / restored
@@ -713,6 +722,7 @@ GoRouter createGoRouter({
               actions: actions,
               appShellKey: appShellKey,
             ),
+            edgeToEdge: true,
           );
         },
       ),
@@ -774,6 +784,7 @@ GoRouter createGoRouter({
                 ),
               ),
             ),
+            edgeToEdge: true,
           );
         },
       ),
@@ -815,6 +826,7 @@ GoRouter createGoRouter({
                 ),
               ),
             ),
+            edgeToEdge: true,
           );
         },
       ),
@@ -850,6 +862,7 @@ GoRouter createGoRouter({
                   ),
                 ),
               ),
+              edgeToEdge: true,
             );
           }
           // No object in hand (deep link / push notification / restored
@@ -860,6 +873,7 @@ GoRouter createGoRouter({
               actions: actions,
               appShellKey: appShellKey,
             ),
+            edgeToEdge: true,
           );
         },
       ),
@@ -938,6 +952,7 @@ GoRouter createGoRouter({
                       ),
               ),
             ),
+            edgeToEdge: true,
           );
         },
       ),

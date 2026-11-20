@@ -12,6 +12,7 @@ import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/resume_service.dart';
 import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
+import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:material_ui/material_ui.dart';
 
 void main() {
@@ -55,7 +56,7 @@ void main() {
   );
 
   testWidgets(
-    'slide-in detail route background paints behind top inset while content stays safe',
+    'detail route runs edge to edge under the top inset; its AppBar stays safe',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(400, 800));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -78,7 +79,16 @@ void main() {
       final bg = _routeDarkBox();
       expect(bg, findsAtLeastNWidgets(1));
       expect(tester.getTopLeft(bg.first), Offset.zero);
-      _expectSafeAreaPadding(tester, bg.first, top: 48);
+      // The detail screen itself (hero backdrop included) starts at the top
+      // of the screen, not below the inset: ItemDetailScaffold reserves the
+      // inset on its own (transparent AppBar + detailAppBarHeight).
+      expect(tester.getTopLeft(find.byType(ItemDetailScaffold)).dy, 0);
+      final backButton = find.descendant(
+        of: find.byType(AppBar),
+        matching: find.byType(IconButton),
+      );
+      expect(backButton, findsOneWidget);
+      expect(tester.getTopLeft(backButton).dy, greaterThanOrEqualTo(48));
     },
   );
 }

@@ -23,6 +23,7 @@ import 'package:m3u_tv/shared/item_detail_scaffold.dart'
     show detailAppBarHeight;
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/shared/poster_strip.dart';
+import 'package:m3u_tv/shared/touch_input_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Shared building blocks for the series-style detail screens (Xtream Series
@@ -1438,8 +1439,11 @@ class RowScrollRegionState extends State<RowScrollRegion> {
     // vertical offset can only move via our own reveal()/navigateVertical()
     // calls - nothing ambient left to fight the rails' own horizontal
     // centering, which is what caused the scroll-drift jank previously.
-    // Desktop mouse/trackpad keeps default physics for ambient wheel-scroll.
-    final physics = isDesktopPlatform(context)
+    // Desktop mouse/trackpad keeps default physics for ambient wheel-scroll,
+    // and touch devices (tablets, an unfolded iPhone Duo - anything wide
+    // enough for this layout) need it to scroll at all.
+    final physics =
+        isDesktopPlatform(context) || TouchInputScope.isTouchOf(context)
         ? null
         : const NeverScrollableScrollPhysics();
     return SingleChildScrollView(

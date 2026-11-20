@@ -9,6 +9,7 @@
 #   tvos*.png    → Apple tvOS (1920×1080, 3840×2160)
 #   ios*.png     → Apple iPhone (6.9", 6.3", 6.7", 6.5", 5.5")
 #   ipados*.png  → Apple iPad (12.9", 11")
+#   duo*.png     → Apple iPhone Duo (inner 2007×2853, outer 1398×2034)
 #   macos*.png   → Apple macOS (1440×900)
 #   tv*.png      → Android TV (1920×1080, 1280×720)
 #   mobile*.png  → Android Phone (1080×2340)
@@ -16,7 +17,8 @@
 #   desktop*.png → generic desktop set (docs; macOS fallback)
 #
 # An Apple set that has no files yet falls back to its generic set
-# (tvos → tv, ios → mobile, ipados → tablet, macos → desktop).
+# (tvos → tv, ios → mobile, ipados → tablet, macos → desktop). duo has no
+# fallback and is skipped when empty.
 #
 # Store headers and banners (Google feature graphic, Android TV banner, iOS
 # product page header, Microsoft art) come from generate-store-assets.sh.
@@ -200,6 +202,43 @@ while IFS= read -r src; do
     resize_fill "$src" "$IOS_IPAD_11/$name" 1668 2388
 done < <(apple_sources ipados tablet)
 
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- Apple iOS (iPhone Duo) ---"
+# iPhone Duo has its own App Store Connect slot, which takes either display:
+#   inner  2007×2853  (unfolded)
+#   outer  1398×2034  (folded cover display)
+# Both are ~1.42-1.45 ratio, so one simulator capture of either display feeds
+# both with only a sliver of crop. Landscape sources (wider than tall) get the
+# landscape sizes (2853×2007, 2034×1398).
+#
+# No fallback: the phone sets are ~2.17 ratio and would lose a third of the
+# frame. Without duo*.png this step is skipped.
+# ---------------------------------------------------------------------------
+DUO_INNER="$OUT_DIR/apple/duo/inner"
+DUO_OUTER="$OUT_DIR/apple/duo/outer"
+prepare_dirs "$DUO_INNER" "$DUO_OUTER"
+
+duo_sources=$(sources_for duo)
+[[ -n "$duo_sources" ]] || echo "  (no duo*.png, skipping)"
+
+while IFS= read -r src; do
+    [[ -n "$src" ]] || continue
+    name=$(basename "$src")
+    read -r src_w src_h < <(magick identify -format "%w %h" "$src")
+    if (( src_w > src_h )); then
+        echo "  [Duo inner 2853×2007] $name"
+        resize_fill "$src" "$DUO_INNER/$name" 2853 2007
+        echo "  [Duo outer 2034×1398] $name"
+        resize_fill "$src" "$DUO_OUTER/$name" 2034 1398
+    else
+        echo "  [Duo inner 2007×2853] $name"
+        resize_fill "$src" "$DUO_INNER/$name" 2007 2853
+        echo "  [Duo outer 1398×2034] $name"
+        resize_fill "$src" "$DUO_OUTER/$name" 1398 2034
+    fi
+done <<< "$duo_sources"
+
 
 # ---------------------------------------------------------------------------
 echo ""
@@ -292,6 +331,8 @@ echo "                     apple/ios/6.3in-1206x2622/     (6.1\"/6.3\" slot)"
 echo "                     apple/ios/6.7in-1290x2796/     (also accepted in 6.9\" slot)"
 echo "                     apple/ios/6.5in-1242x2688/     (required for older iPhones)"
 echo "                     apple/ios/5.5in-1242x2208/     (optional legacy)"
+echo "  Apple iPhone Duo → apple/duo/inner/               (unfolded, either set fills the Duo slot)"
+echo "                     apple/duo/outer/               (folded cover display)"
 echo "  Apple macOS      → apple/macos/1440x900/"
 echo "  Android TV       → google/android-tv/1920x1080/   (required)"
 echo "                     google/android-tv/1280x720/    (optional legacy)"
