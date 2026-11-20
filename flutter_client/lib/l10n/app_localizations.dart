@@ -1592,6 +1592,102 @@ abstract class AppLocalizations {
   /// **'View release'**
   String get settingsAppViewRelease;
 
+  /// No description provided for @appUpdateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update M3U TV'**
+  String get appUpdateTitle;
+
+  /// No description provided for @appUpdateInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Install update'**
+  String get appUpdateInstall;
+
+  /// No description provided for @appUpdateNoticeInstallBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} is ready. Select to download and install it.'**
+  String appUpdateNoticeInstallBody(String version);
+
+  /// No description provided for @appUpdatePermissionMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'To update itself, M3U TV needs permission to install apps. Open settings, allow M3U TV to install unknown apps, then come back here.'**
+  String get appUpdatePermissionMessage;
+
+  /// No description provided for @appUpdateOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get appUpdateOpenSettings;
+
+  /// No description provided for @appUpdateDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading version {version}...'**
+  String appUpdateDownloading(String version);
+
+  /// No description provided for @appUpdateProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{received} of {total} MB'**
+  String appUpdateProgress(String received, String total);
+
+  /// No description provided for @appUpdateProgressUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'{received} MB'**
+  String appUpdateProgressUnknown(String received);
+
+  /// No description provided for @appUpdateConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm the update when Android asks. M3U TV will close while it installs; open it again to use the new version.'**
+  String get appUpdateConfirm;
+
+  /// No description provided for @appUpdateRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get appUpdateRetry;
+
+  /// No description provided for @appUpdateDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The download failed. Check your connection and try again.'**
+  String get appUpdateDownloadFailed;
+
+  /// No description provided for @appUpdateChecksumFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The download didn\'t match the published checksum, so it was discarded. Try again.'**
+  String get appUpdateChecksumFailed;
+
+  /// No description provided for @appUpdateCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'The update was cancelled.'**
+  String get appUpdateCancelled;
+
+  /// No description provided for @appUpdateConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Android won\'t update this copy of M3U TV in place because it was installed from a different source (such as Google Play). Uninstall it, then install the latest version from GitHub.'**
+  String get appUpdateConflict;
+
+  /// No description provided for @appUpdateStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'There isn\'t enough free space to install the update.'**
+  String get appUpdateStorage;
+
+  /// No description provided for @appUpdateInstallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The update couldn\'t be installed: {reason}'**
+  String appUpdateInstallFailed(String reason);
+
   /// No description provided for @settingsAppScanQr.
   ///
   /// In en, this message translates to:

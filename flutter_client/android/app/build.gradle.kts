@@ -1,3 +1,4 @@
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -60,6 +61,19 @@ if (releaseSigningRequired && !releaseSigningAvailable) {
         "ANDROID_REQUIRE_RELEASE_SIGNING is enabled, but Android release signing inputs are incomplete or the keystore file is missing.",
     )
 }
+
+// Flutter forwards each --dart-define to Gradle base64-encoded and
+// comma-joined in the `dart-defines` property. M3UTV_SIDELOAD_UPDATER=true
+// (the GitHub release APK) also turns on the in-app updater in Dart, so one
+// flag gates both halves.
+val dartDefines: Map<String, String> =
+    providers.gradleProperty("dart-defines").orNull
+        ?.split(",")
+        ?.filter { it.isNotBlank() }
+        ?.mapNotNull { runCatching { String(Base64.getDecoder().decode(it)) }.getOrNull() }
+        ?.associate { it.substringBefore("=") to it.substringAfter("=", "") }
+        ?: emptyMap()
+val sideloadUpdaterEnabled = dartDefines["M3UTV_SIDELOAD_UPDATER"] == "true"
 
 android {
     namespace = "dev.sparkison.tv"
@@ -124,6 +138,13 @@ android {
             // copy. The directory is :libmpv's extractLibmpvNative output,
             // wired below via the JniLibFolders task dependency.
             jniLibs.srcDir(libmpvLibcxxJniDir)
+        }
+        // REQUEST_INSTALL_PACKAGES for the self-updater; the Play bundle is
+        // built without the flag and never declares it.
+        if (sideloadUpdaterEnabled) {
+            for (buildType in listOf("debug", "release")) {
+                getByName(buildType).manifest.srcFile("src/sideload/AndroidManifest.xml")
+            }
         }
     }
 }

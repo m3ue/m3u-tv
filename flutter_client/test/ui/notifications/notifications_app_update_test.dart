@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/notifications/notifications_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/providers/app_providers.dart';
+import 'package:m3u_tv/services/apk_update_service.dart';
 import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/services/tv_notification_store.dart';
@@ -51,6 +52,31 @@ void main() {
 
     await tester.tap(find.text('App update available'));
     expect(markedRead, isTrue);
+  });
+
+  testWidgets('offers to install when the update is installable', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _screen(
+        AppUpdateNotice(
+          version: '9.9.9',
+          isRead: false,
+          release: ApkRelease(
+            version: '9.9.9',
+            apkName: 'm3u-tv-v9.9.9-android.apk',
+            apkUrl: Uri.parse('https://example.test/apk'),
+            checksumUrl: Uri.parse('https://example.test/apk.sha256'),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Version 9.9.9 is ready. Select to download and install it.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('shows no update tile when up to date', (tester) async {

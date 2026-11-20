@@ -860,6 +860,70 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAppViewRelease => 'View release';
 
   @override
+  String get appUpdateTitle => 'Update M3U TV';
+
+  @override
+  String get appUpdateInstall => 'Install update';
+
+  @override
+  String appUpdateNoticeInstallBody(String version) {
+    return 'Version $version is ready. Select to download and install it.';
+  }
+
+  @override
+  String get appUpdatePermissionMessage =>
+      'To update itself, M3U TV needs permission to install apps. Open settings, allow M3U TV to install unknown apps, then come back here.';
+
+  @override
+  String get appUpdateOpenSettings => 'Open settings';
+
+  @override
+  String appUpdateDownloading(String version) {
+    return 'Downloading version $version...';
+  }
+
+  @override
+  String appUpdateProgress(String received, String total) {
+    return '$received of $total MB';
+  }
+
+  @override
+  String appUpdateProgressUnknown(String received) {
+    return '$received MB';
+  }
+
+  @override
+  String get appUpdateConfirm =>
+      'Confirm the update when Android asks. M3U TV will close while it installs; open it again to use the new version.';
+
+  @override
+  String get appUpdateRetry => 'Try again';
+
+  @override
+  String get appUpdateDownloadFailed =>
+      'The download failed. Check your connection and try again.';
+
+  @override
+  String get appUpdateChecksumFailed =>
+      'The download didn\'t match the published checksum, so it was discarded. Try again.';
+
+  @override
+  String get appUpdateCancelled => 'The update was cancelled.';
+
+  @override
+  String get appUpdateConflict =>
+      'Android won\'t update this copy of M3U TV in place because it was installed from a different source (such as Google Play). Uninstall it, then install the latest version from GitHub.';
+
+  @override
+  String get appUpdateStorage =>
+      'There isn\'t enough free space to install the update.';
+
+  @override
+  String appUpdateInstallFailed(String reason) {
+    return 'The update couldn\'t be installed: $reason';
+  }
+
+  @override
   String get settingsAppScanQr => 'Scan to open on your phone';
 
   @override

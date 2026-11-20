@@ -831,6 +831,67 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAppViewRelease => '查看版本';
 
   @override
+  String get appUpdateTitle => '更新 M3U TV';
+
+  @override
+  String get appUpdateInstall => '安装更新';
+
+  @override
+  String appUpdateNoticeInstallBody(String version) {
+    return '版本 $version 已就绪。选择以下载并安装。';
+  }
+
+  @override
+  String get appUpdatePermissionMessage =>
+      'M3U TV 需要安装应用的权限才能自我更新。请打开设置，允许 M3U TV 安装未知应用，然后返回此处。';
+
+  @override
+  String get appUpdateOpenSettings => '打开设置';
+
+  @override
+  String appUpdateDownloading(String version) {
+    return '正在下载版本 $version...';
+  }
+
+  @override
+  String appUpdateProgress(String received, String total) {
+    return '$received / $total MB';
+  }
+
+  @override
+  String appUpdateProgressUnknown(String received) {
+    return '$received MB';
+  }
+
+  @override
+  String get appUpdateConfirm =>
+      '在 Android 提示时确认更新。安装期间 M3U TV 将关闭；完成后重新打开即可使用新版本。';
+
+  @override
+  String get appUpdateRetry => '重试';
+
+  @override
+  String get appUpdateDownloadFailed => '下载失败。请检查网络连接后重试。';
+
+  @override
+  String get appUpdateChecksumFailed => '下载内容与发布的校验和不符，已丢弃。请重试。';
+
+  @override
+  String get appUpdateCancelled => '更新已取消。';
+
+  @override
+  String get appUpdateConflict =>
+      '此 M3U TV 是从其他来源（例如 Google Play）安装的，Android 无法直接更新。请先卸载，再从 GitHub 安装最新版本。';
+
+  @override
+  String get appUpdateStorage => '可用空间不足，无法安装更新。';
+
+  @override
+  String appUpdateInstallFailed(String reason) {
+    return '无法安装更新：$reason';
+  }
+
+  @override
   String get settingsAppScanQr => '扫描以在手机上打开';
 
   @override

@@ -868,6 +868,70 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsAppViewRelease => 'Ver versión';
 
   @override
+  String get appUpdateTitle => 'Actualizar M3U TV';
+
+  @override
+  String get appUpdateInstall => 'Instalar actualización';
+
+  @override
+  String appUpdateNoticeInstallBody(String version) {
+    return 'La versión $version está lista. Selecciona para descargarla e instalarla.';
+  }
+
+  @override
+  String get appUpdatePermissionMessage =>
+      'Para actualizarse, M3U TV necesita permiso para instalar aplicaciones. Abre los ajustes, permite que M3U TV instale aplicaciones desconocidas y vuelve aquí.';
+
+  @override
+  String get appUpdateOpenSettings => 'Abrir ajustes';
+
+  @override
+  String appUpdateDownloading(String version) {
+    return 'Descargando la versión $version...';
+  }
+
+  @override
+  String appUpdateProgress(String received, String total) {
+    return '$received de $total MB';
+  }
+
+  @override
+  String appUpdateProgressUnknown(String received) {
+    return '$received MB';
+  }
+
+  @override
+  String get appUpdateConfirm =>
+      'Confirma la actualización cuando Android lo pida. M3U TV se cerrará durante la instalación; ábrela de nuevo para usar la nueva versión.';
+
+  @override
+  String get appUpdateRetry => 'Reintentar';
+
+  @override
+  String get appUpdateDownloadFailed =>
+      'La descarga falló. Comprueba tu conexión e inténtalo de nuevo.';
+
+  @override
+  String get appUpdateChecksumFailed =>
+      'La descarga no coincidía con la suma de comprobación publicada, así que se descartó. Inténtalo de nuevo.';
+
+  @override
+  String get appUpdateCancelled => 'Se canceló la actualización.';
+
+  @override
+  String get appUpdateConflict =>
+      'Android no actualizará esta copia de M3U TV porque se instaló desde otra fuente (como Google Play). Desinstálala y luego instala la última versión desde GitHub.';
+
+  @override
+  String get appUpdateStorage =>
+      'No hay suficiente espacio libre para instalar la actualización.';
+
+  @override
+  String appUpdateInstallFailed(String reason) {
+    return 'No se pudo instalar la actualización: $reason';
+  }
+
+  @override
   String get settingsAppScanQr => 'Escanear para abrir en tu teléfono';
 
   @override

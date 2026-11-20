@@ -161,8 +161,11 @@ jobs:
           test -s upload-keystore.jks
 
       - name: Build APK
+        # M3UTV_SIDELOAD_UPDATER turns on the in-app updater and adds
+        # REQUEST_INSTALL_PACKAGES. GitHub/Downloader APK only - the Play
+        # bundle must be built without it (Play forbids self-updating).
         run: |
-          flutter build apk --release
+          flutter build apk --release --dart-define=M3UTV_SIDELOAD_UPDATER=true
         env:
           ANDROID_KEYSTORE_PATH: ../../upload-keystore.jks
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -199,6 +202,16 @@ jobs:
             echo "### Android APK signing"
             echo "- Signer certificate SHA-256: \`$SIGNER_SHA256\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify in-app updater permission
+        run: |
+          set -euo pipefail
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -type f -name aapt2 | sort -V | tail -1)
+          if ! "$AAPT2" dump permissions build/app/outputs/flutter-apk/app-release.apk \
+            | grep -q 'android.permission.REQUEST_INSTALL_PACKAGES'; then
+            echo "ERROR: APK is missing REQUEST_INSTALL_PACKAGES, so sideloaded installs can't update in-app."
+            exit 1
+          fi
 
       - name: Stage artifact
         run: |

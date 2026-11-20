@@ -26,11 +26,15 @@ class AppAlertDialog extends StatelessWidget {
     required this.title,
     required this.actions,
     this.message,
+    this.content,
     this.memoryKey,
   });
 
   final String title;
   final String? message;
+
+  /// Shown below [message], e.g. a progress bar.
+  final Widget? content;
   final List<AppDialogAction> actions;
 
   /// The button row's [DpadRegion.memoryKey].
@@ -39,9 +43,22 @@ class AppAlertDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final message = this.message;
+    final content = this.content;
     return AlertDialog(
       title: Text(title),
-      content: message == null ? null : Text(message),
+      content: content == null
+          ? (message == null ? null : Text(message))
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (message != null) ...[
+                  Text(message),
+                  const SizedBox(height: 16),
+                ],
+                content,
+              ],
+            ),
       actions: [
         DpadRegion(
           memoryKey: memoryKey,

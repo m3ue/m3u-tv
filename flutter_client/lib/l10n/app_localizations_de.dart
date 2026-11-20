@@ -866,6 +866,70 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAppViewRelease => 'Release ansehen';
 
   @override
+  String get appUpdateTitle => 'M3U TV aktualisieren';
+
+  @override
+  String get appUpdateInstall => 'Update installieren';
+
+  @override
+  String appUpdateNoticeInstallBody(String version) {
+    return 'Version $version ist bereit. Auswählen, um sie herunterzuladen und zu installieren.';
+  }
+
+  @override
+  String get appUpdatePermissionMessage =>
+      'Um sich selbst zu aktualisieren, braucht M3U TV die Berechtigung, Apps zu installieren. Öffne die Einstellungen, erlaube M3U TV die Installation unbekannter Apps und kehre dann hierher zurück.';
+
+  @override
+  String get appUpdateOpenSettings => 'Einstellungen öffnen';
+
+  @override
+  String appUpdateDownloading(String version) {
+    return 'Version $version wird heruntergeladen...';
+  }
+
+  @override
+  String appUpdateProgress(String received, String total) {
+    return '$received von $total MB';
+  }
+
+  @override
+  String appUpdateProgressUnknown(String received) {
+    return '$received MB';
+  }
+
+  @override
+  String get appUpdateConfirm =>
+      'Bestätige das Update, wenn Android danach fragt. M3U TV wird während der Installation geschlossen; öffne es danach erneut, um die neue Version zu nutzen.';
+
+  @override
+  String get appUpdateRetry => 'Erneut versuchen';
+
+  @override
+  String get appUpdateDownloadFailed =>
+      'Der Download ist fehlgeschlagen. Prüfe deine Verbindung und versuche es erneut.';
+
+  @override
+  String get appUpdateChecksumFailed =>
+      'Der Download stimmte nicht mit der veröffentlichten Prüfsumme überein und wurde verworfen. Versuche es erneut.';
+
+  @override
+  String get appUpdateCancelled => 'Das Update wurde abgebrochen.';
+
+  @override
+  String get appUpdateConflict =>
+      'Android aktualisiert diese Kopie von M3U TV nicht direkt, da sie aus einer anderen Quelle (z. B. Google Play) installiert wurde. Deinstalliere sie und installiere dann die neueste Version von GitHub.';
+
+  @override
+  String get appUpdateStorage =>
+      'Es ist nicht genug freier Speicher vorhanden, um das Update zu installieren.';
+
+  @override
+  String appUpdateInstallFailed(String reason) {
+    return 'Das Update konnte nicht installiert werden: $reason';
+  }
+
+  @override
   String get settingsAppScanQr => 'Scannen, um auf deinem Handy zu öffnen';
 
   @override

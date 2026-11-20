@@ -30,6 +30,7 @@ class MainActivity : FlutterActivity() {
     private var mpvPlugin: MpvPlayerPlugin? = null
     private var systemUiChannel: MethodChannel? = null
     private var textInputChannel: MethodChannel? = null
+    private var apkUpdateInstaller: ApkUpdateInstaller? = null
 
     // Mirrors the Dart-side player route (set via applySystemUiPolicy) so
     // onUserLeaveHint knows whether leaving the app should enter PiP.
@@ -191,6 +192,7 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        apkUpdateInstaller = ApkUpdateInstaller(this, flutterEngine.dartExecutor.binaryMessenger)
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
@@ -204,6 +206,8 @@ class MainActivity : FlutterActivity() {
         systemUiChannel = null
         textInputChannel?.setMethodCallHandler(null)
         textInputChannel = null
+        apkUpdateInstaller?.dispose()
+        apkUpdateInstaller = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 

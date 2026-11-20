@@ -6,6 +6,7 @@ import 'package:m3u_tv/providers/app_providers.dart';
 import 'package:m3u_tv/services/app_version_service.dart' show AppUpdateNotice;
 import 'package:m3u_tv/services/tv_notification_store.dart'
     show StoredTvNotification, TvNotificationChannel, TvNotificationStore;
+import 'package:m3u_tv/shared/apk_update_dialog.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
@@ -184,7 +185,14 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
         if (appUpdate != null) ...[
           _AppUpdateTile(
             notice: appUpdate,
-            onTap: () => widget.onMarkAppUpdateRead?.call(),
+            onTap: () {
+              final markRead = widget.onMarkAppUpdateRead;
+              if (markRead != null) unawaited(markRead());
+              final release = appUpdate.release;
+              if (release != null) {
+                unawaited(showApkUpdateDialog(context, release));
+              }
+            },
           ),
           const SizedBox(height: 8),
         ],
@@ -334,7 +342,8 @@ class _ChannelFilterChip extends StatelessWidget {
 // ── App update tile ──────────────────────────────────────────────────────────
 
 /// A newer app release, pinned above the server notifications while it stays
-/// uninstalled. Selecting it marks it read, clearing the bell badge.
+/// uninstalled. Selecting it marks it read, clearing the bell badge, and on a
+/// sideloaded APK also starts the in-app update.
 class _AppUpdateTile extends StatelessWidget {
   const _AppUpdateTile({required this.notice, required this.onTap});
 
@@ -363,7 +372,11 @@ class _AppUpdateTile extends StatelessWidget {
               fontWeight: notice.isRead ? FontWeight.normal : FontWeight.w700,
             ),
           ),
-          subtitle: Text(l.settingsAppUpdateNoticeBody(notice.version)),
+          subtitle: Text(
+            notice.release == null
+                ? l.settingsAppUpdateNoticeBody(notice.version)
+                : l.appUpdateNoticeInstallBody(notice.version),
+          ),
           trailing: notice.isRead
               ? null
               : Icon(Icons.circle, size: 10, color: theme.colorScheme.primary),

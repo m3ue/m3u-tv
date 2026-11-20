@@ -261,8 +261,10 @@ build_android() {
     # Fail instead of falling back to a debug-signed release build. Keys come
     # from env vars or android/signing.properties (see build.gradle.kts).
     export ANDROID_REQUIRE_RELEASE_SIGNING=true
+    # The Play bundle never gets the in-app updater (Play forbids
+    # self-updating); the sideload APK does.
     flutter_build appbundle --release
-    flutter_build apk --release
+    flutter_build apk --release --dart-define=M3UTV_SIDELOAD_UPDATER=true
     collect build/app/outputs/bundle/release/app-release.aab "m3u-tv-v$VERSION-android.aab"
     collect build/app/outputs/flutter-apk/app-release.apk "m3u-tv-v$VERSION-android.apk"
 }

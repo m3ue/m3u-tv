@@ -483,6 +483,60 @@
     }
   },
   "settingsAppViewRelease": "View release",
+  "appUpdateTitle": "Update M3U TV",
+  "appUpdateInstall": "Install update",
+  "appUpdateNoticeInstallBody": "Version {version} is ready. Select to download and install it.",
+  "@appUpdateNoticeInstallBody": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "appUpdatePermissionMessage": "To update itself, M3U TV needs permission to install apps. Open settings, allow M3U TV to install unknown apps, then come back here.",
+  "appUpdateOpenSettings": "Open settings",
+  "appUpdateDownloading": "Downloading version {version}...",
+  "@appUpdateDownloading": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "appUpdateProgress": "{received} of {total} MB",
+  "@appUpdateProgress": {
+    "placeholders": {
+      "received": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "appUpdateProgressUnknown": "{received} MB",
+  "@appUpdateProgressUnknown": {
+    "placeholders": {
+      "received": {
+        "type": "String"
+      }
+    }
+  },
+  "appUpdateConfirm": "Confirm the update when Android asks. M3U TV will close while it installs; open it again to use the new version.",
+  "appUpdateRetry": "Try again",
+  "appUpdateDownloadFailed": "The download failed. Check your connection and try again.",
+  "appUpdateChecksumFailed": "The download didn't match the published checksum, so it was discarded. Try again.",
+  "appUpdateCancelled": "The update was cancelled.",
+  "appUpdateConflict": "Android won't update this copy of M3U TV in place because it was installed from a different source (such as Google Play). Uninstall it, then install the latest version from GitHub.",
+  "appUpdateStorage": "There isn't enough free space to install the update.",
+  "appUpdateInstallFailed": "The update couldn't be installed: {reason}",
+  "@appUpdateInstallFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "settingsAppScanQr": "Scan to open on your phone",
   "settingsReleaseNotesTab": "What's New",
   "settingsReleaseNotesLoading": "Loading release notes…",

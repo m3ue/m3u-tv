@@ -1,0 +1,10 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Sideload builds only (the M3UTV_SIDELOAD_UPDATER=true dart-define,
+         see build.gradle.kts): lets the app install its own updates from
+         GitHub releases. Play policy forbids self-updating, so the Play
+         bundle must never get this. Replaces the debug/release build-type
+         manifests, so it also keeps the INTERNET line the debug one carries
+         for the Flutter tool. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+</manifest>
