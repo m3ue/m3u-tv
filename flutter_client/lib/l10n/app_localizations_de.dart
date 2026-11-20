@@ -863,9 +863,6 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get settingsAppViewRelease => 'Release ansehen';
-
-  @override
   String get appUpdateTitle => 'M3U TV aktualisieren';
 
   @override
@@ -963,9 +960,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsReleaseNotesUpToDate => 'Du nutzt die neueste Version';
-
-  @override
-  String get settingsReleaseNotesViewOnGithub => 'Alle auf GitHub ansehen';
 
   @override
   String get settingsReleaseNotesNoneForVersion =>

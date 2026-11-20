@@ -319,7 +319,6 @@
       }
     }
   },
-  "settingsAppViewRelease": "查看版本",
   "appUpdateTitle": "更新 M3U TV",
   "appUpdateInstall": "安装更新",
   "appUpdateNoticeInstallBody": "版本 {version} 已就绪。选择以下载并安装。",
@@ -360,7 +359,6 @@
     }
   },
   "settingsReleaseNotesUpToDate": "你使用的是最新版本",
-  "settingsReleaseNotesViewOnGithub": "在 GitHub 上查看全部",
   "settingsReleaseNotesNoneForVersion": "此版本没有说明。",
   "settingsReleaseNotesSelectVersion": "选择版本",
   "settingsReleaseNotesFeatureCount": "{count, plural, other{{count} 项新功能}}",

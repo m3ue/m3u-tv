@@ -319,7 +319,6 @@
       }
     }
   },
-  "settingsAppViewRelease": "Voir la version",
   "appUpdateTitle": "Mettre à jour M3U TV",
   "appUpdateInstall": "Installer la mise à jour",
   "appUpdateNoticeInstallBody": "La version {version} est prête. Sélectionnez pour la télécharger et l'installer.",
@@ -360,7 +359,6 @@
     }
   },
   "settingsReleaseNotesUpToDate": "Vous utilisez la dernière version",
-  "settingsReleaseNotesViewOnGithub": "Tout voir sur GitHub",
   "settingsReleaseNotesNoneForVersion": "Aucune note pour cette version.",
   "settingsReleaseNotesSelectVersion": "Sélectionner une version",
   "settingsReleaseNotesFeatureCount": "{count, plural, =1{1 nouveauté} other{{count} nouveautés}}",

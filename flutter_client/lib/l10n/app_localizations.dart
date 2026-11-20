@@ -1586,12 +1586,6 @@ abstract class AppLocalizations {
   /// **'Version {version} is ready to install.'**
   String settingsAppUpdateNoticeBody(String version);
 
-  /// No description provided for @settingsAppViewRelease.
-  ///
-  /// In en, this message translates to:
-  /// **'View release'**
-  String get settingsAppViewRelease;
-
   /// No description provided for @appUpdateTitle.
   ///
   /// In en, this message translates to:
@@ -1747,12 +1741,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You\'re on the latest version'**
   String get settingsReleaseNotesUpToDate;
-
-  /// No description provided for @settingsReleaseNotesViewOnGithub.
-  ///
-  /// In en, this message translates to:
-  /// **'View all on GitHub'**
-  String get settingsReleaseNotesViewOnGithub;
 
   /// No description provided for @settingsReleaseNotesNoneForVersion.
   ///

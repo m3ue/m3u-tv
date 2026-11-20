@@ -6,7 +6,6 @@ import 'package:m3u_tv/services/app_version_service.dart';
 import 'package:m3u_tv/shared/apk_update_dialog.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 // ---------------------------------------------------------------------------
 // App version card
@@ -66,45 +65,18 @@ class _AppVersionCardState extends State<AppVersionCard> {
           value: statusValue,
           valueColor: statusColor,
         ),
-        if (check != null &&
-            check.latestVersion != null &&
-            check.updateAvailable) ...[
+        if (check?.installableRelease case final release?) ...[
           const SizedBox(height: 12),
-          if (check.installableRelease case final release?)
-            SizedBox(
-              width: double.infinity,
-              child: AppButton(
-                icon: Icons.system_update,
-                label: l.appUpdateInstall,
-                onPressed: () => showApkUpdateDialog(context, release),
-              ),
-            )
-          else
-            const _AppReleaseLink(),
+          SizedBox(
+            width: double.infinity,
+            child: AppButton(
+              icon: Icons.system_update,
+              label: l.appUpdateInstall,
+              onPressed: () => showApkUpdateDialog(context, release),
+            ),
+          ),
         ],
       ],
-    );
-  }
-}
-
-/// Opens the latest GitHub release.
-class _AppReleaseLink extends StatelessWidget {
-  const _AppReleaseLink();
-
-  static const _releaseUrl = 'https://github.com/m3ue/m3u-tv/releases/latest';
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: AppButton(
-        icon: Icons.open_in_new,
-        label: AppLocalizations.of(context).settingsAppViewRelease,
-        onPressed: () => launchUrl(
-          Uri.parse(_releaseUrl),
-          mode: LaunchMode.externalApplication,
-        ),
-      ),
     );
   }
 }

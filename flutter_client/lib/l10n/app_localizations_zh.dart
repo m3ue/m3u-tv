@@ -828,9 +828,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get settingsAppViewRelease => '查看版本';
-
-  @override
   String get appUpdateTitle => '更新 M3U TV';
 
   @override
@@ -924,9 +921,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsReleaseNotesUpToDate => '你使用的是最新版本';
-
-  @override
-  String get settingsReleaseNotesViewOnGithub => '在 GitHub 上查看全部';
 
   @override
   String get settingsReleaseNotesNoneForVersion => '此版本没有说明。';

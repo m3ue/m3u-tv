@@ -98,7 +98,10 @@ void main() {
         throwsA(isA<ApkChecksumMismatch>()),
       );
       final dir = Directory('${cache.path}/apk_update');
-      expect(dir.existsSync() ? dir.listSync() : const [], isEmpty);
+      expect(
+        dir.existsSync() ? dir.listSync() : const <FileSystemEntity>[],
+        isEmpty,
+      );
     });
 
     test('clearDownloads removes a finished download', () async {

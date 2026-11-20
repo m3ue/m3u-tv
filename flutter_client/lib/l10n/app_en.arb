@@ -482,7 +482,6 @@
       }
     }
   },
-  "settingsAppViewRelease": "View release",
   "appUpdateTitle": "Update M3U TV",
   "appUpdateInstall": "Install update",
   "appUpdateNoticeInstallBody": "Version {version} is ready. Select to download and install it.",
@@ -561,7 +560,6 @@
     }
   },
   "settingsReleaseNotesUpToDate": "You're on the latest version",
-  "settingsReleaseNotesViewOnGithub": "View all on GitHub",
   "settingsReleaseNotesNoneForVersion": "No notes for this release.",
   "settingsReleaseNotesSelectVersion": "Select a version",
   "settingsReleaseNotesFeatureCount": "{count, plural, =1{1 feature} other{{count} features}}",

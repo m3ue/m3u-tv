@@ -10,12 +10,9 @@ import 'package:m3u_tv/services/release_notes_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
-import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
-import 'package:m3u_tv/shared/qr_link_dialog.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 /// Settings "What's New" sub-page: read the `m3u-tv` GitHub release notes one
 /// version at a time. A single full-width reading view driven on both axes -
@@ -35,9 +32,7 @@ class ReleaseNotesView extends StatefulWidget {
   final ReleaseNotesService? releaseNotesService;
   final AppVersionService? appVersionService;
 
-  /// TV can't open a link (and tvOS has no browser to hand off to), so the
-  /// GitHub button shows a QR code to scan instead, and the remote hint row
-  /// is shown under the notes.
+  /// Shows the remote hint row under the notes.
   final bool isTv;
 
   /// Threaded into the pushed version picker so Android TV's hardware Back
@@ -49,8 +44,6 @@ class ReleaseNotesView extends StatefulWidget {
 }
 
 class _ReleaseNotesViewState extends State<ReleaseNotesView> {
-  static const _githubReleasesUrl = 'https://github.com/m3ue/m3u-tv/releases';
-
   late final ReleaseNotesService _service =
       widget.releaseNotesService ?? ReleaseNotesService();
   late final AppVersionService _versionService =
@@ -200,28 +193,6 @@ class _ReleaseNotesViewState extends State<ReleaseNotesView> {
     _notesFocusNode.requestFocus();
   }
 
-  void _openGithub() {
-    if (widget.isTv) {
-      showAppDialog<void>(
-        context: context,
-        builder: (dialogContext) => QrLinkDialog(
-          title: AppLocalizations.of(
-            dialogContext,
-          ).settingsReleaseNotesViewOnGithub,
-          url: _githubReleasesUrl,
-          memoryKey: 'release-notes-github-qr',
-        ),
-      );
-      return;
-    }
-    unawaited(
-      launchUrl(
-        Uri.parse(_githubReleasesUrl),
-        mode: LaunchMode.externalApplication,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -292,8 +263,6 @@ class _ReleaseNotesViewState extends State<ReleaseNotesView> {
               _StatusBar(
                 currentVersion: _currentVersion,
                 newerCount: _newerCount(),
-                isTv: widget.isTv,
-                onOpenGithub: _openGithub,
               ),
             ),
             SizedBox(height: 12 * scale),
@@ -346,14 +315,10 @@ class _StatusBar extends StatelessWidget {
   const _StatusBar({
     required this.currentVersion,
     required this.newerCount,
-    required this.isTv,
-    required this.onOpenGithub,
   });
 
   final String? currentVersion;
   final int newerCount;
-  final bool isTv;
-  final VoidCallback onOpenGithub;
 
   @override
   Widget build(BuildContext context) {
@@ -381,7 +346,6 @@ class _StatusBar extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Too narrow for the labelled button beside the status text.
         final compact = constraints.maxWidth < 640;
         return Row(
           children: [
@@ -404,22 +368,6 @@ class _StatusBar extends StatelessWidget {
                       ),
                     ),
             ),
-            SizedBox(width: 12 * scale),
-            if (compact)
-              AppIconButton(
-                icon: isTv ? Icons.qr_code_2 : Icons.open_in_new,
-                tooltip: l.settingsReleaseNotesViewOnGithub,
-                autoScroll: false,
-                dense: true,
-                onPressed: onOpenGithub,
-              )
-            else
-              AppButton(
-                icon: isTv ? Icons.qr_code_2 : Icons.open_in_new,
-                label: l.settingsReleaseNotesViewOnGithub,
-                autoScroll: false,
-                onPressed: onOpenGithub,
-              ),
           ],
         );
       },

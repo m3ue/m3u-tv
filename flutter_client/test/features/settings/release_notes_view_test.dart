@@ -8,7 +8,6 @@ import 'package:m3u_tv/services/release_notes_service.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 class _FakeReleaseNotesService extends ReleaseNotesService {
   _FakeReleaseNotesService(this._releases);
@@ -297,9 +296,7 @@ void main() {
     expect(find.textContaining('plain paragraph text'), findsOneWidget);
   });
 
-  testWidgets('TV shows remote hints and a QR code for GitHub', (
-    tester,
-  ) async {
+  testWidgets('TV shows remote hints', (tester) async {
     await pump(
       tester,
       currentVersion: '1.3.0',
@@ -309,11 +306,6 @@ void main() {
     final l = await _l();
 
     expect(find.text(l.settingsReleaseNotesHintVersions), findsOneWidget);
-    expect(find.byType(QrImageView), findsNothing);
-
-    await tester.tap(find.text(l.settingsReleaseNotesViewOnGithub));
-    await tester.pumpAndSettle();
-    expect(find.byType(QrImageView), findsOneWidget);
   });
 
   testWidgets('shows a retry affordance when no releases load', (tester) async {
