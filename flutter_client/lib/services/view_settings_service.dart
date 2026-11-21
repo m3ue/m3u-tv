@@ -272,6 +272,7 @@ class ViewSettingsService extends ChangeNotifier {
   static const matchRefreshRateKey = 'm3ue_tv_match_refresh_rate';
   static const deinterlaceKey = 'm3ue_tv_deinterlace';
   static const hideOverlayOnStartKey = 'm3ue_tv_hide_overlay_on_start';
+  static const backMinimizesPlayerKey = 'm3ue_tv_back_minimizes_player';
   static const prebufferLiveKey = 'm3ue_tv_prebuffer_live';
   static const backgroundAudioKey = 'm3ue_tv_background_audio';
   static const vodPlayerKey = 'm3ue_tv_vod_player';
@@ -940,6 +941,25 @@ class ViewSettingsService extends ChangeNotifier {
     bool enabled,
   ) async {
     await _write(hideOverlayOnStartKey, enabled);
+    notifyListeners();
+  }
+
+  /// Whether Back in the player (with its controls hidden) shrinks it to a
+  /// floating window over the app instead of stopping playback. Defaults off
+  /// (Back stops, as before).
+  Future<bool> backMinimizesPlayer() async {
+    final raw = await _readResolved(backMinimizesPlayerKey);
+    return raw as bool? ?? false;
+  }
+
+  /// Synchronous access to the in-memory cached back-minimizes-player setting.
+  bool get backMinimizesPlayerSync =>
+      (_cached(backMinimizesPlayerKey) as bool?) ?? false;
+
+  Future<void> setBackMinimizesPlayer(
+    bool enabled,
+  ) async {
+    await _write(backMinimizesPlayerKey, enabled);
     notifyListeners();
   }
 

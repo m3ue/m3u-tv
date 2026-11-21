@@ -330,6 +330,13 @@ class PlayerSettingsGroup extends StatelessWidget {
           value: service.hideOverlayOnStartSync,
           onChanged: service.setHideOverlayOnStart,
         ),
+        SettingsSwitchRow(
+          title: l.settingsBackMinimizesPlayer,
+          subtitle: l.settingsBackMinimizesPlayerHint,
+          icon: Icons.picture_in_picture_alt_outlined,
+          value: service.backMinimizesPlayerSync,
+          onChanged: service.setBackMinimizesPlayer,
+        ),
         if (showBackgroundAudio)
           SettingsSwitchRow(
             title: l.settingsBackgroundAudio,

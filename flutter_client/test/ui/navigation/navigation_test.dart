@@ -31,6 +31,7 @@ import 'package:m3u_tv/services/secure_storage.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/viewer_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
+import 'package:m3u_tv/shared/app_menu_dialog.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
 import 'package:m3u_tv/transcoding/transcoding.dart';
@@ -2737,6 +2738,277 @@ void main() {
       expect(find.text('Play movie'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       await settleEpgRetry(tester);
+    });
+  });
+
+  group('Floating player', () {
+    Future<AppStateController> connectedAppState() async {
+      final appState = _testAppState(xtreamService: _NavigationXtreamService());
+      await appState.connectXtream(
+        const UserCredentials(
+          server: 'http://example.com',
+          username: 'user',
+          password: 'pass',
+        ),
+      );
+      return appState;
+    }
+
+    Future<void> openPlayer(
+      WidgetTester tester,
+      AppStateController appState, {
+      DeviceType deviceType = DeviceType.tv,
+    }) async {
+      final adapter = _NavigationPlayerAdapter();
+      await tester.pumpWidget(
+        _TestApp(
+          deviceType: deviceType,
+          appState: appState,
+          useProductionPlayer: true,
+          playbackOrchestratorBuilder: () => _testPlaybackOrchestrator(adapter),
+        ),
+      );
+      await _pumpAppFrame(tester);
+      await tester.tap(find.text('Route News').last);
+      await _pumpAppFrame(tester);
+    }
+
+    bool isMinimized(WidgetTester tester) =>
+        tester.widget<PlayerScreen>(find.byType(PlayerScreen)).minimized;
+
+    bool focusIsInPlayer() {
+      final context = FocusManager.instance.primaryFocus?.context;
+      return context?.findAncestorWidgetOfExactType<PlayerScreen>() != null;
+    }
+
+    final nowPlaying = find.byKey(const ValueKey('now-playing'));
+
+    Future<void> focusNowPlaying(WidgetTester tester) async {
+      tester
+          .widget<Focus>(
+            find.descendant(of: nowPlaying, matching: find.byType(Focus)).first,
+          )
+          .focusNode!
+          .requestFocus();
+      await tester.pump();
+    }
+
+    testWidgets(
+      'with Back set to minimize, Back floats the player and the last Back '
+      'brings it back instead of leaving',
+      (tester) async {
+        final appState = await connectedAppState();
+        addTearDown(appState.dispose);
+        await appState.viewSettingsService.setBackMinimizesPlayer(true);
+        await openPlayer(tester, appState);
+        final playerState = tester.state(find.byType(PlayerScreen));
+        final testApp = tester.state<_TestAppState>(find.byType(_TestApp));
+        // The header button still closes, so it says so instead of looking
+        // like the Back key.
+        expect(find.byTooltip('Close'), findsOneWidget);
+
+        // First Back hides the OSD the player opens with, the second floats
+        // it, on the same PlayerScreen (so the stream never restarts).
+        expect(await testApp.dispatchRouterBack(), isTrue);
+        await tester.pump();
+        expect(isMinimized(tester), isFalse);
+        expect(await testApp.dispatchRouterBack(), isTrue);
+        await _pumpAppFrame(tester);
+
+        expect(isMinimized(tester), isTrue);
+        expect(tester.state(find.byType(PlayerScreen)), same(playerState));
+        expect(focusIsInPlayer(), isFalse);
+        expect(nowPlaying, findsOneWidget);
+
+        for (var i = 0; i < 5 && isMinimized(tester); i++) {
+          expect(await testApp.dispatchRouterBack(), isTrue);
+          await _pumpAppFrame(tester);
+        }
+
+        expect(isMinimized(tester), isFalse);
+        expect(tester.state(find.byType(PlayerScreen)), same(playerState));
+        expect(focusIsInPlayer(), isTrue);
+        expect(nowPlaying, findsNothing);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
+    testWidgets(
+      'the Minimize button floats the player; Now Playing brings it back, '
+      'and Stop closes it',
+      (tester) async {
+        final appState = await connectedAppState();
+        addTearDown(appState.dispose);
+        await openPlayer(tester, appState);
+        final playerState = tester.state(find.byType(PlayerScreen));
+        final testApp = tester.state<_TestAppState>(find.byType(_TestApp));
+
+        await tester.tap(find.byTooltip('Minimize'));
+        await _pumpAppFrame(tester);
+        expect(isMinimized(tester), isTrue);
+
+        // Back now moves through the app, not the floating player.
+        expect(await testApp.dispatchRouterBack(), isTrue);
+        await _pumpAppFrame(tester);
+        expect(isMinimized(tester), isTrue);
+
+        await tester.tap(nowPlaying);
+        await _pumpAppFrame(tester);
+        expect(isMinimized(tester), isFalse);
+        expect(focusIsInPlayer(), isTrue);
+
+        expect(tester.state(find.byType(PlayerScreen)), same(playerState));
+
+        await tester.tap(find.byTooltip('Minimize'));
+        await _pumpAppFrame(tester);
+        await tester.sendKeyEvent(LogicalKeyboardKey.mediaStop);
+        await _pumpAppFrame(tester);
+        expect(find.byType(PlayerScreen), findsNothing);
+        expect(nowPlaying, findsNothing);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
+    testWidgets('Back still stops the player by default', (tester) async {
+      final appState = await connectedAppState();
+      addTearDown(appState.dispose);
+      await openPlayer(tester, appState);
+      final testApp = tester.state<_TestAppState>(find.byType(_TestApp));
+      expect(find.byTooltip('Close'), findsNothing);
+
+      expect(await testApp.dispatchRouterBack(), isTrue);
+      await tester.pump();
+      expect(await testApp.dispatchRouterBack(), isTrue);
+      await _pumpAppFrame(tester);
+
+      expect(find.byType(PlayerScreen), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('on desktop the floating player has Expand and Close', (
+      tester,
+    ) async {
+      final appState = await connectedAppState();
+      addTearDown(appState.dispose);
+      await openPlayer(tester, appState, deviceType: DeviceType.desktop);
+      final playerState = tester.state(find.byType(PlayerScreen));
+
+      Future<void> tapVideo() async {
+        await tester.tapAt(tester.getCenter(find.byType(PlayerScreen)));
+        await tester.pump();
+      }
+
+      await tester.tap(find.byTooltip('Minimize'));
+      await _pumpAppFrame(tester);
+      expect(isMinimized(tester), isTrue);
+      expect(find.byTooltip('Expand'), findsNothing);
+
+      // A tap only shows or hides the controls; Expand is what expands.
+      await tapVideo();
+      expect(find.byTooltip('Expand'), findsOneWidget);
+      expect(isMinimized(tester), isTrue);
+      await tapVideo();
+      expect(find.byTooltip('Expand'), findsNothing);
+      await tapVideo();
+
+      await tester.tap(find.byTooltip('Expand'));
+      await _pumpAppFrame(tester);
+      expect(isMinimized(tester), isFalse);
+      expect(find.byTooltip('Expand'), findsNothing);
+      expect(tester.state(find.byType(PlayerScreen)), same(playerState));
+
+      // Floating again starts on just the picture.
+      await tester.tap(find.byTooltip('Minimize'));
+      await _pumpAppFrame(tester);
+      expect(find.byTooltip('Close'), findsNothing);
+      await tapVideo();
+      await tester.tap(find.byTooltip('Close'));
+      await _pumpAppFrame(tester);
+      expect(find.byType(PlayerScreen), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets(
+      'with a mouse, Expand and Close show while hovering the video',
+      (
+        tester,
+      ) async {
+        final appState = await connectedAppState();
+        addTearDown(appState.dispose);
+        await openPlayer(tester, appState, deviceType: DeviceType.desktop);
+        await tester.tap(find.byTooltip('Minimize'));
+        await _pumpAppFrame(tester);
+
+        final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+        addTearDown(mouse.removePointer);
+        await mouse.addPointer(location: Offset.zero);
+        await mouse.moveTo(tester.getCenter(find.byType(PlayerScreen)));
+        await tester.pump();
+        expect(find.byTooltip('Expand'), findsOneWidget);
+
+        await mouse.moveTo(Offset.zero);
+        await tester.pump();
+        expect(find.byTooltip('Expand'), findsNothing);
+        expect(isMinimized(tester), isTrue);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
+    testWidgets('TV has no floating buttons; holding Select on Now Playing '
+        'asks before closing', (tester) async {
+      final appState = await connectedAppState();
+      addTearDown(appState.dispose);
+      await openPlayer(tester, appState);
+
+      await tester.tap(find.byTooltip('Minimize'));
+      await _pumpAppFrame(tester);
+      expect(find.byTooltip('Expand'), findsNothing);
+
+      await focusNowPlaying(tester);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
+      await _pumpAppFrame(tester);
+
+      // A hold opens the menu without acting on its own.
+      expect(isMinimized(tester), isTrue);
+      expect(find.byType(AppMenuDialog), findsOneWidget);
+      await tester.tap(find.text('Close').last);
+      await _pumpAppFrame(tester);
+      await _pumpAppFrame(tester);
+
+      expect(find.byType(PlayerScreen), findsNothing);
+      expect(find.byType(AppMenuDialog), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('a short Select on Now Playing expands; its menu can too', (
+      tester,
+    ) async {
+      final appState = await connectedAppState();
+      addTearDown(appState.dispose);
+      await openPlayer(tester, appState);
+
+      await tester.tap(find.byTooltip('Minimize'));
+      await _pumpAppFrame(tester);
+      await focusNowPlaying(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await _pumpAppFrame(tester);
+      expect(isMinimized(tester), isFalse);
+      expect(find.byType(AppMenuDialog), findsNothing);
+
+      await tester.tap(find.byTooltip('Minimize'));
+      await _pumpAppFrame(tester);
+      await tester.longPress(nowPlaying);
+      await _pumpAppFrame(tester);
+      expect(find.byType(AppMenuDialog), findsOneWidget);
+      await tester.tap(find.text('Expand').last);
+      await _pumpAppFrame(tester);
+      await _pumpAppFrame(tester);
+
+      expect(isMinimized(tester), isFalse);
+      expect(focusIsInPlayer(), isTrue);
+      await tester.pumpWidget(const SizedBox.shrink());
     });
   });
 }

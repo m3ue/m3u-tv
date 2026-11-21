@@ -78,6 +78,8 @@ class PlaybackControls extends StatelessWidget {
     this.onVolumeChanged,
     this.isFullscreen = false,
     this.onToggleFullscreen,
+    this.onMinimize,
+    this.backClosesPlayer = false,
     this.fallbackReason,
     this.playPauseFocusNode,
     this.onNextChannel,
@@ -142,6 +144,16 @@ class PlaybackControls extends StatelessWidget {
   /// only renders when [onToggleFullscreen] is non-null (desktop only).
   final bool isFullscreen;
   final VoidCallback? onToggleFullscreen;
+
+  /// Shrinks the player to the floating window over the app. The button
+  /// sits after the fullscreen toggle (alone on TV, which has no volume or
+  /// fullscreen) and only renders when non-null.
+  final VoidCallback? onMinimize;
+
+  /// The header's back button closes the player, where the Back key
+  /// minimizes it instead ("Back minimizes the player"): it shows a close
+  /// icon then, so it doesn't look like the Back key.
+  final bool backClosesPlayer;
   final String? fallbackReason;
   final FocusNode? playPauseFocusNode;
   final VoidCallback? onNextChannel;
@@ -253,31 +265,38 @@ class PlaybackControls extends StatelessWidget {
 
   Widget _buildHeader(BuildContext context, ColorScheme colorScheme) {
     final scale = FontSizeScope.scaleOf(context);
-    return Row(
-      children: [
-        DpadFocusable(
-          onSelect: onBack,
-          effects: const [
-            GradientBorderEffect(
-              borderRadius: BorderRadius.all(Radius.circular(50)),
-            ),
-          ],
-          child: GestureDetector(
-            onTap: onBack,
-            child: Container(
-              padding: EdgeInsets.all(10 * scale),
-              decoration: const BoxDecoration(
-                color: Colors.black54,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                AppIcons.back(context),
-                color: colorScheme.onSurface,
-                size: 24 * scale,
-              ),
-            ),
+    final backButton = DpadFocusable(
+      onSelect: onBack,
+      effects: const [
+        GradientBorderEffect(
+          borderRadius: BorderRadius.all(Radius.circular(50)),
+        ),
+      ],
+      child: GestureDetector(
+        onTap: onBack,
+        child: Container(
+          padding: EdgeInsets.all(10 * scale),
+          decoration: const BoxDecoration(
+            color: Colors.black54,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            backClosesPlayer ? Icons.close : AppIcons.back(context),
+            color: colorScheme.onSurface,
+            size: 24 * scale,
           ),
         ),
+      ),
+    );
+    return Row(
+      children: [
+        if (backClosesPlayer)
+          Tooltip(
+            message: AppLocalizations.of(context).close,
+            child: backButton,
+          )
+        else
+          backButton,
         SizedBox(width: 12 * scale),
         if (fallbackReason != null)
           Container(
@@ -335,55 +354,59 @@ class PlaybackControls extends StatelessWidget {
     );
   }
 
-  Widget _buildVolumeControl(BuildContext context) {
+  /// Volume (desktop), the fullscreen toggle (desktop) and Minimize.
+  Widget _buildWindowControls(BuildContext context) {
     final scale = FontSizeScope.scaleOf(context);
     final icon = volume <= 0
         ? Icons.volume_off
         : (volume < 0.5 ? Icons.volume_down : Icons.volume_up);
+    final minimize = onMinimize;
     return SizedBox(
       height: TrackSelector.buttonHeight * scale,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AppIconButton(
-            icon: icon,
-            onPressed: () => onVolumeChanged?.call(volume > 0 ? 0 : 1.0),
-          ),
-          SizedBox(
-            width: 110 * scale,
-            child: DpadFocusable(
-              onDirection: (direction) {
-                final delta = switch (direction) {
-                  TraversalDirection.left => -0.1,
-                  TraversalDirection.right => 0.1,
-                  _ => null,
-                };
-                if (delta == null) return false;
-                onVolumeChanged?.call((volume + delta).clamp(0.0, 1.0));
-                return true;
-              },
-              effects: const [
-                GradientBorderEffect(
-                  borderRadius: BorderRadius.all(Radius.circular(50)),
-                ),
-              ],
-              child: SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackHeight: 3,
-                  thumbShape: const RoundSliderThumbShape(
-                    enabledThumbRadius: 6,
+          if (_showVolumeControl) ...[
+            AppIconButton(
+              icon: icon,
+              onPressed: () => onVolumeChanged?.call(volume > 0 ? 0 : 1.0),
+            ),
+            SizedBox(
+              width: 110 * scale,
+              child: DpadFocusable(
+                onDirection: (direction) {
+                  final delta = switch (direction) {
+                    TraversalDirection.left => -0.1,
+                    TraversalDirection.right => 0.1,
+                    _ => null,
+                  };
+                  if (delta == null) return false;
+                  onVolumeChanged?.call((volume + delta).clamp(0.0, 1.0));
+                  return true;
+                },
+                effects: const [
+                  GradientBorderEffect(
+                    borderRadius: BorderRadius.all(Radius.circular(50)),
                   ),
-                  overlayShape: const RoundSliderOverlayShape(
-                    overlayRadius: 12,
+                ],
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 3,
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 6,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 12,
+                    ),
                   ),
-                ),
-                child: Slider(
-                  value: volume.clamp(0.0, 1.0),
-                  onChanged: onVolumeChanged,
+                  child: Slider(
+                    value: volume.clamp(0.0, 1.0),
+                    onChanged: onVolumeChanged,
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
           if (onToggleFullscreen != null)
             AppIconButton(
               icon: isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
@@ -391,6 +414,12 @@ class PlaybackControls extends StatelessWidget {
                   ? AppLocalizations.of(context).playerExitFullscreen
                   : AppLocalizations.of(context).playerEnterFullscreen,
               onPressed: onToggleFullscreen,
+            ),
+          if (minimize != null)
+            AppIconButton(
+              icon: Icons.picture_in_picture_alt_outlined,
+              tooltip: AppLocalizations.of(context).playerMinimize,
+              onPressed: minimize,
             ),
         ],
       ),
@@ -440,6 +469,9 @@ class PlaybackControls extends StatelessWidget {
 
   bool get _showVolumeControl => onVolumeChanged != null;
 
+  bool get _showWindowControls =>
+      _showVolumeControl || onToggleFullscreen != null || onMinimize != null;
+
   /// Skip back/forward are seeks, so they go when seeking is withheld for a
   /// stated reason; with no reason (e.g. duration not known yet) they stay.
   bool get _showSkipButtons =>
@@ -467,13 +499,16 @@ class PlaybackControls extends StatelessWidget {
     );
   }
 
-  /// Safe upper bound for [_buildVolumeControl]'s width (mute button +
-  /// slider), mirroring [TrackSelector.controlsWidth]'s role as a reservation
-  /// for [_buildControlRow]'s layout math rather than an exact measurement.
+  /// Safe upper bound for the volume part of [_buildWindowControls] (mute
+  /// button + slider), mirroring [TrackSelector.controlsWidth]'s role as a
+  /// reservation for [_buildControlRow]'s layout math rather than an exact
+  /// measurement.
   static const double _volumeControlWidth = 180;
 
-  /// Extra reservation for the fullscreen toggle appended to the volume group.
-  static const double _fullscreenToggleWidth = 52;
+  /// Reservation for each icon button (fullscreen, Minimize) after the
+  /// volume: [AppIconButton]'s own (non-dense) size. Less overflowed on TV,
+  /// where Minimize sits alone without the volume group's slack.
+  static const double _windowButtonWidth = 56;
 
   Widget _buildProgressBar(ColorScheme colorScheme) {
     return _withPosition(
@@ -535,7 +570,7 @@ class PlaybackControls extends StatelessWidget {
           spacing: 16,
           runSpacing: 8,
           children: [
-            if (_showVolumeControl) _buildVolumeControl(context),
+            if (_showWindowControls) _buildWindowControls(context),
             transportControls,
             if (_hasTrackControls) _buildTrackControls(),
           ],
@@ -549,13 +584,11 @@ class PlaybackControls extends StatelessWidget {
         final trackControlsWidth = _hasTrackControls
             ? TrackSelector.controlsWidth * scale
             : 0.0;
-        final volumeControlWidth = _showVolumeControl
-            ? (_volumeControlWidth +
-                      (onToggleFullscreen != null
-                          ? _fullscreenToggleWidth
-                          : 0)) *
-                  scale
-            : 0.0;
+        final windowControlsWidth =
+            ((_showVolumeControl ? _volumeControlWidth : 0) +
+                (onToggleFullscreen != null ? _windowButtonWidth : 0) +
+                (onMinimize != null ? _windowButtonWidth : 0)) *
+            scale;
         final episodePickerWidth = (!isLive && onEpisodePicker != null)
             ? 56.0
             : 0.0;
@@ -566,8 +599,8 @@ class PlaybackControls extends StatelessWidget {
             scale;
         final hasRoomForCenteredTransport =
             constraints.maxWidth >=
-            transportWidth + trackControlsWidth + volumeControlWidth;
-        final hasSideControls = _hasTrackControls || _showVolumeControl;
+            transportWidth + trackControlsWidth + windowControlsWidth;
+        final hasSideControls = _hasTrackControls || _showWindowControls;
 
         if (hasSideControls && !hasRoomForCenteredTransport) {
           return Column(
@@ -582,7 +615,7 @@ class PlaybackControls extends StatelessWidget {
                   spacing: 16,
                   runSpacing: 8,
                   children: [
-                    if (_showVolumeControl) _buildVolumeControl(context),
+                    if (_showWindowControls) _buildWindowControls(context),
                     if (_hasTrackControls) _buildTrackControls(),
                   ],
                 ),
@@ -595,12 +628,12 @@ class PlaybackControls extends StatelessWidget {
           alignment: Alignment.center,
           children: [
             Center(child: transportControls),
-            if (_showVolumeControl)
+            if (_showWindowControls)
               Align(
                 alignment: Alignment.centerLeft,
                 child: SizedBox(
-                  width: volumeControlWidth,
-                  child: _buildVolumeControl(context),
+                  width: windowControlsWidth,
+                  child: _buildWindowControls(context),
                 ),
               ),
             if (_hasTrackControls)

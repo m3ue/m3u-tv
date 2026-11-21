@@ -296,6 +296,10 @@ final categoryOpenRequestProvider = StateProvider<CategoryOpenRequest?>(
 // preview player when it does.
 final playerOverlayActiveProvider = StateProvider<bool>((ref) => false);
 
+/// Whether the open player is floating over the app (minimized) rather
+/// than full screen. [playerOverlayActiveProvider] stays true meanwhile.
+final playerMinimizedProvider = StateProvider<bool>((ref) => false);
+
 final multiviewControllerProvider = ChangeNotifierProvider<MultiviewController>(
   (ref) => MultiviewController(),
 );

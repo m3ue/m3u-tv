@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dpad/dpad.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -22,6 +24,9 @@ class NavigationSidebar extends StatelessWidget {
     required this.onNavigate,
     required this.onActivateSidebar,
     required this.onDeactivateSidebar,
+    this.nowPlayingFocusNode,
+    this.onOpenNowPlaying,
+    this.onNowPlayingMenu,
   });
 
   final int currentIndex;
@@ -33,6 +38,23 @@ class NavigationSidebar extends StatelessWidget {
   final ValueChanged<int> onNavigate;
   final VoidCallback onActivateSidebar;
   final VoidCallback onDeactivateSidebar;
+
+  /// The floating player's entry, above the destinations while one is
+  /// floating (both set): selecting it brings the player back full screen.
+  final FocusNode? nowPlayingFocusNode;
+  final VoidCallback? onOpenNowPlaying;
+
+  /// Long press (or holding Select) on the Now Playing entry.
+  final VoidCallback? onNowPlayingMenu;
+
+  bool get _showsNowPlaying =>
+      nowPlayingFocusNode != null && onOpenNowPlaying != null;
+
+  /// Every item in Up/Down order.
+  List<FocusNode> get _orderedFocusNodes => [
+    if (_showsNowPlaying) nowPlayingFocusNode!,
+    ...focusNodes.take(routes.length),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -127,6 +149,7 @@ class NavigationSidebar extends StatelessWidget {
                 child: _SidebarScrollArea(
                   children: [
                     const SizedBox(height: 12),
+                    if (_showsNowPlaying) _nowPlaying(context, expanded, scale),
                     for (var index = 0; index < footerStart; index++)
                       _destination(context, index, expanded, scale),
                   ],
@@ -169,10 +192,11 @@ class NavigationSidebar extends StatelessWidget {
       _ => 0,
     };
     if (step == 0) return KeyEventResult.ignored;
-    final current = focusNodes.indexWhere((node) => node.hasPrimaryFocus);
+    final nodes = _orderedFocusNodes;
+    final current = nodes.indexWhere((node) => node.hasPrimaryFocus);
     if (current == -1) return KeyEventResult.ignored;
     final next = current + step;
-    if (next >= 0 && next < routes.length) focusNodes[next].requestFocus();
+    if (next >= 0 && next < nodes.length) nodes[next].requestFocus();
     return KeyEventResult.handled;
   }
 
@@ -186,6 +210,22 @@ class NavigationSidebar extends StatelessWidget {
       start--;
     }
     return start;
+  }
+
+  Widget _nowPlaying(BuildContext context, bool expanded, double scale) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 8 * scale, vertical: 2 * scale),
+      child: SidebarDestinationItem(
+        key: const ValueKey('now-playing'),
+        label: AppLocalizations.of(context).navNowPlaying,
+        icon: Icons.picture_in_picture_alt_rounded,
+        selected: false,
+        expanded: expanded,
+        focusNode: nowPlayingFocusNode!,
+        onTap: onOpenNowPlaying!,
+        onLongTap: onNowPlayingMenu,
+      ),
+    );
   }
 
   Widget _destination(
@@ -350,6 +390,7 @@ class SidebarDestinationItem extends StatefulWidget {
     required this.selected,
     required this.focusNode,
     required this.onTap,
+    this.onLongTap,
     this.expanded = true,
     this.badgeCount = 0,
   });
@@ -360,6 +401,10 @@ class SidebarDestinationItem extends StatefulWidget {
   final bool selected;
   final FocusNode focusNode;
   final VoidCallback onTap;
+
+  /// Holding Select (or a long press). With it set, a D-pad Select acts on
+  /// release rather than on press, so a hold can tell itself apart.
+  final VoidCallback? onLongTap;
   final bool expanded;
   final int badgeCount;
 
@@ -375,6 +420,15 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
   // a synthesized pointer tap (InkWell.onTap) for the same physical press.
   // Order-independent: works whether key arrives before or after pointer.
   int _lastActivationMs = 0;
+
+  // Matches the dpad package's long-select threshold (see DpadInkWell).
+  static const _holdDuration = Duration(milliseconds: 500);
+  // Armed by a Select press when [SidebarDestinationItem.onLongTap] is set:
+  // released before it fires is a tap, held until it fires is a long tap.
+  // Android TV repeats a held key as fresh KeyDownEvents, so a press while
+  // it is armed (or after it fired) is ignored rather than re-arming it.
+  Timer? _holdTimer;
+  bool _holdFired = false;
 
   @override
   void initState() {
@@ -397,10 +451,16 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
   @override
   void dispose() {
     widget.focusNode.removeListener(_onFocusChange);
+    _holdTimer?.cancel();
     super.dispose();
   }
 
   void _onFocusChange() {
+    if (!widget.focusNode.hasFocus) {
+      // The long tap's menu took focus: the release goes there, not here.
+      _holdTimer?.cancel();
+      _holdFired = false;
+    }
     setState(() {
       _focused = widget.focusNode.hasFocus;
     });
@@ -421,6 +481,31 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
         duration: Duration.zero,
       );
     });
+  }
+
+  void _activate() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastActivationMs < 350) return;
+    _lastActivationMs = now;
+    widget.onTap();
+  }
+
+  KeyEventResult _handleHoldableSelect(KeyEvent event) {
+    if (event is KeyDownEvent) {
+      if ((_holdTimer?.isActive ?? false) || _holdFired) {
+        return KeyEventResult.handled;
+      }
+      _holdTimer = Timer(_holdDuration, () {
+        _holdFired = true;
+        widget.onLongTap?.call();
+      });
+    } else if (event is KeyUpEvent) {
+      final wasTap = _holdTimer?.isActive ?? false;
+      _holdTimer?.cancel();
+      _holdFired = false;
+      if (wasTap) _activate();
+    }
+    return KeyEventResult.handled;
   }
 
   void _setHovered(bool v) {
@@ -460,17 +545,15 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
       child: Focus(
         focusNode: widget.focusNode,
         onKeyEvent: (node, event) {
-          if (event is KeyDownEvent &&
-                  event.logicalKey == LogicalKeyboardKey.select ||
-              event is KeyDownEvent &&
-                  event.logicalKey == LogicalKeyboardKey.enter) {
-            final now = DateTime.now().millisecondsSinceEpoch;
-            if (now - _lastActivationMs < 350) return KeyEventResult.handled;
-            _lastActivationMs = now;
-            widget.onTap();
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
+          final isSelect =
+              event.logicalKey == LogicalKeyboardKey.select ||
+              event.logicalKey == LogicalKeyboardKey.enter;
+          if (!isSelect) return KeyEventResult.ignored;
+          if (widget.onLongTap != null) return _handleHoldableSelect(event);
+          if (event is KeyDownEvent) _activate();
+          return event is KeyDownEvent
+              ? KeyEventResult.handled
+              : KeyEventResult.ignored;
         },
         child: InkWell(
           onTap: () {
@@ -480,6 +563,7 @@ class _SidebarDestinationItemState extends State<SidebarDestinationItem> {
             widget.focusNode.requestFocus();
             widget.onTap();
           },
+          onLongPress: widget.onLongTap,
           customBorder: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),

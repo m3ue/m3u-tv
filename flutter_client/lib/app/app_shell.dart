@@ -45,7 +45,9 @@ import 'package:m3u_tv/services/memory_watchdog.dart';
 import 'package:m3u_tv/services/tv_notification_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart' show AIOStreamsCatalog;
 import 'package:m3u_tv/shared/app_background.dart';
+import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
+import 'package:m3u_tv/shared/app_menu_dialog.dart';
 import 'package:m3u_tv/shared/app_modal.dart';
 import 'package:m3u_tv/shared/background_frame.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
@@ -200,6 +202,14 @@ class AppShellState extends ConsumerState<AppShell>
   // so back handling dismisses the dialog instead of closing the player.
   bool _playerModalDialogVisible = false;
   FocusNode? _focusBeforePlayer;
+  // The open player floats over the app instead of covering it (see
+  // _minimizePlayer). Its PlayerScreen stays mounted in the same place in
+  // the tree, so the stream carries on without a restart.
+  bool _playerMinimized = false;
+  // The sidebar's Now Playing entry, shown while the player floats.
+  final FocusNode _nowPlayingFocusNode = FocusNode(
+    debugLabel: 'sidebar-now-playing',
+  );
 
   // Set while the player runs on the EPG preview's own player (see
   // LiveTvScreen.onPreviewHandoff): its native view and the callback that
@@ -589,6 +599,7 @@ class AppShellState extends ConsumerState<AppShell>
     }
     _contentFocusNode.dispose();
     _sidebarScopeNode.dispose();
+    _nowPlayingFocusNode.dispose();
     final carPlay = CarPlayController.instance;
     if (carPlay?.onPlayChannel == _playCarPlayChannel) {
       carPlay!.onPlayChannel = null;
@@ -640,7 +651,7 @@ class AppShellState extends ConsumerState<AppShell>
       _appState.refreshEpgGuideIfStale();
     }
     unawaited(
-      _playerArgs == null || _playerHasFailed
+      _playerArgs == null || _playerHasFailed || _playerMinimized
           ? _systemUiPolicy.applyBrowsing()
           : _systemUiPolicy.applyPlayer(),
     );
@@ -892,11 +903,16 @@ class AppShellState extends ConsumerState<AppShell>
       // here: primary focus is inside the player now, so it'd null out the
       // real pre-player node (the originating card) and lose the restore
       // target for when the session finally closes.
+      // Picked from the app while the player floats: it comes back full
+      // screen with the new item, and closing returns to what was picked.
+      if (_playerMinimized) _rememberFocusBeforePlayer();
       setState(() {
         _playerArgs = args;
         _playerHasFailed = false;
         _playerNativePlaneActive = _playerOrchestrator!.isNativePlaneActive;
+        _playerMinimized = false;
       });
+      ref.read(playerMinimizedProvider.notifier).state = false;
       return;
     }
 
@@ -942,6 +958,98 @@ class AppShellState extends ConsumerState<AppShell>
     return false;
   }
 
+  /// Where focus goes back to when a floating player returns full screen and
+  /// then closes: the content focused now, or (from the sidebar's Now
+  /// Playing entry) the content focused last.
+  void _rememberFocusBeforePlayer() {
+    final focus = FocusManager.instance.primaryFocus;
+    _focusBeforePlayer = _isInContentScope(focus)
+        ? focus
+        : _contentFocusNode.focusedChild;
+  }
+
+  /// Shrinks the full-screen player to a floating window over the app, still
+  /// playing, and hands focus back to where it was before the player opened.
+  void _minimizePlayer() {
+    if (_playerArgs == null ||
+        _playerOrchestrator == null ||
+        _playerMinimized ||
+        _playerHasFailed) {
+      return;
+    }
+    final savedFocus = _focusBeforePlayer;
+    _focusBeforePlayer = null;
+    setState(() => _playerMinimized = true);
+    ref.read(playerMinimizedProvider.notifier).state = true;
+    unawaited(_systemUiPolicy.applyBrowsing());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_playerMinimized) return;
+      if (savedFocus != null && savedFocus.canRequestFocus) {
+        savedFocus.requestFocus();
+      } else {
+        _contentFocusNode.requestFocus();
+      }
+    });
+  }
+
+  /// Brings the floating player back full screen. PlayerScreen takes focus
+  /// itself once it is no longer excluded from it.
+  void _expandPlayer() {
+    if (!_playerMinimized) return;
+    _rememberFocusBeforePlayer();
+    setState(() {
+      _playerMinimized = false;
+      _sidebarActive = false;
+    });
+    ref.read(playerMinimizedProvider.notifier).state = false;
+    unawaited(_systemUiPolicy.applyPlayer());
+  }
+
+  /// Stops the floating player.
+  void _closeFloatingPlayer() {
+    if (_playerMinimized) unawaited(_closePlayer());
+  }
+
+  /// Expand or Close for the floating player, from a long press on it or on
+  /// the sidebar's Now Playing entry.
+  Future<void> _showFloatingPlayerMenu() async {
+    final args = _playerArgs;
+    if (!_playerMinimized || args == null) return;
+    final l = AppLocalizations.of(context);
+    final action = await showAppDialog<_FloatingPlayerAction>(
+      context: context,
+      builder: (dialogContext) => AppMenuDialog(
+        title: Text(args.title.isEmpty ? l.navNowPlaying : args.title),
+        children: [
+          AppMenuOption(
+            icon: Icons.open_in_full_rounded,
+            label: l.playerExpand,
+            autofocus: true,
+            onTap: () => Navigator.of(
+              dialogContext,
+            ).pop(_FloatingPlayerAction.expand),
+          ),
+          AppMenuOption(
+            icon: Icons.close_rounded,
+            label: l.close,
+            onTap: () => Navigator.of(
+              dialogContext,
+            ).pop(_FloatingPlayerAction.close),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || !_playerMinimized || !identical(args, _playerArgs)) return;
+    switch (action) {
+      case _FloatingPlayerAction.expand:
+        _expandPlayer();
+      case _FloatingPlayerAction.close:
+        _closeFloatingPlayer();
+      case null:
+        break;
+    }
+  }
+
   Future<void> _closePlayer() async {
     final orch = _playerOrchestrator;
     final args = _playerArgs;
@@ -950,12 +1058,15 @@ class AppShellState extends ConsumerState<AppShell>
     final liveChannel = _playerLiveChannel;
     final nativePlaneSub = _playerNativePlaneSub;
     final savedFocus = _focusBeforePlayer;
+    // Floating, focus is already out in the app, wherever the user took it.
+    final wasMinimized = _playerMinimized;
     _focusBeforePlayer = null;
     if (args?.type == 'series' || args?.type == 'vod') {
       // A finished episode only turns into its "up next" on the server.
       unawaited(_appState.refreshRecentlyWatched());
     }
-    if (lease != null &&
+    if (!wasMinimized &&
+        lease != null &&
         adoptBack != null &&
         orch != null &&
         identical(orch, lease.orchestrator) &&
@@ -977,14 +1088,20 @@ class AppShellState extends ConsumerState<AppShell>
       }
       _playerReleasesOnDispose = true;
     }
-    if (lease != null && liveChannel != null && !_playerHasFailed) {
+    // A floating player was stopped on purpose: the guide's preview doesn't
+    // pick its channel back up.
+    if (!wasMinimized &&
+        lease != null &&
+        liveChannel != null &&
+        !_playerHasFailed) {
       // The preview couldn't take the player back right now: fall back to
       // resuming this channel in it once the player is gone, as for a
       // player that never came from the preview.
       ref.read(epgPreviewHandoffProvider.notifier).state = liveChannel;
     }
     final handoff = ref.read(epgPreviewHandoffProvider);
-    if (handoff != null &&
+    if (!wasMinimized &&
+        handoff != null &&
         args != null &&
         args.type == 'live' &&
         args.streamId == handoff.id) {
@@ -1013,7 +1130,11 @@ class AppShellState extends ConsumerState<AppShell>
       // closed under Android Auto, see didChangeAppLifecycleState).
       debugPrint('Player dispose failed: $error');
     }
-    _finishClosePlayer(nativePlaneSub: nativePlaneSub, savedFocus: savedFocus);
+    _finishClosePlayer(
+      nativePlaneSub: nativePlaneSub,
+      savedFocus: savedFocus,
+      restoreFocus: !wasMinimized,
+    );
   }
 
   /// The part of [_closePlayer] after its orchestrator is dealt with
@@ -1021,10 +1142,14 @@ class AppShellState extends ConsumerState<AppShell>
   void _finishClosePlayer({
     StreamSubscription<bool>? nativePlaneSub,
     FocusNode? savedFocus,
+    bool restoreFocus = true,
   }) {
     // Only after native teardown, so a listener can start its own player
     // (the EPG preview) without two native players alive at once.
     ref.read(playerOverlayActiveProvider.notifier).state = false;
+    ref.read(playerMinimizedProvider.notifier).state = false;
+    // The sidebar's Now Playing entry is about to go with the player.
+    final nowPlayingFocused = _nowPlayingFocusNode.hasFocus;
     nativePlaneSub?.cancel().ignore();
     if (!mounted) return;
     setState(() {
@@ -1040,8 +1165,14 @@ class AppShellState extends ConsumerState<AppShell>
       _playerNativePlaneActive = false;
       _playerHasFailed = false;
       _playerModalDialogVisible = false;
+      _playerMinimized = false;
     });
     _playerChannelContext = ListChannelContext.empty;
+    if (nowPlayingFocused) {
+      _activateSidebar();
+      return;
+    }
+    if (!restoreFocus) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (savedFocus != null && savedFocus.canRequestFocus) {
@@ -1053,7 +1184,7 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   bool _handleBackPress() {
-    if (_playerArgs != null) {
+    if (_playerArgs != null && !_playerMinimized) {
       // The player decides: an open OSD is hidden first, and only a Back
       // with nothing left to dismiss closes it (via its onClose).
       if (!_playerBackController.handleBack()) unawaited(_closePlayer());
@@ -1074,6 +1205,13 @@ class AppShellState extends ConsumerState<AppShell>
 
     if (shouldUseSidebar(widget.deviceType) && !_sidebarActive) {
       _activateSidebar();
+      return true;
+    }
+
+    // Nothing left to go back through: rather than leave the app with a
+    // floating player still going, bring it back.
+    if (_playerMinimized) {
+      _expandPlayer();
       return true;
     }
 
@@ -1546,7 +1684,12 @@ class AppShellState extends ConsumerState<AppShell>
   /// like the DVR series-rule Options page, which is opened via a plain
   /// `Navigator.push` (not a route) from a tab that isn't already
   /// immersive (the Series Rules tab, unlike Show Detail).
-  void _enterFullScreenDetail() => setState(() => _fullScreenDetailDepth++);
+  /// Multiview, which starts its own players: a floating one has to be
+  /// fully torn down first (see EpgPreviewPlayerController).
+  Future<void> _enterFullScreenDetail() async {
+    setState(() => _fullScreenDetailDepth++);
+    if (_playerMinimized) await _closePlayer();
+  }
 
   void _exitFullScreenDetail() {
     if (mounted) setState(() => _fullScreenDetailDepth--);
@@ -1980,8 +2123,21 @@ class AppShellState extends ConsumerState<AppShell>
     final playerOpen = args != null && orch != null;
     final viewerId = _appState.activeViewer?.ulid ?? '';
     final recordingChannelIds = ref.watch(recordingChannelIdsProvider);
+    final playerFloating = playerOpen && _playerMinimized;
+    // Pointer and touch only: a TV remote reaches the floating player
+    // through the sidebar's Now Playing entry instead.
+    final floatingButtons = widget.deviceType == DeviceType.tv
+        ? _FloatingButtons.none
+        // Nothing may paint over an Android Hybrid Composition view (it can
+        // be left black), so there they sit above the video instead.
+        : HostPlatform.isAndroid
+        ? _FloatingButtons.above
+        : _FloatingButtons.overlay;
     final suppressBrowsingComposition =
-        playerOpen && _playerNativePlaneActive && !_playerHasFailed;
+        playerOpen &&
+        !playerFloating &&
+        _playerNativePlaneActive &&
+        !_playerHasFailed;
 
     // The same Stack whether or not the player is open, so the browsing
     // shell is never reparented when it opens or closes: the EPG preview's
@@ -1989,7 +2145,7 @@ class AppShellState extends ConsumerState<AppShell>
     // same frame (see EpgPreviewPlayerController.lend).
     return NotificationToastOverlay(
       key: _toastKey,
-      onNotificationTap: playerOpen ? null : _onToastTap,
+      onNotificationTap: playerOpen && !playerFloating ? null : _onToastTap,
       swipeToDismiss: isTouchDeviceType(widget.deviceType),
       child: Stack(
         children: [
@@ -2004,193 +2160,248 @@ class AppShellState extends ConsumerState<AppShell>
             ),
           ),
           if (args != null && orch != null)
-            Positioned.fill(
-              child:
-                  widget.playerRouteBuilder?.call(args) ??
-                  PlayerScreen(
-                    key: ValueKey(_playerSessionId),
-                    args: args,
-                    orchestrator: orch,
-                    adoptsPlayingSession: _playerLease != null,
-                    surfaceKey: _playerLease?.surfaceKey,
-                    releasesOrchestratorOnDispose: () =>
-                        _playerReleasesOnDispose,
-                    isHandheld:
-                        widget.deviceType == DeviceType.phone ||
-                        widget.deviceType == DeviceType.tablet,
-                    epgService: _appState.epgService,
-                    xtreamService: _appState.xtreamService,
-                    comskipSettings: _appState.comskipSettings,
-                    syncOffsetStore: _appState.syncOffsetStore,
-                    introDbSettings: _appState.introDbSettings,
-                    hasDvrFeature: _appState.hasDvrFeature,
-                    viewerId: viewerId,
-                    viewSettingsService: _appState.viewSettingsService,
-                    onLiveStreamEnded: args.type == 'live'
-                        ? _handleLiveStreamEnded
-                        : null,
-                    onNextChannel: args.type == 'live'
-                        ? _openNextChannel
-                        : null,
-                    onPreviousChannel: args.type == 'live'
-                        ? _openPreviousChannel
-                        : null,
-                    onReplaceItem: args.type == 'series'
-                        ? _openPlayerDirect
-                        : null,
-                    onRecordProgram:
-                        args.type == 'live' && _appState.hasDvrFeature
-                        ? _handleRecordButtonTap
-                        : null,
-                    onTrackDialogVisibilityChanged:
-                        _setPlayerModalDialogVisible,
-                    isRecordingCurrentChannel:
-                        args.type == 'live' &&
-                        recordingChannelIds.contains(args.streamId),
-                    progressReporter: (progress) {
-                      final aioLookupId =
-                          args.metadata['aio_item_id'] as String?;
-                      final existing = _appState.progressList.firstWhereOrNull(
-                        (p) =>
-                            p.contentType == progress.contentType &&
-                            (p.contentType == ContentType.aiostreams
-                                ? p.aioItemId == aioLookupId
-                                : p.streamId == progress.streamId),
-                      );
-                      final toSave = Progress(
-                        viewerId: progress.viewerId,
-                        contentType: progress.contentType,
-                        streamId: progress.streamId,
-                        positionSeconds: progress.positionSeconds,
-                        durationSeconds:
-                            progress.durationSeconds ??
-                            existing?.durationSeconds,
-                        completed: progress.completed,
-                        seriesId: progress.seriesId ?? existing?.seriesId,
-                        seasonNumber:
-                            progress.seasonNumber ??
-                            (args.metadata['season_number'] as int?) ??
-                            existing?.seasonNumber,
-                        episodeNumber:
-                            progress.episodeNumber ??
-                            (args.metadata['episode_number'] as int?) ??
-                            existing?.episodeNumber,
-                        title:
-                            progress.title ??
-                            args.metadata['title'] as String? ??
-                            args.title,
-                        episodeTitle:
-                            progress.episodeTitle ??
-                            args.metadata['episode_title'] as String? ??
-                            existing?.episodeTitle,
-                        seriesName:
-                            progress.seriesName ??
-                            args.metadata['series_name'] as String? ??
-                            existing?.seriesName,
-                        thumbnailUrl:
-                            progress.thumbnailUrl ??
-                            args.metadata['thumbnail_url'] as String? ??
-                            existing?.thumbnailUrl,
-                        backdropUrl:
-                            progress.backdropUrl ??
-                            args.metadata['backdrop_url'] as String? ??
-                            existing?.backdropUrl,
-                        rating:
-                            progress.rating ??
-                            args.metadata['rating'] as String? ??
-                            existing?.rating,
-                        runtime:
-                            progress.runtime ??
-                            args.metadata['duration'] as String? ??
-                            existing?.runtime,
-                        plot:
-                            progress.plot ??
-                            args.metadata['plot'] as String? ??
-                            existing?.plot,
-                        genre: progress.genre ?? existing?.genre,
-                        year:
-                            progress.year ??
-                            args.metadata['year'] as String? ??
-                            existing?.year,
-                      );
-                      final aioItemId = args.metadata['aio_item_id'] as String?;
-                      final aioIntegrationId =
-                          args.metadata['aio_integration_id'] as int?;
-                      final aioToSave = aioItemId != null
-                          ? Progress(
-                              viewerId: toSave.viewerId,
-                              contentType: ContentType.aiostreams,
-                              streamId: 0,
-                              positionSeconds: toSave.positionSeconds,
-                              durationSeconds: toSave.durationSeconds,
-                              completed: toSave.completed,
-                              seasonNumber: toSave.seasonNumber,
-                              episodeNumber: toSave.episodeNumber,
-                              title: toSave.title,
-                              episodeTitle: toSave.episodeTitle,
-                              thumbnailUrl: toSave.thumbnailUrl,
-                              backdropUrl: toSave.backdropUrl,
-                              rating: toSave.rating,
-                              runtime: toSave.runtime,
-                              plot: toSave.plot,
-                              genre: toSave.genre,
-                              year: toSave.year,
-                              aioItemId: aioItemId,
-                              aioIntegrationId: aioIntegrationId,
-                            )
-                          : null;
-                      if (aioToSave != null) {
-                        if (_appState.sourceType == AppSourceType.xtream) {
+            Positioned.fromRect(
+              rect: playerFloating
+                  ? _floatingPlayerRect(
+                      MediaQuery.sizeOf(context),
+                      MediaQuery.paddingOf(context),
+                      clearBottomNav: !useSidebar && !_fullScreenDetailActive,
+                      buttonStripHeight:
+                          floatingButtons == _FloatingButtons.above
+                          ? _PlayerFrame.buttonStripHeight
+                          : 0,
+                    )
+                  : Offset.zero & MediaQuery.sizeOf(context),
+              child: _PlayerFrame(
+                floating: playerFloating,
+                buttons: floatingButtons,
+                onExpand: _expandPlayer,
+                onClose: _closeFloatingPlayer,
+                onMenu: _showFloatingPlayerMenu,
+                child:
+                    widget.playerRouteBuilder?.call(args) ??
+                    PlayerScreen(
+                      key: ValueKey(_playerSessionId),
+                      args: args,
+                      orchestrator: orch,
+                      adoptsPlayingSession: _playerLease != null,
+                      surfaceKey: _playerLease?.surfaceKey,
+                      releasesOrchestratorOnDispose: () =>
+                          _playerReleasesOnDispose,
+                      isHandheld:
+                          widget.deviceType == DeviceType.phone ||
+                          widget.deviceType == DeviceType.tablet,
+                      epgService: _appState.epgService,
+                      xtreamService: _appState.xtreamService,
+                      comskipSettings: _appState.comskipSettings,
+                      syncOffsetStore: _appState.syncOffsetStore,
+                      introDbSettings: _appState.introDbSettings,
+                      hasDvrFeature: _appState.hasDvrFeature,
+                      viewerId: viewerId,
+                      viewSettingsService: _appState.viewSettingsService,
+                      onLiveStreamEnded: args.type == 'live'
+                          ? _handleLiveStreamEnded
+                          : null,
+                      onNextChannel: args.type == 'live'
+                          ? _openNextChannel
+                          : null,
+                      onPreviousChannel: args.type == 'live'
+                          ? _openPreviousChannel
+                          : null,
+                      onReplaceItem: args.type == 'series'
+                          ? _openPlayerDirect
+                          : null,
+                      onRecordProgram:
+                          args.type == 'live' && _appState.hasDvrFeature
+                          ? _handleRecordButtonTap
+                          : null,
+                      onTrackDialogVisibilityChanged:
+                          _setPlayerModalDialogVisible,
+                      isRecordingCurrentChannel:
+                          args.type == 'live' &&
+                          recordingChannelIds.contains(args.streamId),
+                      progressReporter: (progress) {
+                        final aioLookupId =
+                            args.metadata['aio_item_id'] as String?;
+                        final existing = _appState.progressList
+                            .firstWhereOrNull(
+                              (p) =>
+                                  p.contentType == progress.contentType &&
+                                  (p.contentType == ContentType.aiostreams
+                                      ? p.aioItemId == aioLookupId
+                                      : p.streamId == progress.streamId),
+                            );
+                        final toSave = Progress(
+                          viewerId: progress.viewerId,
+                          contentType: progress.contentType,
+                          streamId: progress.streamId,
+                          positionSeconds: progress.positionSeconds,
+                          durationSeconds:
+                              progress.durationSeconds ??
+                              existing?.durationSeconds,
+                          completed: progress.completed,
+                          seriesId: progress.seriesId ?? existing?.seriesId,
+                          seasonNumber:
+                              progress.seasonNumber ??
+                              (args.metadata['season_number'] as int?) ??
+                              existing?.seasonNumber,
+                          episodeNumber:
+                              progress.episodeNumber ??
+                              (args.metadata['episode_number'] as int?) ??
+                              existing?.episodeNumber,
+                          title:
+                              progress.title ??
+                              args.metadata['title'] as String? ??
+                              args.title,
+                          episodeTitle:
+                              progress.episodeTitle ??
+                              args.metadata['episode_title'] as String? ??
+                              existing?.episodeTitle,
+                          seriesName:
+                              progress.seriesName ??
+                              args.metadata['series_name'] as String? ??
+                              existing?.seriesName,
+                          thumbnailUrl:
+                              progress.thumbnailUrl ??
+                              args.metadata['thumbnail_url'] as String? ??
+                              existing?.thumbnailUrl,
+                          backdropUrl:
+                              progress.backdropUrl ??
+                              args.metadata['backdrop_url'] as String? ??
+                              existing?.backdropUrl,
+                          rating:
+                              progress.rating ??
+                              args.metadata['rating'] as String? ??
+                              existing?.rating,
+                          runtime:
+                              progress.runtime ??
+                              args.metadata['duration'] as String? ??
+                              existing?.runtime,
+                          plot:
+                              progress.plot ??
+                              args.metadata['plot'] as String? ??
+                              existing?.plot,
+                          genre: progress.genre ?? existing?.genre,
+                          year:
+                              progress.year ??
+                              args.metadata['year'] as String? ??
+                              existing?.year,
+                        );
+                        final aioItemId =
+                            args.metadata['aio_item_id'] as String?;
+                        final aioIntegrationId =
+                            args.metadata['aio_integration_id'] as int?;
+                        final aioToSave = aioItemId != null
+                            ? Progress(
+                                viewerId: toSave.viewerId,
+                                contentType: ContentType.aiostreams,
+                                streamId: 0,
+                                positionSeconds: toSave.positionSeconds,
+                                durationSeconds: toSave.durationSeconds,
+                                completed: toSave.completed,
+                                seasonNumber: toSave.seasonNumber,
+                                episodeNumber: toSave.episodeNumber,
+                                title: toSave.title,
+                                episodeTitle: toSave.episodeTitle,
+                                thumbnailUrl: toSave.thumbnailUrl,
+                                backdropUrl: toSave.backdropUrl,
+                                rating: toSave.rating,
+                                runtime: toSave.runtime,
+                                plot: toSave.plot,
+                                genre: toSave.genre,
+                                year: toSave.year,
+                                aioItemId: aioItemId,
+                                aioIntegrationId: aioIntegrationId,
+                              )
+                            : null;
+                        if (aioToSave != null) {
+                          if (_appState.sourceType == AppSourceType.xtream) {
+                            unawaited(
+                              _appState.xtreamService
+                                  .reportPlaybackProgress(aioToSave)
+                                  .catchError((_) => false),
+                            );
+                          }
                           unawaited(
-                            _appState.xtreamService
-                                .reportPlaybackProgress(aioToSave)
-                                .catchError((_) => false),
+                            _appState.resumeService.save(aioToSave).then((_) {
+                              if (mounted) {
+                                _appState.updateProgressEntry(aioToSave);
+                              }
+                            }),
+                          );
+                        } else {
+                          if (_appState.sourceType == AppSourceType.xtream) {
+                            unawaited(
+                              _appState.xtreamService
+                                  .reportPlaybackProgress(toSave)
+                                  .catchError((_) => false),
+                            );
+                          }
+                          unawaited(
+                            _appState.resumeService.save(toSave).then((_) {
+                              if (mounted) {
+                                _appState.updateProgressEntry(toSave);
+                              }
+                            }),
                           );
                         }
-                        unawaited(
-                          _appState.resumeService.save(aioToSave).then((_) {
-                            if (mounted) {
-                              _appState.updateProgressEntry(aioToSave);
-                            }
-                          }),
-                        );
-                      } else {
-                        if (_appState.sourceType == AppSourceType.xtream) {
-                          unawaited(
-                            _appState.xtreamService
-                                .reportPlaybackProgress(toSave)
-                                .catchError((_) => false),
-                          );
+                      },
+                      watchHistoryServices: [
+                        _appState.simklService,
+                        _appState.traktService,
+                        _appState.mdblistService,
+                      ],
+                      onlineSubtitleService: _appState.onlineSubtitleService,
+                      onlineSubtitleSettings: _appState.onlineSubtitleSettings,
+                      onPlaybackFailure: () {
+                        if (!mounted) return;
+                        // Floating, the error screen isn't shown: just close.
+                        if (_playerMinimized) {
+                          unawaited(_closePlayer());
+                          return;
                         }
-                        unawaited(
-                          _appState.resumeService.save(toSave).then((_) {
-                            if (mounted) _appState.updateProgressEntry(toSave);
-                          }),
-                        );
-                      }
-                    },
-                    watchHistoryServices: [
-                      _appState.simklService,
-                      _appState.traktService,
-                      _appState.mdblistService,
-                    ],
-                    onlineSubtitleService: _appState.onlineSubtitleService,
-                    onlineSubtitleSettings: _appState.onlineSubtitleSettings,
-                    onPlaybackFailure: () {
-                      if (!mounted) return;
-                      setState(() => _playerHasFailed = true);
-                      unawaited(_systemUiPolicy.applyBrowsing());
-                    },
-                    onClose: _closePlayer,
-                    backController: _playerBackController,
-                    // Through the shared echo guard: the player handles the key
-                    // and the platform popRoute that follows it would otherwise
-                    // close the player right after the key hid its OSD.
-                    onBackKey: _handleShortcutBack,
-                  ),
+                        setState(() => _playerHasFailed = true);
+                        unawaited(_systemUiPolicy.applyBrowsing());
+                      },
+                      onClose: _closePlayer,
+                      onMinimize: _minimizePlayer,
+                      minimized: playerFloating,
+                      backController: _playerBackController,
+                      // Through the shared echo guard: the player handles the key
+                      // and the platform popRoute that follows it would otherwise
+                      // close the player right after the key hid its OSD.
+                      onBackKey: _handleShortcutBack,
+                    ),
+              ),
             ),
         ],
       ),
+    );
+  }
+
+  /// Where the floating player sits: the bottom-right corner, clear of the
+  /// TV overscan margin, the system insets and (on phones) the bottom nav.
+  /// [buttonStripHeight] is added above the video for its buttons.
+  static Rect _floatingPlayerRect(
+    Size screen,
+    EdgeInsets safeArea, {
+    required bool clearBottomNav,
+    double buttonStripHeight = 0,
+  }) {
+    final compact = screen.shortestSide < 600;
+    final width = (screen.width * (compact ? 0.5 : 0.28)).clamp(200.0, 560.0);
+    final height = width * 9 / 16;
+    final margin = (screen.width * 0.025).clamp(16.0, 48.0);
+    final right = margin + safeArea.right;
+    final bottom =
+        margin +
+        safeArea.bottom +
+        (clearBottomNav ? kBottomNavigationBarHeight : 0);
+    return Rect.fromLTWH(
+      screen.width - right - width,
+      screen.height - bottom - height - buttonStripHeight,
+      width,
+      height + buttonStripHeight,
     );
   }
 
@@ -2249,6 +2460,13 @@ class AppShellState extends ConsumerState<AppShell>
                 onNavigate: _navigateTo,
                 onActivateSidebar: _activateSidebar,
                 onDeactivateSidebar: _deactivateSidebar,
+                nowPlayingFocusNode: _playerMinimized
+                    ? _nowPlayingFocusNode
+                    : null,
+                onOpenNowPlaying: _playerMinimized ? _expandPlayer : null,
+                onNowPlayingMenu: _playerMinimized
+                    ? _showFloatingPlayerMenu
+                    : null,
               ),
             ),
           );
@@ -2457,5 +2675,213 @@ class _MenuAction extends Action<_MenuIntent> {
   Object? invoke(_MenuIntent intent) {
     onMenu();
     return null;
+  }
+}
+
+enum _FloatingPlayerAction { expand, close }
+
+/// Where the floating player's Expand and Close go.
+enum _FloatingButtons {
+  /// None (TV: the sidebar's Now Playing entry stands in).
+  none,
+
+  /// In a strip above the video (Android, see [_PlayerFrame.buttonStripHeight]).
+  above,
+
+  /// Over the video's top-right corner.
+  overlay,
+}
+
+/// Holds the player full screen and floating alike, with the same widgets
+/// either way: a different structure would remount PlayerScreen and its
+/// native video view, restarting the stream. Floating, nothing inside takes
+/// focus or pointer input: a tap or click shows or hides Expand and Close
+/// (placed by [buttons]; hovering shows them too), and a long press or right
+/// click opens [onMenu].
+class _PlayerFrame extends StatefulWidget {
+  const _PlayerFrame({
+    required this.floating,
+    required this.buttons,
+    required this.onExpand,
+    required this.onClose,
+    required this.onMenu,
+    required this.child,
+  });
+
+  final bool floating;
+  final _FloatingButtons buttons;
+  final VoidCallback onExpand;
+  final VoidCallback onClose;
+  final VoidCallback onMenu;
+  final Widget child;
+
+  /// Room above the video for the buttons in [_FloatingButtons.above].
+  static const double buttonStripHeight = 52;
+
+  @override
+  State<_PlayerFrame> createState() => _PlayerFrameState();
+}
+
+class _PlayerFrameState extends State<_PlayerFrame> {
+  static const _radius = BorderRadius.all(Radius.circular(8));
+
+  bool _hovered = false;
+  bool _controlsShown = false;
+
+  void _setHovered(bool hovered) {
+    if (_hovered != hovered) setState(() => _hovered = hovered);
+  }
+
+  @override
+  void didUpdateWidget(_PlayerFrame oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Each time it floats again, it starts on just the picture.
+    if (!widget.floating) _controlsShown = false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final floating = widget.floating;
+    final controlsVisible = floating && (_hovered || _controlsShown);
+    final above = controlsVisible && widget.buttons == _FloatingButtons.above;
+    final overlay =
+        controlsVisible && widget.buttons == _FloatingButtons.overlay;
+    // The strip's room stays reserved while it is hidden, so the video
+    // doesn't jump when it shows.
+    final videoTop = floating && widget.buttons == _FloatingButtons.above
+        ? _PlayerFrame.buttonStripHeight
+        : 0.0;
+    return MouseRegion(
+      onEnter: (_) => _setHovered(true),
+      onExit: (_) => _setHovered(false),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(top: videoTop),
+            // Shadow and rounded corners only: nothing paints over the video
+            // except the overlay buttons, never used on Android.
+            child: DecoratedBox(
+              decoration: floating
+                  ? BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: _radius,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    )
+                  : const BoxDecoration(),
+              child: ClipRRect(
+                borderRadius: floating ? _radius : BorderRadius.zero,
+                clipBehavior: floating ? Clip.antiAlias : Clip.none,
+                child: ExcludeFocus(
+                  excluding: floating,
+                  child: IgnorePointer(
+                    ignoring: floating,
+                    child: widget.child,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (floating)
+            Positioned.fill(
+              top: videoTop,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: widget.buttons == _FloatingButtons.none
+                      ? null
+                      : () => setState(() => _controlsShown = !_controlsShown),
+                  onLongPress: widget.onMenu,
+                  onSecondaryTap: widget.onMenu,
+                ),
+              ),
+            ),
+          if (overlay)
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 64,
+              child: IgnorePointer(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(8),
+                  ),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.black54, Colors.transparent],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (above || overlay)
+            Positioned(
+              top: overlay ? 6 : 0,
+              right: overlay ? 6 : 0,
+              child: _FloatingPlayerButtons(
+                onExpand: widget.onExpand,
+                onClose: widget.onClose,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Expand and Close on a solid, raised pill, so they read over the video
+/// and over any screen behind the floating player alike.
+class _FloatingPlayerButtons extends StatelessWidget {
+  const _FloatingPlayerButtons({
+    required this.onExpand,
+    required this.onClose,
+  });
+
+  final VoidCallback onExpand;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return ExcludeFocus(
+      child: Material(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        elevation: 6,
+        shape: const StadiumBorder(),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppIconButton(
+                icon: Icons.open_in_full_rounded,
+                tooltip: l.playerExpand,
+                dense: true,
+                onPressed: onExpand,
+              ),
+              const SizedBox(width: 4),
+              AppIconButton(
+                icon: Icons.close_rounded,
+                tooltip: l.close,
+                dense: true,
+                onPressed: onClose,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

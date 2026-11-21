@@ -98,6 +98,8 @@ class PlayerScreen extends StatefulWidget {
     this.wakelockController = const PlatformWakelockController(),
     this.viewerId = '',
     this.onClose,
+    this.onMinimize,
+    this.minimized = false,
     this.onPlaybackFailure,
     this.onLiveStreamEnded,
     this.onNextChannel,
@@ -157,6 +159,15 @@ class PlayerScreen extends StatefulWidget {
   final String viewerId;
   final ViewSettingsService? viewSettingsService;
   final VoidCallback? onClose;
+
+  /// Shrinks the player to the floating window over the app (see AppShell).
+  /// Null where there is nowhere to float it; the Minimize button and the
+  /// "Back minimizes the player" setting then do nothing.
+  final VoidCallback? onMinimize;
+
+  /// Floating over the app: just the picture, no controls or prompts, and
+  /// nothing in it can take focus (AppShell excludes it).
+  final bool minimized;
   final VoidCallback? onPlaybackFailure;
   final Future<String?> Function()? onLiveStreamEnded;
   final VoidCallback? onNextChannel;
@@ -276,6 +287,9 @@ class _PlayerScreenState extends State<PlayerScreen>
   late double _volume = widget.viewSettingsService?.volumeSync ?? 1.0;
   bool get _hideOverlayOnStart =>
       widget.viewSettingsService?.hideOverlayOnStartSync ?? false;
+  bool get _backMinimizes =>
+      widget.onMinimize != null &&
+      (widget.viewSettingsService?.backMinimizesPlayerSync ?? false);
 
   EpgCurrentNext? _epgData;
 
@@ -319,6 +333,10 @@ class _PlayerScreenState extends State<PlayerScreen>
   // controls are unusable at PiP's tiny window size, so they're hidden and
   // kept from reappearing (_showOverlay below) for the duration.
   bool _isInPictureInPicture = false;
+
+  // System PiP or the app's own floating window: either way the picture is
+  // too small for the controls and prompts.
+  bool get _pictureOnly => _isInPictureInPicture || widget.minimized;
   static const _pipChannel = MethodChannel('m3u_tv/system_ui');
 
   // Owns the outer Focus so we can steal focus from the content area when
@@ -597,6 +615,9 @@ class _PlayerScreenState extends State<PlayerScreen>
         widget.isRecordingCurrentChannel) {
       if (mounted) setState(() {});
     }
+    if (oldWidget.minimized != widget.minimized) {
+      _onMinimizedChanged();
+    }
     if (_isSamePlaybackSession(oldWidget.args, widget.args)) return;
 
     if (_scrobbleActive) _scrobbleFor(oldWidget.args, 'stop');
@@ -764,6 +785,8 @@ class _PlayerScreenState extends State<PlayerScreen>
   void _checkUpNext() {
     if (_disposed ||
         !mounted ||
+        // Floating: no prompt, and an episode that ends just closes.
+        widget.minimized ||
         _upNextDismissed ||
         _upNextVisible ||
         _nextEpisode == null) {
@@ -1577,6 +1600,43 @@ class _PlayerScreenState extends State<PlayerScreen>
     setState(() => _liveEndReason = reason);
   }
 
+  void _minimize() {
+    _reportFinalProgress();
+    widget.onMinimize?.call();
+  }
+
+  void _onMinimizedChanged() {
+    if (widget.isHandheld) {
+      // Browsing is portrait on phones: the landscape lock is only for the
+      // full-screen player (released in dispose otherwise).
+      unawaited(
+        SystemChrome.setPreferredOrientations(
+          widget.minimized
+              ? [DeviceOrientation.portraitUp]
+              : [
+                  DeviceOrientation.landscapeLeft,
+                  DeviceOrientation.landscapeRight,
+                ],
+        ),
+      );
+    }
+    if (widget.minimized) {
+      _overlayHideTimer?.cancel();
+      setState(() {
+        _overlayVisible = false;
+        _upNextVisible = false;
+      });
+      return;
+    }
+    // Back to full screen: AppShell has just stopped excluding this screen
+    // from focus, so take it, then show the controls as on any key press.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _disposed || widget.minimized) return;
+      _screenFocusNode.requestFocus();
+      if (_errorMessage == null) _showOverlay();
+    });
+  }
+
   void _goBack() {
     if (_disposed || !mounted) return;
     // Return focus to _screenFocusNode before closing. AppShell's restoration
@@ -2235,7 +2295,7 @@ class _PlayerScreenState extends State<PlayerScreen>
 
   void _showOverlay() {
     // Transport controls are unusable at PiP's tiny window size.
-    if (_isInPictureInPicture) return;
+    if (_pictureOnly) return;
     // No extra intro-db handling needed here - the intro-db prompt's
     // visibility is derived from `_overlayVisible`, so this setState alone re-shows the
     // prompt (without restarting its countdown) if one is still pending.
@@ -2286,6 +2346,8 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
     if (_overlayVisible) {
       _hideOverlay();
+    } else if (_backMinimizes) {
+      _minimize();
     } else {
       _goBack();
     }
@@ -2499,6 +2561,10 @@ class _PlayerScreenState extends State<PlayerScreen>
                               nativePlane:
                                   widget.orchestrator.activeNativePlaneProvider,
                               aspectRatio: _videoAspectRatio,
+                              // Floating, the browsing screens paint
+                              // beneath it (as for the EPG preview).
+                              clearAncestorPaintForNativePlane:
+                                  widget.minimized,
                             )
                           : const ColoredBox(color: Colors.black),
                     ),
@@ -2506,11 +2572,11 @@ class _PlayerScreenState extends State<PlayerScreen>
                     // PiP: just the picture. The window is too small for any of
                     // the overlays below, and its controls are the system's
                     // (media notification), not the app's.
-                    if (_isInPictureInPicture && _showLoadingOverlay)
+                    if (_pictureOnly && _showLoadingOverlay)
                       const Center(
                         child: AppLoadingIndicator(color: Colors.white),
                       ),
-                    if (!_isInPictureInPicture) ...[
+                    if (!_pictureOnly) ...[
                       // Poster backdrop behind the loading indicator (VOD/series).
                       // Skipped on Android: `NativeVideoSurface` is already
                       // mounted as a live Hybrid Composition `AndroidView` by
@@ -2735,6 +2801,10 @@ class _PlayerScreenState extends State<PlayerScreen>
                               onToggleFullscreen: desktopFullscreen == null
                                   ? null
                                   : () => unawaited(desktopFullscreen.toggle()),
+                              onMinimize: widget.onMinimize == null
+                                  ? null
+                                  : _minimize,
+                              backClosesPlayer: _backMinimizes,
                               onTrackDialogVisibilityChanged:
                                   _handleTrackDialogVisibilityChanged,
                               fallbackReason: _showPlaybackDiagnostics

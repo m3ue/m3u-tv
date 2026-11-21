@@ -58,7 +58,7 @@ class SportsScreen extends ConsumerStatefulWidget {
 
   /// Hide and restore AppShell's chrome around the Multiview push, as Live
   /// TV does.
-  final VoidCallback? onEnterFullScreenDetail;
+  final Future<void> Function()? onEnterFullScreenDetail;
   final VoidCallback? onExitFullScreenDetail;
 
   /// `AppShellState.handleBackFromTopLevelRoute`, for pages this screen opens
@@ -718,8 +718,10 @@ class _SportsScreenState extends ConsumerState<SportsScreen> {
   );
 
   Future<void> _openMultiview() async {
-    widget.onEnterFullScreenDetail?.call();
     try {
+      // Also closes a floating player: Multiview starts its own.
+      await widget.onEnterFullScreenDetail?.call();
+      if (!mounted) return;
       await Navigator.of(context).push<void>(
         appPageRoute<void>(builder: (context) => const MultiviewScreen()),
       );
