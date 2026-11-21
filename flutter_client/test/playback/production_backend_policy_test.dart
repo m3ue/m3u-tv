@@ -1716,6 +1716,52 @@ void main() {
     );
 
     test(
+      'vod_retry: a mid-playback retry resumes where playback got to',
+      () async {
+        final media3 = _PolicyPlayerAdapter(
+          capabilities: PlaybackCapabilities.androidExoPlayer,
+        );
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.android,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.androidExoPlayer: media3,
+          },
+          transcodeGateway: _PolicyTranscodeGateway(),
+          retryDelay: Duration.zero,
+        );
+
+        await orchestrator.open(
+          const PlaybackSource(
+            uri: 'https://provider.example/movie/film.mkv',
+            startPosition: Duration(seconds: 86),
+          ),
+        );
+        media3.emitError(
+          const PlaybackError(
+            backend: PlaybackBackend.androidExoPlayer,
+            message: 'Playback stayed buffering for 15s',
+            code: 'network_unavailable',
+            recoverable: true,
+            position: Duration(hours: 1),
+          ),
+        );
+        await pumpEventQueue();
+
+        expect(media3.loadedSources, hasLength(2));
+        expect(
+          media3.loadedSources.first.startPosition,
+          const Duration(seconds: 86),
+        );
+        expect(
+          media3.loadedSources.last.startPosition,
+          const Duration(hours: 1),
+        );
+
+        await orchestrator.dispose();
+      },
+    );
+
+    test(
       'rapid_channel_switch: twenty server sessions leave no active backend',
       () async {
         final direct = _PolicyPlayerAdapter(

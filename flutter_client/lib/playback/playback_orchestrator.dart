@@ -1006,6 +1006,7 @@ class PlaybackOrchestrator {
                 'Playback stayed buffering for ${_bufferingTimeout.inSeconds}s',
             code: 'network_unavailable',
             recoverable: true,
+            position: _lastState?.position,
           ),
         ),
       );
@@ -1081,7 +1082,10 @@ class PlaybackOrchestrator {
       if (_disposed || generation != _playbackGeneration) return;
       await adapter.stop();
       if (_disposed || generation != _playbackGeneration) return;
-      final retrySource = _withDisplayModePolicy(source);
+      // Retry where playback got to (e.g. after a seek), not where it began.
+      final retrySource = _withDisplayModePolicy(
+        _resumingFrom(source, error.position),
+      );
       _activeSource = retrySource;
       await _loadWithDisplayModePolicy(adapter, retrySource);
     } on PlaybackException catch (retryError) {
