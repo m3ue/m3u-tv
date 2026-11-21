@@ -1620,6 +1620,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         ),
       );
     }
+    _syncAutoPictureInPicture();
     if (widget.minimized) {
       _overlayHideTimer?.cancel();
       setState(() {
@@ -2284,7 +2285,10 @@ class _PlayerScreenState extends State<PlayerScreen>
   void _syncAutoPictureInPicture() {
     if (!HostPlatform.isIOS) return;
     final provider = widget.orchestrator.activePlatformViewProvider;
-    final next = provider is PictureInPictureProvider
+    // Not while floating, as on Android (where AppShell's browsing system UI
+    // turns PiP off): leaving the app from there follows the background
+    // audio setting instead.
+    final next = provider is PictureInPictureProvider && !widget.minimized
         ? provider! as PictureInPictureProvider
         : null;
     if (identical(next, _autoPictureInPicture)) return;

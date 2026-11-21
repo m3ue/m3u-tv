@@ -218,6 +218,10 @@ class AppShellState extends ConsumerState<AppShell>
   EpgPreviewLease? _playerLease;
   bool Function(EpgPreviewLease lease)? _playerLeaseAdoptBack;
   Channel? _playerLiveChannel;
+  // The lease's native view key, kept for the whole session: it outlives
+  // the lease itself when the player moves on to a movie or episode (see
+  // _openPlayerDirect), and changing it would recreate the native view.
+  GlobalKey? _playerSurfaceKey;
   // Read by PlayerScreen as it unmounts: false when its orchestrator went
   // back to the preview, which keeps playing it.
   bool _playerReleasesOnDispose = true;
@@ -907,6 +911,15 @@ class AppShellState extends ConsumerState<AppShell>
       // screen with the new item, and closing returns to what was picked.
       if (_playerMinimized) _rememberFocusBeforePlayer();
       setState(() {
+        if (args.type != 'live') {
+          // Picked while a live channel floats: the stream is no longer the
+          // guide preview's (nothing to give back to it on close) and no
+          // channel is playing (CarPlay and Android Auto compare against it).
+          // _openChannel sets the channel before a live pick gets here.
+          _playerLease = null;
+          _playerLeaseAdoptBack = null;
+          _playerLiveChannel = null;
+        }
         _playerArgs = args;
         _playerHasFailed = false;
         _playerNativePlaneActive = _playerOrchestrator!.isNativePlaneActive;
@@ -1158,6 +1171,7 @@ class AppShellState extends ConsumerState<AppShell>
       // Cleared only now, with PlayerScreen leaving the tree: until then its
       // native view must keep the lease's key, or a rebuild mid-dispose
       // would recreate the view under a player still tearing down.
+      _playerSurfaceKey = null;
       _playerLease = null;
       _playerLeaseAdoptBack = null;
       _playerLiveChannel = null;
@@ -1247,12 +1261,14 @@ class AppShellState extends ConsumerState<AppShell>
     bool Function(EpgPreviewLease lease) adoptBack,
   ) {
     if (_playerOrchestrator != null) {
-      // Can't happen from the guide (it's beneath the open player), but the
-      // lease must go somewhere: back where it came from.
+      // Can't happen from the guide: it's beneath a full-screen player, and
+      // its preview is turned off while one floats (see LiveTvScreen). The
+      // lease must still go somewhere: back where it came from.
       if (!adoptBack(lease)) unawaited(lease.orchestrator.dispose());
       return;
     }
     _playerLease = lease;
+    _playerSurfaceKey = lease.surfaceKey;
     _playerLeaseAdoptBack = adoptBack;
     _playerLiveChannel = lease.channel;
     unawaited(lease.orchestrator.setAllowDisplayModeChanges(true));
@@ -1679,13 +1695,11 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   /// Lets a descendant enter/exit the same immersive full-screen state as
-  /// `_pushDetail(fullScreen: true)` - sidebar hidden, bottom nav hidden —
-  /// without going through a go_router push itself. Needed for screens
-  /// like the DVR series-rule Options page, which is opened via a plain
-  /// `Navigator.push` (not a route) from a tab that isn't already
-  /// immersive (the Series Rules tab, unlike Show Detail).
-  /// Multiview, which starts its own players: a floating one has to be
-  /// fully torn down first (see EpgPreviewPlayerController).
+  /// `_pushDetail(fullScreen: true)` (sidebar and bottom nav hidden) without
+  /// going through a go_router push itself. Live TV and Sports use it around
+  /// Multiview, which opens via a plain `Navigator.push`. Multiview starts
+  /// its own players, so a floating one is fully torn down before this
+  /// completes (see EpgPreviewPlayerController).
   Future<void> _enterFullScreenDetail() async {
     setState(() => _fullScreenDetailDepth++);
     if (_playerMinimized) await _closePlayer();
@@ -2185,7 +2199,7 @@ class AppShellState extends ConsumerState<AppShell>
                       args: args,
                       orchestrator: orch,
                       adoptsPlayingSession: _playerLease != null,
-                      surfaceKey: _playerLease?.surfaceKey,
+                      surfaceKey: _playerSurfaceKey,
                       releasesOrchestratorOnDispose: () =>
                           _playerReleasesOnDispose,
                       isHandheld:
