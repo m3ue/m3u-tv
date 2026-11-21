@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/l10n/timeshift_localizations.dart';
 import 'package:m3u_tv/services/comskip_settings.dart';
 import 'package:m3u_tv/services/proxy_playback_settings.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
@@ -102,22 +103,61 @@ class PlaybackSettingsPage extends StatelessWidget {
           ),
         ],
 
-        if (viewSettings != null && _showPrebufferLiveToggle) ...[
+        // Live TV group: timeshift is backend-agnostic (URL feature) and must
+        // show on Android; the mpv-only prebuffer toggle stays hidden there.
+        // Live prebuffer (seconds) is how much video buffers before playback
+        // begins — 0 = lowest delay, default 1s.
+        if (viewSettings != null) ...[
           SettingsSectionHeader(l.settingsSectionLiveTv),
           ListenableBuilder(
             listenable: viewSettings,
             builder: (context, _) => SettingsGroup(
               children: [
                 SettingsSwitchRow(
-                  title: l.settingsPrebufferLive,
-                  locked: viewSettings.isEnforced(
-                    ViewSettingsService.prebufferLiveKey,
-                  ),
-                  subtitle: l.settingsPrebufferLiveHint,
-                  icon: Icons.hourglass_bottom,
-                  value: viewSettings.prebufferLiveSync,
-                  onChanged: viewSettings.setPrebufferLive,
+                  title: l.settingsTimeshiftMode,
+                  subtitle: l.settingsTimeshiftModeHint,
+                  icon: Icons.timelapse,
+                  value: viewSettings.timeshiftModeSync,
+                  onChanged: viewSettings.setTimeshiftMode,
                 ),
+                SettingsRow(
+                  title: l.settingsLivePrebuffer,
+                  subtitle: l.settingsLivePrebufferValue(
+                    viewSettings.livePrebufferSecondsSync,
+                  ),
+                  icon: Icons.hourglass_bottom,
+                  trailing: const SettingsChevron(),
+                  onTap: () => unawaited(
+                    pushSettingsPicker<int>(
+                      context,
+                      title: (context) =>
+                          AppLocalizations.of(context).settingsLivePrebuffer,
+                      selected: viewSettings.livePrebufferSecondsSync,
+                      options: [
+                        for (final seconds
+                            in ViewSettingsService.livePrebufferSecondsOptions)
+                          SettingsPickerOption(
+                            value: seconds,
+                            label: l.settingsLivePrebufferValue(seconds),
+                          ),
+                      ],
+                      onSelected: (seconds) => unawaited(
+                        viewSettings.setLivePrebufferSeconds(seconds),
+                      ),
+                    ),
+                  ),
+                ),
+                if (_showPrebufferLiveToggle)
+                  SettingsSwitchRow(
+                    title: l.settingsPrebufferLive,
+                    locked: viewSettings.isEnforced(
+                      ViewSettingsService.prebufferLiveKey,
+                    ),
+                    subtitle: l.settingsPrebufferLiveHint,
+                    icon: Icons.hourglass_top,
+                    value: viewSettings.prebufferLiveSync,
+                    onChanged: viewSettings.setPrebufferLive,
+                  ),
               ],
             ),
           ),

@@ -48,6 +48,8 @@ class PlayerArgs {
     this.headers = const <String, String>{},
     this.metadata = const <String, Object?>{},
     this.transcoded = false,
+    this.seekableLive = false,
+    this.startFromBeginning = false,
   });
 
   /// Live playback of [channel]. Shared by the full-screen player and the
@@ -63,24 +65,47 @@ class PlayerArgs {
   );
 
   /// Playback of a DVR [recording]: the live HLS window while it is still
-  /// recording, otherwise the finished file. Shared by the DVR Recordings
-  /// screen and Search. Only call for a [DvrRecording.isPlayable] recording.
-  factory PlayerArgs.dvrRecording(DvrRecording recording) => PlayerArgs(
-    streamUrl: recording.playbackUrl!,
-    title: recording.title,
-    type: recording.isInProgress ? 'live' : 'vod',
-    metadata: <String, Object?>{
-      'dvr_uuid': recording.uuid,
-      'dvr_status': recording.status.name,
-      if (recording.subtitle != null) 'subtitle': recording.subtitle,
-      if (recording.channelName != null) 'channel_name': recording.channelName,
-      if (recording.seasonNumber != null)
-        'season_number': recording.seasonNumber,
-      if (recording.episodeNumber != null)
-        'episode_number': recording.episodeNumber,
-      if (recording.edlUrl != null) 'edl_url': recording.edlUrl,
-    },
-  );
+  /// recording (or finalizing), otherwise the finished file. Shared by the
+  /// DVR Recordings screen and Search. Only call for a
+  /// [DvrRecording.isPlayable] recording.
+  ///
+  /// [startFromBeginning] only applies to the growing live window: it marks
+  /// an explicit seek to window start after open (ExoPlayer defaults a
+  /// dynamic playlist to the live edge). Without it the player joins at the
+  /// edge, matching pre-timeshift behaviour.
+  factory PlayerArgs.dvrRecording(
+    DvrRecording recording, {
+    bool startFromBeginning = false,
+  }) {
+    final liveWindow = recording.playsLiveWindow;
+    return PlayerArgs(
+      streamUrl: recording.playbackUrl!,
+      title: recording.title,
+      type: liveWindow ? 'live' : 'vod',
+      // Progress/resume key: the editor's numeric recording id, matching
+      // content_type=dvr_recording rows. Null on older servers, which simply
+      // disables resume for that recording.
+      streamId: recording.id,
+      startFromBeginning: liveWindow && startFromBeginning,
+      seekableLive: liveWindow,
+      metadata: <String, Object?>{
+        'dvr_uuid': recording.uuid,
+        'dvr_status': recording.status.name,
+        if (liveWindow && recording.elapsedSeconds != null)
+          'dvr_elapsed_seconds': recording.elapsedSeconds,
+        if (liveWindow && recording.actualStart != null)
+          'dvr_actual_start': recording.actualStart!.toIso8601String(),
+        if (recording.subtitle != null) 'subtitle': recording.subtitle,
+        if (recording.channelName != null)
+          'channel_name': recording.channelName,
+        if (recording.seasonNumber != null)
+          'season_number': recording.seasonNumber,
+        if (recording.episodeNumber != null)
+          'episode_number': recording.episodeNumber,
+        if (recording.edlUrl != null) 'edl_url': recording.edlUrl,
+      },
+    );
+  }
 
   final String streamUrl;
   final String title;
@@ -104,10 +129,21 @@ class PlayerArgs {
   /// seeking for VOD/series instead of offering a seek that silently fails.
   final bool transcoded;
 
+  /// Live-type source whose timeline is a growing DVR HLS window (in-progress
+  /// recording): seek bar and in-window seeks are allowed; the live-edge
+  /// pause/release policy does not apply.
+  final bool seekableLive;
+
+  /// Seek to the start of the growing window after open (viewer chose
+  /// "Start from beginning"). Only meaningful when [seekableLive].
+  final bool startFromBeginning;
+
   PlayerArgs copyWith({
     String? streamUrl,
     double? startPosition,
     bool? transcoded,
+    bool? seekableLive,
+    bool? startFromBeginning,
   }) {
     return PlayerArgs(
       streamUrl: streamUrl ?? this.streamUrl,
@@ -125,6 +161,8 @@ class PlayerArgs {
       headers: headers,
       metadata: metadata,
       transcoded: transcoded ?? this.transcoded,
+      seekableLive: seekableLive ?? this.seekableLive,
+      startFromBeginning: startFromBeginning ?? this.startFromBeginning,
     );
   }
 
@@ -137,6 +175,8 @@ class PlayerArgs {
           : Duration.zero,
       isLive: type == 'live',
       isCatchup: type == 'catchup',
+      seekableLive: seekableLive,
+      startFromBeginning: startFromBeginning,
       videoCodec: videoCodec,
       audioCodec: audioCodec,
       userAgent: userAgent,

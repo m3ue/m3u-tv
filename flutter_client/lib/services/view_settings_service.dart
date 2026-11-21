@@ -274,6 +274,14 @@ class ViewSettingsService extends ChangeNotifier {
   static const hideOverlayOnStartKey = 'm3ue_tv_hide_overlay_on_start';
   static const backMinimizesPlayerKey = 'm3ue_tv_back_minimizes_player';
   static const prebufferLiveKey = 'm3ue_tv_prebuffer_live';
+  static const timeshiftModeKey = 'm3ue_tv_timeshift_mode';
+  static const livePrebufferSecondsKey = 'm3ue_tv_live_prebuffer_seconds';
+
+  /// Choices offered for [livePrebufferSeconds]: how much video to buffer
+  /// before live playback begins. Kept at 4 s minimum: shorter cushions made
+  /// the player ride the live edge and stall at every short segment boundary.
+  static const livePrebufferSecondsOptions = <int>[4, 5, 8, 10];
+  static const defaultLivePrebufferSeconds = 4;
   static const backgroundAudioKey = 'm3ue_tv_background_audio';
   static const vodPlayerKey = 'm3ue_tv_vod_player';
   static const showPlaybackDiagnosticsKey = 'm3ue_tv_show_playback_diagnostics';
@@ -980,6 +988,51 @@ class ViewSettingsService extends ChangeNotifier {
     bool enabled,
   ) async {
     await _write(prebufferLiveKey, enabled);
+    notifyListeners();
+  }
+
+  /// Shared per-channel rolling timeshift buffer for normal live channels.
+  /// Default off (current behaviour: no rewind beyond pause). When on, live
+  /// opens append `?timeshift=1` so the editor can serve a seekable window.
+  Future<bool> timeshiftMode() async {
+    final raw = await _readResolved(timeshiftModeKey);
+    return raw as bool? ?? false;
+  }
+
+  bool get timeshiftModeSync => (_cached(timeshiftModeKey) as bool?) ?? false;
+
+  Future<void> setTimeshiftMode(
+    bool enabled,
+  ) async {
+    await _write(timeshiftModeKey, enabled);
+    notifyListeners();
+  }
+
+  /// Seconds of video to buffer before live playback starts (Kodi-style
+  /// prebuffer). 0 = start immediately (lowest delay); default 1s.
+  Future<int> livePrebufferSeconds() async {
+    final raw = await _readResolved(livePrebufferSecondsKey);
+    final value = raw is int ? raw : int.tryParse('${raw ?? ''}');
+    if (value == null || !livePrebufferSecondsOptions.contains(value)) {
+      return defaultLivePrebufferSeconds;
+    }
+    return value;
+  }
+
+  int get livePrebufferSecondsSync {
+    final raw = _cached(livePrebufferSecondsKey);
+    final value = raw is int ? raw : int.tryParse('${raw ?? ''}');
+    if (value == null || !livePrebufferSecondsOptions.contains(value)) {
+      return defaultLivePrebufferSeconds;
+    }
+    return value;
+  }
+
+  Future<void> setLivePrebufferSeconds(int seconds) async {
+    final clamped = livePrebufferSecondsOptions.contains(seconds)
+        ? seconds
+        : defaultLivePrebufferSeconds;
+    await _write(livePrebufferSecondsKey, clamped);
     notifyListeners();
   }
 

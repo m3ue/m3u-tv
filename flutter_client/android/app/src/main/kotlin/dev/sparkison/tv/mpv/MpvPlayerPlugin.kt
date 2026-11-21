@@ -130,6 +130,7 @@ class MpvPlayerPlugin(
                         matchDisplayRefreshRate = args["matchRefreshRate"] as? Boolean ?: false,
                         allowDisplayModeChanges = args["allowDisplayModeChanges"] as? Boolean ?: true,
                         posterUrl = args["posterUrl"] as? String,
+                        livePrebufferSeconds = (args["livePrebufferSeconds"] as? Number)?.toInt() ?: 1,
                     )
                     result.success(mapOf("ok" to true))
                 }

@@ -18,6 +18,9 @@ PlaybackSource applyPlayerSourceSettings(
     matchDisplayRefreshRate: settings?.matchRefreshRateSync ?? false,
     deinterlace: settings?.deinterlaceSync ?? false,
     prebufferLive: settings?.prebufferLiveSync ?? false,
+    livePrebufferSeconds: settings?.livePrebufferSecondsSync ?? 4,
+    // Live TV stays on ExoPlayer: the mpv backend tone-maps HDR to SDR and
+    // produced poor picture quality on this hardware.
     preferMpv:
         !source.isLive && settings?.vodPlayerSync == VodPlayerPreference.mpv,
   );

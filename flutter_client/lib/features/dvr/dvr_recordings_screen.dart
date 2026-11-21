@@ -1,7 +1,9 @@
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:m3u_tv/features/dvr/dvr_series_rule_options_screen.dart';
+import 'package:m3u_tv/features/dvr/in_progress_playback_dialog.dart';
 import 'package:m3u_tv/features/shows/shows_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -1205,9 +1207,13 @@ class _RecordingListState extends ConsumerState<_RecordingList> {
     setState(_selectedUuids.clear);
   }
 
-  void _openRecording(DvrRecording recording) {
+  Future<void> _openRecording(DvrRecording recording) async {
     if (!recording.isPlayable) return;
-    widget.onPlay(PlayerArgs.dvrRecording(recording));
+    await openDvrRecordingPlayback(
+      context,
+      recording: recording,
+      onPlay: widget.onPlay,
+    );
   }
 
   Future<void> _confirmStop(DvrRecording recording) async {
@@ -1555,6 +1561,8 @@ class _MetaLine extends StatelessWidget {
     }
     final duration = recording.durationSeconds;
     final size = recording.fileSizeBytes;
+    // Actual start when the recording ran; scheduled start before it starts.
+    final started = recording.actualStart ?? recording.scheduledStart;
 
     final spans = <InlineSpan>[];
     if (statusWord != null) {
@@ -1574,6 +1582,16 @@ class _MetaLine extends StatelessWidget {
       }
     }
 
+    if (started != null) {
+      appendSeparator();
+      final languageTag = Localizations.localeOf(context).toLanguageTag();
+      spans.add(
+        TextSpan(
+          text: DateFormat.MMMd(languageTag).add_jm().format(started.toLocal()),
+          style: muted,
+        ),
+      );
+    }
     if (channel != null && channel.isNotEmpty) {
       appendSeparator();
       spans.add(TextSpan(text: channel, style: muted));

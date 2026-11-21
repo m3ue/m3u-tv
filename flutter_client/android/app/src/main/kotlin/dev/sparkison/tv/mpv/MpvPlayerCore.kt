@@ -426,6 +426,7 @@ class MpvPlayerCore(
         matchDisplayRefreshRate: Boolean = false,
         allowDisplayModeChanges: Boolean = true,
         posterUrl: String? = null,
+        livePrebufferSeconds: Int = 1,
     ) {
         scope.launch {
             mutex.withLock {
@@ -487,6 +488,18 @@ class MpvPlayerCore(
                     // waits for it, never a channel start. Reset to mpv's
                     // default for every other load, as above.
                     current.setProperty("cache-pause-wait", if (isLive) "6" else "1")
+                    // Kodi-style prebuffer: hold at the first frame until
+                    // ~N seconds are cached so playback starts with a cushion.
+                    // 0 = start immediately (lowest delay).
+                    if (isLive && livePrebufferSeconds > 0) {
+                        current.setProperty("cache-pause-initial", "yes")
+                        current.setProperty(
+                            "cache-pause-wait",
+                            livePrebufferSeconds.coerceIn(1, 30).toString(),
+                        )
+                    } else {
+                        current.setProperty("cache-pause-initial", "no")
+                    }
 
                     val args = mutableListOf("loadfile", uri, "replace")
                     if (startPositionMs > 0) {

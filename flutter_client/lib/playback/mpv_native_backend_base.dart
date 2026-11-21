@@ -121,6 +121,7 @@ abstract class MpvNativeBackendBase
         'deinterlace': source.deinterlace,
         // Read by the Apple mpv cores; the Android core ignores it.
         'prebufferLive': source.prebufferLive,
+        'livePrebufferSeconds': source.livePrebufferSeconds,
         ...extraLoadArguments,
         'externalSubtitles': source.externalSubtitles
             .map(

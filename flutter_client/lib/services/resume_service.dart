@@ -101,7 +101,13 @@ class ResumeService {
           if (!p.upNext) _keyForProgress(p): p.toJson(),
     };
     bool replaced(String key) =>
-        key == recentKey || (prune && key.startsWith(resumePrefix));
+        key == recentKey ||
+        // Keep DVR-recording resume entries: they aren't part of the server's
+        // Continue Watching list (yet), so an authoritative server sync must
+        // not prune them or the recording's resume point would vanish.
+        (prune &&
+            key.startsWith(resumePrefix) &&
+            !key.contains('_dvr_recording_'));
     final store = _store;
     if (store != null) {
       if (shouldCommit == null) {

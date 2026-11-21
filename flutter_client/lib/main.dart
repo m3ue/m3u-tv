@@ -142,6 +142,8 @@ Future<void> main() async {
     appState.viewSettingsService.hideOverlayOnStart(),
     appState.viewSettingsService.backMinimizesPlayer(),
     appState.viewSettingsService.prebufferLive(),
+    appState.viewSettingsService.timeshiftMode(),
+    appState.viewSettingsService.livePrebufferSeconds(),
     appState.viewSettingsService.backgroundAudio(),
     appState.viewSettingsService.vodPlayer(),
     appState.viewSettingsService.showPlaybackDiagnostics(),

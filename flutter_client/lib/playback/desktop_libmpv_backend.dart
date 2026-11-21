@@ -163,6 +163,7 @@ class DesktopLibmpvBackend
         'allowDisplayModeChanges': source.allowDisplayModeChanges,
         'deinterlace': source.deinterlace,
         'prebufferLive': source.prebufferLive,
+        'livePrebufferSeconds': source.livePrebufferSeconds,
         'externalSubtitles': source.externalSubtitles
             .map(
               (subtitle) => <String, Object?>{

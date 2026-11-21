@@ -2,7 +2,7 @@
 
 import 'package:m3u_tv/shared/formatters.dart';
 
-enum ContentType { live, vod, episode, aiostreams }
+enum ContentType { live, vod, episode, aiostreams, dvrRecording }
 
 final RegExp _schemePattern = RegExp('^[a-zA-Z][a-zA-Z0-9+.-]*://');
 
@@ -887,6 +887,7 @@ class DvrRecording {
     required this.uuid,
     required this.title,
     required this.status,
+    this.id,
     this.subtitle,
     this.channelId,
     this.channelName,
@@ -897,6 +898,7 @@ class DvrRecording {
     this.actualStart,
     this.actualEnd,
     this.durationSeconds,
+    this.elapsedSeconds,
     this.fileSizeBytes,
     this.seasonNumber,
     this.episodeNumber,
@@ -908,6 +910,11 @@ class DvrRecording {
   });
 
   final String uuid;
+
+  /// Numeric DvrRecording id on the editor. Used as the watch-progress key
+  /// (`content_type = dvr_recording`) so a recording can be resumed. Null on
+  /// older servers that don't expose it.
+  final int? id;
   final String title;
   final String? subtitle;
   final DvrRecordingStatus status;
@@ -923,6 +930,11 @@ class DvrRecording {
   final DateTime? actualStart;
   final DateTime? actualEnd;
   final int? durationSeconds;
+
+  /// Seconds recorded so far while the growing HLS window is still served
+  /// (`recording` / `post_processing`). Null once completed (use
+  /// [durationSeconds]).
+  final int? elapsedSeconds;
   final int? fileSizeBytes;
   final int? seasonNumber;
   final int? episodeNumber;
@@ -935,8 +947,16 @@ class DvrRecording {
   bool get isInProgress => status == DvrRecordingStatus.recording;
   bool get isCompleted => status == DvrRecordingStatus.completed;
 
+  /// True while the proxy still serves the growing HLS playlist (recording,
+  /// or post-processing before broadcast cleanup). Playback uses [liveUrl]
+  /// and the player treats it as a seekable live window.
+  bool get playsLiveWindow =>
+      !isCompleted &&
+      liveUrl != null &&
+      (isInProgress || status == DvrRecordingStatus.postProcessing);
+
   String? get playbackUrl {
-    if (isInProgress && liveUrl != null) return liveUrl;
+    if (playsLiveWindow) return liveUrl;
     if (isCompleted && streamUrl != null) return streamUrl;
     return streamUrl ?? liveUrl;
   }
@@ -955,6 +975,7 @@ class DvrRecording {
     final title = _asNullableString(pick(['title', 'name'])) ?? 'Recording';
     return DvrRecording(
       uuid: _asNullableString(pick(['uuid', 'id'])) ?? '',
+      id: _asIntOrNull(pick(['id', 'dvr_recording_id'])),
       title: title,
       subtitle: _asNullableString(
         pick(['subtitle', 'episode_title', 'description']),
@@ -979,6 +1000,7 @@ class DvrRecording {
       durationSeconds: _asIntOrNull(
         pick(['duration_seconds', 'duration_secs', 'duration']),
       ),
+      elapsedSeconds: _asIntOrNull(pick(['elapsed_seconds', 'elapsed_secs'])),
       fileSizeBytes: _asIntOrNull(
         pick(['file_size_bytes', 'file_size', 'size_bytes']),
       ),
@@ -1653,6 +1675,7 @@ extension ContentTypeWire on ContentType {
     ContentType.vod => 'vod',
     ContentType.episode => 'episode',
     ContentType.aiostreams => 'aiostreams',
+    ContentType.dvrRecording => 'dvr_recording',
   };
 }
 
@@ -1660,6 +1683,7 @@ ContentType contentTypeFromWire(String value) => switch (value) {
   'live' => ContentType.live,
   'episode' => ContentType.episode,
   'aiostreams' => ContentType.aiostreams,
+  'dvr_recording' => ContentType.dvrRecording,
   _ => ContentType.vod,
 };
 

@@ -46,6 +46,11 @@ class AppLogBuffer {
   int _bytes = 0;
   bool _installed = false;
 
+  /// Capture of whatever `debugPrint` was before install() replaced it, so
+  /// [add] can reach logcat without re-entering the installed tee (which
+  /// calls [add] → StackOverflow).
+  void Function(String? message, {int? wrapWidth})? _rawPrint;
+
   /// Oldest first.
   List<AppLogEntry> get entries => List.unmodifiable(_entries);
 
@@ -60,6 +65,9 @@ class AppLogBuffer {
     while (_bytes > maxBytes && _entries.isNotEmpty) {
       _bytes -= _entries.removeFirst().estimatedBytes;
     }
+    // Hit logcat via the pre-install print, never via debugPrint — the
+    // installed tee calls add(), and add()→debugPrint→add() overflows.
+    _rawPrint?.call(entry.format());
   }
 
   void clear() {
@@ -129,9 +137,11 @@ class AppLogBuffer {
     _installed = true;
 
     final previousPrint = debugPrint;
+    _rawPrint = previousPrint;
     debugPrint = (message, {wrapWidth}) {
+      // add() echoes through `_rawPrint` (the pre-install debugPrint), so do
+      // not forward here too or every line is printed twice.
       if (message != null) add(AppLogLevel.info, message);
-      previousPrint(message, wrapWidth: wrapWidth);
     };
 
     final previousFlutterError = FlutterError.onError;

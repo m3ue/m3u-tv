@@ -306,14 +306,23 @@ class PlaybackSource {
     this.matchDisplayRefreshRate = false,
     this.deinterlace = false,
     this.prebufferLive = false,
+    this.livePrebufferSeconds = 4,
     this.allowDisplayModeChanges = true,
     this.preferMpv = false,
+    this.seekableLive = false,
+    this.startFromBeginning = false,
+    this.mimeType,
   });
 
   final String uri;
   final String? title;
   final Duration startPosition;
   final bool isLive;
+
+  /// Explicit container MIME for the native player. Set by a pre-open probe
+  /// for `?timeshift=1` URLs (response may be HLS or MPEG-TS depending on
+  /// buffer state); null lets the backend infer from the URI.
+  final String? mimeType;
 
   /// A catchup (timeshift) programme. Its timeline comes from the EPG, so the
   /// mpv backends skip work that only serves the file's own duration.
@@ -358,6 +367,23 @@ class PlaybackSource {
   /// setting is hidden there. Mirrors `ViewSettingsService.prebufferLive`.
   final bool prebufferLive;
 
+  /// Seconds of video to buffer before live playback begins (Kodi-style
+  /// prebuffer). 0 = start immediately for lowest delay; default 1. Applied
+  /// by ExoPlayer (`LiveConfiguration` target offset) and mpv
+  /// (`cache-pause-initial` / `cache-pause-wait`).
+  final int livePrebufferSeconds;
+
+  /// Live-type source whose timeline is a seekable HLS window: DVR in-progress
+  /// recordings (growing window from segment 0) and normal live channels when
+  /// timeshift mode is on (`?timeshift=1` → shared rolling buffer). Regular
+  /// live with timeshift off stays false.
+  final bool seekableLive;
+
+  /// Seek to the start of the growing window right after open (viewer chose
+  /// "Start from beginning" on an in-progress recording). Only meaningful
+  /// when [seekableLive].
+  final bool startFromBeginning;
+
   /// Whether the backend may change the display's own mode for this source:
   /// a refresh-rate match ([matchDisplayRefreshRate]), tvOS display criteria
   /// (frame rate and HDR/Dolby Vision range), or the Windows OS HDR switch.
@@ -389,8 +415,12 @@ class PlaybackSource {
     bool? matchDisplayRefreshRate,
     bool? deinterlace,
     bool? prebufferLive,
+    int? livePrebufferSeconds,
     bool? allowDisplayModeChanges,
     bool? preferMpv,
+    bool? seekableLive,
+    bool? startFromBeginning,
+    String? mimeType,
   }) {
     return PlaybackSource(
       uri: uri ?? this.uri,
@@ -409,9 +439,13 @@ class PlaybackSource {
           matchDisplayRefreshRate ?? this.matchDisplayRefreshRate,
       deinterlace: deinterlace ?? this.deinterlace,
       prebufferLive: prebufferLive ?? this.prebufferLive,
+      livePrebufferSeconds: livePrebufferSeconds ?? this.livePrebufferSeconds,
       allowDisplayModeChanges:
           allowDisplayModeChanges ?? this.allowDisplayModeChanges,
       preferMpv: preferMpv ?? this.preferMpv,
+      seekableLive: seekableLive ?? this.seekableLive,
+      startFromBeginning: startFromBeginning ?? this.startFromBeginning,
+      mimeType: mimeType ?? this.mimeType,
     );
   }
 }

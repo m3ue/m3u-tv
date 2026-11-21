@@ -799,6 +799,8 @@ class PlaybackOrchestrator {
         title: source.title,
         startPosition: source.startPosition,
         isLive: source.isLive,
+        seekableLive: source.seekableLive,
+        startFromBeginning: source.startFromBeginning,
         userAgent: source.userAgent,
         headers: source.headers,
         hdrEnabled: source.hdrEnabled,
@@ -806,6 +808,7 @@ class PlaybackOrchestrator {
         allowDisplayModeChanges: source.allowDisplayModeChanges,
         deinterlace: source.deinterlace,
         prebufferLive: source.prebufferLive,
+        livePrebufferSeconds: source.livePrebufferSeconds,
         metadata: <String, Object?>{
           ...source.metadata,
           'transcode_stream_id': response.streamId,

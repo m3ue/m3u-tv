@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:m3u_tv/features/player/format_time.dart';
 import 'package:m3u_tv/features/player/track_selector.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/l10n/timeshift_localizations.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_icons.dart';
@@ -90,13 +91,20 @@ class PlaybackControls extends StatelessWidget {
     this.skipPrompt,
     this.upNextPrompt,
     this.showControlsBar = true,
+    this.showProgressBar = true,
     this.liveProgrammeEnd,
+    this.onGoLive,
+    this.showGoLive = false,
     super.key,
   });
 
   final bool isPlaying;
   final bool isLive;
   final bool canSeek;
+
+  /// Seekable live (DVR window): jump to the write point / live edge.
+  final VoidCallback? onGoLive;
+  final bool showGoLive;
 
   /// Shown where the seek bar would be when seeking is withheld for a reason
   /// the user should know about (e.g. transcoded playback). Ignored when
@@ -184,6 +192,12 @@ class PlaybackControls extends StatelessWidget {
   /// since its buttons do nothing while the stream is still loading; the
   /// header's back button stays available either way.
   final bool showControlsBar;
+
+  /// Whether the seek bar (and its end-time label) renders. False for plain
+  /// live before the timeshift window exists: a raw TS pipe has no duration,
+  /// so showing an empty/static bar is misleading. The rewind button stays
+  /// available; rewinding starts the window, after which this becomes true.
+  final bool showProgressBar;
 
   /// Live TV only: when the current EPG programme ends. A live stream has no
   /// length of its own, so this is what "Ends at" shows for it.
@@ -444,8 +458,8 @@ class PlaybackControls extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (canSeek) _buildProgressBar(colorScheme),
-          if (!canSeek && seekUnavailableMessage != null)
+          if (showProgressBar && canSeek) _buildProgressBar(colorScheme),
+          if ((!showProgressBar || !canSeek) && seekUnavailableMessage != null)
             Text(
               seekUnavailableMessage!,
               textAlign: TextAlign.center,
@@ -453,7 +467,7 @@ class PlaybackControls extends StatelessWidget {
                 color: Colors.white70,
               ),
             ),
-          if (canSeek || seekUnavailableMessage != null)
+          if ((showProgressBar && canSeek) || seekUnavailableMessage != null)
             SizedBox(height: compact ? 6 : 12),
           _buildControlRow(context, colorScheme, compact: compact),
         ],
@@ -474,8 +488,9 @@ class PlaybackControls extends StatelessWidget {
 
   /// Skip back/forward are seeks, so they go when seeking is withheld for a
   /// stated reason; with no reason (e.g. duration not known yet) they stay.
+  /// Seekable live (DVR window) shows them the same as VOD.
   bool get _showSkipButtons =>
-      !isLive && (canSeek || seekUnavailableMessage == null);
+      (!isLive || canSeek) && (canSeek || seekUnavailableMessage == null);
 
   Widget _buildTrackControls() {
     return TrackSelector(
@@ -708,6 +723,15 @@ class PlaybackControls extends StatelessWidget {
               tooltip: isRecording
                   ? AppLocalizations.of(context).playerStopRecordingTooltip
                   : AppLocalizations.of(context).playerRecordNowTooltip,
+            ),
+          ),
+        if (showGoLive && onGoLive != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: AppIconButton(
+              icon: Icons.live_tv,
+              onPressed: onGoLive,
+              tooltip: AppLocalizations.of(context).playerGoLive,
             ),
           ),
         if (_showSkipButtons)

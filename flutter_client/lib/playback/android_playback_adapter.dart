@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/playback/timeshift_mime_probe.dart';
+import 'package:m3u_tv/services/app_log_buffer.dart';
 
 enum VideoCodec { h264, h265, av1, mpeg2, unknown }
 
@@ -131,8 +133,36 @@ class AndroidPlaybackAdapter
   @override
   Stream<PlaybackState> get onState => _stateController.stream;
 
+  /// Resolves the real container of a `?timeshift=1` URL before it reaches
+  /// ExoPlayer. The same `.m3u8` URL serves HLS when the shared buffer is warm
+  /// and a raw MPEG-TS pipe when it is cold; ExoPlayer infers HLS from the
+  /// extension and fails the cold case with `#EXTM3U`. Done here (rather than
+  /// in the full-screen player) so every caller — including the EPG guide
+  /// preview, which opens its own player — gets the right MIME.
+  Future<PlaybackSource> _resolveTimeshiftMime(PlaybackSource source) async {
+    if (source.mimeType != null || !source.uri.contains('timeshift=1')) {
+      return source;
+    }
+    final mime = await probeTimeshiftMime(source.uri);
+    AppLogBuffer.instance.add(
+      AppLogLevel.info,
+      'timeshift-probe mime=${mime ?? "timeout→mp2t"} live=${source.isLive} '
+      'seekable=${source.seekableLive}',
+    );
+    return source.copyWith(mimeType: mime ?? kTsMime);
+  }
+
   @override
-  Future<void> load(PlaybackSource source) async {
+  Future<void> load(PlaybackSource original) async {
+    var source = await _resolveTimeshiftMime(original);
+    // Timeshift live only: never hand display-mode / frame-rate switching to
+    // the player on the shared-buffer/chase path. On this Amlogic box it fires
+    // `frameRateDisplay` mid-playback, which flushes the hardware decoder
+    // (discarded bitstream, picture freeze, occasionally a stream end). Plain
+    // live and VOD keep the user's setting.
+    if (source.uri.contains('timeshift=1') && source.matchDisplayRefreshRate) {
+      source = source.copyWith(matchDisplayRefreshRate: false);
+    }
     final fallbackReason = _fallbackReason(source);
     if (fallbackReason == null) {
       _activeBackend = PlaybackBackend.androidExoPlayer;
@@ -497,8 +527,12 @@ class MethodChannelAndroidMedia3Host implements AndroidMedia3Host {
         'title': source.title,
         'startPositionMs': source.startPosition.inMilliseconds,
         'isLive': source.isLive,
+        'seekableLive': source.seekableLive,
+        'startFromBeginning': source.startFromBeginning,
+        'livePrebufferSeconds': source.livePrebufferSeconds,
         'videoCodec': source.videoCodec,
         'audioCodec': source.audioCodec,
+        'mimeType': source.mimeType,
         'userAgent': source.userAgent,
         'headers': source.headers,
         'metadata': source.metadata,

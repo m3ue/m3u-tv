@@ -263,6 +263,7 @@ void main() {
           'allowDisplayModeChanges': true,
           'deinterlace': false,
           'prebufferLive': false,
+          'livePrebufferSeconds': 4,
           'externalSubtitles': <Map<String, Object?>>[],
         });
         expect(backend.textureId, isNull);

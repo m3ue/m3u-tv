@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:m3u_tv/features/dvr/in_progress_playback_dialog.dart';
 import 'package:m3u_tv/features/epg/timeline_epg_view.dart' show EnsureEpg;
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
@@ -776,8 +777,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       cornerBadgeColor: recording.isInProgress
           ? Theme.of(context).colorScheme.error
           : null,
-      onTap: () =>
-          widget.onRecordingPlay?.call(PlayerArgs.dvrRecording(recording)),
+      onTap: () => unawaited(
+        openDvrRecordingPlayback(
+          context,
+          recording: recording,
+          onPlay: (args) => widget.onRecordingPlay?.call(args),
+        ),
+      ),
     );
   }
 

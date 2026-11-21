@@ -115,6 +115,9 @@ void main() {
 
       await tester.tap(find.text('Live News'));
       await tester.pumpAndSettle();
+      // In-progress recordings ask from-beginning vs live edge first.
+      await tester.tap(find.text('Watch live edge'));
+      await tester.pumpAndSettle();
 
       expect(opened, isNotNull);
       expect(

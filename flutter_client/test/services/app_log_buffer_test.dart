@@ -75,7 +75,12 @@ void main() {
       FlutterErrorDetails(exception: StateError('boom')),
     );
 
-    expect(forwarded, ['hello']);
+    // The pre-install debugPrint is the raw sink for every entry (the
+    // formatted line), so the explicit debugPrint line and the framework error
+    // both reach it.
+    expect(forwarded.first, contains('hello'));
+    expect(forwarded, hasLength(2));
+    expect(forwarded.last, contains('boom'));
     expect(buffer.entries.first.message, 'hello');
     expect(buffer.entries.last.level, AppLogLevel.error);
     expect(buffer.entries.last.message, contains('boom'));

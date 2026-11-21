@@ -565,16 +565,55 @@ class AppStateController extends ChangeNotifier {
   /// (e.g. AIOStreams sources) pass through unchanged. Every player of an
   /// editor stream (full-screen, the EPG preview) must go through this, so
   /// they request the same proxy stream and can share it.
+  ///
+  /// When timeshift mode is on AND the server advertises the `timeshift`
+  /// feature, editor `/live/...` URLs get `?timeshift=1`. Old servers omit
+  /// the feature → no param → identical plain-live behaviour (safe upgrade).
   String applyProxyPlayback(String streamUrl, {required String type}) {
+    var url = streamUrl;
     final proxy = authNotifier.authResponse?.proxy;
     final server = xtreamService.credentials?.server;
-    if (proxy == null || server == null) return streamUrl;
-    return proxyPlaybackSettings.apply(
-      streamUrl,
-      type: type,
-      forced: proxy.forced,
-      serverBase: server,
-    );
+    if (proxy != null && server != null) {
+      url = proxyPlaybackSettings.apply(
+        url,
+        type: type,
+        forced: proxy.forced,
+        serverBase: server,
+      );
+    }
+    final timeshiftSupported =
+        authNotifier.authResponse?.hasFeature('timeshift') ?? false;
+    if (type == 'live' &&
+        viewSettingsService.timeshiftModeSync &&
+        timeshiftSupported) {
+      url = _appendTimeshiftParams(url, server);
+    }
+    return url;
+  }
+
+  /// Append `timeshift=1` to an editor live URL. External or non-/live/ URLs
+  /// pass through unchanged. Query params already present (proxy, client_id
+  /// later) are preserved.
+  String _appendTimeshiftParams(String streamUrl, String? server) {
+    if (server == null || !streamUrl.startsWith(server)) return streamUrl;
+    final uri = Uri.tryParse(streamUrl);
+    if (uri == null) return streamUrl;
+    final segments = uri.pathSegments;
+    // /live/{user}/{pass}/{id}.ext → 4 path segments starting with "live".
+    if (segments.length != 4 || segments.first != 'live') return streamUrl;
+    final params = Map<String, String>.from(uri.queryParameters);
+    if (params.containsKey('timeshift')) return streamUrl;
+    params['timeshift'] = '1';
+    // Apple AVPlayer and web hls.js cannot play the raw MPEG-TS plain-live
+    // fallback, so they ask the editor for the HLS window from the first
+    // request. Android/desktop/mpv instead ask for plain live (the buffer is
+    // still kicked off) and only switch to HLS when the viewer rewinds.
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) {
+      params['timeshift_hls'] = '1';
+    } else {
+      params['timeshift_plain'] = '1';
+    }
+    return uri.replace(queryParameters: params).toString();
   }
 
   /// Whether [applyProxyPlayback] sends [streamUrl] through an explicit

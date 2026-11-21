@@ -26,12 +26,14 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.source.UnrecognizedInputFormatException
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.VideoSize
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -378,7 +380,7 @@ class Media3PlaybackPlugin(
         )
         // DefaultRenderersFactory plus live audio/subtitle sync offsets.
         val renderersFactory = SyncOffsetRenderersFactory(context)
-        val player = ExoPlayer.Builder(context, renderersFactory)
+        val playerBuilder = ExoPlayer.Builder(context, renderersFactory)
             .setTrackSelector(trackSelector)
             .setMediaSourceFactory(
                 // DefaultDataSource passes web URLs to the HTTP factory and also reads
@@ -389,7 +391,23 @@ class Media3PlaybackPlugin(
                     .setDataSourceFactory(DefaultDataSource.Factory(context, httpDataSourceFactory))
             )
             .setAudioAttributes(audioAttributes, handleAudioFocus)
-            .build()
+        // Timeshift only: the shared-buffer/chase path is re-segmented into
+        // short HLS segments, where a small cushion and a fast resume after a
+        // brief upstream gap matter. Plain live and VOD keep ExoPlayer's
+        // defaults.
+        if ((source["uri"] as? String)?.contains("timeshift=1") == true) {
+            val loadControl = DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                    /* minBufferMs = */ 8000,
+                    /* maxBufferMs = */ 30000,
+                    /* bufferForPlaybackMs = */ 1000,
+                    /* bufferForPlaybackAfterRebufferMs = */ 1200,
+                )
+                .setPrioritizeTimeOverSizeThresholds(true)
+                .build()
+            playerBuilder.setLoadControl(loadControl)
+        }
+        val player = playerBuilder.build()
         val subtitleConfigurations = buildSubtitleConfigurations(source["externalSubtitles"])
         val state = PlayerState(
             playerId = playerId,
@@ -417,12 +435,22 @@ class Media3PlaybackPlugin(
                 .setBitmapLoader(artworkLoader)
                 .build()
         states[playerId] = state
+        // Track the mime we actually opened with so retryFlippedMime can
+        // flip it if the probe guessed wrong (HLS body vs TS pipe).
+        state.lastMimeType = (source["mimeType"] as? String)
+            ?: if (uri.contains("timeshift=1")) null
+            else if (source["isLive"] as? Boolean == true) MimeTypes.APPLICATION_M3U8
+            else null
 
         player.setVideoSurfaceView(surfaceView)
         player.addListener(Media3Listener(playerId))
-        // A live stream's splices jump the audio clock in normal use, and live has
-        // nothing to resume, so this only watches on-demand content.
-        if (source["isLive"] as? Boolean != true) {
+        // A live stream's splices jump the audio clock in normal use, and plain
+        // live has nothing to resume, so the freeze watchdog only watches
+        // on-demand content — plus seekable live windows (timeshift/DVR), where
+        // a seek-induced discontinuity that stalls playback must be reported
+        // (otherwise the player freezes with no error, e.g. second rewind).
+        val seekableLive = source["seekableLive"] as? Boolean ?: false
+        if (source["isLive"] as? Boolean != true || seekableLive) {
             player.addAnalyticsListener(AudioDiscontinuityListener(playerId, player))
         }
         if (matchDisplayRefreshRate && allowDisplayModeChanges) {
@@ -580,6 +608,27 @@ class Media3PlaybackPlugin(
     }
 
     /**
+     * Playback duration for the UI/seek bar.
+     *
+     * Live HLS (plain and timeshift windows) reports `player.duration` as
+     * [C.TIME_UNSET]; the real window length lives on the timeline window
+     * and only appears once the playlist has been parsed — and again on every
+     * playlist refresh as the window slides. Falls back to that so seekable
+     * live gets a growing total instead of a permanent 0:00.
+     */
+    private fun effectiveDurationMs(player: Player): Long? {
+        val direct = player.duration
+        if (direct != C.TIME_UNSET && direct > 0) return direct
+        val timeline = player.currentTimeline
+        if (timeline.isEmpty) return null
+        val index = player.currentMediaItemIndex
+        if (index == C.INDEX_UNSET) return null
+        val window = timeline.getWindow(index, Timeline.Window())
+        val fromWindow = window.durationMs
+        return if (fromWindow != C.TIME_UNSET && fromWindow > 0) fromWindow else null
+    }
+
+    /**
      * ExoPlayer can only take a sideloaded subtitle as part of the media item, so
      * this re-prepares at the current position. [PlayerState.subtitleConfigurations]
      * keeps it for a later retryAsTs.
@@ -634,7 +683,7 @@ class Media3PlaybackPlugin(
             playerId = playerId,
             type = if (player.isPlaying) "playing" else "ready",
             positionMs = player.currentPosition,
-            durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0 },
+            durationMs = effectiveDurationMs(player),
             audioTracks = playbackTracks(player.currentTracks, C.TRACK_TYPE_AUDIO),
             subtitleTracks = playbackTracks(player.currentTracks, C.TRACK_TYPE_TEXT),
             selectedAudioTrackId = selectedTrackId(player.currentTracks, C.TRACK_TYPE_AUDIO),
@@ -877,7 +926,7 @@ class Media3PlaybackPlugin(
                         playerId = playerId,
                         type = if (player.isPlaying) "playing" else "ready",
                         positionMs = player.currentPosition,
-                        durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0 },
+                        durationMs = effectiveDurationMs(player),
                         videoAspectRatio = aspectRatio.toDouble(),
                     )
                 }
@@ -902,7 +951,7 @@ class Media3PlaybackPlugin(
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             val player = states[playerId]?.player ?: return
-            val dur = player.duration.takeIf { it != C.TIME_UNSET && it > 0 }
+            val dur = effectiveDurationMs(player)
             when (playbackState) {
                 Player.STATE_BUFFERING -> emit(playerId, "buffering", positionMs = player.currentPosition)
                 Player.STATE_READY -> emit(playerId, if (player.playWhenReady) "playing" else "ready", positionMs = player.currentPosition, durationMs = dur)
@@ -911,16 +960,31 @@ class Media3PlaybackPlugin(
             }
         }
 
+        // Live/timeshift window duration only lands on the timeline after the
+        // playlist parses (and again on every refresh as the window slides).
+        // Without this the seek bar total stays 0:00 — player.duration is
+        // TIME_UNSET for live HLS and state-change emits often fire first.
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+            val player = states[playerId]?.player ?: return
+            val dur = effectiveDurationMs(player) ?: return
+            emit(
+                playerId,
+                if (player.isPlaying) "playing" else "ready",
+                positionMs = player.currentPosition,
+                durationMs = dur,
+            )
+        }
+
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             val player = states[playerId]?.player ?: return
-            val dur = player.duration.takeIf { it != C.TIME_UNSET && it > 0 }
+            val dur = effectiveDurationMs(player)
             emit(playerId, if (isPlaying) "playing" else "ready", positionMs = player.currentPosition, durationMs = dur)
             if (isPlaying) armResumeStallWatchdog(playerId) else cancelResumeStallWatchdog(playerId)
         }
 
         override fun onPlayerError(error: PlaybackException) {
             val state = states[playerId]
-            if (state != null && state.retryAsTs(error)) {
+            if (state != null && state.retryFlippedMime(error)) {
                 emit(playerId, "buffering", uri = state.uri, positionMs = state.player.currentPosition)
                 state.player.prepare()
                 return
@@ -999,16 +1063,31 @@ class Media3PlaybackPlugin(
         var resumeStallBaselinePositionMs: Long = 0L,
         var resumeStallRechecksLeft: Int = 0,
         var resumeStallRecoveryCount: Int = 0,
+        /** Last mime we opened with, so a format-mismatch can flip it. */
+        var lastMimeType: String? = null,
     ) {
-        fun retryAsTs(error: PlaybackException): Boolean {
+        /**
+         * Format mismatch: HLS body parsed as TS (or vice versa) — flip the
+         * mime once and re-prepare. Covers timeshift=1 where the server
+         * returns HLS (buffer ready) or MPEG-TS (buffer cold) and a probe
+         * timeout can guess wrong.
+         */
+        fun retryFlippedMime(error: PlaybackException): Boolean {
             if (retriedHlsAsProgressive || !error.looksLikeFormatMismatch()) {
                 return false
             }
 
             retriedHlsAsProgressive = true
+            val current = lastMimeType ?: MimeTypes.APPLICATION_M3U8
+            val flipped = if (current == MimeTypes.APPLICATION_M3U8) {
+                MimeTypes.VIDEO_MP2T
+            } else {
+                MimeTypes.APPLICATION_M3U8
+            }
+            lastMimeType = flipped
             val builder = MediaItem.Builder()
                 .setUri(Uri.parse(uri))
-                .setMimeType(MimeTypes.VIDEO_MP2T)
+                .setMimeType(flipped)
             if (subtitleConfigurations.isNotEmpty()) {
                 builder.setSubtitleConfigurations(subtitleConfigurations)
             }
@@ -1018,18 +1097,23 @@ class Media3PlaybackPlugin(
         }
     }
 
+    @OptIn(UnstableApi::class)
     private fun buildMediaItem(
         uri: String,
         source: Map<*, *>,
         subtitleConfigurations: List<MediaItem.SubtitleConfiguration>,
     ): MediaItem {
         val isLive = source["isLive"] as? Boolean ?: false
+        val livePrebufferSeconds = (source["livePrebufferSeconds"] as? Number)?.toInt() ?: 1
         val metadata = source["metadata"] as? Map<*, *>
         val containerExtension = metadata?.get("container_extension") as? String
+        // Dart pre-open probe result for ?timeshift=1 (HLS window vs TS pipe).
+        val probedMime = source["mimeType"] as? String
 
-        // For live streams, always hint HLS first (Xtream live URLs have no extension).
-        // For VOD/series, use the container extension from metadata to avoid format sniffing.
+        val isTimeshiftParam = uri.contains("timeshift=1")
         val mimeType: String? = when {
+            probedMime != null -> probedMime
+            isTimeshiftParam -> null
             isLive -> MimeTypes.APPLICATION_M3U8
             containerExtension != null -> mimeTypeFromExtension(containerExtension)
             else -> null
@@ -1038,6 +1122,31 @@ class Media3PlaybackPlugin(
         val builder = MediaItem.Builder().setUri(Uri.parse(uri))
         if (mimeType != null) {
             builder.setMimeType(mimeType)
+        }
+        // Remember for retryFlippedMime if the probe guessed wrong.
+        // (Set on the state after states[playerId] = state below via load().)
+        // Live prebuffer: how far behind the live edge to stay (Kodi-style
+        // "buffer before playback begins"). 0 = as close to live as possible
+        // (lowest delay); N seconds = play Ns behind the edge for cushion.
+        // Playback speed is pinned to 1.0 — LiveConfiguration's speed chase
+        // (e.g. 1.0–1.02×) caused visible micro-stutters on jittery OTA HLS.
+        if (isLive) {
+            // Timeshift windows are re-segmented to short (~2 s) segments; a
+            // 1 s target rides the live edge and stalls at every segment
+            // boundary. Keep a few seconds of cushion — latency is irrelevant
+            // here because the viewer can rewind anyway.
+            val prebufferSeconds =
+                if (isTimeshiftParam) maxOf(livePrebufferSeconds, 4) else livePrebufferSeconds
+            val targetOffsetMs = prebufferSeconds.coerceIn(0, 30) * 1000L
+            builder.setLiveConfiguration(
+                MediaItem.LiveConfiguration.Builder()
+                    .setTargetOffsetMs(targetOffsetMs)
+                    .setMinOffsetMs(0L)
+                    .setMaxOffsetMs((targetOffsetMs * 3).coerceAtLeast(5000L))
+                    .setMinPlaybackSpeed(1.0f)
+                    .setMaxPlaybackSpeed(1.0f)
+                    .build(),
+            )
         }
         if (subtitleConfigurations.isNotEmpty()) {
             builder.setSubtitleConfigurations(subtitleConfigurations)
@@ -1150,10 +1259,22 @@ internal fun List<MediaItem>.isCarPick(): Boolean =
     isNotEmpty() && all { it.localConfiguration == null }
 
 internal fun PlaybackException.looksLikeFormatMismatch(): Boolean {
-    if (cause is UnrecognizedInputFormatException) return true
-    val text = listOfNotNull(message, cause?.message).joinToString("\n")
-    return text.contains("Input does not start with the #EXTM3U header") ||
-        text.contains("UnrecognizedInputFormatException")
+    // The useful detail is often nested several causes deep (e.g. an
+    // ExoPlaybackException wrapping a ParserException), so walk the whole
+    // chain rather than only the top-level message.
+    var current: Throwable? = this
+    while (current != null) {
+        if (current is UnrecognizedInputFormatException) return true
+        val message = current.message
+        if (message != null &&
+            (message.contains("Input does not start with the #EXTM3U header") ||
+                message.contains("UnrecognizedInputFormatException"))
+        ) {
+            return true
+        }
+        current = current.cause
+    }
+    return false
 }
 
 

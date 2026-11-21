@@ -351,10 +351,15 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
           ),
           sourceFor: (channel) {
             final args = PlayerArgs.liveChannel(channel);
+            final streamUrl = applyProxyPlayback(args.streamUrl, type: 'live');
+            // Only seekable when the URL actually carries the opt-in param
+            // (set only if the server advertises the timeshift feature).
+            final seekable = streamUrl.contains('timeshift=1');
             return applyPlayerSourceSettings(
               args
                   .copyWith(
-                    streamUrl: applyProxyPlayback(args.streamUrl, type: 'live'),
+                    streamUrl: streamUrl,
+                    seekableLive: seekable,
                   )
                   .toPlaybackSource(),
               settings,

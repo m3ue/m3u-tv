@@ -840,12 +840,22 @@ class AppShellState extends ConsumerState<AppShell>
   Future<void> _openPlayer(BuildContext context, PlayerArgs args) async {
     var resolvedArgs = args;
     final l = AppLocalizations.of(context);
-    if ((resolvedArgs.type == 'vod' || resolvedArgs.type == 'series') &&
+    // Completed DVR recordings are opened as VOD with a dvr_uuid and the
+    // recording's numeric id, so they resume like VOD under their own
+    // content type (content_type=dvr_recording). In-progress windows keep
+    // their own from-beginning/edge dialog instead.
+    final isDvrRecording =
+        resolvedArgs.metadata['dvr_uuid'] != null && resolvedArgs.type == 'vod';
+    if ((resolvedArgs.type == 'vod' ||
+            resolvedArgs.type == 'series' ||
+            isDvrRecording) &&
         resolvedArgs.startPosition == null &&
         resolvedArgs.streamId != null) {
-      final target = resolvedArgs.type == 'series'
-          ? ContentType.episode
-          : ContentType.vod;
+      final target = isDvrRecording
+          ? ContentType.dvrRecording
+          : (resolvedArgs.type == 'series'
+                ? ContentType.episode
+                : ContentType.vod);
       final progress = _appState.progressList.firstWhereOrNull(
         (p) =>
             p.streamId == resolvedArgs.streamId &&
@@ -897,10 +907,23 @@ class AppShellState extends ConsumerState<AppShell>
       args.streamUrl,
       type: args.type,
     );
-    if (updated == args.streamUrl && transcoded == args.transcoded) {
+    // Timeshift mode: live channels become seekable when the URL carries
+    // ?timeshift=1 (DVR windows already set seekableLive themselves).
+    final timeshiftLive =
+        args.type == 'live' &&
+        _appState.viewSettingsService.timeshiftModeSync &&
+        updated.contains('timeshift=1');
+    final seekableLive = args.seekableLive || timeshiftLive;
+    if (updated == args.streamUrl &&
+        transcoded == args.transcoded &&
+        seekableLive == args.seekableLive) {
       return args;
     }
-    return args.copyWith(streamUrl: updated, transcoded: transcoded);
+    return args.copyWith(
+      streamUrl: updated,
+      transcoded: transcoded,
+      seekableLive: seekableLive,
+    );
   }
 
   void _openPlayerDirect(PlayerArgs rawArgs) {
@@ -2004,7 +2027,7 @@ class AppShellState extends ConsumerState<AppShell>
             isConfigured: _appState.isConfigured,
             useInlineRowActions: shouldUseSidebar(widget.deviceType),
             storageInfo: ref.watch(dvrStorageInfoProvider),
-            onPlay: _openPlayerDirect,
+            onPlay: _openPlayerFromActions,
             onCancelRecording: (uuid) => _appState.cancelDvrRecording(uuid),
             onCancelAndDeleteRecording: _dvrActions.cancelAndDeleteRecording,
             onDeleteRecording: (uuid) => _appState.deleteDvrRecording(uuid),
