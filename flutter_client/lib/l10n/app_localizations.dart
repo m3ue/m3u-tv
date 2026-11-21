@@ -3671,7 +3671,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsBackMinimizesPlayerHint.
   ///
   /// In en, this message translates to:
-  /// **'Back shrinks playback to a floating window so you can keep browsing, instead of stopping it. Use the back arrow in the player\'s controls to stop.'**
+  /// **'Back shrinks playback to a floating window so you can keep browsing, instead of stopping it. Close the floating window to stop.'**
   String get settingsBackMinimizesPlayerHint;
 
   /// No description provided for @settingsBackgroundAudio.

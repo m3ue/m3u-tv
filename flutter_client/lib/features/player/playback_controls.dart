@@ -150,9 +150,9 @@ class PlaybackControls extends StatelessWidget {
   /// fullscreen) and only renders when non-null.
   final VoidCallback? onMinimize;
 
-  /// The header's back button closes the player, where the Back key
-  /// minimizes it instead ("Back minimizes the player"): it shows a close
-  /// icon then, so it doesn't look like the Back key.
+  /// The header button ([onBack]) closes the player, so it shows a close
+  /// icon. False where it minimizes instead, like the Back key ("Back
+  /// minimizes the player"), and shows the back arrow.
   final bool backClosesPlayer;
   final String? fallbackReason;
   final FocusNode? playPauseFocusNode;

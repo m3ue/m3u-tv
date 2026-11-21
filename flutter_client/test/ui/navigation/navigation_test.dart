@@ -2047,7 +2047,8 @@ void main() {
         await _pumpAppFrame(tester);
         await tester.tap(find.text('Route News').last);
         await _pumpAppFrame(tester);
-        expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+        // The OSD is up: its header shows the close button.
+        expect(find.byIcon(Icons.close), findsOneWidget);
 
         // The key event (Escape here, like goBack) reaches the player and
         // hides its OSD; the popRoute echo of the same press must not then
@@ -2060,7 +2061,7 @@ void main() {
         await _pumpAppFrame(tester);
 
         expect(find.byType(PlayerScreen), findsOneWidget);
-        expect(find.byIcon(Icons.arrow_back), findsNothing);
+        expect(find.byIcon(Icons.close), findsNothing);
 
         // Same pair in the other arrival order, now with the OSD hidden,
         // closes the player exactly once.
@@ -2803,9 +2804,9 @@ void main() {
         await openPlayer(tester, appState);
         final playerState = tester.state(find.byType(PlayerScreen));
         final testApp = tester.state<_TestAppState>(find.byType(_TestApp));
-        // The header button still closes, so it says so instead of looking
-        // like the Back key.
-        expect(find.byTooltip('Close'), findsOneWidget);
+        // The header button minimizes like the Back key, so it keeps the
+        // back arrow rather than the close icon.
+        expect(find.byTooltip('Close'), findsNothing);
 
         // First Back hides the OSD the player opens with, the second floats
         // it, on the same PlayerScreen (so the stream never restarts).
@@ -2869,12 +2870,46 @@ void main() {
       },
     );
 
+    Finder headerIcon(IconData icon) => find.descendant(
+      of: find.byType(PlaybackControls),
+      matching: find.byIcon(icon),
+    );
+
+    testWidgets('by default the header button closes, shown as X', (
+      tester,
+    ) async {
+      final appState = await connectedAppState();
+      addTearDown(appState.dispose);
+      await openPlayer(tester, appState);
+
+      expect(headerIcon(Icons.arrow_back), findsNothing);
+      await tester.tap(headerIcon(Icons.close));
+      await _pumpAppFrame(tester);
+      expect(find.byType(PlayerScreen), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('with Back set to minimize, the header button minimizes too, '
+        'shown as the back arrow', (tester) async {
+      final appState = await connectedAppState();
+      addTearDown(appState.dispose);
+      await appState.viewSettingsService.setBackMinimizesPlayer(true);
+      await openPlayer(tester, appState);
+
+      expect(headerIcon(Icons.close), findsNothing);
+      await tester.tap(headerIcon(Icons.arrow_back));
+      await _pumpAppFrame(tester);
+      expect(isMinimized(tester), isTrue);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
     testWidgets('Back still stops the player by default', (tester) async {
       final appState = await connectedAppState();
       addTearDown(appState.dispose);
       await openPlayer(tester, appState);
       final testApp = tester.state<_TestAppState>(find.byType(_TestApp));
-      expect(find.byTooltip('Close'), findsNothing);
+      // The header button closes, and shows a close icon to say so.
+      expect(find.byTooltip('Close'), findsOneWidget);
 
       expect(await testApp.dispatchRouterBack(), isTrue);
       await tester.pump();

@@ -1024,7 +1024,7 @@
   "settingsHideOverlayOnStart": "Player-Overlay beim Start ausblenden",
   "settingsHideOverlayOnStartHint": "Streams starten nur mit dem Bild, ohne Steuerelemente und Senderinfos. Drücke eine beliebige Taste oder tippe auf den Bildschirm, um sie einzublenden.",
   "settingsBackMinimizesPlayer": "Zurück minimiert den Player",
-  "settingsBackMinimizesPlayerHint": "Zurück verkleinert die Wiedergabe auf ein schwebendes Fenster, damit du weiter stöbern kannst, statt sie zu beenden. Zum Beenden den Zurück-Pfeil in der Player-Steuerung verwenden.",
+  "settingsBackMinimizesPlayerHint": "Zurück verkleinert die Wiedergabe auf ein schwebendes Fenster, damit du weiter stöbern kannst, statt sie zu beenden. Schließe das schwebende Fenster, um sie zu beenden.",
   "settingsBackgroundAudio": "Audio im Hintergrund",
   "settingsBackgroundAudioHint": "Audio läuft weiter, mit Wiedergabesteuerung auf dem Sperrbildschirm und in den Mitteilungen, wenn du die App verlässt oder den Bildschirm sperrst.",
   "settingsPrebufferLive": "Live-Streams vor der Wiedergabe puffern",

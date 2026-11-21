@@ -1953,7 +1953,8 @@ void main() {
         );
         await tester.pump();
 
-        expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+        // The header's close button (X: it stops playback by default).
+        expect(find.byIcon(Icons.close), findsOneWidget);
         expect(find.byIcon(Icons.play_arrow), findsNothing);
         expect(find.byIcon(Icons.replay_10), findsNothing);
 

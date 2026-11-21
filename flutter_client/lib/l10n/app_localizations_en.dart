@@ -2113,7 +2113,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsBackMinimizesPlayerHint =>
-      'Back shrinks playback to a floating window so you can keep browsing, instead of stopping it. Use the back arrow in the player\'s controls to stop.';
+      'Back shrinks playback to a floating window so you can keep browsing, instead of stopping it. Close the floating window to stop.';
 
   @override
   String get settingsBackgroundAudio => 'Background audio';

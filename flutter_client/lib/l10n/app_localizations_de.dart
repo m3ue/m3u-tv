@@ -2129,7 +2129,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsBackMinimizesPlayerHint =>
-      'Zurück verkleinert die Wiedergabe auf ein schwebendes Fenster, damit du weiter stöbern kannst, statt sie zu beenden. Zum Beenden den Zurück-Pfeil in der Player-Steuerung verwenden.';
+      'Zurück verkleinert die Wiedergabe auf ein schwebendes Fenster, damit du weiter stöbern kannst, statt sie zu beenden. Schließe das schwebende Fenster, um sie zu beenden.';
 
   @override
   String get settingsBackgroundAudio => 'Audio im Hintergrund';

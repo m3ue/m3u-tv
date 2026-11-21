@@ -2046,7 +2046,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsBackMinimizesPlayerHint =>
-      '按返回键时将播放缩小为悬浮窗口，可继续浏览，而不是停止播放。要停止播放，请使用播放器控制栏中的返回箭头。';
+      '按返回键时将播放缩小为悬浮窗口，可继续浏览，而不是停止播放。关闭悬浮窗口即可停止播放。';
 
   @override
   String get settingsBackgroundAudio => '后台音频';

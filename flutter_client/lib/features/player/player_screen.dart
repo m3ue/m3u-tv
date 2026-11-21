@@ -2770,7 +2770,9 @@ class _PlayerScreenState extends State<PlayerScreen>
                               duration: _duration,
                               onPlayPause: _togglePlayPause,
                               onSeek: _seekTo,
-                              onBack: _goBack,
+                              // Same as the Back key: minimizes where that
+                              // is set to, otherwise closes (shown as X).
+                              onBack: _backMinimizes ? _minimize : _goBack,
                               audioTracks: _audioTracks,
                               subtitleTracks: _subtitleTracks,
                               selectedAudioTrackId: _selectedAudioTrackId,
@@ -2808,7 +2810,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                               onMinimize: widget.onMinimize == null
                                   ? null
                                   : _minimize,
-                              backClosesPlayer: _backMinimizes,
+                              backClosesPlayer: !_backMinimizes,
                               onTrackDialogVisibilityChanged:
                                   _handleTrackDialogVisibilityChanged,
                               fallbackReason: _showPlaybackDiagnostics

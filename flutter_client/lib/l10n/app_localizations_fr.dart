@@ -2137,7 +2137,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsBackMinimizesPlayerHint =>
-      'Retour réduit la lecture dans une fenêtre flottante pour continuer à naviguer, au lieu de l\'arrêter. Utilisez la flèche de retour des commandes du lecteur pour l\'arrêter.';
+      'Retour réduit la lecture dans une fenêtre flottante pour continuer à naviguer, au lieu de l\'arrêter. Fermez la fenêtre flottante pour l\'arrêter.';
 
   @override
   String get settingsBackgroundAudio => 'Audio en arrière-plan';

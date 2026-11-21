@@ -2133,7 +2133,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsBackMinimizesPlayerHint =>
-      'Atrás reduce la reproducción a una ventana flotante para que puedas seguir navegando, en lugar de detenerla. Usa la flecha de retroceso de los controles del reproductor para detenerla.';
+      'Atrás reduce la reproducción a una ventana flotante para que puedas seguir navegando, en lugar de detenerla. Cierra la ventana flotante para detenerla.';
 
   @override
   String get settingsBackgroundAudio => 'Audio en segundo plano';

@@ -1254,7 +1254,7 @@
   "settingsHideOverlayOnStart": "Hide player overlay on start",
   "settingsHideOverlayOnStartHint": "Open streams on just the picture, without the controls and channel info. Press any button or tap the screen to show them.",
   "settingsBackMinimizesPlayer": "Back minimizes the player",
-  "settingsBackMinimizesPlayerHint": "Back shrinks playback to a floating window so you can keep browsing, instead of stopping it. Use the back arrow in the player's controls to stop.",
+  "settingsBackMinimizesPlayerHint": "Back shrinks playback to a floating window so you can keep browsing, instead of stopping it. Close the floating window to stop.",
   "settingsBackgroundAudio": "Background audio",
   "settingsBackgroundAudioHint": "Keep playing audio, with playback controls on the lock screen and in notifications, when you leave the app or lock the screen.",
   "settingsPrebufferLive": "Buffer live streams before playing",

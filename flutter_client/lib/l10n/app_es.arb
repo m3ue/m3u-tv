@@ -1024,7 +1024,7 @@
   "settingsHideOverlayOnStart": "Ocultar la superposición del reproductor al iniciar",
   "settingsHideOverlayOnStartHint": "Las transmisiones se abren solo con la imagen, sin los controles ni la información del canal. Pulsa cualquier botón o toca la pantalla para mostrarlos.",
   "settingsBackMinimizesPlayer": "Atrás minimiza el reproductor",
-  "settingsBackMinimizesPlayerHint": "Atrás reduce la reproducción a una ventana flotante para que puedas seguir navegando, en lugar de detenerla. Usa la flecha de retroceso de los controles del reproductor para detenerla.",
+  "settingsBackMinimizesPlayerHint": "Atrás reduce la reproducción a una ventana flotante para que puedas seguir navegando, en lugar de detenerla. Cierra la ventana flotante para detenerla.",
   "settingsBackgroundAudio": "Audio en segundo plano",
   "settingsBackgroundAudioHint": "Sigue reproduciendo el audio, con controles en la pantalla de bloqueo y en las notificaciones, al salir de la app o bloquear la pantalla.",
   "settingsPrebufferLive": "Almacenar en búfer las transmisiones en vivo antes de reproducir",
