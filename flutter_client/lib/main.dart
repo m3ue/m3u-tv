@@ -11,6 +11,7 @@ import 'package:m3u_tv/app/app_locales.dart';
 import 'package:m3u_tv/app/app_shell.dart'
     show DeviceType, isTouchDeviceType, shouldUseSidebar;
 import 'package:m3u_tv/app/device_type_resolver.dart';
+import 'package:m3u_tv/app/floating_player_host.dart';
 import 'package:m3u_tv/app/launch_splash.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/app/text_input_reporting_binding.dart';
@@ -564,7 +565,11 @@ class _MyAppState extends State<MyApp> {
           stored: viewSettings?.fontSizeSyncOrNull,
           isTv: deviceType == DeviceType.tv,
         );
-        final routerChild = child ?? const SizedBox.shrink();
+        // The floating player's layer sits above the whole Navigator, so
+        // pages pushed over the shell (VOD/Series details) don't cover it.
+        final routerChild = FloatingPlayerHost(
+          child: child ?? const SizedBox.shrink(),
+        );
         return Dpad(
           theme: const DpadThemeData(
             effects: [

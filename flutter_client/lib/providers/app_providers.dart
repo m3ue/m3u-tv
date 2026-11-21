@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show ChangeNotifier;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
+import 'package:m3u_tv/app/floating_player_host.dart';
 import 'package:m3u_tv/features/epg/epg_recording_index.dart';
 import 'package:m3u_tv/features/multiview/multiview_controller.dart';
 import 'package:m3u_tv/playback/editor_stream_session_gateway.dart';
@@ -299,6 +300,14 @@ final playerOverlayActiveProvider = StateProvider<bool>((ref) => false);
 /// Whether the open player is floating over the app (minimized) rather
 /// than full screen. [playerOverlayActiveProvider] stays true meanwhile.
 final playerMinimizedProvider = StateProvider<bool>((ref) => false);
+
+/// Where AppShell draws its player while it floats (see
+/// FloatingPlayerHost), above the pages pushed over the shell.
+final floatingPlayerSlotProvider = Provider<FloatingPlayerSlot>((ref) {
+  final slot = FloatingPlayerSlot();
+  ref.onDispose(slot.dispose);
+  return slot;
+});
 
 final multiviewControllerProvider = ChangeNotifierProvider<MultiviewController>(
   (ref) => MultiviewController(),

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, listEquals;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:m3u_tv/app/floating_player_host.dart';
 import 'package:m3u_tv/app/navigation_sidebar.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_catalog_screen.dart';
@@ -206,6 +207,14 @@ class AppShellState extends ConsumerState<AppShell>
   // _minimizePlayer). Its PlayerScreen stays mounted in the same place in
   // the tree, so the stream carries on without a restart.
   bool _playerMinimized = false;
+  // The player's frame, under one key so it moves between AppShell's Stack
+  // and the FloatingPlayerHost without a remount (see _buildPlayerLayer).
+  final GlobalKey _playerFrameKey = GlobalKey(debugLabel: 'player-frame');
+  // Read in initState: dispose uses it, and can't use ref.
+  late final FloatingPlayerSlot _floatingSlot;
+  // AppShell's own page in the root Navigator, captured in build: the pages
+  // above it are the ones a floating player returning full screen closes.
+  ModalRoute<Object?>? _shellRoute;
   // The sidebar's Now Playing entry, shown while the player floats.
   final FocusNode _nowPlayingFocusNode = FocusNode(
     debugLabel: 'sidebar-now-playing',
@@ -269,6 +278,7 @@ class AppShellState extends ConsumerState<AppShell>
   @override
   void initState() {
     super.initState();
+    _floatingSlot = ref.read(floatingPlayerSlotProvider);
     WidgetsBinding.instance.addObserver(this);
     _memoryWatchdog.start();
     _appState = widget.appState ?? AppStateController();
@@ -604,6 +614,7 @@ class AppShellState extends ConsumerState<AppShell>
     _contentFocusNode.dispose();
     _sidebarScopeNode.dispose();
     _nowPlayingFocusNode.dispose();
+    _floatingSlot.clearDeferred();
     final carPlay = CarPlayController.instance;
     if (carPlay?.onPlayChannel == _playCarPlayChannel) {
       carPlay!.onPlayChannel = null;
@@ -926,6 +937,8 @@ class AppShellState extends ConsumerState<AppShell>
         _playerMinimized = false;
       });
       ref.read(playerMinimizedProvider.notifier).state = false;
+      _syncFloatingSlot();
+      _closePagesAboveShell();
       return;
     }
 
@@ -959,6 +972,7 @@ class AppShellState extends ConsumerState<AppShell>
       if (!mounted || !identical(_playerOrchestrator, newOrch)) return;
       if (_playerNativePlaneActive == active) return;
       setState(() => _playerNativePlaneActive = active);
+      _syncFloatingSlot();
     });
   }
 
@@ -993,6 +1007,7 @@ class AppShellState extends ConsumerState<AppShell>
     final savedFocus = _focusBeforePlayer;
     _focusBeforePlayer = null;
     setState(() => _playerMinimized = true);
+    _syncFloatingSlot();
     ref.read(playerMinimizedProvider.notifier).state = true;
     unawaited(_systemUiPolicy.applyBrowsing());
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1010,12 +1025,46 @@ class AppShellState extends ConsumerState<AppShell>
   void _expandPlayer() {
     if (!_playerMinimized) return;
     _rememberFocusBeforePlayer();
+    // Full screen, the player is back in AppShell's own Stack, beneath any
+    // page pushed over the shell, so those go (as Play on them does).
+    _closePagesAboveShell();
     setState(() {
       _playerMinimized = false;
       _sidebarActive = false;
     });
     ref.read(playerMinimizedProvider.notifier).state = false;
+    _syncFloatingSlot();
     unawaited(_systemUiPolicy.applyPlayer());
+  }
+
+  /// Whether the floating player is drawn by the FloatingPlayerHost above
+  /// the Navigator rather than in AppShell's own Stack. Not for a native
+  /// plane (Linux Wayland): its see-through hole only clears paint in the
+  /// layer it's drawn in, which the host's isn't.
+  bool get _floatsInHost =>
+      _playerMinimized &&
+      _playerArgs != null &&
+      _floatingSlot.hasHost &&
+      !_playerNativePlaneActive;
+
+  /// Hands the floating player to the host, or takes it back. Called right
+  /// after the setState that changes [_floatsInHost], so both rebuild in the
+  /// same frame and the player moves rather than being remounted.
+  void _syncFloatingSlot() {
+    _floatingSlot.place(_floatsInHost ? _buildFloatingPlayerLayer : null);
+  }
+
+  /// Pops the pages pushed over the shell in the root Navigator (VOD/Series
+  /// details and the like).
+  void _closePagesAboveShell() {
+    final shellRoute = _shellRoute;
+    if (shellRoute == null || shellRoute.isCurrent || !shellRoute.isActive) {
+      return;
+    }
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).popUntil((route) => identical(route, shellRoute));
   }
 
   /// Stops the floating player.
@@ -1181,6 +1230,7 @@ class AppShellState extends ConsumerState<AppShell>
       _playerModalDialogVisible = false;
       _playerMinimized = false;
     });
+    _syncFloatingSlot();
     _playerChannelContext = ListChannelContext.empty;
     if (nowPlayingFocused) {
       _activateSidebar();
@@ -2062,6 +2112,7 @@ class AppShellState extends ConsumerState<AppShell>
   Widget build(BuildContext context) {
     // isConfigured triggers route recalculation on connect/disconnect.
     ref.watch(isConfiguredProvider);
+    _shellRoute = ModalRoute.of(context);
 
     final routes = _mainRoutes;
     _syncSidebarFocusNodes(routes);
@@ -2135,18 +2186,16 @@ class AppShellState extends ConsumerState<AppShell>
     final args = _playerArgs;
     final orch = _playerOrchestrator;
     final playerOpen = args != null && orch != null;
-    final viewerId = _appState.activeViewer?.ulid ?? '';
-    final recordingChannelIds = ref.watch(recordingChannelIdsProvider);
+    // Read again by _buildPlayerLayer; watched here so a change rebuilds.
+    ref.watch(recordingChannelIdsProvider);
     final playerFloating = playerOpen && _playerMinimized;
-    // Pointer and touch only: a TV remote reaches the floating player
-    // through the sidebar's Now Playing entry instead.
-    final floatingButtons = widget.deviceType == DeviceType.tv
-        ? _FloatingButtons.none
-        // Nothing may paint over an Android Hybrid Composition view (it can
-        // be left black), so there they sit above the video instead.
-        : HostPlatform.isAndroid
-        ? _FloatingButtons.above
-        : _FloatingButtons.overlay;
+    final playerLayer = _floatsInHost ? null : _buildPlayerLayer(context);
+    if (_floatsInHost) {
+      // Whatever rebuilt AppShell may change the floating player too.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _floatsInHost) _floatingSlot.refresh();
+      });
+    }
     final suppressBrowsingComposition =
         playerOpen &&
         !playerFloating &&
@@ -2173,224 +2222,244 @@ class AppShellState extends ConsumerState<AppShell>
               ),
             ),
           ),
-          if (args != null && orch != null)
-            Positioned.fromRect(
-              rect: playerFloating
-                  ? _floatingPlayerRect(
-                      MediaQuery.sizeOf(context),
-                      MediaQuery.paddingOf(context),
-                      clearBottomNav: !useSidebar && !_fullScreenDetailActive,
-                      buttonStripHeight:
-                          floatingButtons == _FloatingButtons.above
-                          ? _PlayerFrame.buttonStripHeight
-                          : 0,
-                    )
-                  : Offset.zero & MediaQuery.sizeOf(context),
-              child: _PlayerFrame(
-                floating: playerFloating,
-                buttons: floatingButtons,
-                onExpand: _expandPlayer,
-                onClose: _closeFloatingPlayer,
-                onMenu: _showFloatingPlayerMenu,
-                child:
-                    widget.playerRouteBuilder?.call(args) ??
-                    PlayerScreen(
-                      key: ValueKey(_playerSessionId),
-                      args: args,
-                      orchestrator: orch,
-                      adoptsPlayingSession: _playerLease != null,
-                      surfaceKey: _playerSurfaceKey,
-                      releasesOrchestratorOnDispose: () =>
-                          _playerReleasesOnDispose,
-                      isHandheld:
-                          widget.deviceType == DeviceType.phone ||
-                          widget.deviceType == DeviceType.tablet,
-                      epgService: _appState.epgService,
-                      xtreamService: _appState.xtreamService,
-                      comskipSettings: _appState.comskipSettings,
-                      syncOffsetStore: _appState.syncOffsetStore,
-                      introDbSettings: _appState.introDbSettings,
-                      hasDvrFeature: _appState.hasDvrFeature,
-                      viewerId: viewerId,
-                      viewSettingsService: _appState.viewSettingsService,
-                      onLiveStreamEnded: args.type == 'live'
-                          ? _handleLiveStreamEnded
-                          : null,
-                      onNextChannel: args.type == 'live'
-                          ? _openNextChannel
-                          : null,
-                      onPreviousChannel: args.type == 'live'
-                          ? _openPreviousChannel
-                          : null,
-                      onReplaceItem: args.type == 'series'
-                          ? _openPlayerDirect
-                          : null,
-                      onRecordProgram:
-                          args.type == 'live' && _appState.hasDvrFeature
-                          ? _handleRecordButtonTap
-                          : null,
-                      onTrackDialogVisibilityChanged:
-                          _setPlayerModalDialogVisible,
-                      isRecordingCurrentChannel:
-                          args.type == 'live' &&
-                          recordingChannelIds.contains(args.streamId),
-                      progressReporter: (progress) {
-                        final aioLookupId =
-                            args.metadata['aio_item_id'] as String?;
-                        final existing = _appState.progressList
-                            .firstWhereOrNull(
-                              (p) =>
-                                  p.contentType == progress.contentType &&
-                                  (p.contentType == ContentType.aiostreams
-                                      ? p.aioItemId == aioLookupId
-                                      : p.streamId == progress.streamId),
-                            );
-                        final toSave = Progress(
-                          viewerId: progress.viewerId,
-                          contentType: progress.contentType,
-                          streamId: progress.streamId,
-                          positionSeconds: progress.positionSeconds,
-                          durationSeconds:
-                              progress.durationSeconds ??
-                              existing?.durationSeconds,
-                          completed: progress.completed,
-                          seriesId: progress.seriesId ?? existing?.seriesId,
-                          seasonNumber:
-                              progress.seasonNumber ??
-                              (args.metadata['season_number'] as int?) ??
-                              existing?.seasonNumber,
-                          episodeNumber:
-                              progress.episodeNumber ??
-                              (args.metadata['episode_number'] as int?) ??
-                              existing?.episodeNumber,
-                          title:
-                              progress.title ??
-                              args.metadata['title'] as String? ??
-                              args.title,
-                          episodeTitle:
-                              progress.episodeTitle ??
-                              args.metadata['episode_title'] as String? ??
-                              existing?.episodeTitle,
-                          seriesName:
-                              progress.seriesName ??
-                              args.metadata['series_name'] as String? ??
-                              existing?.seriesName,
-                          thumbnailUrl:
-                              progress.thumbnailUrl ??
-                              args.metadata['thumbnail_url'] as String? ??
-                              existing?.thumbnailUrl,
-                          backdropUrl:
-                              progress.backdropUrl ??
-                              args.metadata['backdrop_url'] as String? ??
-                              existing?.backdropUrl,
-                          rating:
-                              progress.rating ??
-                              args.metadata['rating'] as String? ??
-                              existing?.rating,
-                          runtime:
-                              progress.runtime ??
-                              args.metadata['duration'] as String? ??
-                              existing?.runtime,
-                          plot:
-                              progress.plot ??
-                              args.metadata['plot'] as String? ??
-                              existing?.plot,
-                          genre: progress.genre ?? existing?.genre,
-                          year:
-                              progress.year ??
-                              args.metadata['year'] as String? ??
-                              existing?.year,
-                        );
-                        final aioItemId =
-                            args.metadata['aio_item_id'] as String?;
-                        final aioIntegrationId =
-                            args.metadata['aio_integration_id'] as int?;
-                        final aioToSave = aioItemId != null
-                            ? Progress(
-                                viewerId: toSave.viewerId,
-                                contentType: ContentType.aiostreams,
-                                streamId: 0,
-                                positionSeconds: toSave.positionSeconds,
-                                durationSeconds: toSave.durationSeconds,
-                                completed: toSave.completed,
-                                seasonNumber: toSave.seasonNumber,
-                                episodeNumber: toSave.episodeNumber,
-                                title: toSave.title,
-                                episodeTitle: toSave.episodeTitle,
-                                thumbnailUrl: toSave.thumbnailUrl,
-                                backdropUrl: toSave.backdropUrl,
-                                rating: toSave.rating,
-                                runtime: toSave.runtime,
-                                plot: toSave.plot,
-                                genre: toSave.genre,
-                                year: toSave.year,
-                                aioItemId: aioItemId,
-                                aioIntegrationId: aioIntegrationId,
-                              )
-                            : null;
-                        if (aioToSave != null) {
-                          if (_appState.sourceType == AppSourceType.xtream) {
-                            unawaited(
-                              _appState.xtreamService
-                                  .reportPlaybackProgress(aioToSave)
-                                  .catchError((_) => false),
-                            );
-                          }
-                          unawaited(
-                            _appState.resumeService.save(aioToSave).then((_) {
-                              if (mounted) {
-                                _appState.updateProgressEntry(aioToSave);
-                              }
-                            }),
-                          );
-                        } else {
-                          if (_appState.sourceType == AppSourceType.xtream) {
-                            unawaited(
-                              _appState.xtreamService
-                                  .reportPlaybackProgress(toSave)
-                                  .catchError((_) => false),
-                            );
-                          }
-                          unawaited(
-                            _appState.resumeService.save(toSave).then((_) {
-                              if (mounted) {
-                                _appState.updateProgressEntry(toSave);
-                              }
-                            }),
-                          );
-                        }
-                      },
-                      watchHistoryServices: [
-                        _appState.simklService,
-                        _appState.traktService,
-                        _appState.mdblistService,
-                      ],
-                      onlineSubtitleService: _appState.onlineSubtitleService,
-                      onlineSubtitleSettings: _appState.onlineSubtitleSettings,
-                      onPlaybackFailure: () {
-                        if (!mounted) return;
-                        // Floating, the error screen isn't shown: just close.
-                        if (_playerMinimized) {
-                          unawaited(_closePlayer());
-                          return;
-                        }
-                        setState(() => _playerHasFailed = true);
-                        unawaited(_systemUiPolicy.applyBrowsing());
-                      },
-                      onClose: _closePlayer,
-                      onMinimize: _minimizePlayer,
-                      minimized: playerFloating,
-                      backController: _playerBackController,
-                      // Through the shared echo guard: the player handles the key
-                      // and the platform popRoute that follows it would otherwise
-                      // close the player right after the key hid its OSD.
-                      onBackKey: _handleShortcutBack,
-                    ),
-              ),
-            ),
+          ?playerLayer,
         ],
       ),
     );
+  }
+
+  /// The player, full screen or floating: in AppShell's own Stack, or (while
+  /// it floats, see [_floatsInHost]) in the FloatingPlayerHost above the
+  /// Navigator. The same widgets either way, with [_playerFrameKey] moving
+  /// them between the two without a remount.
+  Widget? _buildPlayerLayer(BuildContext context) {
+    final args = _playerArgs;
+    final orch = _playerOrchestrator;
+    if (args == null || orch == null) return null;
+    final playerFloating = _playerMinimized;
+    final useSidebar = shouldUseSidebar(widget.deviceType);
+    final viewerId = _appState.activeViewer?.ulid ?? '';
+    final recordingChannelIds = ref.read(recordingChannelIdsProvider);
+    // Pointer and touch only: a TV remote reaches the floating player
+    // through the sidebar's Now Playing entry instead.
+    final floatingButtons = widget.deviceType == DeviceType.tv
+        ? _FloatingButtons.none
+        // Nothing may paint over an Android Hybrid Composition view (it can
+        // be left black), so there they sit above the video instead.
+        : HostPlatform.isAndroid
+        ? _FloatingButtons.above
+        : _FloatingButtons.overlay;
+    return Positioned.fromRect(
+      rect: playerFloating
+          ? _floatingPlayerRect(
+              MediaQuery.sizeOf(context),
+              MediaQuery.paddingOf(context),
+              clearBottomNav: !useSidebar && !_fullScreenDetailActive,
+              buttonStripHeight: floatingButtons == _FloatingButtons.above
+                  ? _PlayerFrame.buttonStripHeight
+                  : 0,
+            )
+          : Offset.zero & MediaQuery.sizeOf(context),
+      child: _PlayerFrame(
+        key: _playerFrameKey,
+        floating: playerFloating,
+        buttons: floatingButtons,
+        onExpand: _expandPlayer,
+        onClose: _closeFloatingPlayer,
+        onMenu: _showFloatingPlayerMenu,
+        child:
+            widget.playerRouteBuilder?.call(args) ??
+            PlayerScreen(
+              key: ValueKey(_playerSessionId),
+              args: args,
+              orchestrator: orch,
+              adoptsPlayingSession: _playerLease != null,
+              surfaceKey: _playerSurfaceKey,
+              releasesOrchestratorOnDispose: () => _playerReleasesOnDispose,
+              isHandheld:
+                  widget.deviceType == DeviceType.phone ||
+                  widget.deviceType == DeviceType.tablet,
+              epgService: _appState.epgService,
+              xtreamService: _appState.xtreamService,
+              comskipSettings: _appState.comskipSettings,
+              syncOffsetStore: _appState.syncOffsetStore,
+              introDbSettings: _appState.introDbSettings,
+              hasDvrFeature: _appState.hasDvrFeature,
+              viewerId: viewerId,
+              viewSettingsService: _appState.viewSettingsService,
+              onLiveStreamEnded: args.type == 'live'
+                  ? _handleLiveStreamEnded
+                  : null,
+              onNextChannel: args.type == 'live' ? _openNextChannel : null,
+              onPreviousChannel: args.type == 'live'
+                  ? _openPreviousChannel
+                  : null,
+              onReplaceItem: args.type == 'series' ? _openPlayerDirect : null,
+              onRecordProgram: args.type == 'live' && _appState.hasDvrFeature
+                  ? _handleRecordButtonTap
+                  : null,
+              onTrackDialogVisibilityChanged: _setPlayerModalDialogVisible,
+              isRecordingCurrentChannel:
+                  args.type == 'live' &&
+                  recordingChannelIds.contains(args.streamId),
+              progressReporter: (progress) {
+                final aioLookupId = args.metadata['aio_item_id'] as String?;
+                final existing = _appState.progressList.firstWhereOrNull(
+                  (p) =>
+                      p.contentType == progress.contentType &&
+                      (p.contentType == ContentType.aiostreams
+                          ? p.aioItemId == aioLookupId
+                          : p.streamId == progress.streamId),
+                );
+                final toSave = Progress(
+                  viewerId: progress.viewerId,
+                  contentType: progress.contentType,
+                  streamId: progress.streamId,
+                  positionSeconds: progress.positionSeconds,
+                  durationSeconds:
+                      progress.durationSeconds ?? existing?.durationSeconds,
+                  completed: progress.completed,
+                  seriesId: progress.seriesId ?? existing?.seriesId,
+                  seasonNumber:
+                      progress.seasonNumber ??
+                      (args.metadata['season_number'] as int?) ??
+                      existing?.seasonNumber,
+                  episodeNumber:
+                      progress.episodeNumber ??
+                      (args.metadata['episode_number'] as int?) ??
+                      existing?.episodeNumber,
+                  title:
+                      progress.title ??
+                      args.metadata['title'] as String? ??
+                      args.title,
+                  episodeTitle:
+                      progress.episodeTitle ??
+                      args.metadata['episode_title'] as String? ??
+                      existing?.episodeTitle,
+                  seriesName:
+                      progress.seriesName ??
+                      args.metadata['series_name'] as String? ??
+                      existing?.seriesName,
+                  thumbnailUrl:
+                      progress.thumbnailUrl ??
+                      args.metadata['thumbnail_url'] as String? ??
+                      existing?.thumbnailUrl,
+                  backdropUrl:
+                      progress.backdropUrl ??
+                      args.metadata['backdrop_url'] as String? ??
+                      existing?.backdropUrl,
+                  rating:
+                      progress.rating ??
+                      args.metadata['rating'] as String? ??
+                      existing?.rating,
+                  runtime:
+                      progress.runtime ??
+                      args.metadata['duration'] as String? ??
+                      existing?.runtime,
+                  plot:
+                      progress.plot ??
+                      args.metadata['plot'] as String? ??
+                      existing?.plot,
+                  genre: progress.genre ?? existing?.genre,
+                  year:
+                      progress.year ??
+                      args.metadata['year'] as String? ??
+                      existing?.year,
+                );
+                final aioItemId = args.metadata['aio_item_id'] as String?;
+                final aioIntegrationId =
+                    args.metadata['aio_integration_id'] as int?;
+                final aioToSave = aioItemId != null
+                    ? Progress(
+                        viewerId: toSave.viewerId,
+                        contentType: ContentType.aiostreams,
+                        streamId: 0,
+                        positionSeconds: toSave.positionSeconds,
+                        durationSeconds: toSave.durationSeconds,
+                        completed: toSave.completed,
+                        seasonNumber: toSave.seasonNumber,
+                        episodeNumber: toSave.episodeNumber,
+                        title: toSave.title,
+                        episodeTitle: toSave.episodeTitle,
+                        thumbnailUrl: toSave.thumbnailUrl,
+                        backdropUrl: toSave.backdropUrl,
+                        rating: toSave.rating,
+                        runtime: toSave.runtime,
+                        plot: toSave.plot,
+                        genre: toSave.genre,
+                        year: toSave.year,
+                        aioItemId: aioItemId,
+                        aioIntegrationId: aioIntegrationId,
+                      )
+                    : null;
+                if (aioToSave != null) {
+                  if (_appState.sourceType == AppSourceType.xtream) {
+                    unawaited(
+                      _appState.xtreamService
+                          .reportPlaybackProgress(aioToSave)
+                          .catchError((_) => false),
+                    );
+                  }
+                  unawaited(
+                    _appState.resumeService.save(aioToSave).then((_) {
+                      if (mounted) {
+                        _appState.updateProgressEntry(aioToSave);
+                      }
+                    }),
+                  );
+                } else {
+                  if (_appState.sourceType == AppSourceType.xtream) {
+                    unawaited(
+                      _appState.xtreamService
+                          .reportPlaybackProgress(toSave)
+                          .catchError((_) => false),
+                    );
+                  }
+                  unawaited(
+                    _appState.resumeService.save(toSave).then((_) {
+                      if (mounted) {
+                        _appState.updateProgressEntry(toSave);
+                      }
+                    }),
+                  );
+                }
+              },
+              watchHistoryServices: [
+                _appState.simklService,
+                _appState.traktService,
+                _appState.mdblistService,
+              ],
+              onlineSubtitleService: _appState.onlineSubtitleService,
+              onlineSubtitleSettings: _appState.onlineSubtitleSettings,
+              onPlaybackFailure: () {
+                if (!mounted) return;
+                // Floating, the error screen isn't shown: just close.
+                if (_playerMinimized) {
+                  unawaited(_closePlayer());
+                  return;
+                }
+                setState(() => _playerHasFailed = true);
+                unawaited(_systemUiPolicy.applyBrowsing());
+              },
+              onClose: _closePlayer,
+              onMinimize: _minimizePlayer,
+              minimized: playerFloating,
+              backController: _playerBackController,
+              // Through the shared echo guard: the player handles the key
+              // and the platform popRoute that follows it would otherwise
+              // close the player right after the key hid its OSD.
+              onBackKey: _handleShortcutBack,
+            ),
+      ),
+    );
+  }
+
+  /// [_buildPlayerLayer] for the FloatingPlayerHost, which lays it out in a
+  /// Stack of its own.
+  Widget _buildFloatingPlayerLayer(BuildContext context) {
+    if (!_floatsInHost) return const SizedBox.shrink();
+    final layer = _buildPlayerLayer(context);
+    return layer == null ? const SizedBox.shrink() : Stack(children: [layer]);
   }
 
   /// Where the floating player sits: the bottom-right corner, clear of the
@@ -2714,6 +2783,7 @@ enum _FloatingButtons {
 /// click opens [onMenu].
 class _PlayerFrame extends StatefulWidget {
   const _PlayerFrame({
+    super.key,
     required this.floating,
     required this.buttons,
     required this.onExpand,

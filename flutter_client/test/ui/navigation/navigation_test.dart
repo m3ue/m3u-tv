@@ -7,14 +7,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:m3u_tv/app/app_shell.dart';
+import 'package:m3u_tv/app/floating_player_host.dart';
 import 'package:m3u_tv/app/navigation_sidebar.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/features/home/home_spotlight_hero.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
+import 'package:m3u_tv/features/vod/vod_details_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
+import 'package:m3u_tv/navigation/route_names.dart';
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/playback_orchestrator.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
@@ -2989,6 +2992,47 @@ void main() {
       },
     );
 
+    testWidgets('the floating player stays above a VOD details page, and '
+        'Expand closes the page', (tester) async {
+      final appState = await connectedAppState();
+      addTearDown(appState.dispose);
+      await openPlayer(tester, appState, deviceType: DeviceType.desktop);
+      final playerState = tester.state(find.byType(PlayerScreen));
+
+      await tester.tap(find.byTooltip('Minimize'));
+      await _pumpAppFrame(tester);
+      unawaited(
+        GoRouter.of(tester.element(find.byType(AppShell))).push(
+          RouteNames.vodDetailsFor(201),
+          extra: const VodItem(
+            id: 201,
+            name: 'Route Movie',
+            streamUrl: 'http://example.com/movie/201.mp4',
+            containerExtension: 'mp4',
+            categoryId: 'vod',
+          ),
+        ),
+      );
+      await _pumpAppFrame(tester);
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(VodDetailsScreen), findsOneWidget);
+
+      // Still the same player, and on top: a tap on it reaches it rather
+      // than the page.
+      expect(tester.state(find.byType(PlayerScreen)), same(playerState));
+      await tester.tapAt(tester.getCenter(find.byType(PlayerScreen)));
+      await tester.pump();
+      expect(find.byTooltip('Expand'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Expand'));
+      await _pumpAppFrame(tester);
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(isMinimized(tester), isFalse);
+      expect(find.byType(VodDetailsScreen), findsNothing);
+      expect(tester.state(find.byType(PlayerScreen)), same(playerState));
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
     testWidgets('TV has no floating buttons; holding Select on Now Playing '
         'asks before closing', (tester) async {
       final appState = await connectedAppState();
@@ -3179,6 +3223,8 @@ class _TestAppState extends State<_TestApp> {
         title: 'M3U TV Test',
         theme: ThemeData.dark(useMaterial3: true),
         routerConfig: _router,
+        builder: (context, child) =>
+            FloatingPlayerHost(child: child ?? const SizedBox.shrink()),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
       ),
