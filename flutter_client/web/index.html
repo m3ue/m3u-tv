@@ -31,6 +31,13 @@
 
   <title>m3u_tv</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Lets mkv_player.mjs and the @mediabunny/* audio extensions it loads
+       share one Mediabunny instance (the extensions import "mediabunny" by
+       its bare name). Resolved against <base>, like the files themselves. -->
+  <script type="importmap">
+    { "imports": { "mediabunny": "./js/mediabunny.min.mjs" } }
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

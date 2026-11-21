@@ -48,6 +48,28 @@ extension type _MpegtsFeatureList._(JSObject _) implements JSObject {
   external bool get mseLivePlayback;
 }
 
+// --- web/mkv_player.mjs interop (Mediabunny MKV -> fragmented MP4) --------
+
+@JS('M3uMkvPlayer.open')
+external JSPromise<_JsMkvHandle> _mkvOpen(
+  web.HTMLVideoElement video,
+  String url,
+  double startSeconds,
+  JSFunction onError,
+);
+
+@JS()
+extension type _JsMkvHandle._(JSObject _) implements JSObject {
+  external _JsMkvError? get error;
+  external void destroy();
+}
+
+@JS()
+extension type _JsMkvError._(JSObject _) implements JSObject {
+  external String? get code;
+  external String? get message;
+}
+
 @JS('mpegts.getFeatureList')
 external _MpegtsFeatureList _mpegtsGetFeatureList();
 
@@ -96,6 +118,7 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
 
   _JsHls? _hls;
   _JsMpegtsPlayer? _mpegts;
+  _JsMkvHandle? _mkv;
 
   /// Pending while [load] waits on a direct `<video>` source, so its first
   /// `loadedmetadata`/`error` resolves the load instead of reaching
@@ -152,6 +175,8 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
         await _loadHls(uri);
       } else if (_looksLikeMpegTs(contentType, uri)) {
         await _loadMpegTs(uri, isLive: source.isLive);
+      } else if (!source.isLive && _looksLikeMatroska(contentType, uri)) {
+        await _loadMkv(uri, source.startPosition, generation);
       } else {
         _video.src = uri.toString();
         await _awaitNativeLoad(generation);
@@ -297,6 +322,10 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
   bool _looksLikeMpegTs(String contentType, Uri uri) =>
       contentType.contains('mp2t') || uri.path.endsWith('.ts');
 
+  bool _looksLikeMatroska(String contentType, Uri uri) =>
+      contentType.contains('matroska') ||
+      uri.path.toLowerCase().endsWith('.mkv');
+
   Uri _withInAppPlayerParams(String rawUri) {
     final parsed = Uri.parse(rawUri);
     if (parsed.scheme != 'http' && parsed.scheme != 'https') return parsed;
@@ -304,6 +333,79 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
       ..putIfAbsent('proxy', () => 'true')
       ..putIfAbsent('player', () => 'true');
     return parsed.replace(queryParameters: params);
+  }
+
+  // --- MKV (web/mkv_player.mjs) ------------------------------------------
+
+  /// Plays an MKV the server passed through unconverted by copying its
+  /// packets into fragmented MP4 in the browser (Mediabunny + MSE), so it
+  /// seeks like any direct file. Throws [PlaybackException] when the file's
+  /// codecs can't play in this browser, the same way [_awaitNativeLoad] does.
+  Future<void> _loadMkv(
+    Uri uri,
+    Duration startPosition,
+    int generation,
+  ) async {
+    await _ensureScriptLoaded(
+      _mkvScriptUrl,
+      globalName: 'M3uMkvPlayer',
+      isModule: true,
+    );
+    if (generation != _generation) return;
+    final handle = await _mkvOpen(
+      _video,
+      uri.toString(),
+      startPosition.inMilliseconds / 1000,
+      _onMkvError.toJS,
+    ).toDart;
+    final error = handle.error;
+    if (error != null) throw _mkvException(error);
+    if (generation != _generation) {
+      handle.destroy();
+      return;
+    }
+    _mkv = handle;
+  }
+
+  void _onMkvError(JSString message) {
+    _errorController.add(
+      PlaybackError(
+        backend: PlaybackBackend.webVideo,
+        message: 'MKV playback failed: ${message.toDart}',
+        code: 'mkv_playback_error',
+        recoverable: true,
+      ),
+    );
+  }
+
+  PlaybackException _mkvException(_JsMkvError error) {
+    const transcodeHint =
+        'An In-App Player Transcoding profile (Settings > Proxy in M3U '
+        'Editor) can convert it.';
+    final detail = error.message ?? '';
+    final message = switch (error.code) {
+      'unsupported_audio' =>
+        "This video's audio ($detail) can't play in this browser. "
+            '$transcodeHint',
+      'unsupported_video' =>
+        "This video's format ($detail) can't play in this browser. "
+            '$transcodeHint',
+      'no_video' => 'This MKV file has no video track.',
+      'unreadable' =>
+        "The server didn't return a playable video file. The provider may be "
+            "down, or this title's link may be broken.",
+      _ => 'MKV playback failed: $detail',
+    };
+    return PlaybackException(
+      message: message,
+      backend: PlaybackBackend.webVideo,
+      code: switch (error.code) {
+        null => 'mkv_load_failed',
+        'unreadable' => 'web_video_unreadable',
+        _ => 'web_video_unsupported',
+      },
+      recoverable: true,
+    );
   }
 
   // --- hls.js ---------------------------------------------------------
@@ -392,6 +494,15 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
       }
       _mpegts = null;
     }
+    final mkv = _mkv;
+    if (mkv != null) {
+      try {
+        mkv.destroy();
+      } on Object {
+        // Best effort, like the hls.js/mpegts.js teardown above.
+      }
+      _mkv = null;
+    }
   }
 
   // --- <video> element events ---------------------------------------------
@@ -454,6 +565,7 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
 
 String get _hlsScriptUrl => _assetUrl('js/hls.min.js');
 String get _mpegtsScriptUrl => _assetUrl('js/mpegts.min.js');
+String get _mkvScriptUrl => _assetUrl('mkv_player.mjs');
 
 String _assetUrl(String name) =>
     Uri.parse(web.document.baseURI).resolve(name).toString();
@@ -461,15 +573,22 @@ String _assetUrl(String name) =>
 final Map<String, Future<void>> _scriptLoads = <String, Future<void>>{};
 
 /// Injects `<script src=[url]>` once per [url] and waits for it to finish
-/// executing, so [globalName] (`Hls`/`mpegts`) is defined before the caller
-/// touches it. Cached per URL: concurrent/repeated loads of the same library
-/// share one `<script>` tag and one wait.
-Future<void> _ensureScriptLoaded(String url, {required String globalName}) {
+/// executing, so [globalName] (`Hls`/`mpegts`/`M3uMkvPlayer`) is defined
+/// before the caller touches it. [isModule] loads it as an ES module (its
+/// `load` event fires after its imports have run too). Cached per URL:
+/// concurrent/repeated loads of the same library share one `<script>` tag
+/// and one wait.
+Future<void> _ensureScriptLoaded(
+  String url, {
+  required String globalName,
+  bool isModule = false,
+}) {
   if (globalContext.has(globalName)) return Future<void>.value();
   return _scriptLoads.putIfAbsent(url, () async {
     final completer = Completer<void>();
     final script = web.document.createElement('script') as web.HTMLScriptElement
       ..src = url
+      ..type = isModule ? 'module' : ''
       ..async = false
       ..addEventListener(
         'load',
