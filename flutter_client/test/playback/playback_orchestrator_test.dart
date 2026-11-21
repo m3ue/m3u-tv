@@ -823,6 +823,46 @@ void main() {
     );
 
     test(
+      'web without server transcode reports the browser video load failure',
+      () async {
+        final web = _FakePlayerAdapter(
+          capabilities: PlaybackCapabilities.webVideo,
+          loadFailure: const PlaybackException(
+            message: "This browser can't play this video format.",
+            backend: PlaybackBackend.webVideo,
+            code: 'web_video_unsupported',
+            recoverable: true,
+          ),
+        );
+        final transcode = _FakeTranscodeGateway();
+        final orchestrator = PlaybackOrchestrator(
+          platform: PlaybackPlatform.server,
+          adapters: <PlaybackBackend, PlayerAdapter>{
+            PlaybackBackend.webVideo: web,
+          },
+          transcodeGateway: transcode,
+        );
+        final errors = <PlaybackError>[];
+        final sub = orchestrator.onError.listen(errors.add);
+
+        await orchestrator.open(_source(isLive: false));
+        await pumpEventQueue();
+
+        expect(transcode.startedServerRequests, isEmpty);
+        expect(errors, hasLength(1));
+        expect(errors.single.backend, PlaybackBackend.webVideo);
+        expect(errors.single.code, 'web_video_unsupported');
+        expect(
+          errors.single.message,
+          "This browser can't play this video format.",
+        );
+
+        await sub.cancel();
+        await orchestrator.dispose();
+      },
+    );
+
+    test(
       'deterministic desktop dead URL emits one final load error',
       () async {
         final events = _setUpDesktopEvents(eventChannel);

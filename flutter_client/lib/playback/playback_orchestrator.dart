@@ -684,7 +684,11 @@ class PlaybackOrchestrator {
   }) async {
     final adapter = _adapters[PlaybackBackend.serverTranscode];
     if (adapter == null) {
-      if (_platform == PlaybackPlatform.desktop && lastFailure != null) {
+      // Desktop and web register no server-transcode adapter by design, so
+      // the backend's own load failure is the useful message to show.
+      if ((_platform == PlaybackPlatform.desktop ||
+              _platform == PlaybackPlatform.server) &&
+          lastFailure != null) {
         _emitError(PlaybackError.fromException(lastFailure));
         return;
       }

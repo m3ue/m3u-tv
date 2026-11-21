@@ -96,6 +96,17 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
 
   _JsHls? _hls;
   _JsMpegtsPlayer? _mpegts;
+
+  /// Pending while [load] waits on a direct `<video>` source, so its first
+  /// `loadedmetadata`/`error` resolves the load instead of reaching
+  /// [onError]. An error there would start the orchestrator's mid-playback
+  /// retry, whose own repeat of the error is dropped while it's still
+  /// inside load(), leaving a stopped player with no message.
+  Completer<web.MediaError?>? _pendingNativeLoad;
+
+  /// How long [load] waits for a direct source's metadata before handing
+  /// over to the normal buffering/error events.
+  static const Duration _nativeLoadTimeout = Duration(seconds: 30);
   final List<({String type, JSFunction listener})> _videoListeners =
       <({String type, JSFunction listener})>[];
 
@@ -143,7 +154,10 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
         await _loadMpegTs(uri, isLive: source.isLive);
       } else {
         _video.src = uri.toString();
+        await _awaitNativeLoad(generation);
       }
+    } on PlaybackException {
+      rethrow;
     } on Object catch (error) {
       throw PlaybackException(
         message: 'Web video load failed: $error',
@@ -189,6 +203,7 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
   @override
   Future<void> stop() async {
     ++_generation;
+    _settlePendingNativeLoad();
     _teardownActivePlayer();
     _video.removeAttribute('src');
     _emit(_state.copyWith(status: PlaybackStatus.stopped));
@@ -209,6 +224,7 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
   @override
   Future<void> dispose() async {
     ++_generation;
+    _settlePendingNativeLoad();
     _teardownActivePlayer();
     for (final entry in _videoListeners) {
       _video.removeEventListener(entry.type, entry.listener);
@@ -217,6 +233,43 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
     _probeClient.close();
     await _stateController.close();
     await _errorController.close();
+  }
+
+  /// Waits for the direct source just assigned to [_video] to either load
+  /// its metadata or fail, and turns a failure into a [PlaybackException]
+  /// like the native backends throw for a file they can't open (e.g. an MKV
+  /// the In-App Player Transcoding profile didn't convert).
+  Future<void> _awaitNativeLoad(int generation) async {
+    final pending = Completer<web.MediaError?>();
+    _pendingNativeLoad = pending;
+    final web.MediaError? error;
+    try {
+      error = await pending.future.timeout(
+        _nativeLoadTimeout,
+        onTimeout: () => null,
+      );
+    } finally {
+      if (identical(_pendingNativeLoad, pending)) _pendingNativeLoad = null;
+    }
+    if (error == null || generation != _generation) return;
+    final isNetworkError = error.code == web.MediaError.MEDIA_ERR_NETWORK;
+    throw PlaybackException(
+      message: isNetworkError
+          ? "The video couldn't be loaded from the server."
+          : "This browser can't play this video format. An In-App Player "
+                'Transcoding profile (Settings > Proxy in M3U Editor) can '
+                'convert it.',
+      backend: PlaybackBackend.webVideo,
+      code: isNetworkError ? 'web_video_network' : 'web_video_unsupported',
+      recoverable: true,
+    );
+  }
+
+  void _settlePendingNativeLoad([web.MediaError? error]) {
+    final pending = _pendingNativeLoad;
+    if (pending == null || pending.isCompleted) return;
+    _pendingNativeLoad = null;
+    pending.complete(error);
   }
 
   // --- Format probing -----------------------------------------------------
@@ -350,7 +403,10 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
       _videoListeners.add((type: type, listener: listener));
     }
 
-    add('loadedmetadata', (_) => _emitFromVideo(PlaybackStatus.ready));
+    add('loadedmetadata', (_) {
+      _settlePendingNativeLoad();
+      _emitFromVideo(PlaybackStatus.ready);
+    });
     add('playing', (_) => _emitFromVideo(PlaybackStatus.playing));
     add('pause', (_) => _emitFromVideo(PlaybackStatus.paused));
     add('waiting', (_) => _emitFromVideo(PlaybackStatus.buffering));
@@ -358,6 +414,10 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
     add('ended', (_) => _emitFromVideo(PlaybackStatus.completed));
     add('error', (_) {
       final error = _video.error;
+      if (_pendingNativeLoad != null) {
+        _settlePendingNativeLoad(error);
+        return;
+      }
       _errorController.add(
         PlaybackError(
           backend: PlaybackBackend.webVideo,
