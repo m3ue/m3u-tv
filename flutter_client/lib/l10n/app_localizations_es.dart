@@ -36,6 +36,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get navSettings => 'Ajustes';
 
   @override
+  String get navNowPlaying => 'Reproduciendo';
+
+  @override
   String get navMore => 'Más';
 
   @override
@@ -1647,6 +1650,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get playerExitFullscreen => 'Salir de pantalla completa';
 
   @override
+  String get playerMinimize => 'Minimizar';
+
+  @override
+  String get playerExpand => 'Ampliar';
+
+  @override
   String get playerSeekUnavailableTranscoding =>
       'No se puede avanzar ni retroceder durante la transcodificación';
 
@@ -2118,6 +2127,13 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsHideOverlayOnStartHint =>
       'Las transmisiones se abren solo con la imagen, sin los controles ni la información del canal. Pulsa cualquier botón o toca la pantalla para mostrarlos.';
+
+  @override
+  String get settingsBackMinimizesPlayer => 'Atrás minimiza el reproductor';
+
+  @override
+  String get settingsBackMinimizesPlayerHint =>
+      'Atrás reduce la reproducción a una ventana flotante para que puedas seguir navegando, en lugar de detenerla. Usa la flecha de retroceso de los controles del reproductor para detenerla.';
 
   @override
   String get settingsBackgroundAudio => 'Audio en segundo plano';

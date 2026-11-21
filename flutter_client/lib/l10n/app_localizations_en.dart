@@ -36,6 +36,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navSettings => 'Settings';
 
   @override
+  String get navNowPlaying => 'Now Playing';
+
+  @override
   String get navMore => 'More';
 
   @override
@@ -1634,6 +1637,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playerExitFullscreen => 'Exit full screen';
 
   @override
+  String get playerMinimize => 'Minimize';
+
+  @override
+  String get playerExpand => 'Expand';
+
+  @override
   String get playerSeekUnavailableTranscoding =>
       'Seeking isn\'t available while transcoding';
 
@@ -2098,6 +2107,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsHideOverlayOnStartHint =>
       'Open streams on just the picture, without the controls and channel info. Press any button or tap the screen to show them.';
+
+  @override
+  String get settingsBackMinimizesPlayer => 'Back minimizes the player';
+
+  @override
+  String get settingsBackMinimizesPlayerHint =>
+      'Back shrinks playback to a floating window so you can keep browsing, instead of stopping it. Use the back arrow in the player\'s controls to stop.';
 
   @override
   String get settingsBackgroundAudio => 'Background audio';

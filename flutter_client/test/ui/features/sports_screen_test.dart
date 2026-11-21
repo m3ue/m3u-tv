@@ -791,7 +791,7 @@ void main() {
               builder: (_) => SportsScreen(
                 onChannelSelect: (_) {},
                 useSidebarLayout: true,
-                onEnterFullScreenDetail: () => shellResizes++,
+                onEnterFullScreenDetail: () async => shellResizes++,
                 onHandleTopLevelBack: () {
                   backs++;
                   rootKey.currentState!.pop();

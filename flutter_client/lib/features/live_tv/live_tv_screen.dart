@@ -142,8 +142,9 @@ class LiveTvScreen extends ConsumerStatefulWidget {
   /// Wired from AppShell to `AppShell._enterFullScreenDetail`/
   /// `_exitFullScreenDetail`. Multiview opens via a plain `Navigator.push`
   /// (see `dvr_recordings_screen.dart` for the same pattern), so it needs
-  /// these to hide the sidebar/bottom nav itself.
-  final VoidCallback? onEnterFullScreenDetail;
+  /// these to hide the sidebar/bottom nav itself. Completes once a
+  /// floating player is closed, since Multiview starts its own players.
+  final Future<void> Function()? onEnterFullScreenDetail;
   final VoidCallback? onExitFullScreenDetail;
 
   /// Wired by AppShell against `XtreamService.searchEpgShows`. Returns EPG
@@ -978,13 +979,15 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
   }
 
   Future<void> _openMultiview(BuildContext context) async {
-    // Multiview's tiles must not start while the preview's player is still
-    // alive (see EpgPreviewPlayerController).
+    // Multiview's tiles must not start while the preview's player (or a
+    // floating one, closed by onEnterFullScreenDetail) is still alive (see
+    // EpgPreviewPlayerController).
     _resumePreviewChannel = null;
     await _previewPlayer?.stop();
     if (!context.mounted) return;
-    widget.onEnterFullScreenDetail?.call();
     try {
+      await widget.onEnterFullScreenDetail?.call();
+      if (!context.mounted) return;
       await Navigator.of(context).push<void>(
         appPageRoute<void>(builder: (context) => const MultiviewScreen()),
       );
@@ -1336,7 +1339,10 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
         ),
         epgStartView: _epgStartView,
         previewPlayer: _previewPlayer,
-        previewPlayback: _epgPreviewPlayback,
+        // A floating player is already the one native player allowed.
+        previewPlayback: ref.watch(playerMinimizedProvider)
+            ? EpgPreviewPlayback.off
+            : _epgPreviewPlayback,
         previewDelay: _epgPreviewDelay,
         onChannelSelect: (channel) => unawaited(_watchLiveFromGuide(channel)),
         onCatchupProgramSelect: widget.onCatchupProgramSelect == null

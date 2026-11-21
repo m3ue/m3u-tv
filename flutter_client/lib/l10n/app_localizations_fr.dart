@@ -36,6 +36,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get navSettings => 'Paramètres';
 
   @override
+  String get navNowPlaying => 'En cours de lecture';
+
+  @override
   String get navMore => 'Plus';
 
   @override
@@ -1652,6 +1655,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get playerExitFullscreen => 'Quitter le plein écran';
 
   @override
+  String get playerMinimize => 'Réduire';
+
+  @override
+  String get playerExpand => 'Agrandir';
+
+  @override
   String get playerSeekUnavailableTranscoding =>
       'La recherche n\'est pas disponible pendant le transcodage';
 
@@ -2122,6 +2131,13 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsHideOverlayOnStartHint =>
       'Les flux s\'ouvrent uniquement sur l\'image, sans les commandes ni les infos de la chaîne. Appuyez sur n\'importe quel bouton ou touchez l\'écran pour les afficher.';
+
+  @override
+  String get settingsBackMinimizesPlayer => 'Retour réduit le lecteur';
+
+  @override
+  String get settingsBackMinimizesPlayerHint =>
+      'Retour réduit la lecture dans une fenêtre flottante pour continuer à naviguer, au lieu de l\'arrêter. Utilisez la flèche de retour des commandes du lecteur pour l\'arrêter.';
 
   @override
   String get settingsBackgroundAudio => 'Audio en arrière-plan';

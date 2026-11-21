@@ -158,6 +158,12 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get navSettings;
 
+  /// No description provided for @navNowPlaying.
+  ///
+  /// In en, this message translates to:
+  /// **'Now Playing'**
+  String get navNowPlaying;
+
   /// No description provided for @navMore.
   ///
   /// In en, this message translates to:
@@ -2876,6 +2882,18 @@ abstract class AppLocalizations {
   /// **'Exit full screen'**
   String get playerExitFullscreen;
 
+  /// No description provided for @playerMinimize.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimize'**
+  String get playerMinimize;
+
+  /// No description provided for @playerExpand.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand'**
+  String get playerExpand;
+
   /// No description provided for @playerSeekUnavailableTranscoding.
   ///
   /// In en, this message translates to:
@@ -3643,6 +3661,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open streams on just the picture, without the controls and channel info. Press any button or tap the screen to show them.'**
   String get settingsHideOverlayOnStartHint;
+
+  /// No description provided for @settingsBackMinimizesPlayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Back minimizes the player'**
+  String get settingsBackMinimizesPlayer;
+
+  /// No description provided for @settingsBackMinimizesPlayerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Back shrinks playback to a floating window so you can keep browsing, instead of stopping it. Use the back arrow in the player\'s controls to stop.'**
+  String get settingsBackMinimizesPlayerHint;
 
   /// No description provided for @settingsBackgroundAudio.
   ///

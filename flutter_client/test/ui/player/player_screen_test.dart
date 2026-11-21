@@ -31,6 +31,7 @@ import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/watch_history_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/cached_backdrop_image.dart';
+import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/sort_option_row.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -105,6 +106,37 @@ void main() {
       await tester.pump();
       expect(find.text('2:05'), findsOneWidget);
       expect(find.text('1:00'), findsNothing);
+    });
+
+    testWidgets('Minimize alone (TV: no volume or fullscreen) fits at any '
+        'font size', (tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      for (final fontSize in AppFontSize.values) {
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: FontSizeScope(
+              fontSize: fontSize,
+              child: PlaybackControls(
+                isPlaying: true,
+                isLive: false,
+                canSeek: true,
+                currentPosition: Duration.zero,
+                duration: const Duration(hours: 1),
+                onPlayPause: () {},
+                onSeek: (_) {},
+                onBack: () {},
+                onMinimize: () {},
+              ),
+            ),
+          ),
+        );
+        expect(tester.takeException(), isNull, reason: fontSize.name);
+        expect(find.byTooltip('Minimize'), findsOneWidget);
+      }
     });
 
     testWidgets('shows play button when paused', (tester) async {

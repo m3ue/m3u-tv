@@ -36,6 +36,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get navSettings => 'Einstellungen';
 
   @override
+  String get navNowPlaying => 'Aktuelle Wiedergabe';
+
+  @override
   String get navMore => 'Mehr';
 
   @override
@@ -1644,6 +1647,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get playerExitFullscreen => 'Vollbild beenden';
 
   @override
+  String get playerMinimize => 'Minimieren';
+
+  @override
+  String get playerExpand => 'Vergrößern';
+
+  @override
   String get playerSeekUnavailableTranscoding =>
       'Spulen ist während der Transkodierung nicht verfügbar';
 
@@ -2114,6 +2123,13 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsHideOverlayOnStartHint =>
       'Streams starten nur mit dem Bild, ohne Steuerelemente und Senderinfos. Drücke eine beliebige Taste oder tippe auf den Bildschirm, um sie einzublenden.';
+
+  @override
+  String get settingsBackMinimizesPlayer => 'Zurück minimiert den Player';
+
+  @override
+  String get settingsBackMinimizesPlayerHint =>
+      'Zurück verkleinert die Wiedergabe auf ein schwebendes Fenster, damit du weiter stöbern kannst, statt sie zu beenden. Zum Beenden den Zurück-Pfeil in der Player-Steuerung verwenden.';
 
   @override
   String get settingsBackgroundAudio => 'Audio im Hintergrund';

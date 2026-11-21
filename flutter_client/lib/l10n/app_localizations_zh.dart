@@ -36,6 +36,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get navSettings => '设置';
 
   @override
+  String get navNowPlaying => '正在播放';
+
+  @override
   String get navMore => '更多';
 
   @override
@@ -1576,6 +1579,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playerExitFullscreen => '退出全屏';
 
   @override
+  String get playerMinimize => '最小化';
+
+  @override
+  String get playerExpand => '放大';
+
+  @override
   String get playerSeekUnavailableTranscoding => '转码时无法跳转进度';
 
   @override
@@ -2031,6 +2040,13 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get settingsHideOverlayOnStartHint =>
       '播放开始时只显示画面，不显示控制栏和频道信息。按任意按键或轻触屏幕即可显示。';
+
+  @override
+  String get settingsBackMinimizesPlayer => '返回键最小化播放器';
+
+  @override
+  String get settingsBackMinimizesPlayerHint =>
+      '按返回键时将播放缩小为悬浮窗口，可继续浏览，而不是停止播放。要停止播放，请使用播放器控制栏中的返回箭头。';
 
   @override
   String get settingsBackgroundAudio => '后台音频';
