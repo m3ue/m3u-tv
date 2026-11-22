@@ -394,6 +394,8 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
     'aac' => 'AAC',
     'ac3' => 'AC-3',
     'eac3' => 'E-AC-3',
+    'dts' => 'DTS',
+    'truehd' => 'TrueHD',
     'opus' => 'Opus',
     'flac' => 'FLAC',
     'mp3' => 'MP3',

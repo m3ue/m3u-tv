@@ -8,8 +8,11 @@
 #   web/js/mpegts.min.js - mpegts.js, for WebVideoBackend's raw MPEG-TS playback
 #   web/js/mediabunny.min.mjs - Mediabunny, for web/mkv_player.mjs's MKV playback
 #   web/js/mediabunny-ac3.min.mjs - Mediabunny's AC-3/E-AC-3 decoder (FFmpeg, WASM)
+#   web/js/mediabunny-dts.min.mjs - Mediabunny's DTS decoder (FFmpeg, WASM)
+#   web/js/mediabunny-truehd.min.mjs - Mediabunny's TrueHD decoder (FFmpeg, WASM)
 #   web/js/mediabunny-aac-encoder.min.mjs - Mediabunny's AAC encoder (FFmpeg, WASM)
-#   web/js/licenses/ffmpeg/ - FFmpeg's LGPL license files for the two above
+#   web/js/licenses/ffmpeg/ - FFmpeg's LGPL license files for the four above
+#     (every @mediabunny FFmpeg extension ships the same ones)
 #
 # drift_worker.js/sqlite3.wasm must match the drift and sqlite3 package
 # versions the app is built with, so those two are read from pubspec.lock
@@ -33,6 +36,8 @@ MPEGTS_JS_VERSION="1.8.2"
 MEDIABUNNY_VERSION="1.65.2"
 MEDIABUNNY_SHA256="08149edcc8cf980da65d94a0a54a8fc0fa85a65f89b66f55c906f33618363919"
 MEDIABUNNY_AC3_SHA256="ebb5b643b73b610215cb2456a719ef4fc842e2a6036a96707806632f98096e9d"
+MEDIABUNNY_DTS_SHA256="38fefee4c1c48ec524f8a2db20256398aad6332e23ec827cdd65a94eed5fa5af"
+MEDIABUNNY_TRUEHD_SHA256="39f64d0674392dbd9aa33f1a1b93ecf5a0aa6a4220a20f7726c666d3c1ac8566"
 MEDIABUNNY_AAC_ENCODER_SHA256="f7ef810c56d7f018929ed0954cdb82670bf2ad0bb988e75bc1a2f3d8bc23495f"
 
 locked_version() {
@@ -47,11 +52,12 @@ if [ -z "$DRIFT_VERSION" ] || [ -z "$SQLITE3_VERSION" ]; then
 fi
 
 STAMP="web/.web_assets"
-WANTED="drift=$DRIFT_VERSION sqlite3=$SQLITE3_VERSION hls.js=$HLS_JS_VERSION mpegts.js=$MPEGTS_JS_VERSION mediabunny=$MEDIABUNNY_VERSION mediabunny-audio=ac3,aac-encoder"
+WANTED="drift=$DRIFT_VERSION sqlite3=$SQLITE3_VERSION hls.js=$HLS_JS_VERSION mpegts.js=$MPEGTS_JS_VERSION mediabunny=$MEDIABUNNY_VERSION mediabunny-audio=ac3,dts,truehd,aac-encoder"
 if [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$WANTED" ] &&
   [ -s web/drift_worker.js ] && [ -s web/sqlite3.wasm ] &&
   [ -s web/js/hls.min.js ] && [ -s web/js/mpegts.min.js ] &&
   [ -s web/js/mediabunny.min.mjs ] && [ -s web/js/mediabunny-ac3.min.mjs ] &&
+  [ -s web/js/mediabunny-dts.min.mjs ] && [ -s web/js/mediabunny-truehd.min.mjs ] &&
   [ -s web/js/mediabunny-aac-encoder.min.mjs ]; then
   echo "Web assets already match pubspec.lock / pinned versions ($WANTED)."
   exit 0
@@ -73,6 +79,8 @@ download "https://cdn.jsdelivr.net/npm/hls.js@$HLS_JS_VERSION/dist/hls.min.js" w
 download "https://cdn.jsdelivr.net/npm/mpegts.js@$MPEGTS_JS_VERSION/dist/mpegts.min.js" web/js/mpegts.min.js
 download "https://cdn.jsdelivr.net/npm/mediabunny@$MEDIABUNNY_VERSION/dist/bundles/mediabunny.min.mjs" web/js/mediabunny.min.mjs
 download "https://cdn.jsdelivr.net/npm/@mediabunny/ac3@$MEDIABUNNY_VERSION/dist/bundles/mediabunny-ac3.min.mjs" web/js/mediabunny-ac3.min.mjs
+download "https://cdn.jsdelivr.net/npm/@mediabunny/dts@$MEDIABUNNY_VERSION/dist/bundles/mediabunny-dts.min.mjs" web/js/mediabunny-dts.min.mjs
+download "https://cdn.jsdelivr.net/npm/@mediabunny/truehd@$MEDIABUNNY_VERSION/dist/bundles/mediabunny-truehd.min.mjs" web/js/mediabunny-truehd.min.mjs
 download "https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@$MEDIABUNNY_VERSION/dist/bundles/mediabunny-aac-encoder.min.mjs" web/js/mediabunny-aac-encoder.min.mjs
 mkdir -p web/js/licenses/ffmpeg
 download "https://cdn.jsdelivr.net/npm/@mediabunny/ac3@$MEDIABUNNY_VERSION/licenses/ffmpeg/COPYING.LGPLv2.1" web/js/licenses/ffmpeg/COPYING.LGPLv2.1
@@ -107,6 +115,8 @@ verify_sha256() {
 }
 verify_sha256 web/js/mediabunny.min.mjs "$MEDIABUNNY_SHA256"
 verify_sha256 web/js/mediabunny-ac3.min.mjs "$MEDIABUNNY_AC3_SHA256"
+verify_sha256 web/js/mediabunny-dts.min.mjs "$MEDIABUNNY_DTS_SHA256"
+verify_sha256 web/js/mediabunny-truehd.min.mjs "$MEDIABUNNY_TRUEHD_SHA256"
 verify_sha256 web/js/mediabunny-aac-encoder.min.mjs "$MEDIABUNNY_AAC_ENCODER_SHA256"
 
 echo "$WANTED" > "$STAMP"

@@ -3,10 +3,10 @@
 // Browsers don't play Matroska, but most MKVs carry codecs they do play
 // (H.264/HEVC/AV1/VP9 video, AAC/Opus/FLAC audio). Mediabunny reads the MKV
 // over HTTP Range requests and this module copies its packets, untouched,
-// into fragmented MP4 that a MediaSource SourceBuffer accepts. AC-3/E-AC-3
-// audio, which most browsers' MSE rejects, is converted to AAC instead:
-// decoded and re-encoded by Mediabunny's FFmpeg-based WebAssembly
-// extensions, loaded on first use. They don't use WebCodecs, so this works
+// into fragmented MP4 that a MediaSource SourceBuffer accepts. AC-3/E-AC-3,
+// DTS and TrueHD audio, which most browsers' MSE rejects, is converted to
+// AAC instead: decoded and re-encoded by Mediabunny's FFmpeg-based
+// WebAssembly extensions, each loaded the first time a file needs it. They don't use WebCodecs, so this works
 // on plain-HTTP installs too (WebCodecs needs a secure context). The
 // MediaSource gets the file's full duration up front, so the scrubber works
 // across the whole movie: a seek outside what's buffered starts a new copy
@@ -56,32 +56,49 @@ const BYTE_RATE_WARMUP_SECONDS = 4;
 // A seek this close past the copy position is left to the running session.
 const SEEK_CONTINUE_WINDOW_SECONDS = 15;
 
-// Audio the browser can't play that we convert to AAC, and the most channels
-// the conversion keeps (wider layouts, e.g. 7.1, are folded down to 5.1).
-const CONVERTIBLE_AUDIO_CODECS = new Set(['ac3', 'eac3']);
+// Audio the browser can't play that we convert to AAC (codec -> its decoder
+// extension), and the most channels the conversion keeps (wider layouts,
+// e.g. 7.1, are folded down to 5.1). FFmpeg decodes the core channels of
+// TrueHD/DTS-HD, so Atmos and DTS:X object data isn't kept.
+const AUDIO_DECODERS = {
+  ac3: { module: './js/mediabunny-ac3.min.mjs', register: 'registerAc3Decoder' },
+  eac3: { module: './js/mediabunny-ac3.min.mjs', register: 'registerAc3Decoder' },
+  dts: { module: './js/mediabunny-dts.min.mjs', register: 'registerDtsDecoder' },
+  truehd: {
+    module: './js/mediabunny-truehd.min.mjs',
+    register: 'registerTrueHdDecoder',
+  },
+};
 const MAX_CONVERTED_CHANNELS = 6;
 const AAC_CODEC_STRING = 'mp4a.40.2';
 const CONVERTED_AAC_BITRATE_PER_CHANNEL = 96_000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-let audioExtensionsLoad = null;
+// Extension module path -> its load, so each registers once per page.
+const extensionLoads = new Map();
 
-/** Loads and registers the AC-3 decoder and AAC encoder once per page. */
-function loadAudioConversion() {
-  audioExtensionsLoad ??= Promise.all([
-    import('./js/mediabunny-ac3.min.mjs'),
-    import('./js/mediabunny-aac-encoder.min.mjs'),
-  ])
-    .then(([ac3, aac]) => {
-      ac3.registerAc3Decoder();
-      aac.registerAacEncoder();
-    })
-    .catch((error) => {
-      audioExtensionsLoad = null;
-      throw error;
-    });
-  return audioExtensionsLoad;
+function loadExtension(module, register) {
+  let load = extensionLoads.get(module);
+  if (!load) {
+    load = import(module)
+      .then((extension) => extension[register]())
+      .catch((error) => {
+        extensionLoads.delete(module);
+        throw error;
+      });
+    extensionLoads.set(module, load);
+  }
+  return load;
+}
+
+/** Loads [codec]'s decoder and the AAC encoder. */
+function loadAudioConversion(codec) {
+  const decoder = AUDIO_DECODERS[codec];
+  return Promise.all([
+    loadExtension(decoder.module, decoder.register),
+    loadExtension('./js/mediabunny-aac-encoder.min.mjs', 'registerAacEncoder'),
+  ]);
 }
 
 function codedError(code, message) {
@@ -139,7 +156,7 @@ class MkvPlayer {
     }
 
     // Take the file's primary audio track (else the first) as-is when the
-    // browser plays it, or converted to AAC when it's AC-3/E-AC-3; other
+    // browser plays it, or converted to AAC when it's AC-3/E-AC-3/DTS/TrueHD; other
     // tracks are only tried after that, so a playable commentary or
     // second-language track never silently replaces the main one. With
     // audio tracks but none usable, fail rather than play silently.
@@ -160,7 +177,7 @@ class MkvPlayer {
         break;
       }
       if (
-        CONVERTIBLE_AUDIO_CODECS.has(track.codec) &&
+        Object.hasOwn(AUDIO_DECODERS, track.codec) &&
         mseSupports('audio', AAC_CODEC_STRING)
       ) {
         this.audioTrack = track;
@@ -172,7 +189,7 @@ class MkvPlayer {
       const codecs = [...new Set(audioTracks.map((t) => t.codec ?? 'unknown'))];
       throw codedError('unsupported_audio', codecs.join(', '));
     }
-    if (this.convertAudio) await loadAudioConversion();
+    if (this.convertAudio) await loadAudioConversion(this.audioTrack.codec);
 
     this.duration =
       (await this.input.getDurationFromMetadata()) ??
@@ -299,7 +316,7 @@ class MkvPlayer {
 
   /**
    * The audio half of a session, from [startSeconds]: the track's own
-   * packets when the browser plays its codec, else decoded AC-3/E-AC-3
+   * packets when the browser plays its codec, else decoded AC-3/E-AC-3/DTS/TrueHD
    * samples re-encoded to AAC. Either way `nextTimestamp()` peeks the next
    * item and `addNext()` hands it to `source` (the output's audio track).
    */
