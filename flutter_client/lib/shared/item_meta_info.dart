@@ -1,10 +1,8 @@
-import 'package:cached_network_image/cached_network_image.dart'
-    show CachedNetworkImageProvider;
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_browsing_widgets.dart';
-import 'package:m3u_tv/shared/media_image_cache_manager.dart';
+import 'package:m3u_tv/shared/media_image_provider.dart';
 import 'package:m3u_tv/shared/meta_chip_data.dart';
 import 'package:m3u_tv/shared/sized_image_url.dart';
 import 'package:material_ui/material_ui.dart';
@@ -265,10 +263,7 @@ class ItemTitleHeading extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: Image(
             image: ResizeImage(
-              CachedNetworkImageProvider(
-                sizedImageUrl(logo, decodeWidth: decodeWidth),
-                cacheManager: mediaImageCacheManager,
-              ),
+              mediaImageProvider(sizedImageUrl(logo, decodeWidth: decodeWidth)),
               // Bound the decode to the display cap: a wordmark clearlogo can
               // ship at 1500px+ wide and would otherwise decode at full source
               // resolution just to be scaled down into a 350x120 (times the

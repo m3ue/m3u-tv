@@ -1,6 +1,5 @@
-import 'package:cached_network_image/cached_network_image.dart'
-    show CachedNetworkImageProvider;
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
+import 'package:m3u_tv/shared/media_image_provider.dart';
 import 'package:m3u_tv/shared/sized_image_url.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -81,9 +80,8 @@ class _CachedBackdropImageState extends State<CachedBackdropImage> {
         final cacheWidth = constraints.hasBoundedWidth
             ? (constraints.maxWidth * devicePixelRatio).round()
             : null;
-        final provider = CachedNetworkImageProvider(
+        final provider = mediaImageProvider(
           sizedImageUrl(widget.url, decodeWidth: cacheWidth),
-          cacheManager: mediaImageCacheManager,
         );
         final cacheHeight = constraints.hasBoundedHeight
             ? (constraints.maxHeight * devicePixelRatio).round()

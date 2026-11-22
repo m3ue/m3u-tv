@@ -1,7 +1,6 @@
-import 'package:cached_network_image/cached_network_image.dart'
-    show CachedNetworkImageProvider;
 import 'package:m3u_tv/shared/image_quality_scope.dart';
 import 'package:m3u_tv/shared/media_image_cache_manager.dart';
+import 'package:m3u_tv/shared/media_image_provider.dart';
 import 'package:m3u_tv/shared/sized_image_url.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -65,9 +64,8 @@ class CachedMediaThumbnail extends StatelessWidget {
         final cacheHeight = decodeHeight == null
             ? null
             : (decodeHeight * devicePixelRatio).round();
-        final provider = CachedNetworkImageProvider(
+        final provider = mediaImageProvider(
           sizedImageUrl(url, decodeWidth: cacheWidth),
-          cacheManager: mediaImageCacheManager,
         );
         return Image(
           image: cacheWidth == null && cacheHeight == null

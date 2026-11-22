@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:cached_network_image/cached_network_image.dart'
-    show CachedNetworkImageProvider;
 import 'package:dpad/dpad.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/gestures.dart';
@@ -15,7 +13,7 @@ import 'package:m3u_tv/shared/dpad_ink_well.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:m3u_tv/shared/hover_scroll_arrows.dart';
 import 'package:m3u_tv/shared/image_quality_scope.dart';
-import 'package:m3u_tv/shared/media_image_cache_manager.dart';
+import 'package:m3u_tv/shared/media_image_provider.dart';
 import 'package:m3u_tv/shared/sized_image_url.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -571,9 +569,8 @@ class _ResilientMediaImageState extends State<ResilientMediaImage> {
       final cacheHeight = decodeHeight == null
           ? null
           : (decodeHeight * devicePixelRatio).round();
-      final provider = CachedNetworkImageProvider(
+      final provider = mediaImageProvider(
         sizedImageUrl(loadUrl!, decodeWidth: cacheWidth),
-        cacheManager: mediaImageCacheManager,
       );
       return _buildImage(
         provider,
