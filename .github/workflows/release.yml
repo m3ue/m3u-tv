@@ -889,6 +889,41 @@ jobs:
             flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-windows-setup.exe.sha256
 
   # ── GitHub Release ─────────────────────────────────────────────────────────
+  build-web:
+    name: Build Web (M3U Editor /m3u-tv)
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.desktop_artifacts_only != true }}
+    runs-on: ubuntu-latest
+    needs: validate
+    defaults:
+      run:
+        working-directory: flutter_client
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build and package
+        run: |
+          bash scripts/package-web.sh \
+            "${{ needs.validate.outputs.version }}" \
+            "${{ needs.validate.outputs.build_number }}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: web-zip
+          path: |
+            flutter_client/build/web-release/m3u-tv-v${{ needs.validate.outputs.version }}-web.zip
+            flutter_client/build/web-release/m3u-tv-v${{ needs.validate.outputs.version }}-web.zip.sha256
+            flutter_client/build/web-release/m3u-tv-v${{ needs.validate.outputs.version }}-web.json
+          retention-days: 7
+
   release:
     name: Create GitHub Release
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.desktop_artifacts_only != true }}
@@ -898,6 +933,7 @@ jobs:
       - build-android
       - build-linux
       - build-windows
+      - build-web
     permissions:
       contents: write
     steps:
@@ -929,6 +965,12 @@ jobs:
           name: windows-installer
           path: artifacts/windows-installer/
 
+      - name: Download web ZIP
+        uses: actions/download-artifact@v8
+        with:
+          name: web-zip
+          path: artifacts/web/
+
       - name: Verify non-Apple assets
         run: |
           set -euo pipefail
@@ -937,11 +979,13 @@ jobs:
             "artifacts/android-apks/m3u-tv-v${V}-android.apk" \
             "artifacts/linux-zips/m3u-tv-v${V}-linux.zip" \
             "artifacts/windows-zips/m3u-tv-v${V}-windows.zip" \
-            "artifacts/windows-installer/m3u-tv-v${V}-windows-setup.exe"; do
+            "artifacts/windows-installer/m3u-tv-v${V}-windows-setup.exe" \
+            "artifacts/web/m3u-tv-v${V}-web.zip"; do
             test -s "$asset"
             test -s "$asset.sha256"
             (cd "$(dirname "$asset")" && sha256sum -c "$(basename "$asset").sha256")
           done
+          test -s "artifacts/web/m3u-tv-v${V}-web.json"
 
       - name: Generate release notes
         run: |
@@ -976,6 +1020,9 @@ jobs:
             "artifacts/windows-zips/m3u-tv-v${V}-windows.zip.sha256"
             "artifacts/windows-installer/m3u-tv-v${V}-windows-setup.exe"
             "artifacts/windows-installer/m3u-tv-v${V}-windows-setup.exe.sha256"
+            "artifacts/web/m3u-tv-v${V}-web.zip"
+            "artifacts/web/m3u-tv-v${V}-web.zip.sha256"
+            "artifacts/web/m3u-tv-v${V}-web.json"
           )
 
           if gh release view "$TAG" > /dev/null 2>&1; then
@@ -1001,6 +1048,7 @@ jobs:
           echo "| Linux | \`m3u-tv-${V}-linux.zip\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Windows (portable, unsigned) | \`m3u-tv-${V}-windows.zip\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Windows (installer, unsigned) | \`m3u-tv-${V}-windows-setup.exe\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web (M3U Editor /m3u-tv) | \`m3u-tv-${V}-web.zip\` |" >> $GITHUB_STEP_SUMMARY
 
   # ── Apple Release ─────────────────────────────────────────────────────────
   release-apple:
