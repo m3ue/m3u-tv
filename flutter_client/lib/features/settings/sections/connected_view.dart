@@ -152,7 +152,7 @@ class _ConnectedViewState extends State<ConnectedView> {
     final hasViewSettings = widget.viewSettingsService != null;
 
     return SettingsScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: settingsPagePadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

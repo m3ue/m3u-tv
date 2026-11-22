@@ -21,6 +21,20 @@ import 'package:material_ui/material_ui.dart';
 bool get _isMacDesktopWindow => HostPlatform.isMacOS;
 const double _kMacTrafficLightInset = 72;
 const double _kSubpagePadding = 24;
+const double _kCompactSubpagePadding = 16;
+
+/// Phones in portrait (and narrow desktop windows): settings pages trade
+/// padding and fixed-width columns for room to wrap text instead of
+/// truncating it. TVs are always wider than this.
+const double kSettingsCompactWidth = 600;
+
+bool isCompactSettingsLayout(BuildContext context) =>
+    MediaQuery.sizeOf(context).width < kSettingsCompactWidth;
+
+/// The outer padding of a settings page: 24 on wide screens, 16 on phones.
+EdgeInsets settingsPagePadding(BuildContext context) => EdgeInsets.all(
+  isCompactSettingsLayout(context) ? _kCompactSubpagePadding : _kSubpagePadding,
+);
 
 /// tvOS reports its overscan-safe area as real MediaQuery padding on every
 /// edge. Settings sub-pages are pushed on the root Navigator, outside
@@ -155,6 +169,7 @@ class SettingsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scale = FontSizeScope.scaleOf(context);
+    final compact = isCompactSettingsLayout(context);
     final titleColor = destructive ? theme.colorScheme.error : null;
     final titleTrailing = locked
         ? Icon(
@@ -176,21 +191,21 @@ class SettingsRow extends StatelessWidget {
     );
     final content = Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: 16 * scale,
+        horizontal: (compact ? 12 : 16) * scale,
         vertical: 12 * scale,
       ),
       child: Row(
         children: [
           if (leading != null) ...[
             leading!,
-            SizedBox(width: 16 * scale),
+            SizedBox(width: (compact ? 12 : 16) * scale),
           ] else if (icon != null) ...[
             Icon(
               icon,
               size: 22 * scale,
               color: titleColor ?? theme.colorScheme.onSurfaceVariant,
             ),
-            SizedBox(width: 16 * scale),
+            SizedBox(width: (compact ? 12 : 16) * scale),
           ],
           Expanded(
             child: Column(
@@ -211,8 +226,10 @@ class SettingsRow extends StatelessWidget {
                   SizedBox(height: 2 * scale),
                   Text(
                     subtitle!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    // A phone wraps the whole description rather than
+                    // cutting it off mid-sentence.
+                    maxLines: compact ? null : 2,
+                    overflow: compact ? null : TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -221,7 +238,10 @@ class SettingsRow extends StatelessWidget {
               ],
             ),
           ),
-          if (trailing != null) ...[SizedBox(width: 12 * scale), trailing],
+          if (trailing != null) ...[
+            SizedBox(width: (compact ? 8 : 12) * scale),
+            trailing,
+          ],
         ],
       ),
     );
@@ -543,7 +563,7 @@ Widget _settingsSubpageScaffold(
       onBack: () => Navigator.of(context, rootNavigator: true).pop(),
     ),
     body: padBody
-        ? Padding(padding: const EdgeInsets.all(_kSubpagePadding), child: body)
+        ? Padding(padding: settingsPagePadding(context), child: body)
         : body,
   );
 }
@@ -598,7 +618,7 @@ Future<T?> pushSettingsSubpage<T>(
       // 24px short of both edges.
       padBody: false,
       body: SettingsScrollView(
-        padding: const EdgeInsets.all(_kSubpagePadding),
+        padding: settingsPagePadding(context),
         child: builder(context),
       ),
     ),
@@ -608,18 +628,24 @@ Future<T?> pushSettingsSubpage<T>(
 /// Like [pushSettingsSubpage], but gives [builder] the full remaining height
 /// instead of wrapping it in a [SettingsScrollView], for sub-pages that
 /// manage their own scrolling/layout (e.g. the Release Notes master/detail
-/// view).
+/// view). [padBody] false hands [builder] the page edge to edge, for a body
+/// that pads its own content (e.g. a tab bar whose tabs each scroll).
 Future<T?> pushSettingsSubpageFullHeight<T>(
   BuildContext context, {
   required String Function(BuildContext) title,
   required WidgetBuilder builder,
   bool Function()? onBack,
+  bool padBody = true,
 }) {
   return _pushImmersive<T>(
     context,
     onBack: onBack,
-    content: (context) =>
-        _settingsSubpageScaffold(context, title: title, body: builder(context)),
+    content: (context) => _settingsSubpageScaffold(
+      context,
+      title: title,
+      padBody: padBody,
+      body: builder(context),
+    ),
   );
 }
 

@@ -21,8 +21,9 @@ void main() {
     List<String>? available,
     bool usesRemote = true,
     double textScale = 1,
+    Size surfaceSize = const Size(1280, 800),
   }) async {
-    await tester.binding.setSurfaceSize(const Size(1280, 800));
+    await tester.binding.setSurfaceSize(surfaceSize);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     service = ViewSettingsService();
     await tester.pumpWidget(
@@ -139,6 +140,18 @@ void main() {
       tester.renderObject<RenderParagraph>(find.text(hint)).textScaler,
       const TextScaler.linear(1.5),
     );
+  });
+
+  testWidgets('a phone gives each label room instead of truncating it', (
+    tester,
+  ) async {
+    await pumpPage(tester, surfaceSize: const Size(360, 780));
+
+    for (final label in ['Live TV', 'Movies', 'Series']) {
+      final text = tester.renderObject<RenderParagraph>(find.text(label));
+      expect(text.didExceedMaxLines, isFalse, reason: label);
+      expect(text.size.width, greaterThan(100), reason: label);
+    }
   });
 
   testWidgets('lists only the customizable, available destinations', (

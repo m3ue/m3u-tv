@@ -41,7 +41,11 @@ class NavLayoutPage extends ConsumerStatefulWidget {
 }
 
 class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
-  static const double _switchColumnWidth = 72;
+  static const double _wideSwitchColumnWidth = 72;
+
+  /// Still clears a switch's track; the wide 72 leaves a phone's label only a
+  /// few characters.
+  static const double _compactSwitchColumnWidth = 56;
 
   /// Keeps each row's focus borders inside the group's rounded clip. Taken out
   /// of the row's own padding, so the row stays the same size.
@@ -183,6 +187,7 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scale = FontSizeScope.scaleOf(context);
+    final switchColumnWidth = _switchColumnWidth(context);
     _available = ref.watch(availableMainRoutesProvider);
     final rows = _layout.order
         .where(_available.contains)
@@ -230,7 +235,7 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
               const Spacer(),
               for (final label in [l.settingsNavLayoutColumnNav, l.navHome])
                 SizedBox(
-                  width: _switchColumnWidth * scale,
+                  width: switchColumnWidth * scale,
                   child: Text(
                     label,
                     style: columnStyle,
@@ -270,9 +275,18 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
     );
   }
 
+  double _switchColumnWidth(BuildContext context) =>
+      isCompactSettingsLayout(context)
+      ? _compactSwitchColumnWidth
+      : _wideSwitchColumnWidth;
+
   Widget _buildRow(BuildContext context, String route, int index) {
     final theme = Theme.of(context);
     final scale = FontSizeScope.scaleOf(context);
+    // A phone drops the route icon (the label already names it) and tightens
+    // the gaps, so the label gets the width instead of an ellipsis.
+    final compact = isCompactSettingsLayout(context);
+    final gap = (compact ? 8 : 12) * scale;
     final isGrabbed = route == _grabbedRoute;
     final locked = _locked;
     final serverRows = widget.service.customHomeRowsFor(route);
@@ -348,19 +362,22 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
                                 index: index,
                                 child: handle,
                               ),
-                            SizedBox(width: 12 * scale),
-                            Icon(
-                              navigationRouteIcon(route),
-                              size: 22 * scale,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            SizedBox(width: 12 * scale),
+                            SizedBox(width: gap),
+                            if (!compact) ...[
+                              Icon(
+                                navigationRouteIcon(route),
+                                size: 22 * scale,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              SizedBox(width: gap),
+                            ],
                             Expanded(
                               child: Text(
                                 navigationRouteLabel(context, route),
                                 style: theme.textTheme.bodyLarge?.copyWith(
                                   fontWeight: FontWeight.w500,
                                 ),
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -370,6 +387,7 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
                     ),
                   ),
                   _switchCell(
+                    context,
                     scale,
                     value: _layout.showsInNav(route),
                     onChanged: locked
@@ -378,6 +396,7 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
                               _save(_layout.withNav(route, shown: shown)),
                   ),
                   _switchCell(
+                    context,
                     scale,
                     value: _layout.showsHomeRow(route),
                     onChanged: locked
@@ -416,6 +435,11 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
     required ValueChanged<bool>? onChanged,
   }) {
     final theme = Theme.of(context);
+    final switchColumnWidth = _switchColumnWidth(context);
+    // Lines up under the section's label (see [_buildRow]'s handle and icon).
+    final labelInset = isCompactSettingsLayout(context)
+        ? 8 + 24 + 8
+        : 8 + 24 + 12 + 22 + 12;
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -423,7 +447,7 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
           Expanded(
             child: Padding(
               padding: EdgeInsets.fromLTRB(
-                (8 + 24 + 12 + 22 + 12) * scale,
+                labelInset * scale,
                 8 * scale,
                 8 * scale,
                 8 * scale,
@@ -435,26 +459,29 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
           ),
-          SizedBox(width: _switchColumnWidth * scale),
-          _switchCell(scale, value: shown, onChanged: onChanged),
+          SizedBox(width: switchColumnWidth * scale),
+          _switchCell(context, scale, value: shown, onChanged: onChanged),
         ],
       ),
     );
   }
 
   Widget _switchCell(
+    BuildContext context,
     double scale, {
     required bool value,
     required ValueChanged<bool>? onChanged,
   }) {
+    final switchColumnWidth = _switchColumnWidth(context);
     if (onChanged == null) {
       return SizedBox(
-        width: _switchColumnWidth * scale,
+        width: switchColumnWidth * scale,
         child: Center(
           child: AppSwitch(value: value, onChanged: null),
         ),
@@ -464,7 +491,7 @@ class _NavLayoutPageState extends ConsumerState<NavLayoutPage> {
       onTap: () => onChanged(!value),
       borderRadius: BorderRadius.circular(8),
       child: SizedBox(
-        width: _switchColumnWidth * scale,
+        width: switchColumnWidth * scale,
         child: Center(
           child: AppSwitch(value: value, onChanged: onChanged),
         ),

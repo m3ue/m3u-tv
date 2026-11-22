@@ -185,7 +185,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
       return DpadRegion(
         memoryKey: 'device-pairing',
         child: SettingsScrollView(
-          padding: const EdgeInsets.all(32),
+          padding: EdgeInsets.all(isCompactSettingsLayout(context) ? 16 : 32),
           child: _DevicePairingBody(
             service: service,
             onCancel: _cancelPairing,
@@ -202,7 +202,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
       // No pairing service available - a single manual sign-in form, same
       // as before device pairing existed.
       return SettingsScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: settingsPagePadding(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -246,7 +246,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
             children: [
               if (_hasSavedPlaylists)
                 SettingsScrollView(
-                  padding: const EdgeInsets.all(24),
+                  padding: settingsPagePadding(context),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -268,7 +268,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
                   ),
                 ),
               SettingsScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: settingsPagePadding(context),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -320,7 +320,7 @@ class _ConnectionFormBodyState extends State<ConnectionFormBody>
                 ),
               ),
               SettingsScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: settingsPagePadding(context),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -515,7 +515,7 @@ class _DevicePairingBody extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isCompactSettingsLayout(context) ? 16 : 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [logo, const SizedBox(height: 16), body],

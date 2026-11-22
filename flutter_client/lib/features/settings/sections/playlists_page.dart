@@ -179,6 +179,8 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
       context,
       title: (context) => AppLocalizations.of(context).settingsAddPlaylist,
       onBack: widget.onBack,
+      // The form's tabs each pad their own content.
+      padBody: false,
       builder: (_) => _AddPlaylistBody(
         onAdd: widget.playlists.onSwitch,
         onPaired: _service.adoptPaired,
