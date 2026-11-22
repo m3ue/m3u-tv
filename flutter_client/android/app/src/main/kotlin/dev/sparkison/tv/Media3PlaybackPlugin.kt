@@ -352,6 +352,7 @@ class Media3PlaybackPlugin(
             ?: emptyMap()
         val userAgent = source["userAgent"] as? String
         val startPositionMs = (source["startPositionMs"] as? Number)?.toLong() ?: 0L
+        val startFromBeginning = source["startFromBeginning"] as? Boolean ?: false
         val handleAudioFocus = arguments["handleAudioFocus"] as? Boolean ?: true
         val matchDisplayRefreshRate = source["matchDisplayRefreshRate"] as? Boolean ?: false
         val allowDisplayModeChanges = source["allowDisplayModeChanges"] as? Boolean ?: true
@@ -435,6 +436,10 @@ class Media3PlaybackPlugin(
                 .setBitmapLoader(artworkLoader)
                 .build()
         states[playerId] = state
+        // ExoPlayer treats startPosition 0 on a live item as the default live
+        // edge, so "Start from beginning" can't be expressed via setMediaItem.
+        // Seek to the window start once the timeline is READY (see listener).
+        state.pendingStartFromBeginning = startFromBeginning
         // Track the mime we actually opened with so retryFlippedMime can
         // flip it if the probe guessed wrong (HLS body vs TS pipe).
         state.lastMimeType = (source["mimeType"] as? String)
@@ -950,7 +955,14 @@ class Media3PlaybackPlugin(
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            val player = states[playerId]?.player ?: return
+            val state = states[playerId] ?: return
+            val player = state.player
+            if (playbackState == Player.STATE_READY && state.pendingStartFromBeginning) {
+                state.pendingStartFromBeginning = false
+                if (player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) {
+                    player.seekTo(0L)
+                }
+            }
             val dur = effectiveDurationMs(player)
             when (playbackState) {
                 Player.STATE_BUFFERING -> emit(playerId, "buffering", positionMs = player.currentPosition)
@@ -1065,6 +1077,8 @@ class Media3PlaybackPlugin(
         var resumeStallRecoveryCount: Int = 0,
         /** Last mime we opened with, so a format-mismatch can flip it. */
         var lastMimeType: String? = null,
+        /** Seek to window start once READY ("Start from beginning"). */
+        var pendingStartFromBeginning: Boolean = false,
     ) {
         /**
          * Format mismatch: HLS body parsed as TS (or vice versa) — flip the

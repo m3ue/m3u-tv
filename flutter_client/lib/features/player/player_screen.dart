@@ -1551,6 +1551,8 @@ class _PlayerScreenState extends State<PlayerScreen>
       // Prefer the player's own position over our duration — an EXTINF-sum
       // duration can overshoot ExoPlayer's window and seek past EOF (ended).
       if (_pendingEdgeRewind &&
+          !_switchingTimeshift &&
+          widget.orchestrator.activeBackend != null &&
           (state.status == PlaybackStatus.ready ||
               state.status == PlaybackStatus.playing ||
               state.status == PlaybackStatus.paused)) {
@@ -1565,7 +1567,15 @@ class _PlayerScreenState extends State<PlayerScreen>
           'edge-rewind base=${base.inSeconds}s target=${clamped.inSeconds}s dur=${_duration.inSeconds}s',
         );
         setState(() => _currentPosition = clamped);
-        unawaited(widget.orchestrator.seek(clamped));
+        try {
+          unawaited(widget.orchestrator.seek(clamped));
+        } on Object catch (error) {
+          _pendingEdgeRewind = true;
+          AppLogBuffer.instance.add(
+            AppLogLevel.info,
+            'edge-rewind seek deferred: $error',
+          );
+        }
       }
       // Duration for timeshift windows comes from the backend timeline
       // (Media3 effectiveDurationMs → state.duration). Do not fetch the
