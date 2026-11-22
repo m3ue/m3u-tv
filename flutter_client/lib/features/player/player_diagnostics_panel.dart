@@ -8,6 +8,7 @@ class PlaybackDiagnosticsPanel extends StatelessWidget {
     super.key,
     required this.activeBackend,
     required this.diagnostics,
+    this.engine,
     this.compact = false,
     this.width = 360,
     this.fontScale = 1.0,
@@ -15,6 +16,11 @@ class PlaybackDiagnosticsPanel extends StatelessWidget {
 
   final PlaybackBackend? activeBackend;
   final List<String> diagnostics;
+
+  /// The engine inside [activeBackend] that is playing (see
+  /// `PlaybackState.engine`), shown after the backend name, e.g.
+  /// "Web browser video (hls.js)".
+  final String? engine;
 
   /// Shrinks padding/fonts/label width for phones/tablets, where the fixed
   /// 360px panel used to run off the edge of the screen in portrait and
@@ -37,6 +43,7 @@ class PlaybackDiagnosticsPanel extends StatelessWidget {
     final snapshot = _PlaybackDiagnosticsSnapshot.from(
       activeBackend: activeBackend,
       diagnostics: diagnostics,
+      engine: engine,
     );
     final rows = <Widget>[
       _DiagnosticsRow(
@@ -170,6 +177,7 @@ class _PlaybackDiagnosticsSnapshot {
   static _PlaybackDiagnosticsSnapshot from({
     required PlaybackBackend? activeBackend,
     required List<String> diagnostics,
+    String? engine,
   }) {
     var backendLabel = _backendLabel(activeBackend);
     String? fallbackReason;
@@ -203,6 +211,10 @@ class _PlaybackDiagnosticsSnapshot {
         );
         cleanupStatus = 'server transcode stopped ($payload)';
       }
+    }
+
+    if (engine != null && engine.isNotEmpty) {
+      backendLabel = '$backendLabel ($engine)';
     }
 
     return _PlaybackDiagnosticsSnapshot(

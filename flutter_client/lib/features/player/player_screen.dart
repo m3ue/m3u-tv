@@ -2880,6 +2880,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                             fontScale: fontScale,
                             activeBackend: widget.orchestrator.activeBackend,
                             diagnostics: widget.orchestrator.diagnostics,
+                            engine: widget.orchestrator.lastState?.engine,
                           ),
                         ),
 

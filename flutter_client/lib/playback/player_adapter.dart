@@ -483,10 +483,12 @@ class PlaybackState {
     this.isSubtitleTrackSelectionKnown = false,
     this.playbackSpeed = 1,
     this.videoAspectRatio,
+    this.engine,
   });
 
   const PlaybackState.idle({required this.backend})
     : status = PlaybackStatus.idle,
+      engine = null,
       source = null,
       position = Duration.zero,
       duration = null,
@@ -513,6 +515,11 @@ class PlaybackState {
   final double playbackSpeed;
   final double? videoAspectRatio;
 
+  /// Which engine inside [backend] is playing, for the player diagnostics
+  /// (the web backend's hls.js, mpegts.js, Mediabunny or native `<video>`
+  /// paths). Null for backends with a single engine.
+  final String? engine;
+
   PlaybackState copyWith({
     PlaybackBackend? backend,
     PlaybackStatus? status,
@@ -527,6 +534,7 @@ class PlaybackState {
     bool? isSubtitleTrackSelectionKnown,
     double? playbackSpeed,
     double? videoAspectRatio,
+    Object? engine = _unchanged,
   }) {
     return PlaybackState(
       backend: backend ?? this.backend,
@@ -548,6 +556,7 @@ class PlaybackState {
           isSubtitleTrackSelectionKnown ?? this.isSubtitleTrackSelectionKnown,
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       videoAspectRatio: videoAspectRatio ?? this.videoAspectRatio,
+      engine: identical(engine, _unchanged) ? this.engine : engine as String?,
     );
   }
 }

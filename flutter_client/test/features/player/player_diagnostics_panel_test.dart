@@ -39,4 +39,25 @@ void main() {
     expect(find.textContaining('s3cret'), findsNothing);
     expect(find.textContaining('[redacted]'), findsOneWidget);
   });
+
+  testWidgets('names the engine inside the active backend', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: PlaybackDiagnosticsPanel(
+            activeBackend: PlaybackBackend.webVideo,
+            diagnostics: [],
+            engine: 'Mediabunny MKV: H.264, E-AC-3 to AAC',
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      find.text('Web browser video (Mediabunny MKV: H.264, E-AC-3 to AAC)'),
+      findsOneWidget,
+    );
+  });
 }

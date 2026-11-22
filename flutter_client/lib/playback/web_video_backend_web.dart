@@ -61,6 +61,9 @@ external JSPromise<_JsMkvHandle> _mkvOpen(
 @JS()
 extension type _JsMkvHandle._(JSObject _) implements JSObject {
   external _JsMkvError? get error;
+  external String? get videoCodec;
+  external String? get audioCodec;
+  external bool? get audioConverted;
   external void destroy();
 }
 
@@ -159,6 +162,7 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
       _state.copyWith(
         backend: PlaybackBackend.webVideo,
         status: PlaybackStatus.loading,
+        engine: null,
         source: source,
         position: source.startPosition,
       ),
@@ -178,6 +182,7 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
       } else if (!source.isLive && _looksLikeMatroska(contentType, uri)) {
         await _loadMkv(uri, source.startPosition, generation);
       } else {
+        _setEngine('native <video>');
         _video.src = uri.toString();
         await _awaitNativeLoad(generation);
       }
@@ -365,6 +370,40 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
       return;
     }
     _mkv = handle;
+    _setEngine(_mkvEngineLabel(handle));
+  }
+
+  /// "Mediabunny MKV: H.264, E-AC-3 to AAC", for the player diagnostics.
+  String _mkvEngineLabel(_JsMkvHandle handle) {
+    final video = _codecName(handle.videoCodec);
+    final audioCodec = handle.audioCodec;
+    final audio = audioCodec == null
+        ? 'no audio'
+        : handle.audioConverted ?? false
+        ? '${_codecName(audioCodec)} to AAC'
+        : _codecName(audioCodec);
+    return 'Mediabunny MKV: $video, $audio';
+  }
+
+  static String _codecName(String? codec) => switch (codec) {
+    'avc' => 'H.264',
+    'hevc' => 'HEVC',
+    'vp8' => 'VP8',
+    'vp9' => 'VP9',
+    'av1' => 'AV1',
+    'aac' => 'AAC',
+    'ac3' => 'AC-3',
+    'eac3' => 'E-AC-3',
+    'opus' => 'Opus',
+    'flac' => 'FLAC',
+    'mp3' => 'MP3',
+    'vorbis' => 'Vorbis',
+    null => 'unknown',
+    _ => codec.toUpperCase(),
+  };
+
+  void _setEngine(String engine) {
+    _emit(_state.copyWith(engine: engine));
   }
 
   void _onMkvError(JSString message) {
@@ -414,6 +453,7 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
     await _ensureScriptLoaded(_hlsScriptUrl, globalName: 'Hls');
     if (!_hlsIsSupported()) {
       // Safari and other browsers with built-in HLS support.
+      _setEngine('native HLS');
       _video.src = uri.toString();
       return;
     }
@@ -421,6 +461,7 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
       <String, Object?>{'enableWorker': true, 'lowLatencyMode': true}.jsify(),
     );
     _hls = hls;
+    _setEngine('hls.js');
     hls
       ..on('hlsError', _onHlsError.toJS)
       ..loadSource(uri.toString())
@@ -444,6 +485,7 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
   Future<void> _loadMpegTs(Uri uri, {required bool isLive}) async {
     await _ensureScriptLoaded(_mpegtsScriptUrl, globalName: 'mpegts');
     if (!_mpegtsGetFeatureList().mseLivePlayback) {
+      _setEngine('native <video>');
       _video.src = uri.toString();
       return;
     }
@@ -458,6 +500,7 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
       }.jsify()!,
     );
     _mpegts = player;
+    _setEngine('mpegts.js');
     player
       ..on('error', _onMpegtsError.toJS)
       ..attachMediaElement(_video)
