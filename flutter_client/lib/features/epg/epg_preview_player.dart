@@ -142,7 +142,9 @@ class EpgPreviewPlayerController extends ChangeNotifier {
     _attach(orchestrator, channel, GlobalKey(debugLabel: 'epg-preview'));
     notifyListeners();
     try {
-      final source = sourceFor(channel).copyWith(allowDisplayModeChanges: false);
+      final source = sourceFor(
+        channel,
+      ).copyWith(allowDisplayModeChanges: false);
       _sessionTimeshift = source.uri.contains('timeshift=1');
       await orchestrator.open(source);
       if (identical(_orchestrator, orchestrator) ||

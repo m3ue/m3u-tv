@@ -451,7 +451,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool get _seekBlockedByTranscode =>
       !_seekableLive &&
       ((widget.args.transcoded && (widget.args.type == 'vod' || _isSeries)) ||
-       widget.orchestrator.activeBackend == PlaybackBackend.serverTranscode);
+          widget.orchestrator.activeBackend == PlaybackBackend.serverTranscode);
   bool get _isSeries => widget.args.type == 'series';
 
   String get _debugPlaybackMode {
@@ -476,6 +476,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       '${extra == null ? '' : ' $extra'}',
     );
   }
+
   bool get _isNativePlaneActive => widget.orchestrator.isNativePlaneActive;
 
   String _nowPlayingBadgeLabel(BuildContext context) {
@@ -855,7 +856,8 @@ class _PlayerScreenState extends State<PlayerScreen>
         setState(() => _duration = elapsed);
         _debugDuration(
           'liveDurationTimer',
-          extra: 'beforeMs=${before.inMilliseconds} '
+          extra:
+              'beforeMs=${before.inMilliseconds} '
               'openedAt=${openedAt.toIso8601String()}',
         );
       }
@@ -1225,27 +1227,27 @@ class _PlayerScreenState extends State<PlayerScreen>
     _seekableLiveOpenedAt = null;
     _serverWindowKnown = false;
     _seededLiveDuration = false;
-      if (args.seekableLive) {
-        final elapsed = args.metadata['dvr_elapsed_seconds'];
-        if (elapsed is int && elapsed > 0) {
-          _duration = Duration(seconds: elapsed);
-          _seededLiveDuration = true;
-          _seekableLiveOpenedAt = DateTime.now().subtract(
-            Duration(seconds: elapsed),
-          );
-          _seekableLivePositionSeeded = false;
-        } else if (_isTimeshiftLive) {
-          _seekableLiveOpenedAt = DateTime.now();
-          _seekableLivePositionSeeded = true;
-          _duration = const Duration(milliseconds: 500);
-          _seededLiveDuration = true;
-        } else {
-          _duration = Duration.zero;
-          _seededLiveDuration = false;
-          _seekableLiveOpenedAt = null;
-          _seekableLivePositionSeeded = false;
-        }
+    if (args.seekableLive) {
+      final elapsed = args.metadata['dvr_elapsed_seconds'];
+      if (elapsed is int && elapsed > 0) {
+        _duration = Duration(seconds: elapsed);
+        _seededLiveDuration = true;
+        _seekableLiveOpenedAt = DateTime.now().subtract(
+          Duration(seconds: elapsed),
+        );
+        _seekableLivePositionSeeded = false;
+      } else if (_isTimeshiftLive) {
+        _seekableLiveOpenedAt = DateTime.now();
+        _seekableLivePositionSeeded = true;
+        _duration = const Duration(milliseconds: 500);
+        _seededLiveDuration = true;
+      } else {
+        _duration = Duration.zero;
+        _seededLiveDuration = false;
+        _seekableLiveOpenedAt = null;
+        _seekableLivePositionSeeded = false;
       }
+    }
     final source = applyPlayerSourceSettings(
       args.toPlaybackSource(),
       widget.viewSettingsService,
@@ -1271,12 +1273,12 @@ class _PlayerScreenState extends State<PlayerScreen>
     // The MIME for a ?timeshift=1 URL is resolved centrally in
     // AndroidPlaybackAdapter.load so every player (this one and the EPG guide
     // preview) gets it, not just the full-screen path.
-      if (_isTimeshiftLive) {
-        _startPositionTimer();
-        _startLiveDurationTimer();
-      }
-      _debugDuration('open');
-      return _openAndSeek(source);
+    if (_isTimeshiftLive) {
+      _startPositionTimer();
+      _startLiveDurationTimer();
+    }
+    _debugDuration('open');
+    return _openAndSeek(source);
   }
 
   /// Hold a cold timeshift open until the window has ~8 s, then start 4 s
@@ -1642,7 +1644,11 @@ class _PlayerScreenState extends State<PlayerScreen>
       if (_disposed || !mounted) return;
 
       final logState =
-          '${window == null ? 'none' : window <= 0 ? 'zero' : 'live'}:$_serverWindowKnown';
+          '${window == null
+              ? 'none'
+              : window <= 0
+              ? 'zero'
+              : 'live'}:$_serverWindowKnown';
       if (logState != _lastHeartbeatLogState) {
         _lastHeartbeatLogState = logState;
         AppLogBuffer.instance.add(
@@ -1667,6 +1673,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         setState(() => _duration = Duration(seconds: value));
       }
     }
+
     // Fire immediately: returning to a channel whose buffer survived should
     // show its real length from the first frame, not after the first 2s tick
     // (and previously not until the first seek).
@@ -1676,7 +1683,6 @@ class _PlayerScreenState extends State<PlayerScreen>
       (_) => unawaited(poll()),
     );
   }
-
 
   void _handleState(PlaybackState state) {
     if (_disposed || !mounted) return;
@@ -1726,9 +1732,7 @@ class _PlayerScreenState extends State<PlayerScreen>
           : _currentPosition;
     }
 
-    if (_isTimeshiftLive &&
-        _seekableLive &&
-        _seekableLiveOpenedAt == null) {
+    if (_isTimeshiftLive && _seekableLive && _seekableLiveOpenedAt == null) {
       _seekableLiveOpenedAt = DateTime.now();
       _seededLiveDuration = true;
       _seekableLivePositionSeeded = state.position <= Duration.zero;
@@ -1800,7 +1804,8 @@ class _PlayerScreenState extends State<PlayerScreen>
       }
       _debugDuration(
         'state',
-        extra: 'reportedMs=${state.duration?.inMilliseconds} '
+        extra:
+            'reportedMs=${state.duration?.inMilliseconds} '
             'statePosMs=${state.position.inMilliseconds} '
             'beforeMs=$beforeDurationMs',
       );
@@ -1833,8 +1838,8 @@ class _PlayerScreenState extends State<PlayerScreen>
         final base = win != null && win > Duration.zero
             ? win
             : (state.position > Duration.zero
-                ? state.position
-                : (_duration > Duration.zero ? _duration : Duration.zero));
+                  ? state.position
+                  : (_duration > Duration.zero ? _duration : Duration.zero));
         final target = base - _skipStep;
         final clamped = target < Duration.zero ? Duration.zero : target;
         AppLogBuffer.instance.add(
@@ -2620,7 +2625,10 @@ class _PlayerScreenState extends State<PlayerScreen>
     final pos = _skipScrubPosition;
     if (pos == null) return;
     if (_isTimeshiftLive && widget.orchestrator.activeBackend == null) {
-      _debugDuration('commit-skip-ignored', extra: 'targetMs=${pos.inMilliseconds}');
+      _debugDuration(
+        'commit-skip-ignored',
+        extra: 'targetMs=${pos.inMilliseconds}',
+      );
       return;
     }
     _seekableLivePositionSeeded = false;
@@ -3278,7 +3286,8 @@ class _PlayerScreenState extends State<PlayerScreen>
           LogicalKeySet(LogicalKeyboardKey.mediaTrackPrevious): _isLive
               ? const PlayerChannelDownIntent()
               : const PlayerSeekBackIntent(),
-          if (!_overlayVisible && (ModalRoute.of(context)?.isCurrent ?? false)) ...{
+          if (!_overlayVisible &&
+              (ModalRoute.of(context)?.isCurrent ?? false)) ...{
             LogicalKeySet(LogicalKeyboardKey.arrowLeft):
                 const PlayerSeekBackIntent(),
             LogicalKeySet(LogicalKeyboardKey.arrowRight):
