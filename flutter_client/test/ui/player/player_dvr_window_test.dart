@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/player/playback_controls.dart';
 import 'package:m3u_tv/features/player/player_screen.dart';
@@ -16,13 +18,14 @@ import 'fake_transcode_gateway.dart';
 
 const PlaybackBackend _backend = PlaybackBackend.desktopLibmpv;
 
-DvrRecording _recording(String status, {int? id = 42}) =>
+DvrRecording _recording(String status, {int? id = 42, int? duration}) =>
     DvrRecording.fromXtream(<String, Object?>{
       'id': id,
       'uuid': 'rec-1',
       'title': 'The Game',
       'status': status,
       'elapsed_seconds': 1800,
+      'duration_seconds': duration,
       'live_url': status == 'completed' ? null : 'https://x.test/live.m3u8',
       'stream_url': status == 'completed' ? 'https://x.test/rec.mp4' : null,
     });
@@ -150,6 +153,89 @@ void main() {
     // Shorter than the 30 minutes since it started: it was interrupted.
     expect(controls().duration.inMinutes, 20);
     expect(controls().canSeek, isTrue);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a shorter report later on does not shrink the length', (
+    tester,
+  ) async {
+    final adapter = await pumpPlayer(
+      tester,
+      PlayerArgs.dvrRecording(_recording('recording')),
+    );
+    int minutes() => tester
+        .widget<PlaybackControls>(find.byType(PlaybackControls))
+        .duration
+        .inMinutes;
+    void tick(Duration duration) => adapter.emitState(
+      PlaybackState(
+        backend: _backend,
+        status: PlaybackStatus.playing,
+        position: const Duration(minutes: 1),
+        duration: duration,
+      ),
+    );
+    tick(const Duration(minutes: 20));
+    await tester.pump();
+    tick(const Duration(minutes: 15));
+    await tester.pump();
+    expect(minutes(), 20);
+    tick(const Duration(minutes: 25));
+    await tester.pump();
+    expect(minutes(), 25);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  for (final status in ['post_processing', 'completed']) {
+    testWidgets('closes at the end after stalling there ($status)', (
+      tester,
+    ) async {
+      var closed = false;
+      final replaced = <PlayerArgs>[];
+      final adapter = await pumpPlayer(
+        tester,
+        PlayerArgs.dvrRecording(_recording('recording')),
+        replaced: replaced,
+        fetch: (_) async => _recording(status, duration: 1800),
+        onClose: () => closed = true,
+      );
+      emit(adapter, PlaybackStatus.playing, const Duration(minutes: 30));
+      await tester.pump();
+      emit(adapter, PlaybackStatus.buffering, const Duration(minutes: 30));
+      await tester.pump(const Duration(seconds: 10));
+      // Reopening a stream that is gone resets the position.
+      emit(adapter, PlaybackStatus.loading, Duration.zero);
+      await tester.pump(const Duration(seconds: 19));
+      await tester.pump(const Duration(seconds: 31));
+      emit(adapter, PlaybackStatus.completed, Duration.zero);
+      await tester.pump();
+      await tester.pump();
+      expect(closed, isTrue);
+      expect(replaced, isEmpty);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
+
+  testWidgets('a failed lookup is retried', (tester) async {
+    final replaced = <PlayerArgs>[];
+    var calls = 0;
+    final adapter = await pumpPlayer(
+      tester,
+      PlayerArgs.dvrRecording(_recording('recording')),
+      replaced: replaced,
+      fetch: (_) async {
+        if (calls++ == 0) throw TimeoutException('offline');
+        return _recording('completed', duration: 1800);
+      },
+    );
+    emit(adapter, PlaybackStatus.playing, const Duration(minutes: 10));
+    await tester.pump();
+    emit(adapter, PlaybackStatus.completed, const Duration(minutes: 10));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pump();
+    expect(calls, 2);
+    expect(replaced.single.startPosition, 600);
     await tester.pumpWidget(const SizedBox());
   });
 

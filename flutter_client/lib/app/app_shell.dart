@@ -3,7 +3,8 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:clock/clock.dart';
 import 'package:dpad/dpad.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, listEquals;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, listEquals, mapEquals;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -890,6 +891,7 @@ class AppShellState extends ConsumerState<AppShell>
   }
 
   bool _openingDvrRecording = false;
+  static const _dvrOpeningToastId = 'dvr-opening';
 
   /// Opens a DVR recording after asking where to start: an unfinished one
   /// always offers its beginning and the live end, and any recording offers
@@ -898,6 +900,25 @@ class AppShellState extends ConsumerState<AppShell>
   Future<void> _openDvrRecording(PlayerArgs listed) async {
     if (_openingDvrRecording) return;
     _openingDvrRecording = true;
+    // Usually too quick to mention.
+    final openingToast = Timer(const Duration(milliseconds: 600), () {
+      if (!mounted) return;
+      _toastKey.currentState?.updateItem(
+        TvNotificationItem(
+          id: _dvrOpeningToastId,
+          channel: 'dvr',
+          title: listed.title,
+          body: AppLocalizations.of(context).playerLoadingStream,
+          status: 'info',
+          sticky: true,
+        ),
+      );
+    });
+    void endOpeningToast() {
+      openingToast.cancel();
+      if (mounted) _toastKey.currentState?.dismissById(_dvrOpeningToastId);
+    }
+
     try {
       const timeout = Duration(seconds: 5);
       final service = _appState.xtreamService;
@@ -911,15 +932,20 @@ class AppShellState extends ConsumerState<AppShell>
             .catchError((Object _) => null),
         viewerId == null || listed.dvrRecordingId == null
             ? Future.value(const <Progress>[])
+            // A position just reported may still be on its way there.
             : service
-                  .getRecentlyWatched(
-                    viewerId,
-                    type: ContentType.dvrRecording,
-                    limit: 100,
+                  .playbackProgressSettled()
+                  .then(
+                    (_) => service.getRecentlyWatched(
+                      viewerId,
+                      type: ContentType.dvrRecording,
+                      limit: 100,
+                    ),
                   )
                   .timeout(timeout)
                   .catchError((Object _) => const <Progress>[]),
       ).wait;
+      endOpeningToast();
       if (!mounted) return;
       final args =
           recording != null && recording.uuid == uuid && recording.isPlayable
@@ -946,6 +972,15 @@ class AppShellState extends ConsumerState<AppShell>
         showWatchLive: window != null,
       );
       if (result == null || !mounted) return;
+      // Already playing (floating): the player carries on rather than opening
+      // it again, so move it to what was picked. Resume is where it is.
+      final playing = _playerArgs;
+      final alreadyOpen =
+          !_playerHasFailed &&
+          playing != null &&
+          playing.streamUrl == args.streamUrl &&
+          mapEquals(playing.metadata, args.metadata);
+      final orchestrator = _playerOrchestrator;
       _openPlayerDirect(
         switch (result.action) {
           ResumeAction.resume => args.copyWith(
@@ -957,7 +992,22 @@ class AppShellState extends ConsumerState<AppShell>
           _ => args,
         },
       );
+      if (alreadyOpen && orchestrator != null) {
+        final target = switch (result.action) {
+          ResumeAction.startOver => Duration.zero,
+          ResumeAction.watchLive => window?.livePosition,
+          _ => null,
+        };
+        if (target != null) {
+          try {
+            await orchestrator.seek(target);
+          } on Object catch (error) {
+            debugPrint('DVR: seek on reopen failed: $error');
+          }
+        }
+      }
     } finally {
+      endOpeningToast();
       _openingDvrRecording = false;
     }
   }

@@ -104,7 +104,7 @@ class PlayerArgs {
     dvrRecordingId: recording.id,
     dvrWindow: recording.playsLivePlaylist
         ? DvrWindow(
-            recorded: Duration(seconds: _recordedSeconds(recording)),
+            recorded: Duration(seconds: recordedSeconds(recording)),
             measuredAt: clock.now(),
             isGrowing: recording.isInProgress,
           )
@@ -122,7 +122,8 @@ class PlayerArgs {
     },
   );
 
-  static int _recordedSeconds(DvrRecording recording) {
+  /// Seconds recorded so far, by the editor's clock.
+  static int recordedSeconds(DvrRecording recording) {
     final elapsed = recording.elapsedSeconds;
     if (elapsed != null) return elapsed;
     final start = recording.actualStart;

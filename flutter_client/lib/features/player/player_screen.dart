@@ -407,10 +407,13 @@ class _PlayerScreenState extends State<PlayerScreen>
       widget.orchestrator.activeBackend == PlaybackBackend.serverTranscode;
   bool get _isSeries => widget.args.type == 'series';
 
-  // Unfinished DVR recordings: the length to extrapolate from, replaced by
-  // each length the player itself reports.
+  // Unfinished DVR recordings: the length to extrapolate from, corrected by
+  // what the player itself reports.
   DvrWindow? _dvrWindow;
-  Duration? _dvrReportedLength;
+  bool _dvrLengthReported = false;
+  // Where playback last was. Unlike _currentPosition, not reset by the states
+  // of a stream that is failing or being reopened.
+  Duration _dvrPosition = Duration.zero;
   bool _dvrWindowEnding = false;
 
   /// The furthest a seek may go. Short of the end on an unfinished recording,
@@ -1082,7 +1085,8 @@ class _PlayerScreenState extends State<PlayerScreen>
     _reopenPlatformView = null;
     _duration = _catchup?.duration ?? Duration.zero;
     _dvrWindow = args.dvrWindow;
-    _dvrReportedLength = null;
+    _dvrLengthReported = false;
+    _dvrPosition = Duration(seconds: args.startPosition?.toInt() ?? 0);
     _dvrWindowEnding = false;
     if (_dvrWindow != null) _duration = _dvrWindow!.length;
   }
@@ -1334,12 +1338,14 @@ class _PlayerScreenState extends State<PlayerScreen>
       _currentPosition = acceptedPosition;
       final dvrWindow = _dvrWindow;
       if (dvrWindow != null) {
-        // Players report the length so far, but not steadily as it grows.
+        // The first report is the true length so far. Later ones may lag: mpv
+        // keeps that length until its buffer passes it, then reports the end
+        // of the buffer. Only a longer one tells anything new.
         final reported = state.duration;
         if (reported != null &&
             reported > Duration.zero &&
-            reported != _dvrReportedLength) {
-          _dvrReportedLength = reported;
+            (!_dvrLengthReported || reported > dvrWindow.length)) {
+          _dvrLengthReported = true;
           _dvrWindow = DvrWindow(
             recorded: reported,
             measuredAt: clock.now(),
@@ -1347,6 +1353,10 @@ class _PlayerScreenState extends State<PlayerScreen>
           );
         }
         _duration = _dvrWindow!.length;
+        if (state.status == PlaybackStatus.playing ||
+            state.status == PlaybackStatus.paused) {
+          _dvrPosition = acceptedPosition;
+        }
       } else if (state.duration != null && state.duration! > Duration.zero) {
         // A catchup duration is the programme's, not the stream's. A stream
         // that reports one at all can seek in place.
@@ -1515,6 +1525,26 @@ class _PlayerScreenState extends State<PlayerScreen>
 
   static const Duration _dvrFinishPollInterval = Duration(seconds: 5);
   static const int _dvrFinishPolls = 24;
+  static const int _dvrFinishMaxFailures = 5;
+
+  /// How long [recording] turned out to be, now that it has stopped. The
+  /// editor's elapsed time counts what was never recorded (a slow start, an
+  /// interruption), which the length reported by the player corrects.
+  Duration _dvrFinalLength(DvrRecording recording) {
+    final seconds = recording.durationSeconds ?? 0;
+    if (recording.isCompleted && seconds > 0) return Duration(seconds: seconds);
+    final elapsed = Duration(seconds: PlayerArgs.recordedSeconds(recording));
+    final estimated = widget.args.dvrWindow?.length;
+    final corrected = _dvrWindow?.length;
+    return estimated == null || corrected == null
+        ? elapsed
+        : elapsed - (estimated - corrected);
+  }
+
+  bool _dvrWatchedToEnd(DvrRecording recording, Duration position) {
+    final length = _dvrFinalLength(recording);
+    return length > Duration.zero && position >= length - DvrWindow.liveMargin;
+  }
 
   /// Playback of an unfinished recording stopped. Once finished, the playlist
   /// it was playing is removed and replaced by a file, so this moves over to
@@ -1525,7 +1555,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (_dvrWindowEnding) return;
     _dvrWindowEnding = true;
     final args = widget.args;
-    final position = _currentPosition;
+    final position = _dvrPosition;
     final uuid = args.metadata['dvr_uuid'] as String?;
     final fetch = widget.fetchDvrRecording;
     final started = _hasStartedPlayback;
@@ -1535,6 +1565,8 @@ class _PlayerScreenState extends State<PlayerScreen>
     _isPlaying = false;
     _stopPositionTimer();
     _progressTimer?.cancel();
+    setState(() => _status = PlaybackStatus.loading);
+    var failures = 0;
     for (var poll = 0; fetch != null && uuid != null; poll++) {
       DvrRecording? recording;
       try {
@@ -1543,8 +1575,17 @@ class _PlayerScreenState extends State<PlayerScreen>
         debugPrint('DVR: recording lookup failed: $fetchError');
       }
       if (stale()) return;
-      if (recording == null || recording.isInProgress) break;
-      if (started && position >= _seekLimit) {
+      if (recording == null) {
+        // One dropped request is no reason to give up on the recording.
+        failures++;
+        if (failures >= _dvrFinishMaxFailures || poll >= _dvrFinishPolls) break;
+        await Future<void>.delayed(_dvrFinishPollInterval);
+        if (stale()) return;
+        continue;
+      }
+      failures = 0;
+      if (recording.isInProgress) break;
+      if (started && _dvrWatchedToEnd(recording, position)) {
         _goBack();
         return;
       }
@@ -2105,6 +2146,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       return;
     }
     setState(() => _currentPosition = clamped);
+    _dvrPosition = clamped;
     _reportProgress(clamped);
     unawaited(widget.orchestrator.seek(clamped));
   }
