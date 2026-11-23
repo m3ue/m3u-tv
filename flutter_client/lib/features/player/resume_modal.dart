@@ -20,6 +20,9 @@ enum ResumeAction {
 
   /// Mark the title finished and do not play.
   markWatched,
+
+  /// Play an unfinished recording from its newest part.
+  watchLive,
 }
 
 /// Result of [showResumeModal]. [startPositionSeconds] is only meaningful for
@@ -37,11 +40,15 @@ class ResumeModalResult {
 /// [showManageActions] is true the dialog also offers "Clear progress" and
 /// "Mark watched" - callers that pass it must handle
 /// [ResumeAction.clearProgress] / [ResumeAction.markWatched] in the result.
+///
+/// For an unfinished recording, [showWatchLive] adds [ResumeAction.watchLive],
+/// and [positionSeconds] is null when there is no saved position to resume.
 Future<ResumeModalResult?> showResumeModal(
   BuildContext context, {
   required String title,
-  required int positionSeconds,
+  required int? positionSeconds,
   bool showManageActions = false,
+  bool showWatchLive = false,
 }) {
   return showAppDialog<ResumeModalResult>(
     context: context,
@@ -49,6 +56,7 @@ Future<ResumeModalResult?> showResumeModal(
       title: title,
       positionSeconds: positionSeconds,
       showManageActions: showManageActions,
+      showWatchLive: showWatchLive,
     ),
   );
 }
@@ -78,11 +86,13 @@ class _ResumeModal extends StatelessWidget {
     required this.positionSeconds,
     required this.showManageActions,
     this.upNext = false,
+    this.showWatchLive = false,
   });
 
   final String title;
-  final int positionSeconds;
+  final int? positionSeconds;
   final bool showManageActions;
+  final bool showWatchLive;
 
   /// Nothing to resume: offers Play and Mark watched only.
   final bool upNext;
@@ -95,18 +105,29 @@ class _ResumeModal extends StatelessWidget {
 
     final scale = FontSizeScope.scaleOf(context);
     const playFromStart = ResumeModalResult(ResumeAction.startOver);
-    final resume = upNext
+    final savedSeconds = upNext ? null : positionSeconds;
+    final canResume = savedSeconds != null;
+    final resume = savedSeconds == null
         ? playFromStart
         : ResumeModalResult(
             ResumeAction.resume,
-            startPositionSeconds: positionSeconds.toDouble(),
+            startPositionSeconds: savedSeconds.toDouble(),
           );
+    final primaryLabel = upNext
+        ? l.playerPlay
+        : canResume
+        ? l.playerContinue
+        : l.playerStartFromBeginning;
 
     return OptionsDialog(
       maxWidth: 400 * scale,
       children: [
         Text(
-          upNext ? l.homeUpNext : l.playerResumeWatching,
+          upNext
+              ? l.homeUpNext
+              : canResume
+              ? l.playerResumeWatching
+              : l.dvrRecordingInProgress,
           style: theme.textTheme.titleLarge,
         ),
         const SizedBox(height: 4),
@@ -121,20 +142,30 @@ class _ResumeModal extends StatelessWidget {
         const SizedBox(height: 20),
         DialogPrimaryOption(
           icon: Icons.play_arrow,
-          title: upNext ? l.playerPlay : l.playerContinue,
-          subtitle: upNext
+          title: primaryLabel,
+          subtitle: savedSeconds == null
               ? null
               : l.playerFromTime(
-                  formatTime(Duration(seconds: positionSeconds)),
+                  formatTime(Duration(seconds: savedSeconds)),
                 ),
           onTap: () => Navigator.of(context).pop(resume),
         ),
-        if (!upNext) ...[
+        if (canResume) ...[
           const SizedBox(height: 8),
           DialogActionTile(
             icon: Icons.replay,
             label: l.playerStartFromBeginning,
             onTap: () => Navigator.of(context).pop(playFromStart),
+          ),
+        ],
+        if (showWatchLive) ...[
+          const SizedBox(height: 8),
+          DialogActionTile(
+            icon: Icons.live_tv,
+            label: l.playerWatchLive,
+            onTap: () => Navigator.of(context).pop(
+              const ResumeModalResult(ResumeAction.watchLive),
+            ),
           ),
         ],
         if (showManageActions) ...[
@@ -167,7 +198,7 @@ class _ResumeModal extends StatelessWidget {
             AppButton(
               autofocus: true,
               variant: AppButtonVariant.primary,
-              label: upNext ? l.playerPlay : l.playerResume,
+              label: canResume ? l.playerResume : l.playerPlay,
               onPressed: () => Navigator.of(context).pop(resume),
             ),
           ],

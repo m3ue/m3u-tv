@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
 import 'package:m3u_tv/playback/android_mpv_backend.dart';
 import 'package:m3u_tv/playback/android_playback_adapter.dart';
@@ -30,6 +31,33 @@ class PlaceholderScreen extends StatelessWidget {
   }
 }
 
+/// How much of an unfinished DVR recording exists, since players don't all
+/// report a length for a playlist that is still being written.
+@immutable
+class DvrWindow {
+  const DvrWindow({
+    required this.recorded,
+    required this.measuredAt,
+    required this.isGrowing,
+  });
+
+  /// How far behind the end of the recording "watch live" starts, and how
+  /// close to it a seek may land: the newest segments may not be listed yet.
+  static const Duration liveMargin = Duration(seconds: 20);
+
+  final Duration recorded;
+  final DateTime measuredAt;
+
+  /// False while finalizing: the playlist is still served but complete.
+  final bool isGrowing;
+
+  Duration get length =>
+      isGrowing ? recorded + clock.now().difference(measuredAt) : recorded;
+
+  Duration get livePosition =>
+      length > liveMargin ? length - liveMargin : Duration.zero;
+}
+
 /// Player route arguments.
 class PlayerArgs {
   const PlayerArgs({
@@ -48,6 +76,8 @@ class PlayerArgs {
     this.headers = const <String, String>{},
     this.metadata = const <String, Object?>{},
     this.transcoded = false,
+    this.dvrRecordingId,
+    this.dvrWindow,
   });
 
   /// Live playback of [channel]. Shared by the full-screen player and the
@@ -62,13 +92,23 @@ class PlayerArgs {
     headers: channel.headers,
   );
 
-  /// Playback of a DVR [recording]: the live HLS window while it is still
-  /// recording, otherwise the finished file. Shared by the DVR Recordings
-  /// screen and Search. Only call for a [DvrRecording.isPlayable] recording.
+  /// Playback of a DVR [recording]: the growing HLS playlist while it is still
+  /// recording or finalizing, otherwise the finished file. Both are on-demand
+  /// content: an unfinished recording is seekable from its start, and none of
+  /// live TV's channel, pause or EPG behavior applies to it. Only call for a
+  /// [DvrRecording.isPlayable] recording.
   factory PlayerArgs.dvrRecording(DvrRecording recording) => PlayerArgs(
     streamUrl: recording.playbackUrl!,
     title: recording.title,
-    type: recording.isInProgress ? 'live' : 'vod',
+    type: 'vod',
+    dvrRecordingId: recording.id,
+    dvrWindow: recording.playsLivePlaylist
+        ? DvrWindow(
+            recorded: Duration(seconds: _recordedSeconds(recording)),
+            measuredAt: clock.now(),
+            isGrowing: recording.isInProgress,
+          )
+        : null,
     metadata: <String, Object?>{
       'dvr_uuid': recording.uuid,
       'dvr_status': recording.status.name,
@@ -81,6 +121,16 @@ class PlayerArgs {
       if (recording.edlUrl != null) 'edl_url': recording.edlUrl,
     },
   );
+
+  static int _recordedSeconds(DvrRecording recording) {
+    final elapsed = recording.elapsedSeconds;
+    if (elapsed != null) return elapsed;
+    final start = recording.actualStart;
+    if (start == null) return 0;
+    final end = recording.actualEnd ?? clock.now();
+    final seconds = end.difference(start).inSeconds;
+    return seconds < 0 ? 0 : seconds;
+  }
 
   final String streamUrl;
   final String title;
@@ -104,6 +154,14 @@ class PlayerArgs {
   /// seeking for VOD/series instead of offering a seek that silently fails.
   final bool transcoded;
 
+  /// The DVR recording's id, which its watch progress is saved under. Kept
+  /// apart from [streamId]: the two number different things, so a recording
+  /// would pick up the sync offsets and progress of an unrelated title.
+  final int? dvrRecordingId;
+
+  /// Set while the recording is unfinished.
+  final DvrWindow? dvrWindow;
+
   PlayerArgs copyWith({
     String? streamUrl,
     double? startPosition,
@@ -125,18 +183,28 @@ class PlayerArgs {
       headers: headers,
       metadata: metadata,
       transcoded: transcoded ?? this.transcoded,
+      dvrRecordingId: dvrRecordingId,
+      dvrWindow: dvrWindow,
     );
+  }
+
+  Duration get _sourceStart {
+    final start = Duration(seconds: (startPosition ?? 0).round());
+    // ExoPlayer can't tell an explicit zero from "no position" and would join
+    // an unfinished playlist at its live edge.
+    return dvrWindow != null && start == Duration.zero
+        ? const Duration(milliseconds: 1)
+        : start;
   }
 
   PlaybackSource toPlaybackSource({bool includeStartPosition = true}) {
     return PlaybackSource(
       uri: streamUrl,
       title: title,
-      startPosition: includeStartPosition && startPosition != null
-          ? Duration(seconds: startPosition!.round())
-          : Duration.zero,
+      startPosition: includeStartPosition ? _sourceStart : Duration.zero,
       isLive: type == 'live',
       isCatchup: type == 'catchup',
+      isGrowing: dvrWindow != null,
       videoCodec: videoCodec,
       audioCodec: audioCodec,
       userAgent: userAgent,

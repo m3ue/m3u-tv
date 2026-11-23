@@ -300,7 +300,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
     switch (choice.action) {
       case ResumeAction.resume:
         _playEpisode(episode, startPosition: choice.startPositionSeconds);
-      case ResumeAction.startOver:
+      case ResumeAction.startOver || ResumeAction.watchLive:
         _playEpisode(episode, startPosition: 0);
       case ResumeAction.clearProgress:
         await _markEpisode(episode, watched: false);

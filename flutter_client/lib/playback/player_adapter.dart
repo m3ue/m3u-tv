@@ -296,6 +296,7 @@ class PlaybackSource {
     this.startPosition = Duration.zero,
     this.isLive = false,
     this.isCatchup = false,
+    this.isGrowing = false,
     this.videoCodec,
     this.audioCodec,
     this.userAgent,
@@ -318,6 +319,11 @@ class PlaybackSource {
   /// A catchup (timeshift) programme. Its timeline comes from the EPG, so the
   /// mpv backends skip work that only serves the file's own duration.
   final bool isCatchup;
+
+  /// An on-demand HLS playlist that is still being written (an unfinished DVR
+  /// recording). FFmpeg joins those near the end, and then can't map seeks
+  /// back to the start, so the mpv backends open it at its first segment.
+  final bool isGrowing;
 
   final String? videoCodec;
   final String? audioCodec;
@@ -379,6 +385,7 @@ class PlaybackSource {
     Duration? startPosition,
     bool? isLive,
     bool? isCatchup,
+    bool? isGrowing,
     String? videoCodec,
     String? audioCodec,
     String? userAgent,
@@ -398,6 +405,7 @@ class PlaybackSource {
       startPosition: startPosition ?? this.startPosition,
       isLive: isLive ?? this.isLive,
       isCatchup: isCatchup ?? this.isCatchup,
+      isGrowing: isGrowing ?? this.isGrowing,
       videoCodec: videoCodec ?? this.videoCodec,
       audioCodec: audioCodec ?? this.audioCodec,
       userAgent: userAgent ?? this.userAgent,

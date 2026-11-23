@@ -361,6 +361,19 @@ class AppLocalizationsFr extends AppLocalizations {
   String get playerStartFromBeginning => 'Recommencer depuis le début';
 
   @override
+  String get playerWatchLive => 'Regarder en direct';
+
+  @override
+  String get dvrRecordingInProgress => 'Enregistrement en cours';
+
+  @override
+  String get dvrFinishing => 'Finalisation de l’enregistrement…';
+
+  @override
+  String get dvrStreamStopped =>
+      'La lecture de cet enregistrement s’est arrêtée.';
+
+  @override
   String get playerPlay => 'Lire';
 
   @override

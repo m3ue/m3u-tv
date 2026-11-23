@@ -101,6 +101,7 @@ abstract class MpvNativeBackendBase
         'startPositionMs': source.startPosition.inMilliseconds,
         'isLive': source.isLive,
         'isCatchup': source.isCatchup,
+        'isGrowing': source.isGrowing,
         'userAgent': source.userAgent,
         'headers': source.headers,
         // Read by the Android mpv core (FrameRateManager) and the tvOS core

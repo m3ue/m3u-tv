@@ -170,6 +170,10 @@
     }
   },
   "playerStartFromBeginning": "Recommencer depuis le début",
+  "playerWatchLive": "Regarder en direct",
+  "dvrRecordingInProgress": "Enregistrement en cours",
+  "dvrFinishing": "Finalisation de l’enregistrement…",
+  "dvrStreamStopped": "La lecture de cet enregistrement s’est arrêtée.",
   "playerPlay": "Lire",
   "playerResume": "Reprendre",
   "playerClearProgress": "Effacer la progression",

@@ -403,6 +403,7 @@ final class MpvPlayerCore {
     startPositionMs: Int,
     isLive: Bool,
     isCatchup: Bool,
+    isGrowing: Bool,
     userAgent: String?,
     headers: [String: String]?,
     externalSubtitles: [(uri: String, title: String?, language: String?)] = [],
@@ -443,7 +444,11 @@ final class MpvPlayerCore {
       // of the file to estimate its duration, and let the probe rewind inside a larger
       // stream buffer: a catchup open then costs one request to the provider instead of
       // three. Reset for every other load, since this handle persists across loads.
-      mpv_set_option_string(handle, "demuxer-lavf-o", isCatchup ? "skip_estimate_duration_from_pts=1" : "")
+      // An unfinished recording's playlist opens at its first segment: FFmpeg joins one near
+      // the end by default, and then maps seeks from there instead of from the start.
+      mpv_set_option_string(
+        handle, "demuxer-lavf-o",
+        isCatchup ? "skip_estimate_duration_from_pts=1" : isGrowing ? "live_start_index=0" : "")
       mpv_set_option_string(handle, "stream-buffer-size", isCatchup ? "4MiB" : "128KiB")
       // The Deinterlace setting: `auto` filters only frames flagged interlaced. Set on
       // every load, since this handle persists across loads.

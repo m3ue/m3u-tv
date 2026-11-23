@@ -420,6 +420,7 @@ class MpvPlayerCore(
         startPositionMs: Int,
         isLive: Boolean,
         isCatchup: Boolean,
+        isGrowing: Boolean,
         userAgent: String?,
         headers: Map<String, String>?,
         externalSubtitles: List<Triple<String, String?, String?>>,
@@ -477,7 +478,17 @@ class MpvPlayerCore(
                     // probe rewind inside a larger stream buffer: a catchup open then costs
                     // one request to the provider instead of three. Reset for every other
                     // load, for the same reason as above.
-                    current.setProperty("demuxer-lavf-o", if (isCatchup) "skip_estimate_duration_from_pts=1" else "")
+                    // An unfinished recording's playlist opens at its first segment: FFmpeg
+                    // joins one near the end by default, and then maps seeks from there
+                    // instead of from the start.
+                    current.setProperty(
+                        "demuxer-lavf-o",
+                        when {
+                            isCatchup -> "skip_estimate_duration_from_pts=1"
+                            isGrowing -> "live_start_index=0"
+                            else -> ""
+                        },
+                    )
                     current.setProperty("stream-buffer-size", if (isCatchup) "4MiB" else "128KiB")
                     // A live stream arrives at 1x, so mpv's default of
                     // resuming a stall once 1 s is buffered rides the live

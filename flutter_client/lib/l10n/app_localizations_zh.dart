@@ -352,6 +352,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playerStartFromBeginning => '从头开始';
 
   @override
+  String get playerWatchLive => '观看直播';
+
+  @override
+  String get dvrRecordingInProgress => '正在录制';
+
+  @override
+  String get dvrFinishing => '正在完成录制…';
+
+  @override
+  String get dvrStreamStopped => '此录制内容的播放已停止。';
+
+  @override
   String get playerPlay => '播放';
 
   @override

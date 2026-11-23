@@ -152,6 +152,7 @@ class DesktopLibmpvBackend
         'startPositionMs': source.startPosition.inMilliseconds,
         'isLive': source.isLive,
         'isCatchup': source.isCatchup,
+        'isGrowing': source.isGrowing,
         'userAgent': source.userAgent,
         'headers': source.headers,
         // Passed with the load so the native side has the right value before

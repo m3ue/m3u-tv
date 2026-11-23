@@ -838,6 +838,7 @@ class AppShellState extends ConsumerState<AppShell>
       unawaited(_openPlayer(context, args));
 
   Future<void> _openPlayer(BuildContext context, PlayerArgs args) async {
+    if (args.metadata['dvr_uuid'] != null) return _openDvrRecording(args);
     var resolvedArgs = args;
     final l = AppLocalizations.of(context);
     if ((resolvedArgs.type == 'vod' || resolvedArgs.type == 'series') &&
@@ -866,7 +867,7 @@ class AppShellState extends ConsumerState<AppShell>
             resolvedArgs = resolvedArgs.copyWith(
               startPosition: result.startPositionSeconds,
             );
-          case ResumeAction.startOver:
+          case ResumeAction.startOver || ResumeAction.watchLive:
             break;
           case ResumeAction.clearProgress:
             await _setWatchState(
@@ -888,7 +889,83 @@ class AppShellState extends ConsumerState<AppShell>
     _openPlayerDirect(resolvedArgs);
   }
 
+  bool _openingDvrRecording = false;
+
+  /// Opens a DVR recording after asking where to start: an unfinished one
+  /// always offers its beginning and the live end, and any recording offers
+  /// the saved position. The recording is looked up again first, since the
+  /// one in the list may have grown or finished since it was loaded.
+  Future<void> _openDvrRecording(PlayerArgs listed) async {
+    if (_openingDvrRecording) return;
+    _openingDvrRecording = true;
+    try {
+      const timeout = Duration(seconds: 5);
+      final service = _appState.xtreamService;
+      final uuid = listed.metadata['dvr_uuid']! as String;
+      final viewerId = _appState.activeViewer?.ulid;
+      final (recording, progressList) = await (
+        service
+            .getDvrRecording(uuid)
+            .timeout(timeout)
+            .then<DvrRecording?>((r) => r)
+            .catchError((Object _) => null),
+        viewerId == null || listed.dvrRecordingId == null
+            ? Future.value(const <Progress>[])
+            : service
+                  .getRecentlyWatched(
+                    viewerId,
+                    type: ContentType.dvrRecording,
+                    limit: 100,
+                  )
+                  .timeout(timeout)
+                  .catchError((Object _) => const <Progress>[]),
+      ).wait;
+      if (!mounted) return;
+      final args =
+          recording != null && recording.uuid == uuid && recording.isPlayable
+          ? PlayerArgs.dvrRecording(recording)
+          : listed;
+      final saved = progressList
+          .firstWhereOrNull(
+            (p) =>
+                p.contentType == ContentType.dvrRecording &&
+                p.streamId == args.dvrRecordingId &&
+                p.positionSeconds >= 30 &&
+                !p.completed,
+          )
+          ?.positionSeconds;
+      final window = args.dvrWindow;
+      if (window == null && saved == null) {
+        _openPlayerDirect(args);
+        return;
+      }
+      final result = await showResumeModal(
+        context,
+        title: args.title,
+        positionSeconds: saved,
+        showWatchLive: window != null,
+      );
+      if (result == null || !mounted) return;
+      _openPlayerDirect(
+        switch (result.action) {
+          ResumeAction.resume => args.copyWith(
+            startPosition: result.startPositionSeconds,
+          ),
+          ResumeAction.watchLive => args.copyWith(
+            startPosition: window!.livePosition.inSeconds.toDouble(),
+          ),
+          _ => args,
+        },
+      );
+    } finally {
+      _openingDvrRecording = false;
+    }
+  }
+
   PlayerArgs _applyProxyPlayback(PlayerArgs args) {
+    // Recordings are served by the editor's own DVR routes, which take no
+    // proxy or transcoding profile.
+    if (args.metadata['dvr_uuid'] != null) return args;
     final updated = _appState.applyProxyPlayback(
       args.streamUrl,
       type: args.type,
@@ -1908,7 +1985,7 @@ class AppShellState extends ConsumerState<AppShell>
         onSidebarActivate: _activateSidebar,
         onSearchShows: _dvrActions.searchEpgShows,
         onShowSelect: _openShow,
-        onRecordingPlay: _openPlayerDirect,
+        onRecordingPlay: _openPlayerFromActions,
         onEnsureEpg: _appState.ensureEpgForChannels,
         useSidebarLayout: shouldUseSidebar(widget.deviceType),
       ),
@@ -2004,7 +2081,7 @@ class AppShellState extends ConsumerState<AppShell>
             isConfigured: _appState.isConfigured,
             useInlineRowActions: shouldUseSidebar(widget.deviceType),
             storageInfo: ref.watch(dvrStorageInfoProvider),
-            onPlay: _openPlayerDirect,
+            onPlay: _openPlayerFromActions,
             onCancelRecording: (uuid) => _appState.cancelDvrRecording(uuid),
             onCancelAndDeleteRecording: _dvrActions.cancelAndDeleteRecording,
             onDeleteRecording: (uuid) => _appState.deleteDvrRecording(uuid),
@@ -2294,7 +2371,10 @@ class AppShellState extends ConsumerState<AppShell>
               onPreviousChannel: args.type == 'live'
                   ? _openPreviousChannel
                   : null,
-              onReplaceItem: args.type == 'series' ? _openPlayerDirect : null,
+              onReplaceItem: args.type == 'series' || args.dvrWindow != null
+                  ? _openPlayerDirect
+                  : null,
+              fetchDvrRecording: _appState.xtreamService.getDvrRecording,
               onRecordProgram: args.type == 'live' && _appState.hasDvrFeature
                   ? _handleRecordButtonTap
                   : null,
@@ -2303,6 +2383,16 @@ class AppShellState extends ConsumerState<AppShell>
                   args.type == 'live' &&
                   recordingChannelIds.contains(args.streamId),
               progressReporter: (progress) {
+                // Recordings resume from the DVR screen, not from Continue
+                // Watching, so their position is only kept on the editor.
+                if (progress.contentType == ContentType.dvrRecording) {
+                  unawaited(
+                    _appState.xtreamService
+                        .reportPlaybackProgress(progress)
+                        .catchError((_) => false),
+                  );
+                  return;
+                }
                 final aioLookupId = args.metadata['aio_item_id'] as String?;
                 final existing = _appState.progressList.firstWhereOrNull(
                   (p) =>

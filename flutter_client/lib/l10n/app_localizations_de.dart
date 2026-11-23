@@ -361,6 +361,19 @@ class AppLocalizationsDe extends AppLocalizations {
   String get playerStartFromBeginning => 'Von vorne abspielen';
 
   @override
+  String get playerWatchLive => 'Live ansehen';
+
+  @override
+  String get dvrRecordingInProgress => 'Aufnahme läuft';
+
+  @override
+  String get dvrFinishing => 'Aufnahme wird fertiggestellt…';
+
+  @override
+  String get dvrStreamStopped =>
+      'Die Wiedergabe dieser Aufnahme wurde beendet.';
+
+  @override
   String get playerPlay => 'Abspielen';
 
   @override

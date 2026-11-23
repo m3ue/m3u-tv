@@ -170,6 +170,10 @@
     }
   },
   "playerStartFromBeginning": "从头开始",
+  "playerWatchLive": "观看直播",
+  "dvrRecordingInProgress": "正在录制",
+  "dvrFinishing": "正在完成录制…",
+  "dvrStreamStopped": "此录制内容的播放已停止。",
   "playerPlay": "播放",
   "playerResume": "恢复播放",
   "playerClearProgress": "清除进度",

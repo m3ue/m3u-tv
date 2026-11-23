@@ -2,7 +2,7 @@
 
 import 'package:m3u_tv/shared/formatters.dart';
 
-enum ContentType { live, vod, episode, aiostreams }
+enum ContentType { live, vod, episode, aiostreams, dvrRecording }
 
 final RegExp _schemePattern = RegExp('^[a-zA-Z][a-zA-Z0-9+.-]*://');
 
@@ -887,6 +887,8 @@ class DvrRecording {
     required this.uuid,
     required this.title,
     required this.status,
+    this.id,
+    this.elapsedSeconds,
     this.subtitle,
     this.channelId,
     this.channelName,
@@ -908,6 +910,14 @@ class DvrRecording {
   });
 
   final String uuid;
+
+  /// The editor's numeric id, which watch progress is keyed by. Null on
+  /// editors that don't send it, where a recording can't be resumed.
+  final int? id;
+
+  /// Seconds recorded when the editor answered, while the recording still
+  /// serves its live playlist. Null otherwise.
+  final int? elapsedSeconds;
   final String title;
   final String? subtitle;
   final DvrRecordingStatus status;
@@ -935,8 +945,14 @@ class DvrRecording {
   bool get isInProgress => status == DvrRecordingStatus.recording;
   bool get isCompleted => status == DvrRecordingStatus.completed;
 
+  /// Whether the HLS playlist written while recording is what plays: during
+  /// the recording, and while it is being finalized into a file.
+  bool get playsLivePlaylist =>
+      liveUrl != null &&
+      (isInProgress || status == DvrRecordingStatus.postProcessing);
+
   String? get playbackUrl {
-    if (isInProgress && liveUrl != null) return liveUrl;
+    if (playsLivePlaylist) return liveUrl;
     if (isCompleted && streamUrl != null) return streamUrl;
     return streamUrl ?? liveUrl;
   }
@@ -955,6 +971,8 @@ class DvrRecording {
     final title = _asNullableString(pick(['title', 'name'])) ?? 'Recording';
     return DvrRecording(
       uuid: _asNullableString(pick(['uuid', 'id'])) ?? '',
+      id: _asIntOrNull(json['id']),
+      elapsedSeconds: _asIntOrNull(json['elapsed_seconds']),
       title: title,
       subtitle: _asNullableString(
         pick(['subtitle', 'episode_title', 'description']),
@@ -1653,6 +1671,7 @@ extension ContentTypeWire on ContentType {
     ContentType.vod => 'vod',
     ContentType.episode => 'episode',
     ContentType.aiostreams => 'aiostreams',
+    ContentType.dvrRecording => 'dvr_recording',
   };
 }
 
@@ -1660,6 +1679,7 @@ ContentType contentTypeFromWire(String value) => switch (value) {
   'live' => ContentType.live,
   'episode' => ContentType.episode,
   'aiostreams' => ContentType.aiostreams,
+  'dvr_recording' => ContentType.dvrRecording,
   _ => ContentType.vod,
 };
 

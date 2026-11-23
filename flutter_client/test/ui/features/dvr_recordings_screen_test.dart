@@ -122,7 +122,9 @@ void main() {
         'https://stream.example/recordings/rec-2/live.m3u8',
       );
       expect(opened!.title, 'Live News');
-      expect(opened!.type, 'live');
+      expect(opened!.type, 'vod');
+      expect(opened!.dvrWindow!.isGrowing, isTrue);
+      expect(opened!.toPlaybackSource().isLive, isFalse);
       expect(opened!.metadata['dvr_uuid'], 'rec-2');
     });
 

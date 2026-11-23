@@ -517,7 +517,7 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
       switch (chosen.action) {
         case ResumeAction.resume:
           startPosition = chosen.startPositionSeconds;
-        case ResumeAction.startOver:
+        case ResumeAction.startOver || ResumeAction.watchLive:
           startPosition = 0;
         case ResumeAction.clearProgress:
           await widget.onSetWatchState?.call(progress, watched: false);

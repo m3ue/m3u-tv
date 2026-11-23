@@ -170,6 +170,10 @@
     }
   },
   "playerStartFromBeginning": "Von vorne abspielen",
+  "playerWatchLive": "Live ansehen",
+  "dvrRecordingInProgress": "Aufnahme läuft",
+  "dvrFinishing": "Aufnahme wird fertiggestellt…",
+  "dvrStreamStopped": "Die Wiedergabe dieser Aufnahme wurde beendet.",
   "playerPlay": "Abspielen",
   "playerResume": "Fortsetzen",
   "playerClearProgress": "Fortschritt löschen",
