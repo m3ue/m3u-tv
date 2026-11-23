@@ -3650,8 +3650,6 @@ class _PlayerScreenState extends State<PlayerScreen>
                               duration: _duration,
                               onPlayPause: _togglePlayPause,
                               onSeek: _seekTo,
-                              onSkipBack: () => _adjustSkip(-1),
-                              onSkipForward: () => _adjustSkip(1),
                               // Same as the Back key: minimizes where that
                               // is set to, otherwise closes (shown as X).
                               onBack: _backMinimizes ? _minimize : _goBack,
