@@ -191,10 +191,12 @@ void main() {
       tester,
     ) async {
       var closed = false;
+      final reports = <Progress>[];
       final replaced = <PlayerArgs>[];
       final adapter = await pumpPlayer(
         tester,
         PlayerArgs.dvrRecording(_recording('recording')),
+        reports: reports,
         replaced: replaced,
         fetch: (_) async => _recording(status, duration: 1800),
         onClose: () => closed = true,
@@ -213,8 +215,55 @@ void main() {
       expect(closed, isTrue);
       expect(replaced, isEmpty);
       await tester.pumpWidget(const SizedBox());
+      expect(reports.last.completed, isTrue);
+      expect(reports.last.positionSeconds, 1800);
+      expect(reports.last.durationSeconds, 1800);
     });
   }
+
+  testWidgets('reopening the recording while it finishes keeps waiting', (
+    tester,
+  ) async {
+    final replaced = <PlayerArgs>[];
+    final answers = [_recording('post_processing'), _recording('completed')];
+    final adapter = FakePlayerAdapter(
+      capabilities: PlaybackCapabilities.desktopLibmpv,
+      textureId: 7,
+    );
+    final orchestrator = PlaybackOrchestrator(
+      platform: PlaybackPlatform.desktop,
+      adapters: <PlaybackBackend, PlayerAdapter>{_backend: adapter},
+      transcodeGateway: FakeTranscodeGateway(),
+    );
+    addTearDown(orchestrator.dispose);
+    final epg = EpgService(clock: () => DateTime.utc(2026));
+    Widget app(PlayerArgs args) => MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: PlayerScreen(
+        args: args,
+        orchestrator: orchestrator,
+        epgService: epg,
+        onReplaceItem: replaced.add,
+        fetchDvrRecording: (_) async => answers.removeAt(0),
+      ),
+    );
+    await tester.pumpWidget(
+      app(PlayerArgs.dvrRecording(_recording('recording'))),
+    );
+    await tester.pump();
+    emit(adapter, PlaybackStatus.playing, const Duration(minutes: 10));
+    await tester.pump();
+    emit(adapter, PlaybackStatus.completed, const Duration(minutes: 10));
+    await tester.pump();
+    await tester.pumpWidget(
+      app(PlayerArgs.dvrRecording(_recording('recording'))),
+    );
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pump();
+    expect(replaced.single.startPosition, 600);
+    await tester.pumpWidget(const SizedBox());
+  });
 
   testWidgets('a failed lookup is retried', (tester) async {
     final replaced = <PlayerArgs>[];

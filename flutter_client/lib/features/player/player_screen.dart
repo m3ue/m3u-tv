@@ -415,6 +415,10 @@ class _PlayerScreenState extends State<PlayerScreen>
   // of a stream that is failing or being reopened.
   Duration _dvrPosition = Duration.zero;
   bool _dvrWindowEnding = false;
+  // Counts opened sources, so waiting on a recording ends with its own.
+  int _dvrSession = 0;
+  // The final length, once an unfinished recording was watched to its end.
+  Duration? _dvrFinishedLength;
 
   /// The furthest a seek may go. Short of the end on an unfinished recording,
   /// whose newest segments may not be listed yet.
@@ -1088,6 +1092,8 @@ class _PlayerScreenState extends State<PlayerScreen>
     _dvrLengthReported = false;
     _dvrPosition = Duration(seconds: args.startPosition?.toInt() ?? 0);
     _dvrWindowEnding = false;
+    _dvrSession++;
+    _dvrFinishedLength = null;
     if (_dvrWindow != null) _duration = _dvrWindow!.length;
   }
 
@@ -1560,7 +1566,10 @@ class _PlayerScreenState extends State<PlayerScreen>
     final fetch = widget.fetchDvrRecording;
     final started = _hasStartedPlayback;
     final l10n = AppLocalizations.of(context);
-    bool stale() => _disposed || !mounted || !identical(args, widget.args);
+    // Not by args: reopening this recording while it floats replaces those
+    // without starting another session.
+    final session = _dvrSession;
+    bool stale() => _disposed || !mounted || session != _dvrSession;
 
     _isPlaying = false;
     _stopPositionTimer();
@@ -1586,6 +1595,9 @@ class _PlayerScreenState extends State<PlayerScreen>
       failures = 0;
       if (recording.isInProgress) break;
       if (started && _dvrWatchedToEnd(recording, position)) {
+        // Closing reports this, as watched.
+        _dvrFinishedLength = _dvrFinalLength(recording);
+        _currentPosition = position;
         _goBack();
         return;
       }
@@ -1637,7 +1649,10 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (isDvr && dvrRecordingId == null) return;
     // An unfinished recording has no final length, so being near its end
     // doesn't mean it was watched to the end.
-    final durationSeconds = _dvrWindow != null ? 0 : _duration.inSeconds;
+    final finishedLength = _dvrFinishedLength;
+    final durationSeconds = _dvrWindow != null
+        ? finishedLength?.inSeconds ?? 0
+        : _duration.inSeconds;
     widget.progressReporter!(
       Progress(
         viewerId: widget.viewerId,
@@ -1653,8 +1668,9 @@ class _PlayerScreenState extends State<PlayerScreen>
         // copy drops out of Continue Watching right away instead of sitting
         // there as a "100%" card until the next server sync.
         completed:
-            durationSeconds > 0 &&
-            position.inSeconds >= durationSeconds * _kCompletedFraction,
+            finishedLength != null ||
+            (durationSeconds > 0 &&
+                position.inSeconds >= durationSeconds * _kCompletedFraction),
         seriesId: widget.args.seriesId,
         seasonNumber: widget.args.seasonNumber,
       ),
