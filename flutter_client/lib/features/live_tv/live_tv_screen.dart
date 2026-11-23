@@ -349,6 +349,15 @@ class _LiveTvScreenState extends ConsumerState<LiveTvScreen>
             streamSessionGateway: ref.read(streamSessionGatewayProvider),
             playerId: 'epg-preview-${_previewPlayerSeq++}',
           ),
+          // Keeps the timeshift buffer's lease alive while the guide shows
+          // this channel (same 2s heartbeat as the full-screen player), so a
+          // preview -> full-screen handoff inherits a warm buffer instead of
+          // a reaped one.
+          heartbeat: ref
+              .read(appStateControllerProvider)
+              .appState
+              .xtreamService
+              .timeshiftHeartbeat,
           sourceFor: (channel) {
             final args = PlayerArgs.liveChannel(channel);
             final streamUrl = applyProxyPlayback(args.streamUrl, type: 'live');

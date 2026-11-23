@@ -95,6 +95,8 @@ class PlaybackControls extends StatelessWidget {
     this.liveProgrammeEnd,
     this.onGoLive,
     this.showGoLive = false,
+    this.onSkipBack,
+    this.onSkipForward,
     super.key,
   });
 
@@ -120,6 +122,13 @@ class PlaybackControls extends StatelessWidget {
   final VoidCallback onPlayPause;
   final ValueChanged<Duration> onSeek;
   final VoidCallback onBack;
+
+  /// Timeshift/skip buttons: when set, go through the player's accumulating
+  /// skip queue instead of a direct absolute seek, so repeated presses are
+  /// coalesced into one seek (e.g. 3x rewind = -30 s) instead of flushing the
+  /// hardware decoder three times.
+  final VoidCallback? onSkipBack;
+  final VoidCallback? onSkipForward;
   final List<PlaybackTrack> audioTracks;
   final List<PlaybackTrack> subtitleTracks;
   final String? selectedAudioTrackId;
@@ -674,16 +683,18 @@ class PlaybackControls extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: AppIconButton(
               icon: Icons.replay_10,
-              onPressed: () {
-                final target = _latestPosition - seekStep;
-                final clamped = Duration(
-                  milliseconds: target.inMilliseconds.clamp(
-                    0,
-                    duration.inMilliseconds,
-                  ),
-                );
-                onSeek(clamped);
-              },
+              onPressed:
+                  onSkipBack ??
+                  () {
+                    final target = _latestPosition - seekStep;
+                    final clamped = Duration(
+                      milliseconds: target.inMilliseconds.clamp(
+                        0,
+                        duration.inMilliseconds,
+                      ),
+                    );
+                    onSeek(clamped);
+                  },
             ),
           ),
         if (isLive && onPreviousChannel != null)
@@ -739,16 +750,18 @@ class PlaybackControls extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: AppIconButton(
               icon: Icons.forward_10,
-              onPressed: () {
-                final target = _latestPosition + seekStep;
-                final clamped = Duration(
-                  milliseconds: target.inMilliseconds.clamp(
-                    0,
-                    duration.inMilliseconds,
-                  ),
-                );
-                onSeek(clamped);
-              },
+              onPressed:
+                  onSkipForward ??
+                  () {
+                    final target = _latestPosition + seekStep;
+                    final clamped = Duration(
+                      milliseconds: target.inMilliseconds.clamp(
+                        0,
+                        duration.inMilliseconds,
+                      ),
+                    );
+                    onSeek(clamped);
+                  },
             ),
           ),
         if (!isLive && onEpisodePicker != null)

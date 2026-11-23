@@ -102,6 +102,7 @@ class PlayerScreen extends StatefulWidget {
     this.minimized = false,
     this.onPlaybackFailure,
     this.onLiveStreamEnded,
+    this.onTimeshiftHeartbeat,
     this.onNextChannel,
     this.onPreviousChannel,
     this.onReplaceItem,
@@ -170,6 +171,10 @@ class PlayerScreen extends StatefulWidget {
   final bool minimized;
   final VoidCallback? onPlaybackFailure;
   final Future<String?> Function()? onLiveStreamEnded;
+
+  /// Extends the server-side timeshift buffer lease while this player is open
+  /// (including paused). Null disables the heartbeat (e.g. non-timeshift).
+  final Future<int?> Function(int channelId)? onTimeshiftHeartbeat;
   final VoidCallback? onNextChannel;
   final VoidCallback? onPreviousChannel;
 
@@ -236,6 +241,8 @@ class _PlayerScreenState extends State<PlayerScreen>
   /// rather than the backend — the position timer then advances it so the
   /// seek bar total tracks the growing window until a real duration arrives.
   bool _seededLiveDuration = false;
+  DateTime? _seekableLiveOpenedAt;
+  bool _seekableLivePositionSeeded = false;
   String? _errorMessage;
   String? _fallbackReason;
   String? _retryStatusMessage;
@@ -358,8 +365,29 @@ class _PlayerScreenState extends State<PlayerScreen>
   Timer? _overlayHideTimer;
   Timer? _progressTimer;
   Timer? _positionTimer;
+  Timer? _liveDurationTimer;
   Timer? _epgTimer;
   Timer? _liveEndHoldTimer;
+  Timer? _timeshiftHeartbeatTimer;
+  Duration? _pendingRecoverySeek;
+
+  /// Real recorded HLS window length, from the backend (`state.duration`).
+  /// Distinct from [_duration], which for timeshift-live is wall-clock seeded
+  /// and runs AHEAD of the buffer while it is still filling. A seek target is
+  /// valid only against this, never against `_duration`.
+  Duration? _windowDuration;
+
+  /// A seek whose target exceeds [_windowDuration]. ExoPlayer cannot seek past
+  /// the end of a live window - it accepts the position, parks, and appears
+  /// frozen. Hold it here and flush when the window catches up.
+  Duration? _deferredSeekTarget;
+  DateTime? _deferredSeekDeadline;
+
+  /// The server has told us the real buffer length. Once true, the wall-clock
+  /// placeholder is disabled and the heartbeat value is authoritative - so a
+  /// buffer that survived a channel change shows its real length immediately,
+  /// and a reaped one correctly shows 0.
+  bool _serverWindowKnown = false;
   bool _liveEndHold = false;
   String? _liveEndReason;
   Future<void>? _epgFetch;
@@ -406,6 +434,9 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool get _isTimeshiftLive =>
       _seekableLive && _isLive && widget.args.streamUrl.contains('timeshift=1');
 
+  bool get _isDirectTimeshiftHls =>
+      _isTimeshiftLive && widget.args.streamUrl.contains('timeshift_hls=1');
+
   /// Seekable live may not report a duration yet (ExoPlayer often leaves
   /// live window duration unset until the timeline settles) — still allow
   /// relative ±10s skips so the transport buttons work immediately.
@@ -418,9 +449,33 @@ class _PlayerScreenState extends State<PlayerScreen>
   /// Catchup is left alone: its seeks reopen the timeshift stream at the
   /// target instead of seeking the open one.
   bool get _seekBlockedByTranscode =>
-      (widget.args.transcoded && (widget.args.type == 'vod' || _isSeries)) ||
-      widget.orchestrator.activeBackend == PlaybackBackend.serverTranscode;
+      !_seekableLive &&
+      ((widget.args.transcoded && (widget.args.type == 'vod' || _isSeries)) ||
+       widget.orchestrator.activeBackend == PlaybackBackend.serverTranscode);
   bool get _isSeries => widget.args.type == 'series';
+
+  String get _debugPlaybackMode {
+    if (_catchup != null) return 'catchup';
+    if (_isTimeshiftLive) return 'timeshift';
+    if (_seekableLive) return 'seekable-live';
+    if (_isLive) return 'live';
+    return widget.args.type;
+  }
+
+  void _debugDuration(String source, {String? extra}) {
+    AppLogBuffer.instance.add(
+      AppLogLevel.info,
+      'DURDBG source=$source mode=$_debugPlaybackMode '
+      'durationMs=${_duration.inMilliseconds} '
+      'positionMs=${_currentPosition.inMilliseconds} '
+      'status=$_status '
+      'seekable=$_seekableLive tsLive=$_isTimeshiftLive '
+      'tsOpened=$_timeshiftOpened seeded=$_seededLiveDuration '
+      'posSeeded=$_seekableLivePositionSeeded canSeek=$_canSeek '
+      'backend=${widget.orchestrator.activeBackend}'
+      '${extra == null ? '' : ' $extra'}',
+    );
+  }
   bool get _isNativePlaneActive => widget.orchestrator.isNativePlaneActive;
 
   String _nowPlayingBadgeLabel(BuildContext context) {
@@ -467,6 +522,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     // not just while actively playing — e.g. staying paused on an overlay
     // shouldn't let the screen sleep. Enabled here, disabled in dispose().
     unawaited(widget.wakelockController.enable());
+    _startTimeshiftHeartbeat();
     widget.backController?._handler = _handleBack;
     HardwareKeyboard.instance.addHandler(_handleTransportKey);
     if (HostPlatform.isAndroid || HostPlatform.isIOS) {
@@ -530,8 +586,23 @@ class _PlayerScreenState extends State<PlayerScreen>
     _resetCatchupTimeline(widget.args);
     if (widget.adoptsPlayingSession) {
       // onState doesn't replay, so start from where the session already is.
+      // ADOPTION IS PRESERVED: the preview's video is kept (no reload).
       final state = widget.orchestrator.lastState;
       if (state != null) _handleState(state);
+      // ADOPT PATH: _openSource() is skipped entirely here and lastState can
+      // be null, so the seek-bar seed it performs may never run -> total
+      // pinned at 0:00. Seed it here (idempotent: only when not already done).
+      if (_isTimeshiftLive && _seekableLiveOpenedAt == null) {
+        _seekableLiveOpenedAt = DateTime.now();
+        _seededLiveDuration = true;
+        _seekableLivePositionSeeded = true;
+        if (_duration <= Duration.zero) {
+          _duration = const Duration(milliseconds: 500);
+        }
+        _startPositionTimer();
+        _startLiveDurationTimer();
+        _debugDuration('adopt-seed', extra: 'lastState=${state?.status}');
+      }
     } else {
       _openInitialSource();
     }
@@ -640,11 +711,19 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
     if (_isSamePlaybackSession(oldWidget.args, widget.args)) return;
 
+    _pendingRecoverySeek = null;
+    _windowDuration = null;
+    _deferredSeekTarget = null;
+    _deferredSeekDeadline = null;
+    _serverWindowKnown = false;
+    _startTimeshiftHeartbeat();
+
     if (_scrobbleActive) _scrobbleFor(oldWidget.args, 'stop');
     _scrobbleActive = false;
     _failureReported = false;
     _lastValidProgress = 0;
     _stopPositionTimer();
+    _liveDurationTimer?.cancel();
     _progressTimer?.cancel();
     _epgTimer?.cancel();
     _epgFetch = null;
@@ -661,6 +740,8 @@ class _PlayerScreenState extends State<PlayerScreen>
       _currentPosition = Duration.zero;
       _duration = Duration.zero;
       _seededLiveDuration = false;
+      _seekableLiveOpenedAt = null;
+      _seekableLivePositionSeeded = false;
       _pendingSeekToStart = false;
       _pendingEdgeRewind = false;
       _timeshiftCushionPending = false;
@@ -756,12 +837,46 @@ class _PlayerScreenState extends State<PlayerScreen>
         mapEquals(a.metadata, b.metadata);
   }
 
+  void _startLiveDurationTimer() {
+    _liveDurationTimer?.cancel();
+    if (!_seekableLive || !_seededLiveDuration) return;
+    _debugDuration('liveDurationTimer-start');
+    _liveDurationTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (_disposed || !mounted) return;
+      if (_serverWindowKnown) {
+        // The server's window is authoritative; wall-clock must not fight it.
+        return;
+      }
+      final openedAt = _seekableLiveOpenedAt;
+      if (openedAt == null) return;
+      final elapsed = DateTime.now().difference(openedAt);
+      if (elapsed > _duration) {
+        final before = _duration;
+        setState(() => _duration = elapsed);
+        _debugDuration(
+          'liveDurationTimer',
+          extra: 'beforeMs=${before.inMilliseconds} '
+              'openedAt=${openedAt.toIso8601String()}',
+        );
+      }
+    });
+  }
+
   void _startPositionTimer() {
     _positionTimer?.cancel();
     _positionTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
-      if (_disposed ||
-          !mounted ||
-          !_isPlaying ||
+      if (_disposed || !mounted) return;
+      final openedAt = _seekableLiveOpenedAt;
+      if (!_serverWindowKnown &&
+          _seekableLive &&
+          _seededLiveDuration &&
+          openedAt != null) {
+        final elapsed = DateTime.now().difference(openedAt);
+        if (elapsed > _duration) {
+          setState(() => _duration = elapsed);
+        }
+      }
+      if (!_isPlaying ||
           // Live has no ticking timeline unless it is a seekable DVR window
           // (growing duration + position for the seek bar).
           (_isLive && !_seekableLive) ||
@@ -773,15 +888,6 @@ class _PlayerScreenState extends State<PlayerScreen>
       _currentPosition = (_duration > Duration.zero && next > _duration)
           ? _duration
           : next;
-      // Seeded DVR window (in-progress recording): keep the right-hand total
-      // advancing with wall clock while playing. ExoPlayer only refreshes
-      // duration on timeline changes, so without this the max time freezes
-      // after the first report while position keeps moving (progress hits
-      // 100%). Timeshift windows get duration from the backend timeline
-      // (Media3 effectiveDurationMs → state.duration), not a local tick.
-      if (_seekableLive && _seededLiveDuration && _duration > Duration.zero) {
-        _duration = _duration + const Duration(milliseconds: 500);
-      }
       _skips.check();
       _checkUpNext();
     });
@@ -1063,6 +1169,8 @@ class _PlayerScreenState extends State<PlayerScreen>
     _positionTimer?.cancel();
     _epgTimer?.cancel();
     _liveEndHoldTimer?.cancel();
+    _liveDurationTimer?.cancel();
+    _timeshiftHeartbeatTimer?.cancel();
     _skipCommitTimer?.cancel();
     _livePauseReleaseTimer?.cancel();
     _skips.dispose();
@@ -1099,21 +1207,45 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   Future<void> _openSource(PlayerArgs args) async {
+    // Keys only - never the host/path/query values, which carry credentials.
+    // Confirms whether the timeshift params actually left the app, so a
+    // missing server-side kickoff can be attributed to client or server.
+    final openKeys = Uri.tryParse(args.streamUrl)?.queryParameters.keys;
+    AppLogBuffer.instance.add(
+      AppLogLevel.info,
+      'player-open type=${args.type} seekable=${args.seekableLive} '
+      'keys=${openKeys == null || openKeys.isEmpty ? 'none' : openKeys.join(',')}',
+    );
     // Seed the growing-window duration from the server's elapsed_seconds so
     // the seek bar can appear before the backend reports a timeline duration
     // (ExoPlayer often leaves live duration unset until the window settles).
     // Only DVR windows carry that metadata; timeshift-live relies on the
     // backend's duration for the rolling HLS window.
+    _liveDurationTimer?.cancel();
+    _seekableLiveOpenedAt = null;
+    _serverWindowKnown = false;
     _seededLiveDuration = false;
-    if (args.seekableLive) {
-      final elapsed = args.metadata['dvr_elapsed_seconds'];
-      if (elapsed is int && elapsed > 0) {
-        _duration = Duration(seconds: elapsed);
-        _seededLiveDuration = true;
-      } else {
-        _duration = Duration.zero;
+      if (args.seekableLive) {
+        final elapsed = args.metadata['dvr_elapsed_seconds'];
+        if (elapsed is int && elapsed > 0) {
+          _duration = Duration(seconds: elapsed);
+          _seededLiveDuration = true;
+          _seekableLiveOpenedAt = DateTime.now().subtract(
+            Duration(seconds: elapsed),
+          );
+          _seekableLivePositionSeeded = false;
+        } else if (_isTimeshiftLive) {
+          _seekableLiveOpenedAt = DateTime.now();
+          _seekableLivePositionSeeded = true;
+          _duration = const Duration(milliseconds: 500);
+          _seededLiveDuration = true;
+        } else {
+          _duration = Duration.zero;
+          _seededLiveDuration = false;
+          _seekableLiveOpenedAt = null;
+          _seekableLivePositionSeeded = false;
+        }
       }
-    }
     final source = applyPlayerSourceSettings(
       args.toPlaybackSource(),
       widget.viewSettingsService,
@@ -1139,7 +1271,12 @@ class _PlayerScreenState extends State<PlayerScreen>
     // The MIME for a ?timeshift=1 URL is resolved centrally in
     // AndroidPlaybackAdapter.load so every player (this one and the EPG guide
     // preview) gets it, not just the full-screen path.
-    return _openAndSeek(source);
+      if (_isTimeshiftLive) {
+        _startPositionTimer();
+        _startLiveDurationTimer();
+      }
+      _debugDuration('open');
+      return _openAndSeek(source);
   }
 
   /// Hold a cold timeshift open until the window has ~8 s, then start 4 s
@@ -1457,6 +1594,90 @@ class _PlayerScreenState extends State<PlayerScreen>
     });
   }
 
+  /// Last `heartbeat-window` log state ("live:true" etc). The window grows
+  /// every healthy beat, so only transitions are logged - not each beat.
+  String? _lastHeartbeatLogState;
+
+  /// Timeshift/DVR HLS windows can wedge the Amlogic decoder after repeated
+  /// seeks: the player stays BUFFERING forever while the backend timeline keeps
+  /// growing. Reload the HLS window at the live edge after a stalled open.
+  void _startTimeshiftHeartbeat() {
+    _timeshiftHeartbeatTimer?.cancel();
+    _timeshiftHeartbeatTimer = null;
+    _lastHeartbeatLogState = null;
+    final callback = widget.onTimeshiftHeartbeat;
+    final channelId = widget.args.streamId;
+    if (callback == null || channelId == null || !_isTimeshiftLive) {
+      // Log only genuine anomalies (a timeshift session with broken wiring).
+      // A plain-live open reaching here is normal and stays silent so
+      // non-timeshift playback is untouched.
+      if (_isTimeshiftLive) {
+        AppLogBuffer.instance.add(
+          AppLogLevel.info,
+          'heartbeat-skipped hasCallback=${callback != null} '
+          'channelId=$channelId',
+        );
+      }
+      return;
+    }
+    AppLogBuffer.instance.add(
+      AppLogLevel.info,
+      'heartbeat-start channelId=$channelId '
+      'initialMs=${_duration.inMilliseconds}',
+    );
+
+    Future<void> poll() async {
+      int? window;
+      try {
+        window = await callback(channelId);
+      } on Object catch (error) {
+        // Endpoint unreachable: keep whatever placeholder we already show
+        // rather than blanking the seek bar.
+        AppLogBuffer.instance.add(
+          AppLogLevel.info,
+          'heartbeat-window ERROR $error',
+        );
+        return;
+      }
+      if (_disposed || !mounted) return;
+
+      final logState =
+          '${window == null ? 'none' : window <= 0 ? 'zero' : 'live'}:$_serverWindowKnown';
+      if (logState != _lastHeartbeatLogState) {
+        _lastHeartbeatLogState = logState;
+        AppLogBuffer.instance.add(
+          AppLogLevel.info,
+          'heartbeat-window window=$window known=$_serverWindowKnown '
+          'prevMs=${_duration.inMilliseconds} '
+          'posMs=${_currentPosition.inMilliseconds}',
+        );
+      }
+
+      final value = window ?? 0;
+      if (value <= 0) {
+        // 0 means "not readable yet" (buffer still starting, or reaped).
+        // Never blank the total with it - keep what we show and let the next
+        // beat correct it once the window is real.
+        return;
+      }
+
+      _serverWindowKnown = true;
+      _liveDurationTimer?.cancel();
+      if (_duration.inSeconds != value) {
+        setState(() => _duration = Duration(seconds: value));
+      }
+    }
+    // Fire immediately: returning to a channel whose buffer survived should
+    // show its real length from the first frame, not after the first 2s tick
+    // (and previously not until the first seek).
+    unawaited(poll());
+    _timeshiftHeartbeatTimer = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => unawaited(poll()),
+    );
+  }
+
+
   void _handleState(PlaybackState state) {
     if (_disposed || !mounted) return;
 
@@ -1475,18 +1696,53 @@ class _PlayerScreenState extends State<PlayerScreen>
     // the pending target — that proves the real seek genuinely caught up.
     final pendingTarget = _skips.pendingComskipSeekTarget;
     final catchup = _catchup;
-    final Duration acceptedPosition;
-    if (catchup != null) {
-      if (!_catchupReopenPending) _catchupStreamPosition = state.position;
-      acceptedPosition = _catchupReopenPending || _catchupSeekTarget != null
-          ? _currentPosition
-          : catchup.positionOf(state.position);
-    } else {
-      acceptedPosition = pendingTarget != null && state.position < pendingTarget
-          ? _currentPosition
-          : state.position;
+    var acceptedPosition = catchup != null
+        ? (_catchupReopenPending || _catchupSeekTarget != null
+              ? _currentPosition
+              : catchup.positionOf(state.position))
+        : (pendingTarget != null && state.position < pendingTarget
+              ? _currentPosition
+              : state.position);
+    if (catchup != null && !_catchupReopenPending) {
+      _catchupStreamPosition = state.position;
     }
 
+    // HLS can briefly report an absolute programme/PTS position (e.g. 9:33)
+    // after a seek while the window is still relative. Accepting that makes the
+    // dial flash a huge value and turns the next relative seek into an
+    // out-of-window jump to live. Keep the last sane position.
+    if (_seekableLive &&
+        _duration > Duration.zero &&
+        acceptedPosition > _duration + const Duration(minutes: 1)) {
+      AppLogBuffer.instance.add(
+        AppLogLevel.info,
+        'POSDBG ignore rawPositionMs=${state.position.inMilliseconds} '
+        'acceptedMs=${acceptedPosition.inMilliseconds} '
+        'durationMs=${_duration.inMilliseconds} '
+        'currentMs=${_currentPosition.inMilliseconds} status=${state.status}',
+      );
+      acceptedPosition = _currentPosition > _duration
+          ? _duration
+          : _currentPosition;
+    }
+
+    if (_isTimeshiftLive &&
+        _seekableLive &&
+        _seekableLiveOpenedAt == null) {
+      _seekableLiveOpenedAt = DateTime.now();
+      _seededLiveDuration = true;
+      _seekableLivePositionSeeded = state.position <= Duration.zero;
+      if (_duration <= Duration.zero) {
+        _duration = const Duration(milliseconds: 500);
+      }
+      _startLiveDurationTimer();
+      _debugDuration(
+        'state-seed',
+        extra: 'statePositionMs=${state.position.inMilliseconds}',
+      );
+    }
+
+    final beforeDurationMs = _duration.inMilliseconds;
     _maybeApplyTimeshiftCushion(state);
 
     setState(() {
@@ -1515,12 +1771,18 @@ class _PlayerScreenState extends State<PlayerScreen>
       }
       _retryStatusMessage = null;
       _currentPosition = acceptedPosition;
+      if (_seekableLivePositionSeeded && acceptedPosition > Duration.zero) {
+        _seekableLivePositionSeeded = false;
+      }
       // Growing DVR/timeshift window: never shrink the displayed total on a
       // stale backend report, and do NOT clear _seededLiveDuration — the
       // position timer keeps advancing a seeded DVR total so it tracks the
       // live edge while ExoPlayer's duration lags. Timeshift windows grow
       // via timeline refreshes (Media3 emits duration on onTimelineChanged).
       if (state.duration != null && state.duration! > Duration.zero) {
+        // Real recorded window (not `_duration`, which is wall-clock seeded).
+        _windowDuration = state.duration;
+        _flushDeferredSeek();
         // A catchup duration is the programme's, not the stream's. A stream
         // that reports one at all can seek in place.
         if (catchup == null) {
@@ -1536,6 +1798,12 @@ class _PlayerScreenState extends State<PlayerScreen>
           _catchupStreamSeekable = true;
         }
       }
+      _debugDuration(
+        'state',
+        extra: 'reportedMs=${state.duration?.inMilliseconds} '
+            'statePosMs=${state.position.inMilliseconds} '
+            'beforeMs=$beforeDurationMs',
+      );
       // Retry the deferred "start from beginning" seek once the timeline is
       // up (first ready/playing after open).
       if (_pendingSeekToStart &&
@@ -1557,24 +1825,38 @@ class _PlayerScreenState extends State<PlayerScreen>
               state.status == PlaybackStatus.playing ||
               state.status == PlaybackStatus.paused)) {
         _pendingEdgeRewind = false;
-        final base = state.position > Duration.zero
-            ? state.position
-            : (_duration > Duration.zero ? _duration : Duration.zero);
+        // Behind the live edge = window END minus the skip step. Deriving it
+        // from the window's current position was wrong: right after a switch
+        // that position starts near 0 (e.g. 9s), so `9 - 10` clamped to 0 and
+        // the first rewind visibly landed on 0 before jumping back to ~9.
+        final win = _windowDuration;
+        final base = win != null && win > Duration.zero
+            ? win
+            : (state.position > Duration.zero
+                ? state.position
+                : (_duration > Duration.zero ? _duration : Duration.zero));
         final target = base - _skipStep;
         final clamped = target < Duration.zero ? Duration.zero : target;
         AppLogBuffer.instance.add(
           AppLogLevel.info,
-          'edge-rewind base=${base.inSeconds}s target=${clamped.inSeconds}s dur=${_duration.inSeconds}s',
+          'edge-rewind base=${base.inSeconds}s target=${clamped.inSeconds}s dur=${_duration.inSeconds}s window=${_windowDuration?.inSeconds}s',
         );
-        setState(() => _currentPosition = clamped);
+        // Through _applySeek, so a target beyond the recorded window is held
+        // (SEEKDBG defer) rather than parking ExoPlayer past its end.
+        _applySeek(clamped);
+      }
+      if (_pendingRecoverySeek != null &&
+          !_switchingTimeshift &&
+          widget.orchestrator.activeBackend != null &&
+          (state.status == PlaybackStatus.ready ||
+              state.status == PlaybackStatus.playing ||
+              state.status == PlaybackStatus.paused)) {
+        final target = _pendingRecoverySeek!;
+        _pendingRecoverySeek = null;
         try {
-          unawaited(widget.orchestrator.seek(clamped));
-        } on Object catch (error) {
-          _pendingEdgeRewind = true;
-          AppLogBuffer.instance.add(
-            AppLogLevel.info,
-            'edge-rewind seek deferred: $error',
-          );
+          unawaited(widget.orchestrator.seek(target));
+        } on Object {
+          _pendingRecoverySeek = target;
         }
       }
       // Duration for timeshift windows comes from the backend timeline
@@ -2228,7 +2510,8 @@ class _PlayerScreenState extends State<PlayerScreen>
   // locally - same pattern as _SeekBar._adjustScrub's dpad-focused scrubbing
   // - and only commits a single real seek once the repeats go quiet.
   static const Duration _skipStep = Duration(seconds: 10);
-  static const Duration _skipCommitDebounce = Duration(milliseconds: 700);
+  static const Duration _skipCommitDebounce = Duration(milliseconds: 900);
+  static const Duration _seekQueueDebounce = Duration(milliseconds: 300);
   Duration? _skipScrubPositionValue;
   Duration? get _skipScrubPosition => _skipScrubPositionValue;
   set _skipScrubPosition(Duration? value) {
@@ -2241,13 +2524,26 @@ class _PlayerScreenState extends State<PlayerScreen>
   DateTime? _lastSkipCommitAt;
 
   void _adjustSkip(int direction) {
+    _debugDuration('adjust-skip', extra: 'direction=$direction');
     if (!_canSeek) return;
+    if (widget.orchestrator.activeBackend == null ||
+        _status == PlaybackStatus.stopped ||
+        _status == PlaybackStatus.idle) {
+      _debugDuration('adjust-skip-ignored');
+      return;
+    }
     _skipCommitDeferrals = 0;
     // Plain live (seekable mode, but no window duration yet — still on the
     // raw pipe): rewind switches onto the timeshift window if the buffer is
     // ready (server re-redirects ?timeshift=1 → HLS). FF at the live edge
     // is a no-op until a window is reported.
-    if (_isTimeshiftLive && _duration <= Duration.zero) {
+    // Gate on window state, NOT on `_duration`: the protected counter fix
+    // seeds `_duration > 0` immediately, so a `_duration <= 0` gate never
+    // fires and every rewind silently seeks the raw pipe (seek appears dead).
+    if (_isTimeshiftLive &&
+        !_timeshiftOpened &&
+        !_switchingTimeshift &&
+        !_isDirectTimeshiftHls) {
       if (direction >= 0) return;
       AppLogBuffer.instance.add(
         AppLogLevel.info,
@@ -2295,6 +2591,10 @@ class _PlayerScreenState extends State<PlayerScreen>
       AppLogLevel.info,
       'timeshift-switch requested dur=$_duration pos=$_currentPosition',
     );
+    _debugDuration(
+      'timeshift-switch-request',
+      extra: 'requestedPositionMs=${_currentPosition.inMilliseconds}',
+    );
     _timeshiftOpened = true;
     _pendingEdgeRewind = true;
     // Rewind asks for the seekable HLS window explicitly: drop the
@@ -2319,6 +2619,12 @@ class _PlayerScreenState extends State<PlayerScreen>
     _skipCommitTimer = null;
     final pos = _skipScrubPosition;
     if (pos == null) return;
+    if (_isTimeshiftLive && widget.orchestrator.activeBackend == null) {
+      _debugDuration('commit-skip-ignored', extra: 'targetMs=${pos.inMilliseconds}');
+      return;
+    }
+    _seekableLivePositionSeeded = false;
+    _debugDuration('commit-skip', extra: 'targetMs=${pos.inMilliseconds}');
     // Seeking while a previous seek is still buffering stacks decoder flushes;
     // on Amlogic hardware rapid rewinds wedge the video decoder (picture
     // freezes while the live timeline keeps advancing). Keep accumulating and
@@ -2350,7 +2656,122 @@ class _PlayerScreenState extends State<PlayerScreen>
     _lastSkipCommitAt = now;
     _skipCommitDeferrals = 0;
     _skipScrubPosition = null;
-    _seekTo(pos);
+    _applySeek(pos);
+  }
+
+  /// Route every timeshift seek through [_commitSkip], so the on-screen
+  /// ┬▒10s buttons and seek-bar taps are debounced/spaced like the held
+  /// remote path and can't flush the Amlogic decoder repeatedly.
+  void _queueTimeshiftSeek(Duration target) {
+    AppLogBuffer.instance.add(
+      AppLogLevel.info,
+      'SEEKDBG queue-target targetMs=${target.inMilliseconds} '
+      'durationMs=${_duration.inMilliseconds} '
+      'posMs=${_currentPosition.inMilliseconds} '
+      'tsOpened=$_timeshiftOpened directHls=$_isDirectTimeshiftHls',
+    );
+    _skipCommitDeferrals = 0;
+    _skipScrubPosition = target;
+    setState(() => _currentPosition = target);
+    _reportProgress(target);
+    _skipCommitTimer?.cancel();
+    _skipCommitTimer = Timer(_seekQueueDebounce, _commitSkip);
+  }
+
+  void _queueTimeshiftSwitch() {
+    _skipCommitTimer?.cancel();
+    _skipCommitTimer = Timer(_skipCommitDebounce, () {
+      _skipCommitTimer = null;
+      unawaited(_switchToTimeshiftAndRewind());
+    });
+  }
+
+  void _applySeek(Duration clamped) {
+    AppLogBuffer.instance.add(
+      AppLogLevel.info,
+      'SEEKDBG apply-target targetMs=${clamped.inMilliseconds} '
+      'durationMs=${_duration.inMilliseconds} '
+      'windowMs=${_windowDuration?.inMilliseconds} '
+      'posBeforeMs=${_currentPosition.inMilliseconds} '
+      'tsOpened=$_timeshiftOpened directHls=$_isDirectTimeshiftHls '
+      'canSeek=$_canSeek',
+    );
+    final win = _windowDuration;
+    if (win != null && win > Duration.zero && clamped > win) {
+      // Beyond the recorded buffer. Wait for the window instead of letting
+      // ExoPlayer park past its end (that is the first-rewind freeze).
+      if (_deferredSeekTarget != clamped) {
+        AppLogBuffer.instance.add(
+          AppLogLevel.info,
+          'SEEKDBG defer targetMs=${clamped.inMilliseconds} '
+          'windowMs=${win.inMilliseconds}',
+        );
+      }
+      _deferredSeekTarget = clamped;
+      _deferredSeekDeadline = DateTime.now().add(const Duration(seconds: 8));
+      setState(() => _currentPosition = clamped);
+      _reportProgress(clamped);
+      return;
+    }
+    _deferredSeekTarget = null;
+    _skips.clearPendingComskipSeek();
+    setState(() => _currentPosition = clamped);
+    _reportProgress(clamped);
+    try {
+      unawaited(widget.orchestrator.seek(clamped));
+    } on Object catch (error) {
+      AppLogBuffer.instance.add(
+        AppLogLevel.info,
+        'seek deferred: $error',
+      );
+    }
+  }
+
+  /// Runs when the backend reports a real window length. Releases a seek that
+  /// was held because its target was still beyond the recorded buffer.
+  void _flushDeferredSeek() {
+    final target = _deferredSeekTarget;
+    final win = _windowDuration;
+    if (target == null || win == null || win <= Duration.zero) return;
+
+    if (win >= target) {
+      _deferredSeekTarget = null;
+      AppLogBuffer.instance.add(
+        AppLogLevel.info,
+        'SEEKDBG flush targetMs=${target.inMilliseconds} '
+        'windowMs=${win.inMilliseconds}',
+      );
+      try {
+        unawaited(widget.orchestrator.seek(target));
+      } on Object catch (error) {
+        _deferredSeekTarget = target;
+        AppLogBuffer.instance.add(
+          AppLogLevel.info,
+          'SEEKDBG flush failed: $error',
+        );
+      }
+      return;
+    }
+
+    final deadline = _deferredSeekDeadline;
+    if (deadline == null || DateTime.now().isBefore(deadline)) return;
+
+    // Window still short after the grace period - go as far back as it allows
+    // rather than stay frozen.
+    _deferredSeekTarget = null;
+    AppLogBuffer.instance.add(
+      AppLogLevel.info,
+      'SEEKDBG flush-clamp targetMs=${target.inMilliseconds} '
+      'windowMs=${win.inMilliseconds}',
+    );
+    try {
+      unawaited(widget.orchestrator.seek(win));
+    } on Object catch (error) {
+      AppLogBuffer.instance.add(
+        AppLogLevel.info,
+        'SEEKDBG flush-clamp failed: $error',
+      );
+    }
   }
 
   // Mirrors _adjustSkip's debounce reasoning: holding channel up/down fires
@@ -2383,21 +2804,31 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   void _seekTo(Duration position) {
+    AppLogBuffer.instance.add(
+      AppLogLevel.info,
+      'SEEKDBG seekTo-raw requestedMs=${position.inMilliseconds} '
+      'durationMs=${_duration.inMilliseconds} '
+      'posMs=${_currentPosition.inMilliseconds} '
+      'canSeek=$_canSeek tsOpened=$_timeshiftOpened '
+      'directHls=$_isDirectTimeshiftHls switching=$_switchingTimeshift',
+    );
     if (!_canSeek) return;
     // Plain live still on the raw TS pipe (no window duration yet): seeking it
     // is meaningless — ExoPlayer treats a seek on a live progressive stream as
     // EOF and emits `completed` at position 0. A backward seek means "switch
     // onto the timeshift window" instead, exactly like the rewind key.
-    if (_isTimeshiftLive && _duration <= Duration.zero) {
-      if (!_timeshiftOpened && !_switchingTimeshift) {
-        if (position <= _currentPosition) {
-          unawaited(_switchToTimeshiftAndRewind());
-        }
-        return;
+    // Same window-state gate as _adjustSkip: a backward seek on the raw pipe
+    // must switch to HLS rather than seek it - seeking a live progressive pipe
+    // is a no-op / EOF. `_duration <= 0` cannot be used here because the
+    // protected counter fix seeds `_duration > 0` from the first frame.
+    if (_isTimeshiftLive &&
+        !_timeshiftOpened &&
+        !_switchingTimeshift &&
+        !_isDirectTimeshiftHls) {
+      if (position <= _currentPosition) {
+        _queueTimeshiftSwitch();
       }
-      // Window already opened but its duration isn't reported yet: fall
-      // through and seek relatively rather than reopening (reopening killed
-      // the stream).
+      return;
     }
     // A manual seek always supersedes any in-flight comskip seek — the
     // user's deliberate new position should never be guarded by the
@@ -2418,9 +2849,11 @@ class _PlayerScreenState extends State<PlayerScreen>
       _seekCatchup(clamped);
       return;
     }
-    setState(() => _currentPosition = clamped);
-    _reportProgress(clamped);
-    unawaited(widget.orchestrator.seek(clamped));
+    if (_isTimeshiftLive) {
+      _queueTimeshiftSeek(clamped);
+      return;
+    }
+    _applySeek(clamped);
   }
 
   // How long a catchup seek may wait for the buffer to reach its target
@@ -2845,9 +3278,7 @@ class _PlayerScreenState extends State<PlayerScreen>
           LogicalKeySet(LogicalKeyboardKey.mediaTrackPrevious): _isLive
               ? const PlayerChannelDownIntent()
               : const PlayerSeekBackIntent(),
-          // Only claim arrow keys when the overlay is hidden - when visible,
-          // let dpad's root Shortcuts handle them for spatial navigation.
-          if (!_overlayVisible) ...{
+          if (!_overlayVisible && (ModalRoute.of(context)?.isCurrent ?? false)) ...{
             LogicalKeySet(LogicalKeyboardKey.arrowLeft):
                 const PlayerSeekBackIntent(),
             LogicalKeySet(LogicalKeyboardKey.arrowRight):
@@ -3196,10 +3627,6 @@ class _PlayerScreenState extends State<PlayerScreen>
                               // Cold plain live (raw TS pipe) has no window
                               // duration yet: hide the seek bar/end time until
                               // the first rewind opens the timeshift window.
-                              showProgressBar:
-                                  !(_isTimeshiftLive &&
-                                      (_duration <= Duration.zero ||
-                                          _timeshiftCushionPending)),
                               seekUnavailableMessage:
                                   !_isLive &&
                                       _duration > Duration.zero &&
@@ -3214,6 +3641,8 @@ class _PlayerScreenState extends State<PlayerScreen>
                               duration: _duration,
                               onPlayPause: _togglePlayPause,
                               onSeek: _seekTo,
+                              onSkipBack: () => _adjustSkip(-1),
+                              onSkipForward: () => _adjustSkip(1),
                               // Same as the Back key: minimizes where that
                               // is set to, otherwise closes (shown as X).
                               onBack: _backMinimizes ? _minimize : _goBack,

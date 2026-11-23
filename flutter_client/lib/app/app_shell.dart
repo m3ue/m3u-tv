@@ -2313,6 +2313,7 @@ class AppShellState extends ConsumerState<AppShell>
               onLiveStreamEnded: args.type == 'live'
                   ? _handleLiveStreamEnded
                   : null,
+              onTimeshiftHeartbeat: _appState.xtreamService.timeshiftHeartbeat,
               onNextChannel: args.type == 'live' ? _openNextChannel : null,
               onPreviousChannel: args.type == 'live'
                   ? _openPreviousChannel

@@ -5,6 +5,7 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:m3u_tv/services/app_log_buffer.dart';
 import 'package:m3u_tv/services/async_lifecycle.dart';
 import 'package:m3u_tv/services/cache_service.dart';
 import 'package:m3u_tv/services/client_config.dart';
@@ -784,6 +785,34 @@ class XtreamService {
   /// Upper bound on pages per full load (10,000 recordings), so a server that
   /// keeps returning full pages can't loop forever.
   static const int _dvrRecordingsMaxPages = 50;
+
+  /// Extends the server-side timeshift buffer lease while the full-screen
+  /// player is open (including paused). The server stops the buffer after
+  /// `timeshift.idle_stop_seconds` without a heartbeat/playlist fetch.
+  ///
+  /// Returns the buffer's real rewindable length in seconds - 0 when the
+  /// buffer is cold or was reaped while we were away. Null if the endpoint
+  /// failed, so callers can fall back to the wall-clock placeholder.
+  Future<int?> timeshiftHeartbeat(int channelId) async {
+    final response = await _request(
+      'timeshift_heartbeat',
+      params: <String, String>{'channel_id': '$channelId'},
+    );
+    // Raw server body - proves what the server actually sent (only
+    // success/window_seconds, so safe to log).
+    AppLogBuffer.instance.add(
+      AppLogLevel.info,
+      'heartbeat-response body=$response',
+    );
+    final window = response is Map ? response['window_seconds'] : null;
+    if (window is int) return window;
+    if (window is num) return window.toInt();
+    AppLogBuffer.instance.add(
+      AppLogLevel.info,
+      'heartbeat-response UNPARSEABLE window=$window type=${window.runtimeType}',
+    );
+    return null;
+  }
 
   Future<List<DvrRecording>> getDvrRecordings({
     DvrRecordingStatus? status,

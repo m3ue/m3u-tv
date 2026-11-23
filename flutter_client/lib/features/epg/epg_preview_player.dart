@@ -58,6 +58,7 @@ class EpgPreviewPlayerController extends ChangeNotifier {
     required this.buildPlayer,
     PlaybackSource Function(Channel channel)? sourceFor,
     this.onOpened,
+    this.heartbeat,
   }) : sourceFor = sourceFor ?? _rawSource;
 
   final EpgPreviewPlayerBuilder buildPlayer;
@@ -72,6 +73,17 @@ class EpgPreviewPlayerController extends ChangeNotifier {
   /// Called once a channel has opened, for the settings the full-screen
   /// player pushes after opening (see `applyPlayerOpenedSettings`).
   final void Function(PlaybackOrchestrator orchestrator)? onOpened;
+
+  /// Same 2s timeshift heartbeat the full-screen player sends.
+  ///
+  /// While the guide shows this channel it IS a real viewer, so it has to hold
+  /// the buffer's lease open - with `idle_stop=10` the buffer is otherwise
+  /// reaped mid-browse and the full-screen handoff inherits a dead buffer
+  /// (first rewind then lands on a 1s window and does nothing).
+  final Future<int?> Function(int channelId)? heartbeat;
+
+  Timer? _heartbeatTimer;
+  bool _sessionTimeshift = false;
 
   static PlaybackSource _rawSource(Channel channel) => PlaybackSource(
     uri: channel.streamUrl,
@@ -130,12 +142,13 @@ class EpgPreviewPlayerController extends ChangeNotifier {
     _attach(orchestrator, channel, GlobalKey(debugLabel: 'epg-preview'));
     notifyListeners();
     try {
-      await orchestrator.open(
-        sourceFor(channel).copyWith(allowDisplayModeChanges: false),
-      );
+      final source = sourceFor(channel).copyWith(allowDisplayModeChanges: false);
+      _sessionTimeshift = source.uri.contains('timeshift=1');
+      await orchestrator.open(source);
       if (identical(_orchestrator, orchestrator) ||
           identical(_lentOrchestrator, orchestrator)) {
         onOpened?.call(orchestrator);
+        _startHeartbeat(channel);
       }
     } on Object catch (_) {
       if (!identical(_orchestrator, orchestrator)) return;
@@ -239,7 +252,34 @@ class EpgPreviewPlayerController extends ChangeNotifier {
     });
   }
 
+  /// Mirrors PlayerScreen's heartbeat: fire once immediately so a warm buffer
+  /// is confirmed straight away, then every 2s while this preview holds the
+  /// channel. Failures are ignored - the full-screen player heartbeats too.
+  void _startHeartbeat(Channel channel) {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    final send = heartbeat;
+    if (send == null || !_sessionTimeshift) return;
+    final id = channel.id;
+
+    Future<void> beat() async {
+      try {
+        await send(id);
+      } on Object {
+        return;
+      }
+    }
+
+    unawaited(beat());
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      unawaited(beat());
+    });
+  }
+
   void _detach() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    _sessionTimeshift = false;
     _orchestrator = null;
     _channel = null;
     _state = null;

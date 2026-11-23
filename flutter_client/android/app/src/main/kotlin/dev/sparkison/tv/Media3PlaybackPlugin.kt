@@ -230,7 +230,21 @@ class Media3PlaybackPlugin(
                     result.success(null)
                 }
                 "seek" -> {
-                    requirePlayer(playerId).seekTo(call.longArgument("positionMs"))
+                    val posMs = call.longArgument("positionMs")
+                    val player = requirePlayer(playerId)
+                    val beforeMs = player.currentPosition
+                    val windowMs = effectiveDurationMs(player) ?: -1L
+                    android.util.Log.i(
+                        "SEEKDBG",
+                        "native-seek requestMs=$posMs beforePosMs=$beforeMs " +
+                            "windowDurMs=$windowMs playerDurMs=${player.duration}"
+                    )
+                    player.seekTo(posMs)
+                    android.util.Log.i(
+                        "SEEKDBG",
+                        "native-seek afterPosMs=${player.currentPosition} " +
+                            "windowDurMs=$windowMs"
+                    )
                     result.success(null)
                 }
                 "setAudioTrack" -> {
@@ -979,6 +993,19 @@ class Media3PlaybackPlugin(
         override fun onTimelineChanged(timeline: Timeline, reason: Int) {
             val player = states[playerId]?.player ?: return
             val dur = effectiveDurationMs(player) ?: return
+            val idx = player.currentMediaItemIndex
+            if (timeline.windowCount > 0 && idx != C.INDEX_UNSET) {
+                val w = timeline.getWindow(idx, Timeline.Window())
+                android.util.Log.i(
+                    "SEEKDBG",
+                    "window windowDurMs=${w.durationMs} " +
+                        "posInPeriodMs=${w.positionInFirstPeriodMs} " +
+                        "isSeekable=${w.isSeekable} isDynamic=${w.isDynamic} " +
+                        "playerPosMs=${player.currentPosition} " +
+                        "playerDurMs=${player.duration} " +
+                        "bufferedMs=${player.bufferedPosition} reason=$reason"
+                )
+            }
             emit(
                 playerId,
                 if (player.isPlaying) "playing" else "ready",

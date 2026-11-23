@@ -581,14 +581,34 @@ class AppStateController extends ChangeNotifier {
         serverBase: server,
       );
     }
-    final timeshiftSupported =
+    final timeshiftMode = viewSettingsService.timeshiftModeSync;
+    final timeshiftFeature =
         authNotifier.authResponse?.hasFeature('timeshift') ?? false;
-    if (type == 'live' &&
-        viewSettingsService.timeshiftModeSync &&
-        timeshiftSupported) {
+    AppLogBuffer.instance.add(
+      AppLogLevel.info,
+      'proxy-playback type=$type mode=$timeshiftMode feature=$timeshiftFeature '
+      'proxyEnabled=${proxyPlaybackSettings.enabled} '
+      'liveProfile=${proxyPlaybackSettings.liveProfileId} '
+      'before=${_diagnosticUrl(url)}',
+    );
+    if (type == 'live' && timeshiftMode && timeshiftFeature) {
       url = _appendTimeshiftParams(url, server);
     }
+    AppLogBuffer.instance.add(
+      AppLogLevel.info,
+      'proxy-playback result type=$type url=${_diagnosticUrl(url)}',
+    );
     return url;
+  }
+
+  String _diagnosticUrl(String value) {
+    final uri = Uri.tryParse(value);
+    if (uri == null) return '<invalid>';
+    final segments = uri.pathSegments;
+    final leaf = segments.isEmpty ? '' : segments.last;
+    final keys = uri.queryParameters.keys.join(',');
+    return '${uri.scheme}://${uri.host}/.../$leaf'
+        '${keys.isEmpty ? '' : '?keys=$keys'}';
   }
 
   /// Append `timeshift=1` to an editor live URL. External or non-/live/ URLs
@@ -606,8 +626,9 @@ class AppStateController extends ChangeNotifier {
     params['timeshift'] = '1';
     // Apple AVPlayer and web hls.js cannot play the raw MPEG-TS plain-live
     // fallback, so they ask the editor for the HLS window from the first
-    // request. Android/desktop/mpv instead ask for plain live (the buffer is
-    // still kicked off) and only switch to HLS when the viewer rewinds.
+    // request. Android/desktop ask for plain live (the buffer is still kicked
+    // off) and only switch to HLS when the viewer rewinds. Requesting HLS on a
+    // cold buffer can receive raw TS and fail ExoPlayer with "#EXTM3U".
     if (kIsWeb || defaultTargetPlatform == TargetPlatform.iOS) {
       params['timeshift_hls'] = '1';
     } else {
