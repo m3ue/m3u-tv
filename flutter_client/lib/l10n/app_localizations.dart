@@ -722,6 +722,30 @@ abstract class AppLocalizations {
   /// **'Start from Beginning'**
   String get playerStartFromBeginning;
 
+  /// No description provided for @playerWatchLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Watch Live'**
+  String get playerWatchLive;
+
+  /// No description provided for @dvrRecordingInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording in Progress'**
+  String get dvrRecordingInProgress;
+
+  /// No description provided for @dvrFinishing.
+  ///
+  /// In en, this message translates to:
+  /// **'Finishing recording…'**
+  String get dvrFinishing;
+
+  /// No description provided for @dvrStreamStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback of this recording stopped.'**
+  String get dvrStreamStopped;
+
   /// No description provided for @playerPlay.
   ///
   /// In en, this message translates to:

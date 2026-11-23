@@ -256,6 +256,7 @@ void main() {
           'startPositionMs': 12000,
           'isLive': false,
           'isCatchup': false,
+          'isGrowing': false,
           'userAgent': 'm3u-tv/windows-test',
           'headers': <String, String>{'Referer': 'https://provider.test'},
           'hdrEnabled': true,

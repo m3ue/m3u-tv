@@ -1642,6 +1642,9 @@ FlMethodResponse* Load(FlValue* args) {
     api.set_option_string(handle, "demuxer-lavf-o", "skip_estimate_duration_from_pts=1");
     api.set_option_string(handle, "stream-buffer-size", "4MiB");
   }
+  // An unfinished recording's playlist opens at its first segment: FFmpeg joins one near the
+  // end by default, and then maps seeks from there instead of from the start.
+  if (BoolArg(args, "isGrowing", false)) api.set_option_string(handle, "demuxer-lavf-o", "live_start_index=0");
   // The Deinterlace setting: `auto` filters only frames flagged interlaced.
   // The system libmpv may predate `auto` and reject it, which leaves mpv's
   // default (off) rather than failing the open.

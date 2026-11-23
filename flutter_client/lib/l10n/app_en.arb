@@ -242,6 +242,10 @@
     }
   },
   "playerStartFromBeginning": "Start from Beginning",
+  "playerWatchLive": "Watch Live",
+  "dvrRecordingInProgress": "Recording in Progress",
+  "dvrFinishing": "Finishing recording…",
+  "dvrStreamStopped": "Playback of this recording stopped.",
   "playerPlay": "Play",
   "playerResume": "Resume",
   "playerClearProgress": "Clear progress",

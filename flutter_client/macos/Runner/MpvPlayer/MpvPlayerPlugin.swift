@@ -57,6 +57,7 @@ final class MpvPlayerPlugin: NSObject, FlutterStreamHandler, MpvPlayerCoreDelega
           startPositionMs: (args["startPositionMs"] as? NSNumber)?.intValue ?? 0,
           isLive: args["isLive"] as? Bool ?? false,
           isCatchup: args["isCatchup"] as? Bool ?? false,
+          isGrowing: args["isGrowing"] as? Bool ?? false,
           userAgent: args["userAgent"] as? String,
           headers: args["headers"] as? [String: String],
           externalSubtitles: Self.parseExternalSubtitles(args["externalSubtitles"]),

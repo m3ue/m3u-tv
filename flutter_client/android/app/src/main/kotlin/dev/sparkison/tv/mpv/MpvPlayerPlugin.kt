@@ -124,6 +124,7 @@ class MpvPlayerPlugin(
                         startPositionMs = (args["startPositionMs"] as? Number)?.toInt() ?: 0,
                         isLive = args["isLive"] as? Boolean ?: false,
                         isCatchup = args["isCatchup"] as? Boolean ?: false,
+                        isGrowing = args["isGrowing"] as? Boolean ?: false,
                         userAgent = args["userAgent"] as? String,
                         headers = headers,
                         externalSubtitles = parseExternalSubtitles(args["externalSubtitles"]),

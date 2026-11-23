@@ -1175,6 +1175,9 @@ bool TryLoadGpuTexture(LibmpvApi& api, HWND hwnd,
     api.set_option_string(gpu_handle, "demuxer-lavf-o", "skip_estimate_duration_from_pts=1");
     api.set_option_string(gpu_handle, "stream-buffer-size", "4MiB");
   }
+  // An unfinished recording's playlist opens at its first segment: FFmpeg joins one near the
+  // end by default, and then maps seeks from there instead of from the start.
+  if (BoolArg(args, "isGrowing", false)) api.set_option_string(gpu_handle, "demuxer-lavf-o", "live_start_index=0");
   // The Deinterlace setting: `auto` filters only frames flagged interlaced.
   if (BoolArg(args, "deinterlace", false)) api.set_option_string(gpu_handle, "deinterlace", "auto");
   // A live stream arrives at 1x, so mpv's default of resuming a stall once 1 s is buffered
@@ -1445,6 +1448,9 @@ ProbeMap Load(const flutter::EncodableMap* args, HWND hwnd,
     api.set_option_string(handle, "demuxer-lavf-o", "skip_estimate_duration_from_pts=1");
     api.set_option_string(handle, "stream-buffer-size", "4MiB");
   }
+  // An unfinished recording's playlist opens at its first segment: FFmpeg joins one near the
+  // end by default, and then maps seeks from there instead of from the start.
+  if (BoolArg(args, "isGrowing", false)) api.set_option_string(handle, "demuxer-lavf-o", "live_start_index=0");
   if (BoolArg(args, "deinterlace", false)) api.set_option_string(handle, "deinterlace", "auto");
   // See the matching comment on the GPU-path handle above.
   if (BoolArg(args, "isLive", false)) {
