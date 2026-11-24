@@ -34,9 +34,17 @@
 
   <!-- Lets mkv_player.mjs and the @mediabunny/* audio extensions it loads
        share one Mediabunny instance (the extensions import "mediabunny" by
-       its bare name). Resolved against <base>, like the files themselves. -->
+       its bare name). Resolved against <base>, like the files themselves.
+       The AC-3 and AAC ones get it through mediabunny_coders.mjs, which also
+       records their coders for live_audio_filter.mjs. -->
   <script type="importmap">
-    { "imports": { "mediabunny": "./js/mediabunny.min.mjs" } }
+    {
+      "imports": { "mediabunny": "./js/mediabunny.min.mjs" },
+      "scopes": {
+        "./js/mediabunny-ac3.min.mjs": { "mediabunny": "./mediabunny_coders.mjs" },
+        "./js/mediabunny-aac-encoder.min.mjs": { "mediabunny": "./mediabunny_coders.mjs" }
+      }
+    }
   </script>
 </head>
 <body>

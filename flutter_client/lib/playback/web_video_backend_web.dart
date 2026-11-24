@@ -6,6 +6,7 @@ import 'dart:ui_web' as ui_web;
 import 'package:http/http.dart' as http;
 import 'package:m3u_tv/playback/playback_capabilities.dart';
 import 'package:m3u_tv/playback/player_adapter.dart';
+import 'package:m3u_tv/playback/web_stream_kind.dart';
 import 'package:web/web.dart' as web;
 
 PlayerAdapter createWebVideoBackend() => WebVideoBackend();
@@ -33,7 +34,10 @@ extension type _HlsErrorData._(JSObject _) implements JSObject {
 // --- mpegts.js interop (github.com/xqq/mpegts.js) ----------------------
 
 @JS('mpegts.createPlayer')
-external _JsMpegtsPlayer _mpegtsCreatePlayer(JSAny config);
+external _JsMpegtsPlayer _mpegtsCreatePlayer(
+  JSAny mediaDataSource, [
+  JSAny? config,
+]);
 
 @JS()
 extension type _JsMpegtsPlayer._(JSObject _) implements JSObject {
@@ -47,6 +51,16 @@ extension type _JsMpegtsPlayer._(JSObject _) implements JSObject {
 extension type _MpegtsFeatureList._(JSObject _) implements JSObject {
   external bool get mseLivePlayback;
 }
+
+@JS()
+extension type _MpegtsErrorInfo._(JSObject _) implements JSObject {
+  external int? get code;
+}
+
+// --- web/live_audio_filter.mjs interop (live AC-3/E-AC-3 -> AAC) ----------
+
+@JS('M3uLiveAudioFilter.loader')
+external JSAny get _liveAudioLoader;
 
 // --- web/mkv_player.mjs interop (Mediabunny MKV -> fragmented MP4) --------
 
@@ -112,6 +126,13 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
 
   static int _nextViewId = 0;
 
+  static const String _transcodeHint =
+      'An In-App Player Transcoding profile (Settings > Proxy in M3U '
+      'Editor) can convert it.';
+
+  /// DOMException's legacy code for NotSupportedError.
+  static const int _notSupportedErrorCode = 9;
+
   @override
   final String platformViewType;
 
@@ -171,20 +192,21 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
     _teardownActivePlayer();
 
     final uri = _withInAppPlayerParams(source.uri);
-    final contentType = await _probeContentType(uri);
+    final kind = await _probeStreamKind(uri, isLive: source.isLive);
     if (generation != _generation) return; // superseded by a newer load()
 
     try {
-      if (_looksLikeHls(contentType, uri)) {
-        await _loadHls(uri);
-      } else if (_looksLikeMpegTs(contentType, uri)) {
-        await _loadMpegTs(uri, isLive: source.isLive);
-      } else if (!source.isLive && _looksLikeMatroska(contentType, uri)) {
-        await _loadMkv(uri, source.startPosition, generation);
-      } else {
-        _setEngine('native <video>');
-        _video.src = uri.toString();
-        await _awaitNativeLoad(generation);
+      switch (kind) {
+        case WebStreamKind.hls:
+          await _loadHls(uri);
+        case WebStreamKind.mpegTs:
+          await _loadMpegTs(uri, isLive: source.isLive);
+        case WebStreamKind.matroska:
+          await _loadMkv(uri, source.startPosition, generation);
+        case WebStreamKind.native:
+          _setEngine('native <video>');
+          _video.src = uri.toString();
+          await _awaitNativeLoad(generation);
       }
     } on PlaybackException {
       rethrow;
@@ -207,8 +229,10 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
     // this backend has to start itself the same way. Safe to call this
     // unprompted: load() only ever runs as a result of the user picking
     // something to watch, so the browser's autoplay gesture requirement is
-    // already satisfied.
-    await play();
+    // already satisfied. Not awaited: the promise stays pending until frames
+    // arrive, and a load() stuck on it makes the orchestrator drop the error
+    // when its retry fails too, leaving an endless spinner.
+    unawaited(play());
   }
 
   @override
@@ -286,9 +310,7 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
     throw PlaybackException(
       message: isNetworkError
           ? "The video couldn't be loaded from the server."
-          : "This browser can't play this video format. An In-App Player "
-                'Transcoding profile (Settings > Proxy in M3U Editor) can '
-                'convert it.',
+          : "This browser can't play this video format. $_transcodeHint",
       backend: PlaybackBackend.webVideo,
       code: isNetworkError ? 'web_video_network' : 'web_video_unsupported',
       recoverable: true,
@@ -304,32 +326,34 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
 
   // --- Format probing -----------------------------------------------------
 
-  /// Resolves [uri]'s `Content-Type` by reading only the response headers,
-  /// then cancelling the body -- avoids buffering a live stream's unbounded
-  /// body just to learn its format. Empty when the request itself fails;
-  /// the caller falls through to native `<video>` playback, which will
-  /// surface its own error if the URL genuinely doesn't work.
-  Future<String> _probeContentType(Uri uri) async {
+  /// Resolves [uri]'s format by reading only the response headers, then
+  /// cancelling the body -- avoids buffering a live stream's unbounded body
+  /// just to learn its format. A failed request falls back to [uri]'s
+  /// extension; the chosen player surfaces its own error if the URL genuinely
+  /// doesn't work.
+  Future<WebStreamKind> _probeStreamKind(
+    Uri uri, {
+    required bool isLive,
+  }) async {
+    var contentType = '';
+    Uri? resolvedUri;
     try {
       final streamed = await _probeClient.send(http.Request('GET', uri));
-      final contentType = (streamed.headers['content-type'] ?? '')
-          .toLowerCase();
+      contentType = streamed.headers['content-type'] ?? '';
+      if (streamed case http.BaseResponseWithUrl(:final url)) {
+        resolvedUri = url;
+      }
       unawaited(streamed.stream.listen((_) {}).cancel());
-      return contentType;
     } on Object {
-      return '';
+      // Falls back to the requested URL.
     }
+    return webStreamKind(
+      contentType: contentType,
+      requestedUri: uri,
+      resolvedUri: resolvedUri,
+      isLive: isLive,
+    );
   }
-
-  bool _looksLikeHls(String contentType, Uri uri) =>
-      contentType.contains('mpegurl') || uri.path.endsWith('.m3u8');
-
-  bool _looksLikeMpegTs(String contentType, Uri uri) =>
-      contentType.contains('mp2t') || uri.path.endsWith('.ts');
-
-  bool _looksLikeMatroska(String contentType, Uri uri) =>
-      contentType.contains('matroska') ||
-      uri.path.toLowerCase().endsWith('.mkv');
 
   Uri _withInAppPlayerParams(String rawUri) {
     final parsed = Uri.parse(rawUri);
@@ -420,17 +444,14 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
   }
 
   PlaybackException _mkvException(_JsMkvError error) {
-    const transcodeHint =
-        'An In-App Player Transcoding profile (Settings > Proxy in M3U '
-        'Editor) can convert it.';
     final detail = error.message ?? '';
     final message = switch (error.code) {
       'unsupported_audio' =>
         "This video's audio ($detail) can't play in this browser. "
-            '$transcodeHint',
+            '$_transcodeHint',
       'unsupported_video' =>
         "This video's format ($detail) can't play in this browser. "
-            '$transcodeHint',
+            '$_transcodeHint',
       'no_video' => 'This MKV file has no video track.',
       'unreadable' =>
         "The server didn't return a playable video file. The provider may be "
@@ -484,40 +505,116 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
 
   // --- mpegts.js --------------------------------------------------------
 
-  Future<void> _loadMpegTs(Uri uri, {required bool isLive}) async {
+  /// [convertAudio] rewrites AC-3/E-AC-3 audio to AAC on its way into
+  /// mpegts.js (web/live_audio_filter.mjs). Only used once the browser has
+  /// turned the stream's own audio down, see [_onMpegtsError].
+  Future<void> _loadMpegTs(
+    Uri uri, {
+    required bool isLive,
+    bool convertAudio = false,
+  }) async {
+    final generation = _generation;
     await _ensureScriptLoaded(_mpegtsScriptUrl, globalName: 'mpegts');
+    if (convertAudio) {
+      await _ensureScriptLoaded(
+        _liveAudioFilterScriptUrl,
+        globalName: 'M3uLiveAudioFilter',
+        isModule: true,
+      );
+    }
+    if (generation != _generation) return;
     if (!_mpegtsGetFeatureList().mseLivePlayback) {
       _setEngine('native <video>');
       _video.src = uri.toString();
       return;
     }
-    final player = _mpegtsCreatePlayer(
-      <String, Object?>{
-        'type': 'mpegts',
-        'url': uri.toString(),
-        'isLive': isLive,
-        'enableWorker': true,
-        'cors': true,
-        'liveBufferLatencyChasing': false,
-      }.jsify()!,
-    );
+    final source = <String, Object?>{
+      'type': 'mpegts',
+      'url': uri.toString(),
+      'isLive': isLive,
+      'enableWorker': true,
+      'cors': true,
+      'liveBufferLatencyChasing': false,
+    }.jsify()!;
+    final _JsMpegtsPlayer player;
+    if (convertAudio) {
+      final config = JSObject()
+        ..['enableWorker'] = false.toJS
+        ..['lazyLoad'] = false.toJS
+        ..['customLoader'] = _liveAudioLoader;
+      player = _mpegtsCreatePlayer(source, config);
+    } else {
+      player = _mpegtsCreatePlayer(source);
+    }
     _mpegts = player;
-    _setEngine('mpegts.js');
+    _setEngine(convertAudio ? 'mpegts.js: AC-3 to AAC' : 'mpegts.js');
     player
-      ..on('error', _onMpegtsError.toJS)
+      ..on(
+        'error',
+        (JSString type, JSString details, JSAny? info) {
+          if (generation != _generation || !identical(_mpegts, player)) return;
+          _onMpegtsError(
+            type.toDart,
+            details.toDart,
+            info,
+            uri: uri,
+            canConvertAudio: isLive && !convertAudio,
+          );
+        }.toJS,
+      )
       ..attachMediaElement(_video)
       ..load();
   }
 
-  void _onMpegtsError(JSString type, JSString details, JSAny? info) {
+  void _onMpegtsError(
+    String type,
+    String details,
+    JSAny? info, {
+    required Uri uri,
+    required bool canConvertAudio,
+  }) {
+    // The browser turned a track's codec down. That doesn't say which one
+    // (Firefox leaves it out), but AC-3 audio is the usual reason.
+    final isUnsupportedCodec =
+        details == 'MediaMSEError' &&
+        (info as _MpegtsErrorInfo?)?.code == _notSupportedErrorCode;
+    if (isUnsupportedCodec && canConvertAudio) {
+      unawaited(_restartWithConvertedAudio(uri));
+      return;
+    }
     _errorController.add(
       PlaybackError(
         backend: PlaybackBackend.webVideo,
-        message: 'MPEG-TS playback failed: ${type.toDart}: ${details.toDart}',
-        code: 'mpegts_error',
+        message: isUnsupportedCodec
+            ? "This browser can't play this channel's format. $_transcodeHint"
+            : 'MPEG-TS playback failed: $type: $details',
+        code: isUnsupportedCodec ? 'web_video_unsupported' : 'mpegts_error',
         recoverable: true,
       ),
     );
+  }
+
+  Future<void> _restartWithConvertedAudio(Uri uri) async {
+    final generation = _generation;
+    // mpegts.js is still inside the error event it reported this from.
+    await Future<void>.delayed(Duration.zero);
+    if (generation != _generation) return;
+    _teardownActivePlayer();
+    try {
+      await _loadMpegTs(uri, isLive: true, convertAudio: true);
+    } on Object catch (error) {
+      if (generation != _generation) return;
+      _errorController.add(
+        PlaybackError(
+          backend: PlaybackBackend.webVideo,
+          message: 'Audio conversion failed: $error',
+          code: 'web_video_load_failed',
+          recoverable: true,
+        ),
+      );
+      return;
+    }
+    if (generation == _generation) unawaited(play());
   }
 
   void _teardownActivePlayer() {
@@ -610,6 +707,7 @@ class WebVideoBackend implements PlayerAdapter, HtmlViewProvider {
 
 String get _hlsScriptUrl => _assetUrl('js/hls.min.js');
 String get _mpegtsScriptUrl => _assetUrl('js/mpegts.min.js');
+String get _liveAudioFilterScriptUrl => _assetUrl('live_audio_filter.mjs');
 String get _mkvScriptUrl => _assetUrl('mkv_player.mjs');
 
 String _assetUrl(String name) =>
