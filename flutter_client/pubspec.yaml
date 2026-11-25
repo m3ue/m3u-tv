@@ -28,12 +28,12 @@ dependencies:
   flutter_secure_storage: ^11.1.1
   flutter_secure_storage_tvos:
     path: packages/flutter_secure_storage_tvos
-  flutter_svg: ^2.4.0
+  flutter_svg: ^2.5.0
   go_router: ^18.1.4
   http: ^1.2.0
   intl: ^0.20.2
   material_ui: ^1.7.0
-  palette_generator_master: ^1.1.0
+  palette_generator_master: ^1.2.0
   path: ^1.9.0
   path_provider: ^2.1.0
   path_provider_tvos: ^0.0.3
