@@ -131,7 +131,12 @@ class _ContinueWatchingScreenState extends State<ContinueWatchingScreen> {
                   // quickly - same guard MediaPreviewSection uses.
                   : ExcludeSemantics(
                       child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                        padding: EdgeInsets.fromLTRB(
+                          24,
+                          0,
+                          24,
+                          24 + MediaQuery.paddingOf(context).bottom,
+                        ),
                         child: Wrap(
                           spacing: MediaBrowsingMetrics.itemGap,
                           runSpacing: MediaBrowsingMetrics.itemGap,

@@ -698,7 +698,10 @@ class _AIOStreamsStreamPickerSheetState
                   }
 
                   return ListView.separated(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: EdgeInsets.only(
+                      top: 8,
+                      bottom: 8 + MediaQuery.paddingOf(context).bottom,
+                    ),
                     shrinkWrap: true,
                     itemCount: streams.length,
                     separatorBuilder: (_, _) =>

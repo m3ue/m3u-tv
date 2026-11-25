@@ -883,7 +883,12 @@ Future<void> showEpgProgramDetailsSheet(
           maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.85,
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            0,
+            20,
+            24 + MediaQuery.paddingOf(sheetContext).bottom,
+          ),
           child: Column(
             key: const ValueKey('epg-program-details-sheet'),
             crossAxisAlignment: CrossAxisAlignment.stretch,

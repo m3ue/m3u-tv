@@ -338,6 +338,13 @@ class _AIOStreamsCatalogScreenState extends State<AIOStreamsCatalogScreen> {
                   ),
                 ),
               ),
+            // The bottom nav is hidden on this page, so nothing else clears
+            // the system navigation bar.
+            SliverPadding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.paddingOf(context).bottom,
+              ),
+            ),
           ],
         ),
       ),

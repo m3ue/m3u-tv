@@ -4,7 +4,6 @@ import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.util.DisplayMetrics
@@ -71,7 +70,7 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Applied again per-route once Dart boots (applySystemUiPolicy), but
-        // decorFitsSystemWindows must be set before the first frame too, or
+        // edge-to-edge must be set up before the first frame too, or
         // Android 15's mandatory edge-to-edge enforcement letterboxes the
         // launch theme behind the (still opaque) system bars for one frame.
         applySystemUiPolicy("browsing")
@@ -213,17 +212,18 @@ class MainActivity : FlutterActivity() {
 
     private fun applySystemUiPolicy(route: String) {
         isPlayerRouteActive = route == "player"
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        // Android 15+ (API 35) enforces edge-to-edge unconditionally and
-        // deprecates these setters/flags in favor of just leaving the system
-        // bars to draw over content; only needed below that for a transparent
-        // bar instead of the platform's default scrim.
-        if (Build.VERSION.SDK_INT < 35) {
-            window.statusBarColor = Color.TRANSPARENT
-            window.navigationBarColor = Color.TRANSPARENT
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        // Transparent bars with content drawn behind them, on every API level.
+        // Android 15+ (API 35) enforces this anyway; older versions need the
+        // call.
+        WindowCompat.enableEdgeToEdge(window)
+        // Drop the platform's translucent scrim. The navigation bar one still
+        // applies on Android 15+ with 3-button navigation; the status bar
+        // setter is deprecated and has no effect there.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+            if (Build.VERSION.SDK_INT < 35) {
+                @Suppress("DEPRECATION")
                 window.isStatusBarContrastEnforced = false
-                window.isNavigationBarContrastEnforced = false
             }
         }
 

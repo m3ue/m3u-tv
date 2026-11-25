@@ -32,9 +32,19 @@ bool isCompactSettingsLayout(BuildContext context) =>
     MediaQuery.sizeOf(context).width < kSettingsCompactWidth;
 
 /// The outer padding of a settings page: 24 on wide screens, 16 on phones.
-EdgeInsets settingsPagePadding(BuildContext context) => EdgeInsets.all(
-  isCompactSettingsLayout(context) ? _kCompactSubpagePadding : _kSubpagePadding,
-);
+/// Includes the bottom system inset (navigation bar, home indicator), so the
+/// last row can scroll clear of it.
+EdgeInsets settingsPagePadding(BuildContext context) {
+  final padding = isCompactSettingsLayout(context)
+      ? _kCompactSubpagePadding
+      : _kSubpagePadding;
+  return EdgeInsets.fromLTRB(
+    padding,
+    padding,
+    padding,
+    padding + MediaQuery.paddingOf(context).bottom,
+  );
+}
 
 /// tvOS reports its overscan-safe area as real MediaQuery padding on every
 /// edge. Settings sub-pages are pushed on the root Navigator, outside
@@ -562,9 +572,20 @@ Widget _settingsSubpageScaffold(
       leadingInset: macInset,
       onBack: () => Navigator.of(context, rootNavigator: true).pop(),
     ),
-    body: padBody
-        ? Padding(padding: settingsPagePadding(context), child: body)
-        : body,
+    // A [padBody] body is fixed inside the insets; otherwise its scroll views
+    // run behind the navigation bar (see [settingsPagePadding]).
+    body: SafeArea(
+      top: false,
+      bottom: padBody,
+      child: padBody
+          ? Builder(
+              builder: (context) => Padding(
+                padding: settingsPagePadding(context),
+                child: body,
+              ),
+            )
+          : body,
+    ),
   );
 }
 

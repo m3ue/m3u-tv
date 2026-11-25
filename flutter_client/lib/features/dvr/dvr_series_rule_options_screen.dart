@@ -55,7 +55,7 @@ Widget _topLevelSafeArea(Widget screen) => Builder(
           removeRight: true,
           child: screen,
         )
-      : screen,
+      : SafeArea(top: false, bottom: false, child: screen),
 );
 
 /// Opens the series-rule options screen and returns the picked
@@ -274,7 +274,9 @@ class _DvrSeriesRuleOptionsScreenState
         onBack: () => Navigator.of(context).pop(),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
+        padding:
+            const EdgeInsets.all(MediaBrowsingMetrics.pagePadding) +
+            EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

@@ -402,7 +402,9 @@ class _ShowDetailScreenState extends ConsumerState<ShowDetailScreen> {
         onBack: () => context.pop(),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
+        padding:
+            const EdgeInsets.all(MediaBrowsingMetrics.pagePadding) +
+            EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

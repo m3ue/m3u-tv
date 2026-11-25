@@ -233,9 +233,11 @@ class _SportsTeamsScreenState extends ConsumerState<SportsTeamsScreen> {
                 }
               },
               child: ScrollbarGridView(
-                padding: const EdgeInsets.all(
-                  MediaBrowsingMetrics.pagePadding,
-                ),
+                padding:
+                    const EdgeInsets.all(MediaBrowsingMetrics.pagePadding) +
+                    EdgeInsets.only(
+                      bottom: MediaQuery.paddingOf(context).bottom,
+                    ),
                 gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: 200 * scale,
                   mainAxisExtent: 150 * scale,
@@ -269,9 +271,13 @@ class _SportsTeamsScreenState extends ConsumerState<SportsTeamsScreen> {
             : 0.0,
         onBack: () => Navigator.of(context).maybePop(),
       ),
-      body: useSidebarLayout
-          ? Row(children: [nav, content])
-          : Column(children: [nav, content]),
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: useSidebarLayout
+            ? Row(children: [nav, content])
+            : Column(children: [nav, content]),
+      ),
     );
   }
 }

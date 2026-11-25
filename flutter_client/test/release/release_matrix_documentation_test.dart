@@ -947,7 +947,7 @@ void main() {
     expect(systemUiPolicy, contains('m3u_tv/system_ui'));
     expect(mainActivity, contains('m3u_tv/system_ui'));
     // Native implementation must cover both show and hide paths.
-    expect(mainActivity, contains('WindowCompat.setDecorFitsSystemWindows'));
+    expect(mainActivity, contains('WindowCompat.enableEdgeToEdge(window)'));
     expect(mainActivity, contains('WindowInsetsCompat.Type.systemBars()'));
     expect(mainActivity, contains('insetsController.show(systemBars)'));
     expect(mainActivity, contains('insetsController.hide(systemBars)'));

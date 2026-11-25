@@ -162,6 +162,8 @@ tasks.matching { it.name.startsWith("merge") && it.name.endsWith("JniLibFolders"
 }
 
 dependencies {
+    // WindowCompat.enableEdgeToEdge (MainActivity) needs 1.17+.
+    implementation("androidx.core:core:1.17.0")
     implementation("androidx.lifecycle:lifecycle-process:$lifecycleVersion")
     implementation("androidx.media3:media3-exoplayer:$media3Version")
     implementation("androidx.media3:media3-exoplayer-dash:$media3Version")

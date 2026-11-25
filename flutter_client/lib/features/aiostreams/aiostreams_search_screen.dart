@@ -251,7 +251,9 @@ class _AIOStreamsSearchScreenState extends State<AIOStreamsSearchScreen>
     // VodScreen / SeriesScreen): cards up to 220 wide at a 0.6 aspect ratio,
     // rendered with the shared MediaPreviewCard.
     return GridView.builder(
-      padding: const EdgeInsets.all(MediaBrowsingMetrics.contentPadding),
+      padding:
+          const EdgeInsets.all(MediaBrowsingMetrics.contentPadding) +
+          EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 220,
         mainAxisSpacing: MediaBrowsingMetrics.itemGap,
