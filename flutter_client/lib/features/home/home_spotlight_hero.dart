@@ -185,7 +185,20 @@ class _DockedRowsState extends State<_DockedRows> {
     final column = _columnKey.currentContext?.findRenderObject();
     if (column is! RenderBox || !column.hasSize) return 0;
     final content = column.size.height + _padding.vertical;
-    return (content - _viewportHeight).clamp(0.0, double.infinity);
+    final contentOverflow = content - _viewportHeight;
+    // A short last row would otherwise stop below the fade band, leaving the
+    // row above it peeking out under the hero; let it dock like the others.
+    var lastRowTop = 0.0;
+    for (final key in _rowKeys.reversed) {
+      final row = key.currentContext?.findRenderObject();
+      if (row is! RenderBox || !row.hasSize || row.size.height == 0) continue;
+      lastRowTop = row.localToGlobal(Offset.zero, ancestor: column).dy;
+      break;
+    }
+    return (contentOverflow > lastRowTop ? contentOverflow : lastRowTop).clamp(
+      0.0,
+      double.infinity,
+    );
   }
 
   void _setOffset(double offset, Duration duration) {
