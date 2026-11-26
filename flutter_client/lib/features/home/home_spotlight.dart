@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart' show IconData;
 
 import 'package:m3u_tv/features/sports/sports_fixture_card.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
+import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/shared/formatters.dart';
@@ -57,8 +58,21 @@ class ProgressSpotlightTarget extends HomeSpotlightTarget {
 
   @override
   String get key =>
-      'progress:${progress.contentType.name}:${progress.streamId}'
+      'progress:${progress.contentType.name}'
+      ':${progress.contentType == ContentType.aiostreams ? progress.aioItemId : progress.streamId}'
       ':${progress.upNext}';
+}
+
+/// A movie or series from an AIOStreams catalog. The catalog's own meta
+/// carries the art and plot, so it needs no extra fetch.
+class AioStreamsSpotlightTarget extends HomeSpotlightTarget {
+  const AioStreamsSpotlightTarget(this.item, {required this.integrationId});
+
+  final AIOStreamsItem item;
+  final int integrationId;
+
+  @override
+  String get key => 'aio:$integrationId:${item.type}:${item.id}';
 }
 
 /// A game in Home's Sports row, with the channels that carry it.
@@ -457,6 +471,27 @@ HomeSpotlight resolveHomeSpotlight(
     case SportsSpotlightTarget():
       return _sportsSpotlight(target, format);
 
+    case AioStreamsSpotlightTarget(:final item):
+      final backdrop = nullIfBlank(item.background);
+      return HomeSpotlight(
+        key: target.key,
+        title: item.name,
+        clearLogoUrl: nullIfBlank(item.clearLogoUrl),
+        backdropUrl: backdrop,
+        toneUrl: backdrop ?? nullIfBlank(item.poster),
+        chips: [
+          if (nullIfBlank(item.year) case final year?) MetaChipData.year(year),
+          for (final genre in item.genres.take(2))
+            if (nullIfBlank(genre) case final genre?) MetaChipData.genre(genre),
+          ?MetaChipData.runtimeText(item.runtime),
+          ?MetaChipData.ratingText(item.imdbRating),
+        ],
+        plot: nullIfBlank(item.description),
+        playLength: item.type == 'series'
+            ? null
+            : parseRuntimeText(item.runtime),
+      );
+
     case StaticSpotlightTarget():
       final artwork = target.artworkUrls
           .map(nullIfBlank)
@@ -619,7 +654,13 @@ HomeSpotlight _progressSpotlight(
   final genre = nullIfBlank(progress.genre);
   final rating = nullIfBlank(progress.rating);
 
-  if (progress.contentType == ContentType.episode) {
+  // AIOStreams progress has its own content type; an entry with a season
+  // is an episode.
+  final isEpisode =
+      progress.contentType == ContentType.episode ||
+      (progress.contentType == ContentType.aiostreams &&
+          progress.seasonNumber != null);
+  if (isEpisode) {
     final series = progress.seriesId == null
         ? null
         : enricher.series(progress.seriesId!);

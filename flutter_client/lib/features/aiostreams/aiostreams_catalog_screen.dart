@@ -2,12 +2,15 @@ import 'dart:async';
 
 import 'package:dpad/dpad.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_detail_screen.dart';
+import 'package:m3u_tv/features/home/home_spotlight.dart';
+import 'package:m3u_tv/features/home/home_spotlight_hero.dart';
 import 'package:m3u_tv/features/player/resume_modal.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/aiostreams_api_service.dart';
 import 'package:m3u_tv/services/aiostreams_favorites_service.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_icons.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
@@ -406,6 +409,7 @@ class AIOStreamsHomeScreen extends StatefulWidget {
     this.onSidebarActivate,
     this.onSetWatchState,
     this.useSidebarLayout = false,
+    this.viewSettingsService,
   });
 
   final List<AIOStreamsIntegration> integrations;
@@ -432,13 +436,22 @@ class AIOStreamsHomeScreen extends StatefulWidget {
   /// Home screen's rows (see [MediaPreviewSection.useSidebarLayout]).
   final bool useSidebarLayout;
 
+  /// Source of the Home screen style. In the sidebar layout the Spotlight
+  /// style gives this tab the same hero as Home; null keeps the plain list.
+  final ViewSettingsService? viewSettingsService;
+
   @override
   State<AIOStreamsHomeScreen> createState() => _AIOStreamsHomeScreenState();
 }
 
 class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
   final ScrollController _scrollController = ScrollController();
+  final HomeSpotlightController _spotlight = HomeSpotlightController();
+
+  /// Catalog metas already carry the art and plot, so nothing is fetched.
+  final HomeSpotlightEnricher _enricher = HomeSpotlightEnricher();
   List<AIOStreamsFavoriteItem> _favorites = const [];
+  late HomeScreenStyle _style;
 
   Set<String> get _favoriteIds => _favorites.map((f) => f.id).toSet();
 
@@ -451,6 +464,13 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
     super.initState();
     widget.favoritesService?.addListener(_onFavoritesChanged);
     unawaited(_loadFavorites());
+    _style =
+        widget.viewSettingsService?.homeScreenStyleCached ??
+        (widget.viewSettingsService == null
+            ? HomeScreenStyle.simplified
+            : HomeScreenStyle.rich);
+    widget.viewSettingsService?.addListener(_onViewSettingsChanged);
+    unawaited(_loadStyle());
   }
 
   @override
@@ -461,13 +481,33 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
       widget.favoritesService?.addListener(_onFavoritesChanged);
       unawaited(_loadFavorites());
     }
+    if (old.viewSettingsService != widget.viewSettingsService) {
+      old.viewSettingsService?.removeListener(_onViewSettingsChanged);
+      widget.viewSettingsService?.addListener(_onViewSettingsChanged);
+      unawaited(_loadStyle());
+    }
   }
 
   @override
   void dispose() {
     widget.favoritesService?.removeListener(_onFavoritesChanged);
+    widget.viewSettingsService?.removeListener(_onViewSettingsChanged);
     _scrollController.dispose();
+    _spotlight.dispose();
     super.dispose();
+  }
+
+  void _onViewSettingsChanged() => unawaited(_loadStyle());
+
+  Future<void> _loadStyle() async {
+    final service = widget.viewSettingsService;
+    if (service == null) return;
+    final style = await service.homeScreenStyle();
+    if (!mounted || style == _style) return;
+    // The rows remount under the new layout; without this the hero would
+    // describe whatever was focused before the switch until focus moves.
+    _spotlight.reset();
+    setState(() => _style = style);
   }
 
   void _onFavoritesChanged() => unawaited(_loadFavorites());
@@ -628,7 +668,58 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
     final continueWatching = widget.progressList
         .where((p) => p.aioItemId != null && isContinueWatchingEligible(p))
         .toList(growable: false);
-    final rows = _buildRows(context, l, continueWatching);
+    // The spotlight follows D-pad/mouse focus, so touch layouts always get
+    // the plain list.
+    final rich =
+        widget.useSidebarLayout &&
+        widget.viewSettingsService != null &&
+        _style == HomeScreenStyle.rich;
+    final spotlight = rich ? _spotlight : null;
+    final rows = _buildRows(context, l, continueWatching, spotlight);
+    final searchEntry = _hasSearchableCatalog
+        // Its own region: in the page's region, Down would find nothing
+        // there (each row is a nested region), so dpad would scroll the page
+        // most of a viewport looking for more before settling on the top row.
+        ? DpadRegion(
+            horizontalEdge: DpadEdgeBehavior.stop,
+            onEdge: (direction) {
+              if (direction == TraversalDirection.left) {
+                widget.onSidebarActivate?.call();
+              }
+            },
+            child: _AIOStreamsSearchEntry(
+              hintText: l.aiostreamsSearchHint,
+              onTap: widget.onSearchSelect,
+            ),
+          )
+        : null;
+
+    if (rich) {
+      return Scaffold(
+        body: DpadRegion(
+          horizontalEdge: DpadEdgeBehavior.stop,
+          onEdge: (direction) {
+            if (direction == TraversalDirection.left) {
+              widget.onSidebarActivate?.call();
+            }
+          },
+          child: RichHomeLayout(
+            controller: _spotlight,
+            enricher: _enricher,
+            rows: [
+              if (searchEntry != null)
+                Padding(
+                  padding: const EdgeInsets.only(
+                    bottom: MediaBrowsingMetrics.pagePadding,
+                  ),
+                  child: searchEntry,
+                ),
+              ...rows,
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       body: DpadRegion(
@@ -642,23 +733,8 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
           controller: _scrollController,
           padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
           children: [
-            if (_hasSearchableCatalog) ...[
-              // Its own region: in the page's region, Down would find
-              // nothing there (each row is a nested region), so dpad would
-              // scroll the page most of a viewport looking for more before
-              // settling on the top row.
-              DpadRegion(
-                horizontalEdge: DpadEdgeBehavior.stop,
-                onEdge: (direction) {
-                  if (direction == TraversalDirection.left) {
-                    widget.onSidebarActivate?.call();
-                  }
-                },
-                child: _AIOStreamsSearchEntry(
-                  hintText: l.aiostreamsSearchHint,
-                  onTap: widget.onSearchSelect,
-                ),
-              ),
+            if (searchEntry != null) ...[
+              searchEntry,
               const SizedBox(height: MediaBrowsingMetrics.pagePadding),
             ],
             for (final (index, row) in rows.indexed)
@@ -681,6 +757,7 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
     BuildContext context,
     AppLocalizations l,
     List<Progress> continueWatching,
+    HomeSpotlightController? spotlight,
   ) {
     return [
       // Continue Watching row (landscape style to match home screen)
@@ -728,6 +805,12 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
                     integrationId: integrationId,
                     isSeries: isSeries,
                   ),
+                  onFocused: spotlight == null
+                      ? null
+                      : () => spotlight.select(ProgressSpotlightTarget(p)),
+                  onHoverChanged: spotlight?.hoverHandler(
+                    ProgressSpotlightTarget(p),
+                  ),
                   onLongTap: widget.favoritesService == null
                       ? null
                       : () => unawaited(
@@ -755,8 +838,17 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
           posterStyle: true,
           useSidebarLayout: widget.useSidebarLayout,
           items: _favorites
-              .map(
-                (fav) => MediaPreviewItem(
+              .map((fav) {
+                final target = AioStreamsSpotlightTarget(
+                  AIOStreamsItem(
+                    id: fav.id,
+                    type: fav.type,
+                    name: fav.name,
+                    poster: fav.poster,
+                  ),
+                  integrationId: fav.integrationId,
+                );
+                return MediaPreviewItem(
                   title: fav.name,
                   imageUrl: fav.poster,
                   subtitle: fav.type,
@@ -785,8 +877,12 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
                             ),
                           ),
                         ),
-                ),
-              )
+                  onFocused: spotlight == null
+                      ? null
+                      : () => spotlight.select(target),
+                  onHoverChanged: spotlight?.hoverHandler(target),
+                );
+              })
               .toList(growable: false),
           onSidebarActivate: widget.onSidebarActivate,
         ),
@@ -801,6 +897,7 @@ class _AIOStreamsHomeScreenState extends State<AIOStreamsHomeScreen> {
             favoritesService: widget.favoritesService,
             favoriteIds: _favoriteIds,
             useSidebarLayout: widget.useSidebarLayout,
+            spotlight: spotlight,
             onItemSelect: (item) => widget.onItemSelect(item, integration.id),
             onViewAll: widget.onCatalogSelect == null
                 ? null
@@ -824,6 +921,7 @@ class AIOStreamsCatalogRow extends StatefulWidget {
     this.favoriteIds = const {},
     this.onSidebarActivate,
     this.useSidebarLayout = false,
+    this.spotlight,
   });
 
   final AIOStreamsCatalog catalog;
@@ -838,6 +936,9 @@ class AIOStreamsCatalogRow extends StatefulWidget {
   final Set<String> favoriteIds;
   final VoidCallback? onSidebarActivate;
   final bool useSidebarLayout;
+
+  /// The tab's spotlight in its rich layout; null in the plain list.
+  final HomeSpotlightController? spotlight;
 
   @override
   State<AIOStreamsCatalogRow> createState() => _AIOStreamsCatalogRowState();
@@ -859,8 +960,20 @@ class _AIOStreamsCatalogRowState extends State<AIOStreamsCatalogRow> {
       builder: (context, snapshot) {
         final items = snapshot.data ?? const [];
         final onViewAll = widget.onViewAll;
+        final spotlight = widget.spotlight;
+        final title = _catalogDisplayTitle(l, widget.catalog);
+        final viewAllTarget = StaticSpotlightTarget(
+          id:
+              'aio-view-all-${widget.integrationId}-${widget.catalog.type}'
+              '-${widget.catalog.id}',
+          title: title,
+          description: l.homeBrowseCategory(title),
+          kicker: l.homeViewAll,
+          icon: _catalogTypeIcon(widget.catalog),
+          artworkUrls: [for (final item in items) ?item.poster],
+        );
         return MediaPreviewSection(
-          title: _catalogDisplayTitle(l, widget.catalog),
+          title: title,
           titleIcon: _catalogTypeIcon(widget.catalog),
           emptyLabel: AppLocalizations.of(context).aiostrreamsCatalogEmpty,
           posterStyle: true,
@@ -872,6 +985,10 @@ class _AIOStreamsCatalogRowState extends State<AIOStreamsCatalogRow> {
                   title: l.homeViewAll,
                   fallbackIcon: Icons.arrow_forward,
                   onTap: onViewAll,
+                  onFocused: spotlight == null
+                      ? null
+                      : () => spotlight.select(viewAllTarget),
+                  onHoverChanged: spotlight?.hoverHandler(viewAllTarget),
                 ),
           items: items
               .take(MediaPreviewSection.maxVisibleItems)
@@ -884,6 +1001,20 @@ class _AIOStreamsCatalogRowState extends State<AIOStreamsCatalogRow> {
                   fallbackTitle: item.name,
                   isFavorite: widget.favoriteIds.contains(item.id),
                   onTap: () => widget.onItemSelect(item),
+                  onFocused: spotlight == null
+                      ? null
+                      : () => spotlight.select(
+                          AioStreamsSpotlightTarget(
+                            item,
+                            integrationId: widget.integrationId,
+                          ),
+                        ),
+                  onHoverChanged: spotlight?.hoverHandler(
+                    AioStreamsSpotlightTarget(
+                      item,
+                      integrationId: widget.integrationId,
+                    ),
+                  ),
                   onLongTap: widget.favoritesService == null
                       ? null
                       : () => unawaited(

@@ -2106,6 +2106,7 @@ class AppShellState extends ConsumerState<AppShell>
           progressList: _appState.progressList,
           onSidebarActivate: _activateSidebar,
           useSidebarLayout: shouldUseSidebar(widget.deviceType),
+          viewSettingsService: _appState.viewSettingsService,
           onSetWatchState: (progress, {required watched}) => _setWatchState(
             progress,
             watched: watched,
