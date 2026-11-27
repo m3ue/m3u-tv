@@ -251,6 +251,7 @@ That's the same script CI and the release workflow run. It needs an **Ubuntu 24.
 sudo apt-get install clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
   libwayland-dev libegl-dev libsecret-1-dev libjsoncpp-dev libx11-dev libxi-dev \
   gsettings-desktop-schemas zstd imagemagick zsync desktop-file-utils \
+  libmujs3 liblua5.2-0 libdisplay-info1 libva-wayland2 dconf-gsettings-backend \
   flatpak flatpak-builder
 flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak install --user flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08

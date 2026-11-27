@@ -70,7 +70,8 @@ def resolve(bundle: Path) -> tuple[dict[str, str], list[str], str]:
                 continue
             if target.startswith("not found"):
                 if obj.name not in UNLOADED_ON_LINUX:
-                    errors.append(f"{obj.relative_to(bundle)} needs {name}, which resolves nowhere")
+                    errors.append(f"{obj.relative_to(bundle)} needs {name}, which resolves nowhere "
+                                  "(install it on the build host so bundle-libs.sh can copy it)")
                 continue
             path = target.split(" (")[0]
             if not path.startswith("/") or path.startswith(lib_dir + "/"):

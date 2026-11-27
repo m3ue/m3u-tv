@@ -565,6 +565,7 @@ jobs:
             libgtk-3-dev liblzma-dev libwayland-dev libegl-dev \
             libsecret-1-dev libjsoncpp-dev libx11-dev libxi-dev \
             gsettings-desktop-schemas zstd imagemagick zsync desktop-file-utils \
+            libmujs3 liblua5.2-0 libdisplay-info1 libva-wayland2 dconf-gsettings-backend \
             flatpak flatpak-builder
 
       - name: Install Flatpak runtime
