@@ -14,6 +14,11 @@
 
 set -euo pipefail
 
+if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
+    echo "Error: Linux packages are built on Linux x86_64 (Ubuntu 24.04); this is $(uname -s) $(uname -m)" >&2
+    exit 1
+fi
+
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 CLIENT_DIR="$(realpath "$SCRIPT_DIR/../..")"
 cd "$CLIENT_DIR"
