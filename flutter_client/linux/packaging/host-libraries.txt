@@ -1,0 +1,52 @@
+# Libraries the Linux bundle never ships: they must come from the running
+# system. One extended regex per line, matched against the start of a library
+# file name. Read by bundle-libs.sh (what to skip) and check-bundle.py (what
+# may resolve outside the bundle); anything else the bundle loads from the host
+# is a packaging bug.
+
+# C runtime and dynamic loader
+linux-vdso\.so
+ld-linux
+libc\.so
+libm\.so
+libmvec\.so
+libpthread\.so
+libdl\.so
+librt\.so
+libresolv\.so
+libnss_
+
+# C++ runtime: host Mesa/driver libraries are loaded into this process and
+# need the host's libstdc++, which is never older than the build host's on a
+# distro new enough for this glibc.
+libstdc\+\+\.so
+libgcc_s\.so
+
+# GPU, video acceleration and display servers, coupled to the host driver and
+# compositor
+libGL\.so
+libEGL\.so
+libGLX\.so
+libGLESv2\.so
+libGLdispatch\.so
+libOpenGL\.so
+libepoxy\.so
+libvulkan\.so
+libdrm\.so
+libgbm\.so
+libnvidia
+libcuda
+libva
+libvdpau\.so
+libwayland-
+libxcb
+libX11\.so
+libX11-xcb\.so
+libXext\.so
+
+# Audio
+libasound\.so
+
+# Fonts: must agree with the host's fontconfig configuration and font cache
+libfontconfig\.so
+libfreetype\.so

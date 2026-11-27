@@ -57,9 +57,33 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
 pkg_check_modules(MPV QUIET mpv)
-find_library(LIBMPV_RUNTIME NAMES mpv libmpv.so.2 libmpv.so.1 libmpv.so)
+# Release packaging points this at the pinned mpv-build prefix
+# (linux/packaging/fetch-libmpv.py) so the bundle never picks up a distro
+# libmpv. Without it, a dev build keeps using the host's libmpv as before.
+set(M3U_TV_LIBMPV_PREFIX "$ENV{M3U_TV_LIBMPV_PREFIX}")
+# Re-resolve on every configure: switching between the pinned prefix and the
+# host libmpv must not reuse the other one's cached path.
+unset(LIBMPV_RUNTIME CACHE)
+unset(LIBSHADERC_RUNTIME CACHE)
+if(M3U_TV_LIBMPV_PREFIX)
+  find_library(LIBMPV_RUNTIME NAMES libmpv.so.2 mpv
+    PATHS "${M3U_TV_LIBMPV_PREFIX}/lib"
+    PATH_SUFFIXES x86_64-linux-gnu aarch64-linux-gnu
+    NO_DEFAULT_PATH)
+  find_library(LIBSHADERC_RUNTIME NAMES libshaderc_shared.so.1 shaderc_shared
+    PATHS "${M3U_TV_LIBMPV_PREFIX}/lib"
+    NO_DEFAULT_PATH)
+  if(NOT LIBMPV_RUNTIME OR NOT LIBSHADERC_RUNTIME)
+    message(FATAL_ERROR "M3U_TV_LIBMPV_PREFIX=${M3U_TV_LIBMPV_PREFIX} has no libmpv.so.2 or libshaderc_shared.so.1")
+  endif()
+  get_filename_component(LIBSHADERC_RUNTIME_REALPATH "${LIBSHADERC_RUNTIME}" REALPATH)
+else()
+  find_library(LIBMPV_RUNTIME NAMES mpv libmpv.so.2 libmpv.so.1 libmpv.so)
+endif()
 if(MPV_FOUND)
   message(STATUS "libmpv pkg-config metadata found: ${MPV_VERSION}")
+elseif(M3U_TV_LIBMPV_PREFIX)
+  message(STATUS "Bundling pinned libmpv from ${M3U_TV_LIBMPV_PREFIX}")
 else()
   message(WARNING "mpv.pc was not found; Linux backend will use runtime dlopen diagnostics and may fall back to server transcode.")
 endif()
@@ -168,6 +192,13 @@ if(LIBMPV_RUNTIME_REALPATH)
   install(FILES "${LIBMPV_RUNTIME_REALPATH}"
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     RENAME "libmpv.so.2"
+    COMPONENT Runtime)
+endif()
+
+if(LIBSHADERC_RUNTIME_REALPATH)
+  install(FILES "${LIBSHADERC_RUNTIME_REALPATH}"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    RENAME "libshaderc_shared.so.1"
     COMPONENT Runtime)
 endif()
 

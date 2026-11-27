@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       desktop: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.desktop == 'true' }}
+      linux_packaging: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.linux_packaging == 'true' }}
       apple: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.apple == 'true' }}
       tvos: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.tvos == 'true' }}
     steps:
@@ -28,10 +29,16 @@ jobs:
           filters: |
             desktop:
               - 'flutter_client/linux/**'
+              - 'flutter_client/mpv-build.lock.json'
               - 'flutter_client/windows/**'
               - 'flutter_client/lib/**'
               - 'flutter_client/pubspec.yaml'
               - 'flutter_client/pubspec.lock'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/release.yml'
+            linux_packaging:
+              - 'flutter_client/linux/packaging/**'
+              - 'flutter_client/mpv-build.lock.json'
               - '.github/workflows/ci.yml'
               - '.github/workflows/release.yml'
             apple:
@@ -119,9 +126,8 @@ jobs:
     name: Build Linux runner (verify only)
     needs: changes
     if: needs.changes.outputs.desktop == 'true'
-    # Pinned, not ubuntu-latest: the Linux ZIP links against the build
-    # host's glibc/GTK/ffmpeg, so building on a newer Ubuntu drops support
-    # for older distros. Bump deliberately, with ALLOWED_SYSTEM_LIBS.
+    # Pinned, not ubuntu-latest: must match the release job, whose bundled
+    # GTK/glib set the glibc floor. Bump the two together.
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -134,8 +140,17 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y \
             clang cmake ninja-build pkg-config \
-            libgtk-3-dev liblzma-dev libmpv-dev \
-            libsecret-1-dev libjsoncpp-dev libx11-dev libxi-dev
+            libgtk-3-dev liblzma-dev libwayland-dev libegl-dev \
+            libsecret-1-dev libjsoncpp-dev libx11-dev libxi-dev \
+            gsettings-desktop-schemas zstd imagemagick zsync desktop-file-utils
+
+      - name: Install Flatpak tooling
+        if: needs.changes.outputs.linux_packaging == 'true'
+        run: |
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user --noninteractive -y flathub \
+            org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
 
       - name: Test Windows refresh-rate matching
         run: |
@@ -152,21 +167,21 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Build Linux app
-        run: flutter build linux --release
-
-      - name: Verify Linux runner and runtime files
+      # Same script as the release job. The Flatpak (a large runtime download)
+      # is only built when the packaging itself changes.
+      - name: Build, bundle and package Linux app
         run: |
-          BUNDLE="build/linux/x64/release/bundle"
-          test -x "$BUNDLE/m3u_tv"
-          test -s "$BUNDLE/lib/libflutter_linux_gtk.so"
-          test -s "$BUNDLE/lib/libmpv.so.2"
-          test -s "$BUNDLE/data/icudtl.dat"
-          test -d "$BUNDLE/data/flutter_assets"
-          if ldd "$BUNDLE/m3u_tv" | tee /tmp/m3u-tv-ldd.txt | grep -q 'not found'; then
-            cat /tmp/m3u-tv-ldd.txt
-            exit 1
+          FORMATS=zip,appimage,deb
+          if [ "${{ needs.changes.outputs.linux_packaging }}" = "true" ]; then
+            FORMATS="$FORMATS,flatpak"
           fi
+          linux/packaging/build-linux-release.sh --formats "$FORMATS" --output build/linux-release
+
+      - name: Verify installed Flatpak
+        if: needs.changes.outputs.linux_packaging == 'true'
+        run: |
+          flatpak install --user --noninteractive -y build/linux-release/*.flatpak
+          python3 linux/packaging/build-flatpak.py verify
 
   build-windows-native:
     name: Build Windows runner (verify only)

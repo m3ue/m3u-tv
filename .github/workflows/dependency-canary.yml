@@ -1,7 +1,7 @@
 name: Dependency Canary
 
 # Checks that the mpv-build/MPVKit binary assets we pin (Apple project.pbxproj
-# revisions + mpv-build.lock.json for Android/Windows) are still servable from
+# revisions + mpv-build.lock.json for Android/Linux/Windows) are still servable from
 # GitHub, on a schedule independent of any release.
 #
 # Why this exists: mpv-build's GitHub Releases (one perpetually-growing release
