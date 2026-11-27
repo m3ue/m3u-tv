@@ -386,6 +386,20 @@ void main() {
           published: true,
         ),
         (
+          verified:
+              r'artifacts/linux-appimages/m3u-tv-v${V}-linux-x86_64.AppImage',
+          uploaded:
+              r'artifacts/linux-appimages/m3u-tv-v${V}-linux-x86_64.AppImage',
+          published: true,
+        ),
+        (
+          verified:
+              r'artifacts/linux-appimages/m3u-tv-v${V}-linux-x86_64.AppImage.zsync',
+          uploaded:
+              r'artifacts/linux-appimages/m3u-tv-v${V}-linux-x86_64.AppImage.zsync',
+          published: true,
+        ),
+        (
           verified: r'artifacts/windows-zips/m3u-tv-v${V}-windows.zip',
           uploaded: r'artifacts/windows-zips/m3u-tv-v${V}-windows.zip',
           published: true,

@@ -18,7 +18,7 @@ Cross-platform TV front-end player for the [M3U Editor web app](https://github.c
 | iOS / iPadOS | [.ipa (sideload)](https://github.com/m3ue/m3u-tv/releases/latest) |
 | Apple TV (tvOS) | [.ipa (sideload)](https://github.com/m3ue/m3u-tv/releases/latest) |
 | macOS | [.dmg (Apple Silicon + Intel)](https://github.com/m3ue/m3u-tv/releases/latest) |
-| Linux | [portable .zip](https://github.com/m3ue/m3u-tv/releases/latest) |
+| Linux (x86_64) | [AppImage](https://github.com/m3ue/m3u-tv/releases/latest) &middot; [portable .zip](https://github.com/m3ue/m3u-tv/releases/latest)|
 | Windows | [installer .exe](https://github.com/m3ue/m3u-tv/releases/latest) &middot; [portable .zip](https://github.com/m3ue/m3u-tv/releases/latest) &middot; Microsoft Store |
 
 **NOTE:** Release assets are versioned (`m3u-tv-v<version>-<platform>.<ext>`), so each row links to the latest release page rather than a fixed-name download.

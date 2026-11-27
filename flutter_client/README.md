@@ -243,7 +243,17 @@ Things to know before submitting:
 
 ```bash
 flutter build linux --release
+./scripts/package-linux-appimage.sh build/linux/x64/release/bundle \
+  build/m3u-tv-linux-x86_64.AppImage
 ```
+
+Build the release on **Ubuntu 24.04 x86_64** with the native dependencies listed in the Linux workflow, plus `curl`, `desktop-file-utils`, `python3`, `gsettings-desktop-schemas` and `imagemagick`. The packaging script downloads a checksum-pinned linuxdeploy release, bundles libmpv and its transitive FFmpeg/codec libraries, preserves Flutter's executable-relative asset layout, and produces an AppImage, its `.zsync` companion, and SHA-256 sidecars for both. It uses the same `assets/icons/icon-desktop.png` artwork as Windows, resized to 512px with transparency preserved. `scripts/build-release.sh linux` produces both the ZIP and AppImage.
+
+The image embeds `gh-releases-zsync|m3ue|m3u-tv|latest|m3u-tv-v*-linux-x86_64.AppImage.zsync`, allowing Gear Lever and AppImageUpdate to discover stable upstream releases. Its desktop version comes from the built Flutter bundle. The release workflow publishes the AppImage and matching `.zsync` together, after verifying their checksums and update metadata. Enable update checks in Gear Lever; automatic discovery does not mean the app silently installs updates. Forks distributing their own builds should change the repository in the packaging script and verifier.
+
+The AppImage requires **glibc 2.39 or newer** and host graphics/audio drivers; it does not require a separately installed mpv/FFmpeg. It preserves the user's X11/Wayland selection and the existing `~/.local/share/m3u_tv` data directory (`$XDG_DATA_HOME/m3u_tv` when configured). For hosts without FUSE, use `./m3u-tv-linux-x86_64.AppImage --appimage-extract-and-run`.
+
+Packaging runs `scripts/verify-linux-appimage.py`: check the embedded update source and `.zsync` filename, URL, length and SHA-1, extract without FUSE, check the ELF dependency closure including dynamically loaded plugins, require bundled FFmpeg/libplacebo, then load and initialize bundled libmpv and decode a generated audio sample. This catches stale update metadata and missing codec libraries even when the app window itself opens. The unused `libdartjni.so` left by transitive Android plugins is omitted; a manifest that registers it causes packaging to fail for review. Ubuntu dependency copyright notices, common license texts and a package/version manifest are included under `usr/share/doc/m3u-tv`; Flutter's own `NOTICES.Z` stays in its assets. GPU rendering, audio output and HDR still need testing on real hardware.
 
 ### Windows
 

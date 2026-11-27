@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=M3U TV
+Comment=Watch your live TV, movies and series
+Exec=m3u_tv
+Icon=dev.sparkison.tv
+Terminal=false
+Categories=AudioVideo;Video;TV;
+StartupWMClass=M3u_tv

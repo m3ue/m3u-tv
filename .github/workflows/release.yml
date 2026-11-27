@@ -545,10 +545,11 @@ jobs:
 
   # ── Linux ─────────────────────────────────────────────────────────────────
   build-linux:
-    name: Build Linux ZIP
+    name: Build Linux ZIP and AppImage
     # Pinned, not ubuntu-latest: the Linux ZIP links against the build
     # host's glibc/GTK/ffmpeg, so building on a newer Ubuntu drops support
-    # for older distros. Bump deliberately, with ALLOWED_SYSTEM_LIBS.
+    # for older distros. AppImage also requires glibc >= 2.39.
+    # Bump deliberately, with ALLOWED_SYSTEM_LIBS.
     runs-on: ubuntu-24.04
     needs: validate
     defaults:
@@ -563,7 +564,8 @@ jobs:
           sudo apt-get install -y \
             clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libmpv-dev \
-            libsecret-1-dev libjsoncpp-dev libx11-dev libxi-dev
+            libsecret-1-dev libjsoncpp-dev libx11-dev libxi-dev \
+            curl desktop-file-utils python3 gsettings-desktop-schemas imagemagick
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -732,6 +734,11 @@ jobs:
             exit 1
           fi
 
+      - name: Package and verify Linux AppImage
+        run: |
+          ./scripts/package-linux-appimage.sh build/linux/x64/release/bundle \
+            "m3u-tv-v${{ needs.validate.outputs.version }}-linux-x86_64.AppImage"
+
       - name: Package as ZIP
         run: |
           V="${{ needs.validate.outputs.version }}"
@@ -747,6 +754,15 @@ jobs:
           path: |
             flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-linux.zip
             flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-linux.zip.sha256
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-appimage
+          path: |
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-linux-x86_64.AppImage
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-linux-x86_64.AppImage.sha256
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-linux-x86_64.AppImage.zsync
+            flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-linux-x86_64.AppImage.zsync.sha256
 
   # ── Windows ───────────────────────────────────────────────────────────────
   #
@@ -953,6 +969,12 @@ jobs:
           name: linux-zip
           path: artifacts/linux-zips/
 
+      - name: Download Linux AppImage
+        uses: actions/download-artifact@v8
+        with:
+          name: linux-appimage
+          path: artifacts/linux-appimages/
+
       - name: Download Windows ZIP
         uses: actions/download-artifact@v8
         with:
@@ -978,6 +1000,8 @@ jobs:
           for asset in \
             "artifacts/android-apks/m3u-tv-v${V}-android.apk" \
             "artifacts/linux-zips/m3u-tv-v${V}-linux.zip" \
+            "artifacts/linux-appimages/m3u-tv-v${V}-linux-x86_64.AppImage" \
+            "artifacts/linux-appimages/m3u-tv-v${V}-linux-x86_64.AppImage.zsync" \
             "artifacts/windows-zips/m3u-tv-v${V}-windows.zip" \
             "artifacts/windows-installer/m3u-tv-v${V}-windows-setup.exe" \
             "artifacts/web/m3u-tv-v${V}-web.zip"; do
@@ -986,6 +1010,13 @@ jobs:
             (cd "$(dirname "$asset")" && sha256sum -c "$(basename "$asset").sha256")
           done
           test -s "artifacts/web/m3u-tv-v${V}-web.json"
+
+      - name: Verify AppImage update metadata
+        run: |
+          IMAGE="artifacts/linux-appimages/m3u-tv-v${{ needs.validate.outputs.version }}-linux-x86_64.AppImage"
+          # upload/download-artifact does not preserve executable permissions.
+          chmod +x "$IMAGE"
+          python3 flutter_client/scripts/verify-linux-appimage.py --updates-only "$IMAGE"
 
       - name: Generate release notes
         run: |
@@ -1016,6 +1047,10 @@ jobs:
             "artifacts/android-apks/m3u-tv-android.apk"
             "artifacts/linux-zips/m3u-tv-v${V}-linux.zip"
             "artifacts/linux-zips/m3u-tv-v${V}-linux.zip.sha256"
+            "artifacts/linux-appimages/m3u-tv-v${V}-linux-x86_64.AppImage"
+            "artifacts/linux-appimages/m3u-tv-v${V}-linux-x86_64.AppImage.sha256"
+            "artifacts/linux-appimages/m3u-tv-v${V}-linux-x86_64.AppImage.zsync"
+            "artifacts/linux-appimages/m3u-tv-v${V}-linux-x86_64.AppImage.zsync.sha256"
             "artifacts/windows-zips/m3u-tv-v${V}-windows.zip"
             "artifacts/windows-zips/m3u-tv-v${V}-windows.zip.sha256"
             "artifacts/windows-installer/m3u-tv-v${V}-windows-setup.exe"
@@ -1045,7 +1080,7 @@ jobs:
           echo "| Platform | Artifact |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
           echo "| Android + Android TV | \`m3u-tv-${V}-android.apk\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Linux | \`m3u-tv-${V}-linux.zip\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Linux | \`m3u-tv-${V}-linux-x86_64.AppImage\`, \`m3u-tv-${V}-linux.zip\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Windows (portable, unsigned) | \`m3u-tv-${V}-windows.zip\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Windows (installer, unsigned) | \`m3u-tv-${V}-windows-setup.exe\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Web (M3U Editor /m3u-tv) | \`m3u-tv-${V}-web.zip\` |" >> $GITHUB_STEP_SUMMARY

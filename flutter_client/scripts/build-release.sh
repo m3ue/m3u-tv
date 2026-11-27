@@ -372,6 +372,8 @@ build_linux() {
     require python3 "It's used to zip the bundle, same as CI."
     flutter_build linux --release
     zip_dir build/linux/x64/release/bundle "$OUT_DIR/m3u-tv-v$VERSION-linux.zip"
+    run "$FLUTTER_CLIENT/scripts/package-linux-appimage.sh" \
+        build/linux/x64/release/bundle "$OUT_DIR/m3u-tv-v$VERSION-linux-x86_64.AppImage"
 }
 
 build_windows() {

@@ -28,6 +28,8 @@ jobs:
           filters: |
             desktop:
               - 'flutter_client/linux/**'
+              - 'flutter_client/scripts/*appimage*'
+              - 'flutter_client/assets/icons/icon-desktop.png'
               - 'flutter_client/windows/**'
               - 'flutter_client/lib/**'
               - 'flutter_client/pubspec.yaml'
@@ -135,7 +137,8 @@ jobs:
           sudo apt-get install -y \
             clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libmpv-dev \
-            libsecret-1-dev libjsoncpp-dev libx11-dev libxi-dev
+            libsecret-1-dev libjsoncpp-dev libx11-dev libxi-dev \
+            curl desktop-file-utils python3 gsettings-desktop-schemas imagemagick
 
       - name: Test Windows refresh-rate matching
         run: |
@@ -167,6 +170,11 @@ jobs:
             cat /tmp/m3u-tv-ldd.txt
             exit 1
           fi
+
+      - name: Package and verify Linux AppImage
+        run: |
+          ./scripts/package-linux-appimage.sh build/linux/x64/release/bundle \
+            "build/m3u-tv-ci-linux-x86_64.AppImage"
 
   build-windows-native:
     name: Build Windows runner (verify only)

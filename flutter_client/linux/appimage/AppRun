@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+APPDIR=$(CDPATH='' cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd)
+export APPDIR
+export LD_LIBRARY_PATH="$APPDIR/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export XDG_DATA_DIRS="$APPDIR/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+export GSETTINGS_SCHEMA_DIR="$APPDIR/usr/share/glib-2.0/schemas"
+
+# Keep the user's display backend and XDG_DATA_HOME. AppImage and ZIP builds
+# share the same saved playlists/settings, and Wayland retains its video plane.
+exec "$APPDIR/usr/bin/m3u_tv" "$@"
