@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:m3u_tv/features/home/home_screen.dart';
+import 'package:m3u_tv/features/home/home_spotlight_carousel.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/nav_layout.dart';
 import 'package:m3u_tv/navigation/route_names.dart';
@@ -160,6 +161,7 @@ void main() {
     bool hasRequests = false,
     VoidCallback? onSidebarActivate,
     FavoritesService? vodFavorites,
+    bool useSidebarLayout = true,
   }) async {
     // A TV screen: every row is on it.
     await tester.binding.setSurfaceSize(const Size(1920, 1080));
@@ -242,7 +244,7 @@ void main() {
             onAioStreamsSelect: () {},
             onRequestsSelect: () {},
             onAioStreamsItemSelect: (_, _) {},
-            useSidebarLayout: true,
+            useSidebarLayout: useSidebarLayout,
             onSidebarActivate: onSidebarActivate,
           ),
         ),
@@ -388,6 +390,49 @@ void main() {
 
     expect(find.text('Big Buck Bunny'), findsWidgets);
     expect(tester.getSize(_section('Movies')).height, loadingHeight);
+  });
+
+  group('touch spotlight carousel', () {
+    testWidgets('is off by default', (tester) async {
+      await pumpHome(
+        tester,
+        const _Catalog(channels: _channels, movies: _movies, series: _series),
+        useSidebarLayout: false,
+      );
+      await _settle(tester);
+
+      expect(find.byType(HomeSpotlightCarousel), findsNothing);
+      expect(find.text('More info'), findsNothing);
+    });
+
+    testWidgets('features the newest titles once turned on', (tester) async {
+      final service = _rowsOnlySettings();
+      await service.setMobileHomeSpotlight(true);
+      await pumpHome(
+        tester,
+        const _Catalog(channels: _channels, movies: _movies, series: _series),
+        viewSettings: service,
+        useSidebarLayout: false,
+      );
+      await _settle(tester);
+
+      expect(find.byType(HomeSpotlightCarousel), findsOneWidget);
+      expect(find.text('More info'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('stays off on TV/desktop layouts', (tester) async {
+      final service = _rowsOnlySettings();
+      await service.setMobileHomeSpotlight(true);
+      await pumpHome(
+        tester,
+        const _Catalog(channels: _channels, movies: _movies, series: _series),
+        viewSettings: service,
+      );
+      await _settle(tester);
+
+      expect(find.byType(HomeSpotlightCarousel), findsNothing);
+    });
   });
 
   testWidgets('a row with nothing in it is hidden', (tester) async {

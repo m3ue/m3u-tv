@@ -2081,6 +2081,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsHomeScreenStyleRich => 'Spotlight';
 
   @override
+  String get settingsMobileHomeSpotlight => 'Home spotlight';
+
+  @override
+  String get settingsMobileHomeSpotlightSubtitle =>
+      'Swipe through featured titles at the top of Home';
+
+  @override
   String get settingsSectionPlayer => 'Player';
 
   @override
@@ -2759,4 +2766,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get carPlaySignInHint => 'Open M3U TV on your iPhone to sign in.';
+
+  @override
+  String get homeSpotlightMoreInfo => 'More info';
 }

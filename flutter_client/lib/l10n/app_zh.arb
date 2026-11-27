@@ -1015,6 +1015,8 @@
   "settingsHomeScreenStyle": "主屏幕",
   "settingsHomeScreenStyleSimplified": "简洁",
   "settingsHomeScreenStyleRich": "聚光灯",
+  "settingsMobileHomeSpotlight": "首页聚光灯",
+  "settingsMobileHomeSpotlightSubtitle": "在首页顶部滑动浏览精选内容",
   "settingsSectionPlayer": "播放器",
   "settingsVodPlayer": "电影和剧集播放器",
   "settingsVodPlayerExoPlayerFirst": "优先尝试 ExoPlayer",
@@ -1213,5 +1215,6 @@
   "carPlayFavorites": "收藏",
   "carPlayNoFavorites": "还没有收藏的频道",
   "carPlayNoFavoritesHint": "在 iPhone 上的 M3U TV 中收藏频道，即可在此处查看。",
-  "carPlaySignInHint": "在 iPhone 上打开 M3U TV 进行登录。"
+  "carPlaySignInHint": "在 iPhone 上打开 M3U TV 进行登录。",
+  "homeSpotlightMoreInfo": "更多信息"
 }

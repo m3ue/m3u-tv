@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:m3u_tv/features/home/home_spotlight.dart';
+import 'package:m3u_tv/features/home/home_spotlight_carousel.dart';
 import 'package:m3u_tv/features/home/home_spotlight_hero.dart';
 import 'package:m3u_tv/features/sports/sports_fixture_actions.dart';
 import 'package:m3u_tv/features/sports/sports_fixture_card.dart';
@@ -26,6 +27,7 @@ import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/app_callout.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
+import 'package:m3u_tv/shared/app_page_route.dart' show kAppPageBackground;
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/channel_grid_tile.dart';
 import 'package:m3u_tv/shared/channel_sort.dart';
@@ -136,6 +138,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// right layout builds immediately (a Simplified-then-Rich swap flashed and
   /// remounted every row). Falls back to Simplified if nothing was cached.
   late HomeScreenStyle _style;
+
+  /// Touch layouts' opt-in spotlight carousel (Settings > Layout).
+  late bool _mobileSpotlight;
   late NavLayout _navLayout;
   final HomeSpotlightController _spotlight = HomeSpotlightController();
   late final HomeSpotlightEnricher _enricher = HomeSpotlightEnricher(
@@ -185,6 +190,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _viewSettings = ref.read(viewSettingsServiceProvider);
     _shownPlaylistKey = ref.read(shownPlaylistKeyProvider);
     _style = _viewSettings.homeScreenStyleCached ?? HomeScreenStyle.rich;
+    _mobileSpotlight = _viewSettings.mobileHomeSpotlightSync;
     _navLayout = _viewSettings.navLayoutSync;
     _homeRows = _readHomeRows();
     _liveTvOrder = _viewSettings.liveTvBrowseOrder;
@@ -230,12 +236,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
     if (rowsChanged ||
         layout != _navLayout ||
+        _mobileSpotlight != _viewSettings.mobileHomeSpotlightSync ||
         _liveTvOrder != _viewSettings.liveTvBrowseOrder ||
         _vodOrder != _viewSettings.vodBrowseOrder ||
         _seriesOrder != _viewSettings.seriesBrowseOrder) {
       setState(() {
         _homeRows = homeRows;
         _navLayout = layout;
+        _mobileSpotlight = _viewSettings.mobileHomeSpotlightSync;
         _liveTvOrder = _viewSettings.liveTvBrowseOrder;
         _vodOrder = _viewSettings.vodBrowseOrder;
         _seriesOrder = _viewSettings.seriesBrowseOrder;
@@ -516,8 +524,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     };
   }
 
+  /// The touch carousel runs up behind the status bar, like the detail
+  /// screens' backdrops; the Home route leaves that inset to this screen.
+  bool get _showsCarousel => !widget.useSidebarLayout && _mobileSpotlight;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => SafeArea(
+    top: !_showsCarousel,
+    bottom: false,
+    child: _buildHome(context),
+  );
+
+  Widget _buildHome(BuildContext context) {
     final isBootstrapping = ref.watch(isBootstrappingProvider);
     final isConfigured = ref.watch(isConfiguredProvider);
     final sourceError = ref.watch(sourceErrorProvider);
@@ -631,18 +649,77 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
+    final content = [
+      if (hasSourceError) ...[
+        _OfflineBanner(message: sourceError),
+        const SizedBox(height: MediaBrowsingMetrics.pagePadding),
+      ],
+      ...rows,
+    ];
+
+    if (_showsCarousel) {
+      // The carousel runs edge to edge, so only the rows keep the padding.
+      final statusBarInset = MediaQuery.paddingOf(context).top;
+      return Scaffold(
+        body: Focus(
+          focusNode: _homeNode,
+          child: Stack(
+            children: [
+              CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: HomeSpotlightCarousel(
+                      key: ValueKey(('spotlight-carousel', playlistKey)),
+                      enricher: _enricher,
+                      includeMovies: homeRowRoutes.contains(RouteNames.vod),
+                      includeSeries: homeRowRoutes.contains(RouteNames.series),
+                      onVodSelect: widget.onVodSelect,
+                      onSeriesSelect: widget.onSeriesSelect,
+                      onProgressSelect: widget.onProgressSelect,
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.all(
+                      MediaBrowsingMetrics.pagePadding,
+                    ),
+                    sliver: SliverList.list(children: content),
+                  ),
+                ],
+              ),
+              // Keeps the status bar legible over art and rows scrolled
+              // up under it.
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: statusBarInset,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          kAppPageBackground.withValues(alpha: 0.7),
+                          kAppPageBackground.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       body: Focus(
         focusNode: _homeNode,
         child: ListView(
           padding: const EdgeInsets.all(MediaBrowsingMetrics.pagePadding),
-          children: [
-            if (hasSourceError) ...[
-              _OfflineBanner(message: sourceError),
-              const SizedBox(height: MediaBrowsingMetrics.pagePadding),
-            ],
-            ...rows,
-          ],
+          children: content,
         ),
       ),
     );

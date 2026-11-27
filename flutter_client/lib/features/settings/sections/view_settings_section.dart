@@ -39,6 +39,7 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
   bool _rememberMediaSort = true;
   DefaultStartPage _defaultStartPage = DefaultStartPage.home;
   HomeScreenStyle _homeScreenStyle = HomeScreenStyle.rich;
+  bool _mobileHomeSpotlight = false;
   bool _navigationSoundEnabled = true;
   OptimizeFor _optimizeFor = OptimizeFor.quality;
   AppFontSize _fontSize = AppFontSize.normal;
@@ -76,6 +77,7 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
     final rememberMediaSort = await widget.service.rememberMediaSort();
     final defaultStartPage = await widget.service.defaultStartPage();
     final homeScreenStyle = await widget.service.homeScreenStyle();
+    final mobileHomeSpotlight = await widget.service.mobileHomeSpotlight();
     final navigationSoundEnabled = await widget.service
         .navigationSoundEnabled();
     final optimizeFor = await widget.service.optimizeFor();
@@ -94,6 +96,7 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
       _rememberMediaSort = rememberMediaSort;
       _defaultStartPage = defaultStartPage;
       _homeScreenStyle = homeScreenStyle;
+      _mobileHomeSpotlight = mobileHomeSpotlight;
       _navigationSoundEnabled = navigationSoundEnabled;
       _optimizeFor = optimizeFor;
       _fontSize = fontSize;
@@ -137,7 +140,7 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
               ),
             ),
             // The rich Home's spotlight follows D-pad/mouse focus, which touch
-            // layouts don't have - they always render the simplified Home.
+            // layouts don't have; they get the swipeable carousel instead.
             if (_showNavigationSoundToggle)
               SettingsRow(
                 title: l.settingsHomeScreenStyle,
@@ -164,6 +167,14 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
                     onSelected: widget.service.setHomeScreenStyle,
                   ),
                 ),
+              )
+            else
+              SettingsSwitchRow(
+                title: l.settingsMobileHomeSpotlight,
+                subtitle: l.settingsMobileHomeSpotlightSubtitle,
+                icon: Icons.view_carousel_outlined,
+                value: _mobileHomeSpotlight,
+                onChanged: widget.service.setMobileHomeSpotlight,
               ),
             SettingsRow(
               title: l.settingsNavLayout,

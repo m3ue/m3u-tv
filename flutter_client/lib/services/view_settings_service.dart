@@ -279,6 +279,7 @@ class ViewSettingsService extends ChangeNotifier {
   static const showPlaybackDiagnosticsKey = 'm3ue_tv_show_playback_diagnostics';
   static const defaultStartPageKey = 'm3ue_tv_default_start_page';
   static const homeScreenStyleKey = 'm3ue_tv_home_screen_style';
+  static const mobileHomeSpotlightKey = 'm3ue_tv_mobile_home_spotlight';
   static const navLayoutKey = 'm3ue_tv_nav_layout';
   static const windowBoundsKey = 'm3ue_tv_window_bounds';
   static const optimizeForKey = 'm3ue_tv_optimize_for';
@@ -540,6 +541,23 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<void> setHomeScreenStyle(HomeScreenStyle style) async {
     await _write(homeScreenStyleKey, style.value);
+    notifyListeners();
+  }
+
+  /// Whether touch layouts (phone/tablet) show a swipeable spotlight
+  /// carousel at the top of Home. Separate from [homeScreenStyle], which only
+  /// TV/desktop read. Defaults off.
+  Future<bool> mobileHomeSpotlight() async {
+    final raw = await _readResolved(mobileHomeSpotlightKey);
+    return raw as bool? ?? false;
+  }
+
+  /// Synchronous access to the in-memory cached carousel setting.
+  bool get mobileHomeSpotlightSync =>
+      (_cached(mobileHomeSpotlightKey) as bool?) ?? false;
+
+  Future<void> setMobileHomeSpotlight(bool enabled) async {
+    await _write(mobileHomeSpotlightKey, enabled);
     notifyListeners();
   }
 

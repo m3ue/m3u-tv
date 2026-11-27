@@ -33,9 +33,11 @@ import 'package:m3u_tv/shared/desktop_back_key.dart';
 import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:material_ui/material_ui.dart';
 
-Widget _withGradient(Widget screen) => DecoratedBox(
+/// [top] false leaves the status bar inset to the screen itself (Home, whose
+/// touch spotlight carousel runs up behind the status bar).
+Widget _withGradient(Widget screen, {bool top = true}) => DecoratedBox(
   decoration: kAppGradientBg,
-  child: SafeArea(bottom: false, child: screen),
+  child: SafeArea(top: top, bottom: false, child: screen),
 );
 
 /// tvOS reports its overscan-safe area as real [MediaQuery] padding on every
@@ -452,7 +454,10 @@ GoRouter createGoRouter({
               GoRoute(
                 path: RouteNames.home,
                 pageBuilder: (context, state) => NoTransitionPage(
-                  child: _withGradient(_tabScreen(context, RouteNames.home)),
+                  child: _withGradient(
+                    _tabScreen(context, RouteNames.home),
+                    top: false,
+                  ),
                 ),
                 routes: [
                   GoRoute(

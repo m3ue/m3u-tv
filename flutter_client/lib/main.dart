@@ -151,6 +151,7 @@ Future<void> main() async {
     // later swapped Simplified for Rich a frame in (a flash, and a full row
     // remount that lost the initial focus).
     appState.viewSettingsService.homeScreenStyle(),
+    appState.viewSettingsService.mobileHomeSpotlight(),
     // Same for the nav and Home row order, read synchronously from here on.
     appState.viewSettingsService.navLayout(),
     appState.viewSettingsService.loadHiddenHomeRows(),

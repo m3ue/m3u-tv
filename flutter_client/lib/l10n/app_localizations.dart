@@ -3614,6 +3614,18 @@ abstract class AppLocalizations {
   /// **'Spotlight'**
   String get settingsHomeScreenStyleRich;
 
+  /// No description provided for @settingsMobileHomeSpotlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Home spotlight'**
+  String get settingsMobileHomeSpotlight;
+
+  /// No description provided for @settingsMobileHomeSpotlightSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe through featured titles at the top of Home'**
+  String get settingsMobileHomeSpotlightSubtitle;
+
   /// No description provided for @settingsSectionPlayer.
   ///
   /// In en, this message translates to:
@@ -4807,6 +4819,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open M3U TV on your iPhone to sign in.'**
   String get carPlaySignInHint;
+
+  /// No description provided for @homeSpotlightMoreInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'More info'**
+  String get homeSpotlightMoreInfo;
 }
 
 class _AppLocalizationsDelegate

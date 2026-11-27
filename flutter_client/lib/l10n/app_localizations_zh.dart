@@ -2015,6 +2015,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsHomeScreenStyleRich => '聚光灯';
 
   @override
+  String get settingsMobileHomeSpotlight => '首页聚光灯';
+
+  @override
+  String get settingsMobileHomeSpotlightSubtitle => '在首页顶部滑动浏览精选内容';
+
+  @override
   String get settingsSectionPlayer => '播放器';
 
   @override
@@ -2660,4 +2666,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get carPlaySignInHint => '在 iPhone 上打开 M3U TV 进行登录。';
+
+  @override
+  String get homeSpotlightMoreInfo => '更多信息';
 }

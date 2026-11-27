@@ -1015,6 +1015,8 @@
   "settingsHomeScreenStyle": "Startbildschirm",
   "settingsHomeScreenStyleSimplified": "Vereinfacht",
   "settingsHomeScreenStyleRich": "Spotlight",
+  "settingsMobileHomeSpotlight": "Home-Spotlight",
+  "settingsMobileHomeSpotlightSubtitle": "Hervorgehobene Titel oben auf der Startseite durchwischen",
   "settingsSectionPlayer": "Player",
   "settingsVodPlayer": "Player für Filme und Serien",
   "settingsVodPlayerExoPlayerFirst": "Zuerst ExoPlayer versuchen",
@@ -1213,5 +1215,6 @@
   "carPlayFavorites": "Favoriten",
   "carPlayNoFavorites": "Noch keine Lieblingssender",
   "carPlayNoFavoritesHint": "Markiere Sender in M3U TV auf deinem iPhone als Favoriten, um sie hier zu sehen.",
-  "carPlaySignInHint": "Öffne M3U TV auf deinem iPhone, um dich anzumelden."
+  "carPlaySignInHint": "Öffne M3U TV auf deinem iPhone, um dich anzumelden.",
+  "homeSpotlightMoreInfo": "Mehr Infos"
 }
