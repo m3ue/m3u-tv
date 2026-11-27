@@ -320,6 +320,19 @@ void main() {
     },
   );
 
+  test('Watch Next fills to 10 past entries that resolve to nothing', () async {
+    appState.progressList = [
+      // No title and no catalog entry: dropped.
+      _progress(type: ContentType.vod, streamId: 100),
+      for (var id = 101; id <= 112; id++)
+        _progress(type: ContentType.vod, streamId: id, title: 'Movie $id'),
+    ];
+    final payload = await bridge.collect(fresh: false);
+    final items = payload['watchNext']! as List<Map<String, Object?>>;
+    expect(items, hasLength(AndroidHomeScreenBridge.maxWatchNext));
+    expect(items.first['key'], 'vod:101');
+  });
+
   test('the Continue Watching row lists the Watch Next cards', () async {
     final payload = await bridge.collect(fresh: false);
     final watchNext = payload['watchNext']! as List<Map<String, Object?>>;

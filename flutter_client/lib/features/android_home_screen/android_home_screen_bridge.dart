@@ -229,7 +229,12 @@ class AndroidHomeScreenBridge {
 
     var sports = const <Map<String, Object?>>[];
     if (configured && sportsEnabled) {
-      final fixtures = await _sportsFixtures(fresh: fresh);
+      // Bounded as a whole: a slow Sports endpoint must not hold up the
+      // other rows past what the background refresh waits for.
+      final fixtures = await _sportsFixtures(fresh: fresh).timeout(
+        _refreshWait,
+        onTimeout: () => _sportsCache?.fixtures ?? const [],
+      );
       sports = [
         for (final (fixture, channel) in fixtures)
           _sportsItem(fixture, channel, time),
@@ -373,12 +378,7 @@ class AndroidHomeScreenBridge {
     }
     final appState = _catalog.appState;
     try {
-      if (fresh) {
-        await appState.ensureServerHandshake().timeout(
-          _refreshWait,
-          onTimeout: () => false,
-        );
-      }
+      if (fresh) await appState.ensureServerHandshake();
       final capability = appState.sportsCapability;
       if (capability == null) return const [];
       final settings = appState.sportsSettings;
@@ -457,9 +457,10 @@ class AndroidHomeScreenBridge {
   Future<List<Map<String, Object?>>> _watchNextItems(
     List<Progress> progressList,
   ) async {
+    // AIOStreams entries are left out: a card can't resolve them back to
+    // something to play.
     final eligible = progressList
         .where((p) => isContinueWatchingEligible(p) && p.aioItemId == null)
-        .take(maxWatchNext)
         .toList(growable: false);
     if (eligible.isEmpty) return const [];
     final repository = _catalog.appState.catalogRepository;
@@ -488,10 +489,12 @@ class AndroidHomeScreenBridge {
         ))
           series.id: series,
     };
+    // Capped after dropping entries that resolve to nothing, so the row
+    // still fills up.
     return [
       for (final p in eligible)
         ?_watchNextItem(p, vodById[p.streamId], seriesById[p.seriesId]),
-    ];
+    ].take(maxWatchNext).toList(growable: false);
   }
 
   Map<String, Object?>? _watchNextItem(

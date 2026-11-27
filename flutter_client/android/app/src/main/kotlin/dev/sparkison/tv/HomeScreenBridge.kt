@@ -31,7 +31,7 @@ internal class HomeScreenBridge(private val context: Context, messenger: BinaryM
                         result.success(null)
                         return@setMethodCallHandler
                     }
-                    writer.execute { publish(context, payload) }
+                    writer.execute { write(context, payload) }
                     result.success(null)
                 }
                 "takeLaunch" -> {
@@ -81,7 +81,9 @@ internal class HomeScreenBridge(private val context: Context, messenger: BinaryM
 
         private val handler = Handler(Looper.getMainLooper())
 
-        // One writer, so two publishes can't interleave their row syncs.
+        // One writer for every publish (the app's and the worker's), so two
+        // can't interleave their row syncs: both would create a channel the
+        // first time, and one's card pruning could delete the other's card.
         private val writer = Executors.newSingleThreadExecutor()
 
         /** The engine's bridge, while there is an engine. Main thread. */
@@ -91,10 +93,23 @@ internal class HomeScreenBridge(private val context: Context, messenger: BinaryM
         // The card the app was opened from, until Dart takes it. Main thread.
         private var pendingLaunch: Map<String, Any?>? = null
 
-        /** Writes the rows and plans the next refresh. Blocking. */
+        /**
+         * Writes the rows and plans the next refresh, on the one writer.
+         * Blocks until done, so call off the main thread.
+         */
         fun publish(context: Context, payload: Map<*, *>) {
-            HomeScreenRows.publish(context, payload)
-            HomeScreenRefreshWorker.schedule(context, payload)
+            writer.submit { write(context, payload) }.get()
+        }
+
+        private fun write(context: Context, payload: Map<*, *>) {
+            if (!HomeScreenRows.isSupported(context)) return
+            // Thrown on the writer thread, it would take the app down.
+            try {
+                HomeScreenRows.publish(context, payload)
+                HomeScreenRefreshWorker.schedule(context, payload)
+            } catch (error: RuntimeException) {
+                Log.w(TAG, "Home screen rows not written", error)
+            }
         }
 
         /** Hands a card's [intent] to Dart, if it is one. Main thread. */

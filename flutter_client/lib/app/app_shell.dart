@@ -302,9 +302,7 @@ class AppShellState extends ConsumerState<AppShell>
     _notificationActivationSub = _appState.notificationActivations.listen(
       _onNotificationActivation,
     );
-    // The app may have been started in the background to refresh the home
-    // screen rows; now that it's shown, refresh from the server too.
-    _appState.resumeDeferredRefresh();
+    _resumeDeferredRefreshIfShown();
     unawaited(_appState.ensureBooted());
     CarPlayController.instance?.onPlayChannel = _playCarPlayChannel;
     AndroidAutoBridge.instance?.onPlayChannel = _playCarPlayChannel;
@@ -320,6 +318,17 @@ class AppShellState extends ConsumerState<AppShell>
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => unawaited(_announceAppUpdate()),
     );
+  }
+
+  /// The app may have been started in the background to refresh the home
+  /// screen rows (`AppStateController.deferServerRefresh`), which still
+  /// builds this shell (the launch splash builds the app beneath it) with no
+  /// activity. Once the app is actually in front, refresh from the server
+  /// too.
+  void _resumeDeferredRefreshIfShown() {
+    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      _appState.resumeDeferredRefresh();
+    }
   }
 
   // Settings > General already shows the update status, but only to someone
@@ -648,6 +657,7 @@ class AppShellState extends ConsumerState<AppShell>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     debugPrint('[Lifecycle] ${state.name}');
+    _resumeDeferredRefreshIfShown();
     // What counts as leaving: TV/mobile need a real `paused`, since there
     // `inactive` is a system overlay (the assistant panel, a permission
     // dialog) and `resumed` can arrive at launch, where the content refresh

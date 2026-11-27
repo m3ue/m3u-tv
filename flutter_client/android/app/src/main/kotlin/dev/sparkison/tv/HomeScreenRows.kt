@@ -73,14 +73,21 @@ internal object HomeScreenRows {
             try {
                 val enabled = row["enabled"] == true
                 val items = (row["items"] as? List<*>).orEmpty().filterIsInstance<Map<*, *>>()
-                // An empty channel shows on the home screen as a row with
-                // nothing in it, so there's none until there is something to
-                // put in it.
-                if (enabled && items.isNotEmpty()) {
-                    syncChannel(context, id, row["title"] as? String ?: id, items, cardKeys)
-                } else {
-                    Log.i(TAG, "$id: off or nothing to show (enabled=$enabled), removing the channel")
-                    deleteChannel(context, id)
+                when {
+                    !enabled -> {
+                        Log.i(TAG, "$id: off, removing the channel")
+                        deleteChannel(context, id)
+                    }
+                    items.isNotEmpty() ->
+                        syncChannel(context, id, row["title"] as? String ?: id, items, cardKeys)
+                    // Nothing to show for now (no games today, everything
+                    // watched): the channel stays, emptied, since a new one
+                    // would come back hidden after the viewer turned this one
+                    // on. One is only created once there's something in it.
+                    else -> {
+                        Log.i(TAG, "$id: nothing to show, emptying the channel")
+                        clearChannel(context, id)
+                    }
                 }
             } catch (error: RuntimeException) {
                 Log.w(TAG, "$id update failed", error)
@@ -433,7 +440,12 @@ internal object HomeScreenRows {
             .setInternalProviderId(id)
             .build()
             .toContentValues()
-        findChannels(context, id).firstOrNull()?.let { existing ->
+        val found = findChannels(context, id)
+        // Left by an older build's overlapping writes: keep one.
+        for (extra in found.drop(1)) {
+            resolver.delete(TvContractCompat.buildChannelUri(extra.id), null, null)
+        }
+        found.firstOrNull()?.let { existing ->
             if (existing.displayName != title) {
                 resolver.update(TvContractCompat.buildChannelUri(existing.id), values, null, null)
             }
@@ -452,6 +464,26 @@ internal object HomeScreenRows {
             Log.w(TAG, "Couldn't show the $id channel", error)
         }
         return channelId
+    }
+
+    @SuppressLint("RestrictedApi")
+    private fun clearChannel(context: Context, id: String) {
+        val resolver = context.contentResolver
+        for (channel in findChannels(context, id)) {
+            val programs = mutableListOf<Long>()
+            resolver.query(
+                TvContractCompat.buildPreviewProgramsUriForChannel(channel.id),
+                arrayOf(TvContractCompat.PreviewPrograms._ID),
+                null,
+                null,
+                null,
+            )?.use { cursor ->
+                while (cursor.moveToNext()) programs += cursor.getLong(0)
+            }
+            for (program in programs) {
+                resolver.delete(TvContractCompat.buildPreviewProgramUri(program), null, null)
+            }
+        }
     }
 
     private fun deleteChannel(context: Context, id: String) {

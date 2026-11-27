@@ -768,9 +768,6 @@ class AppStateController extends ChangeNotifier {
 
   Future<void>? _ensureBootFuture;
 
-  /// Boots once if no source is configured yet, sharing an in-flight boot
-  /// between callers: the phone's shell and the CarPlay screens (which can
-  /// start the app with no phone window, where the shell never builds).
   /// Set before boot for a start with no UI to show (the Android TV home
   /// screen refresh, `HomeScreenRefreshWorker.kt`): boot paints from the
   /// cache as usual but holds the server refresh (the whole catalog, the
@@ -804,6 +801,9 @@ class AppStateController extends ChangeNotifier {
     return connected;
   }
 
+  /// Boots once if no source is configured yet, sharing an in-flight boot
+  /// between callers: the phone's shell and the CarPlay screens (which can
+  /// start the app with no phone window, where the shell never builds).
   Future<void> ensureBooted() {
     if (isConfigured) return Future<void>.value();
     return _ensureBootFuture ??= boot().whenComplete(
