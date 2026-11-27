@@ -43,6 +43,30 @@ OUT_DIR="$(realpath "$OUT_DIR")"
 
 wants() { [[ ",$FORMATS," == *",$1,"* ]]; }
 
+# Check every tool up front so a missing package fails here, not after the
+# Flutter build. The apt packages are listed in flutter_client/README.md.
+REQUIRED_TOOLS=(python3 zstd tar ldd readelf strip pkg-config glib-compile-schemas sha256sum cmp)
+$SKIP_BUILD || REQUIRED_TOOLS+=(flutter)
+if wants appimage; then
+    REQUIRED_TOOLS+=(curl)
+    if [[ -n "${UPDATE_REPO:-}" ]]; then
+        REQUIRED_TOOLS+=(zsyncmake)
+    fi
+fi
+wants deb && REQUIRED_TOOLS+=(dpkg-deb dpkg-query)
+wants flatpak && REQUIRED_TOOLS+=(flatpak flatpak-builder)
+MISSING=()
+for tool in "${REQUIRED_TOOLS[@]}"; do
+    command -v "$tool" >/dev/null || MISSING+=("$tool")
+done
+if wants appimage || wants deb || wants flatpak; then
+    command -v magick >/dev/null || command -v convert >/dev/null || MISSING+=("imagemagick")
+fi
+if ((${#MISSING[@]})); then
+    echo "Error: missing build tools: ${MISSING[*]} (see the Linux section of flutter_client/README.md)" >&2
+    exit 1
+fi
+
 PREFIX="$CLIENT_DIR/build/libmpv-prefix"
 BUNDLE="$CLIENT_DIR/build/linux/x64/release/bundle"
 
