@@ -13,6 +13,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_database.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/channel_grid_tile.dart';
 import 'package:m3u_tv/shared/dpad_tab_bar.dart';
@@ -152,6 +153,75 @@ void main() {
       expect(find.text('Matrix Reloaded'), findsOneWidget);
       // BBC News and CNN should not appear in All results
       expect(find.text('BBC News'), findsNothing);
+    });
+
+    group('long-press favorites a result', () {
+      testWidgets('movie', (tester) async {
+        final favorites = FavoritesService();
+        await tester.pumpWidget(
+          _TestApp(catalogRepository: testRepo, vodFavoritesService: favorites),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'matrix');
+        await tester.pumpAndSettle();
+
+        await tester.longPress(find.text('The Matrix'));
+        await tester.pumpAndSettle();
+        expect(await favorites.all(), {10});
+        expect(find.byIcon(Icons.star), findsOneWidget);
+
+        await tester.longPress(find.text('The Matrix'));
+        await tester.pumpAndSettle();
+        expect(await favorites.all(), isEmpty);
+        expect(find.byIcon(Icons.star), findsNothing);
+      });
+
+      testWidgets('series', (tester) async {
+        final favorites = FavoritesService();
+        await tester.pumpWidget(
+          _TestApp(
+            catalogRepository: testRepo,
+            seriesFavoritesService: favorites,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'bad');
+        await tester.pumpAndSettle();
+
+        await tester.longPress(find.text('Breaking Bad'));
+        await tester.pumpAndSettle();
+        expect(await favorites.all(), {20});
+      });
+
+      testWidgets('channel', (tester) async {
+        final favorites = FavoritesService();
+        await tester.pumpWidget(
+          _TestApp(
+            catalogRepository: testRepo,
+            liveFavoritesService: favorites,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'bbc');
+        await tester.pumpAndSettle();
+
+        await tester.longPress(find.text('BBC News'));
+        await tester.pumpAndSettle();
+        expect(await favorites.all(), {1});
+      });
+
+      testWidgets('shows an existing favorite as one', (tester) async {
+        final favorites = FavoritesService();
+        await favorites.add(11);
+        await tester.pumpWidget(
+          _TestApp(catalogRepository: testRepo, vodFavoritesService: favorites),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'matrix');
+        await tester.pumpAndSettle();
+
+        expect(find.byIcon(Icons.star), findsOneWidget);
+      });
     });
 
     testWidgets('a catalog reload re-runs the search on the new rows', (
@@ -1165,7 +1235,14 @@ class _TestApp extends StatelessWidget {
     this.dvrRecordings = const <DvrRecording>[],
     this.onRecordingPlay,
     this.dpad = false,
+    this.liveFavoritesService,
+    this.vodFavoritesService,
+    this.seriesFavoritesService,
   });
+
+  final FavoritesService? liveFavoritesService;
+  final FavoritesService? vodFavoritesService;
+  final FavoritesService? seriesFavoritesService;
 
   final CatalogRepository catalogRepository;
   final bool isConfigured;
@@ -1228,6 +1305,9 @@ class _TestApp extends StatelessWidget {
           onSearchShows: onSearchShows,
           onShowSelect: onShowSelect,
           onRecordingPlay: onRecordingPlay,
+          liveFavoritesService: liveFavoritesService,
+          vodFavoritesService: vodFavoritesService,
+          seriesFavoritesService: seriesFavoritesService,
         ),
       ),
     );

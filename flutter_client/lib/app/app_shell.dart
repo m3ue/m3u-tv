@@ -2038,6 +2038,9 @@ class AppShellState extends ConsumerState<AppShell>
         onRecordingPlay: _openPlayerFromActions,
         onEnsureEpg: _appState.ensureEpgForChannels,
         useSidebarLayout: shouldUseSidebar(widget.deviceType),
+        liveFavoritesService: _appState.favoritesService,
+        vodFavoritesService: _appState.vodFavoritesService,
+        seriesFavoritesService: _appState.seriesFavoritesService,
       ),
       RouteNames.liveTv => LiveTvScreen(
         favoritesService: _appState.favoritesService,

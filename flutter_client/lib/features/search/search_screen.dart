@@ -11,6 +11,7 @@ import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
     show kCatalogKindLive, kCatalogKindSeries, kCatalogKindVod;
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
 import 'package:m3u_tv/shared/channel_grid_tile.dart';
@@ -48,6 +49,9 @@ class SearchScreen extends ConsumerStatefulWidget {
     this.onRecordingPlay,
     this.onEnsureEpg,
     this.useSidebarLayout = false,
+    this.liveFavoritesService,
+    this.vodFavoritesService,
+    this.seriesFavoritesService,
   });
 
   final void Function(Channel) onChannelSelect;
@@ -86,6 +90,13 @@ class SearchScreen extends ConsumerStatefulWidget {
   /// All tab's rows size their cards around.
   final bool useSidebarLayout;
 
+  /// Favorites for each kind of result: a long-press toggles one, the same
+  /// as on the Live TV, Movies and Series screens. Null leaves that kind's
+  /// cards without the favorite badge or the long-press.
+  final FavoritesService? liveFavoritesService;
+  final FavoritesService? vodFavoritesService;
+  final FavoritesService? seriesFavoritesService;
+
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
@@ -122,12 +133,50 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   /// The On Now rows' channels, read from the catalog.
   final ShowResultChannelLookup _showResultChannels = ShowResultChannelLookup();
 
+  Set<int> _favoriteChannelIds = const {};
+  Set<int> _favoriteVodIds = const {};
+  Set<int> _favoriteSeriesIds = const {};
+  int _favoritesLoadGeneration = 0;
+
+  List<FavoritesService> get _favoritesServices => [
+    ?widget.liveFavoritesService,
+    ?widget.vodFavoritesService,
+    ?widget.seriesFavoritesService,
+  ];
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _baseTabCount, vsync: this);
     _showSearchController.addListener(_onShowSearchChanged);
+    for (final service in _favoritesServices) {
+      service.addListener(_onFavoritesChanged);
+    }
+    unawaited(_loadFavorites());
   }
+
+  void _onFavoritesChanged() => unawaited(_loadFavorites());
+
+  Future<void> _loadFavorites() async {
+    final generation = ++_favoritesLoadGeneration;
+    Future<Set<int>> idsOf(FavoritesService? service) =>
+        service?.all() ?? Future.value(const <int>{});
+    final (channels, movies, series) = await (
+      idsOf(widget.liveFavoritesService),
+      idsOf(widget.vodFavoritesService),
+      idsOf(widget.seriesFavoritesService),
+    ).wait;
+    if (!mounted || generation != _favoritesLoadGeneration) return;
+    setState(() {
+      _favoriteChannelIds = channels;
+      _favoriteVodIds = movies;
+      _favoriteSeriesIds = series;
+    });
+  }
+
+  /// Null when [service] isn't wired, so the card has no long-press.
+  VoidCallback? _toggleFavorite(FavoritesService? service, int id) =>
+      service == null ? null : () => unawaited(service.toggle(id));
 
   void _onShowSearchChanged() {
     if (mounted) setState(() {});
@@ -136,6 +185,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   @override
   void dispose() {
     _debounce?.cancel();
+    for (final service in _favoritesServices) {
+      service.removeListener(_onFavoritesChanged);
+    }
     _tabController.dispose();
     _showSearchController
       ..removeListener(_onShowSearchChanged)
@@ -602,6 +654,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       maxItems: _rowMaxItems(channels.length, preview: preview),
       viewAll: _rowViewAll(channels.length, preview: preview),
       onChannelTap: (channel) => _selectChannel(channels, channel),
+      favoriteIds: _favoriteChannelIds,
+      onChannelLongPress: _channelLongPress,
       onEnsureEpg: widget.onEnsureEpg,
       useSidebarLayout: widget.useSidebarLayout,
       onSidebarActivate: widget.onSidebarActivate,
@@ -648,6 +702,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     return _ChannelResultsGrid(
       channels: channels,
       onChannelTap: (channel) => _selectChannel(channels, channel),
+      favoriteIds: _favoriteChannelIds,
+      onChannelLongPress: _channelLongPress,
       onEnsureEpg: widget.onEnsureEpg,
       onEdge: _handleContentEdge,
     );
@@ -726,6 +782,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
     );
   }
 
+  ValueChanged<Channel>? get _channelLongPress {
+    final service = widget.liveFavoritesService;
+    if (service == null) return null;
+    return (channel) => unawaited(service.toggle(channel.id));
+  }
+
   MediaPreviewItem _vodItem(VodItem item) {
     final rating = item.rating;
     return MediaPreviewItem(
@@ -734,7 +796,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       subtitle: item.year,
       ratingLabel: rating == null ? null : formatRating(rating),
       fallbackIcon: Icons.movie,
+      isFavorite: _favoriteVodIds.contains(item.id),
       onTap: () => widget.onVodSelect(item),
+      onLongTap: _toggleFavorite(widget.vodFavoritesService, item.id),
     );
   }
 
@@ -746,7 +810,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       subtitle: series.year,
       ratingLabel: rating == null ? null : formatRating(rating),
       fallbackIcon: Icons.tv,
+      isFavorite: _favoriteSeriesIds.contains(series.id),
       onTap: () => widget.onSeriesSelect(series),
+      onLongTap: _toggleFavorite(widget.seriesFavoritesService, series.id),
     );
   }
 
@@ -807,6 +873,8 @@ class _ChannelResultsRow extends ConsumerWidget {
     required this.maxItems,
     required this.viewAll,
     required this.onChannelTap,
+    required this.favoriteIds,
+    required this.onChannelLongPress,
     required this.onEnsureEpg,
     required this.useSidebarLayout,
     required this.onSidebarActivate,
@@ -815,6 +883,8 @@ class _ChannelResultsRow extends ConsumerWidget {
 
   final String title;
   final List<Channel> channels;
+  final Set<int> favoriteIds;
+  final ValueChanged<Channel>? onChannelLongPress;
 
   /// The matching show airing now on a channel, shown in place of its guide
   /// entry.
@@ -855,10 +925,13 @@ class _ChannelResultsRow extends ConsumerWidget {
             programme: airing == null
                 ? null
                 : showResultTileProgramme(airing, languageTag, l),
-            isFavorite: false,
+            isFavorite: favoriteIds.contains(channel.id),
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: autofocus,
             onTap: () => onChannelTap(channel),
+            onLongPress: onChannelLongPress == null
+                ? null
+                : () => onChannelLongPress!(channel),
           ),
         );
       },
@@ -947,12 +1020,16 @@ class _ChannelResultsGrid extends ConsumerWidget {
   const _ChannelResultsGrid({
     required this.channels,
     required this.onChannelTap,
+    required this.favoriteIds,
+    required this.onChannelLongPress,
     required this.onEnsureEpg,
     required this.onEdge,
   });
 
   final List<Channel> channels;
   final ValueChanged<Channel> onChannelTap;
+  final Set<int> favoriteIds;
+  final ValueChanged<Channel>? onChannelLongPress;
   final EnsureEpg? onEnsureEpg;
   final ValueChanged<TraversalDirection> onEdge;
 
@@ -980,10 +1057,13 @@ class _ChannelResultsGrid extends ConsumerWidget {
           return ChannelGridTile(
             channel: channel,
             epg: epgService.lookupForChannel(channel),
-            isFavorite: false,
+            isFavorite: favoriteIds.contains(channel.id),
             isRecording: recordingChannelIds.contains(channel.id),
             autofocus: index == 0,
             onTap: () => onChannelTap(channel),
+            onLongPress: onChannelLongPress == null
+                ? null
+                : () => onChannelLongPress!(channel),
           );
         },
       ),
