@@ -1489,7 +1489,10 @@ class AppShellState extends ConsumerState<AppShell>
       case HomeScreenChannelLaunch(:final channel, :final context):
         _playCarPlayChannel(channel, context);
       case HomeScreenProgressLaunch(:final progress):
-        unawaited(_openProgress(progress));
+        // A card picked on the home screen opens over Home while its rows
+        // are still loading, and their autofocus would take focus from a
+        // resume dialog; Android expects the card to play anyway.
+        unawaited(_openProgress(progress, playDirectly: true));
     }
   }
 
@@ -1912,7 +1915,17 @@ class AppShellState extends ConsumerState<AppShell>
     if (mounted) setState(() => _fullScreenDetailDepth--);
   }
 
-  Future<void> _openProgress(Progress progress) async {
+  /// Plays a Continue Watching entry. [playDirectly] (a home screen card,
+  /// which Android expects to resume) skips the resume and Up Next choices:
+  /// a partly watched item resumes where it was left, an Up Next episode
+  /// starts.
+  Future<void> _openProgress(
+    Progress progress, {
+    bool playDirectly = false,
+  }) async {
+    final resumeAt = playDirectly && progress.positionSeconds >= 30
+        ? progress.positionSeconds.toDouble()
+        : null;
     if (progress.contentType == ContentType.vod) {
       final item = await _appState.catalogRepository.activeItemById<VodItem>(
         kind: kCatalogKindVod,
@@ -1927,6 +1940,7 @@ class AppShellState extends ConsumerState<AppShell>
               title: progress.title ?? item.name,
               type: 'vod',
               streamId: item.id,
+              startPosition: resumeAt,
               metadata: <String, Object?>{
                 'container_extension': item.containerExtension,
                 if (progress.backdropUrl != null)
@@ -1953,7 +1967,7 @@ class AppShellState extends ConsumerState<AppShell>
         id: progress.seriesId!,
       );
       if (series != null && mounted) {
-        if (progress.upNext) {
+        if (progress.upNext && !playDirectly) {
           // Nothing to resume, but the viewer may want to skip this episode:
           // marking it watched surfaces the one after it as "up next".
           final l = AppLocalizations.of(context);
@@ -1989,6 +2003,7 @@ class AppShellState extends ConsumerState<AppShell>
               streamId: progress.streamId,
               seriesId: progress.seriesId,
               seasonNumber: progress.seasonNumber,
+              startPosition: resumeAt,
               metadata: <String, Object?>{
                 if (series.tmdbId != null) 'tmdb_id': series.tmdbId,
                 if (series.year != null) 'year': series.year,
