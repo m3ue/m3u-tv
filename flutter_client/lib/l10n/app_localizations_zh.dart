@@ -508,7 +508,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsAndroidHomeOnNowHint =>
-      '在主屏幕添加一行，显示你收藏的频道及其正在播出的节目。应用关闭时也会保持更新。';
+      '在主屏幕添加一行，按你的直播电视排序显示直播频道及其正在播出的节目。应用关闭时也会保持更新。';
+
+  @override
+  String get settingsAndroidHomeSports => '体育频道';
+
+  @override
+  String get settingsAndroidHomeSportsHint =>
+      '在主屏幕添加一行，显示你的频道今天转播的比赛，与首页的体育行一致。';
 
   @override
   String get settingsSectionFilters => '筛选';

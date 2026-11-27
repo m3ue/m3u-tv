@@ -1167,14 +1167,10 @@ class _SportsRowState extends ConsumerState<_SportsRow> {
   ) async {
     final generation = ++_generation;
     _refreshTimer?.cancel();
-    final now = DateTime.now();
-    final midnight = DateTime(now.year, now.month, now.day);
-    final from = midnight.toUtc();
-    final to = DateTime(
-      midnight.year,
-      midnight.month,
-      midnight.day + (widget.custom?.sportsDays ?? 1),
-    ).toUtc();
+    final (:from, :to) = homeSportsWindow(
+      DateTime.now(),
+      days: widget.custom?.sportsDays ?? 1,
+    );
     final rowLimit = min(
       widget.custom?.limit ?? widget.rowItemLimit,
       widget.rowItemLimit,
@@ -1212,22 +1208,7 @@ class _SportsRowState extends ConsumerState<_SportsRow> {
         _matchesFetchedAt = DateTime.now();
       }
       if (!mounted || generation != _generation) return;
-      int rank(SportsFixture fixture) {
-        final isFollowed = fixture.displayOrder.any(
-          (side) => followed.contains(side.team.key),
-        );
-        final isLive = fixture.state == SportsFixtureState.live;
-        return (isLive ? 0 : 2) + (isFollowed ? 0 : 1);
-      }
-
-      final shown =
-          watchable
-              .where((fixture) => matches[fixture.key]?.isNotEmpty ?? false)
-              .toList()
-            ..sort((a, b) {
-              final byRank = rank(a).compareTo(rank(b));
-              return byRank != 0 ? byRank : a.start.compareTo(b.start);
-            });
+      final shown = rankHomeSportsFixtures(watchable, matches, followed);
       setState(() {
         _fixtures = shown.take(rowLimit).toList();
         _matches = matches;

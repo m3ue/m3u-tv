@@ -788,6 +788,22 @@ class AppStateController extends ChangeNotifier {
     if (refresh != null) _runBackgroundPersistence(refresh());
   }
 
+  /// The server handshake on its own, for a [deferServerRefresh] start that
+  /// needs what the server says it offers (Sports): the cached boot skips it
+  /// along with the rest of the refresh. True once connected.
+  Future<bool> ensureServerHandshake() async {
+    if (authNotifier.authResponse != null) return true;
+    final credentials = authNotifier.credentials;
+    if (credentials == null) return false;
+    final generation = _sourceOperationGeneration.current;
+    final connected = await authNotifier.connect(
+      credentials,
+      isCurrent: () => !_sourceOperationGeneration.isStale(generation),
+    );
+    if (connected) notifyListeners();
+    return connected;
+  }
+
   Future<void> ensureBooted() {
     if (isConfigured) return Future<void>.value();
     return _ensureBootFuture ??= boot().whenComplete(

@@ -1025,8 +1025,20 @@ abstract class AppLocalizations {
   /// No description provided for @settingsAndroidHomeOnNowHint.
   ///
   /// In en, this message translates to:
-  /// **'Add a home screen row of your favorite channels and what\'s airing on them. Kept up to date while the app is closed.'**
+  /// **'Add a home screen row of your Live TV channels and what\'s airing on them, in your Live TV sort order. Kept up to date while the app is closed.'**
   String get settingsAndroidHomeOnNowHint;
+
+  /// No description provided for @settingsAndroidHomeSports.
+  ///
+  /// In en, this message translates to:
+  /// **'Sports channel'**
+  String get settingsAndroidHomeSports;
+
+  /// No description provided for @settingsAndroidHomeSportsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a home screen row of today\'s games that your channels carry, as Home\'s Sports row lists them.'**
+  String get settingsAndroidHomeSportsHint;
 
   /// No description provided for @settingsSectionFilters.
   ///

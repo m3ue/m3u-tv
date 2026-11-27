@@ -46,6 +46,7 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
   AppFontSize _fontSize = AppFontSize.normal;
   bool _androidHomeWatchNext = true;
   bool _androidHomeOnNow = true;
+  bool _androidHomeSports = true;
 
   // Only Android TV has the home screen rows these fill.
   bool get _showAndroidHomeScreen =>
@@ -91,6 +92,7 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
     final storedFontSize = await widget.service.fontSizeOrNull();
     final androidHomeWatchNext = await widget.service.androidHomeWatchNext();
     final androidHomeOnNow = await widget.service.androidHomeOnNow();
+    final androidHomeSports = await widget.service.androidHomeSports();
     final fontSize = AppFontSize.resolveDefault(
       stored: storedFontSize,
       isTv: widget.deviceType == DeviceType.tv,
@@ -111,6 +113,7 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
       _fontSize = fontSize;
       _androidHomeWatchNext = androidHomeWatchNext;
       _androidHomeOnNow = androidHomeOnNow;
+      _androidHomeSports = androidHomeSports;
     });
   }
 
@@ -466,6 +469,13 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
                 icon: Icons.live_tv_outlined,
                 value: _androidHomeOnNow,
                 onChanged: widget.service.setAndroidHomeOnNow,
+              ),
+              SettingsSwitchRow(
+                title: l.settingsAndroidHomeSports,
+                subtitle: l.settingsAndroidHomeSportsHint,
+                icon: Icons.stadium_outlined,
+                value: _androidHomeSports,
+                onChanged: widget.service.setAndroidHomeSports,
               ),
             ],
           ),

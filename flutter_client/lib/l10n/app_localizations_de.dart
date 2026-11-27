@@ -518,7 +518,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAndroidHomeOnNowHint =>
-      'Fügt dem Startbildschirm eine Zeile mit deinen Lieblingskanälen und ihrem aktuellen Programm hinzu. Wird auch bei geschlossener App aktualisiert.';
+      'Fügt dem Startbildschirm eine Zeile mit deinen Live-TV-Kanälen und ihrem aktuellen Programm hinzu, in deiner Live-TV-Sortierung. Wird auch bei geschlossener App aktualisiert.';
+
+  @override
+  String get settingsAndroidHomeSports => 'Sportkanal';
+
+  @override
+  String get settingsAndroidHomeSportsHint =>
+      'Fügt dem Startbildschirm eine Zeile mit den heutigen Spielen hinzu, die deine Kanäle zeigen, wie in der Sportzeile der Startseite.';
 
   @override
   String get settingsSectionFilters => 'Filter';

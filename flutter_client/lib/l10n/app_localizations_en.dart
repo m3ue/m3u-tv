@@ -515,7 +515,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAndroidHomeOnNowHint =>
-      'Add a home screen row of your favorite channels and what\'s airing on them. Kept up to date while the app is closed.';
+      'Add a home screen row of your Live TV channels and what\'s airing on them, in your Live TV sort order. Kept up to date while the app is closed.';
+
+  @override
+  String get settingsAndroidHomeSports => 'Sports channel';
+
+  @override
+  String get settingsAndroidHomeSportsHint =>
+      'Add a home screen row of today\'s games that your channels carry, as Home\'s Sports row lists them.';
 
   @override
   String get settingsSectionFilters => 'Filters';

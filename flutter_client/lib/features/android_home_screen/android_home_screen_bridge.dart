@@ -7,10 +7,15 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:m3u_tv/app/device_type_resolver.dart';
 import 'package:m3u_tv/features/carplay/car_catalog.dart';
+import 'package:m3u_tv/features/sports/sports_fixture_actions.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_codec.dart'
     show kCatalogKindSeries, kCatalogKindVod;
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/sports_channel_lookup.dart';
+import 'package:m3u_tv/services/sports_models.dart';
+import 'package:m3u_tv/services/sports_service.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
+import 'package:m3u_tv/shared/channel_sort.dart';
 import 'package:m3u_tv/shared/continue_watching_items.dart';
 
 /// What a home screen card asked the app to open.
@@ -24,7 +29,7 @@ class HomeScreenChannelLaunch extends HomeScreenLaunch {
 
   final Channel channel;
 
-  /// The favorites, for next/previous channel.
+  /// The Live TV lineup, for next/previous channel.
   final ChannelContext context;
 }
 
@@ -35,9 +40,10 @@ class HomeScreenProgressLaunch extends HomeScreenLaunch {
   final Progress progress;
 }
 
-/// Fills the Android TV home screen rows (`HomeScreenRows.kt`): Watch Next
-/// from Continue Watching and Up Next, and the "On Now" channel from the
-/// favorite live channels and what's airing on each.
+/// Fills the Android TV home screen rows (`HomeScreenRows.kt`) with what the
+/// app's own Home shows: Watch Next from Continue Watching and Up Next, the
+/// "On Now" channel from the Live TV lineup (in its sort) and what's airing
+/// on each channel, and the Sports channel from today's games.
 ///
 /// The launcher shows only what was last written, so the rows are written
 /// again when leaving the app, when Continue Watching changes while in it,
@@ -63,6 +69,8 @@ class AndroidHomeScreenBridge {
   /// Android asks apps to keep Watch Next short.
   static const maxWatchNext = 10;
   static const maxOnNow = 20;
+  static const maxSports = 20;
+  static const _sportsCacheAge = Duration(minutes: 5);
 
   static const _guidePoll = Duration(milliseconds: 250);
 
@@ -80,6 +88,7 @@ class AndroidHomeScreenBridge {
   List<Progress>? _publishedProgress;
   bool _wasConfigured = false;
   void Function(HomeScreenLaunch launch)? _onLaunch;
+  ({DateTime at, List<(SportsFixture, Channel)> fixtures})? _sportsCache;
 
   /// Set by the shell while it's up: opens what a card asked for. A card
   /// the app was started from is handed over as soon as this is set.
@@ -113,8 +122,13 @@ class AndroidHomeScreenBridge {
       case 'collect':
         await _catalog.appState.ensureBooted();
         // Signed out, or nothing to show yet: leave the rows as they are.
-        if (!_catalog.appState.isConfigured) return null;
-        return collect(fresh: true);
+        if (!_catalog.appState.isConfigured) {
+          debugPrint('[HomeScreen] Background refresh: not signed in');
+          return null;
+        }
+        final payload = await collect(fresh: true);
+        debugPrint('[HomeScreen] Background refresh: ${_describe(payload)}');
+        return payload;
       case 'launch':
         await _takeLaunch();
         return null;
@@ -153,25 +167,43 @@ class AndroidHomeScreenBridge {
     if (appState.isBootstrapping) return;
     _publishedProgress = appState.progressList;
     try {
-      await _channel.invokeMethod<void>(
-        'publish',
-        await collect(fresh: false),
-      );
+      final payload = await collect(fresh: false);
+      debugPrint('[HomeScreen] Publishing ${_describe(payload)}');
+      await _channel.invokeMethod<void>('publish', payload);
     } on Object catch (error) {
       debugPrint('[HomeScreen] Publish failed: $error');
     }
   }
 
+  static String _describe(Map<String, Object?> payload) => [
+    '${(payload['watchNext']! as List).length} Watch Next',
+    for (final channel in payload['channels']! as List<Map<String, Object?>>)
+      '${(channel['items']! as List).length} ${channel['id']}',
+  ].join(', ');
+
   /// The rows, as `HomeScreenRows.kt` writes them. [fresh] (the background
-  /// refresh) re-reads Continue Watching from the server and waits a little
-  /// for the favorites' guide first.
+  /// refresh) re-reads Continue Watching and today's games from the server
+  /// and waits a little for the channels' guide first.
   @visibleForTesting
   Future<Map<String, Object?>> collect({required bool fresh}) async {
     final appState = _catalog.appState;
     final settings = appState.viewSettingsService;
     final watchNextEnabled = await settings.androidHomeWatchNext();
     final onNowEnabled = await settings.androidHomeOnNow();
+    final sportsEnabled = await settings.androidHomeSports();
     final configured = appState.isConfigured;
+    final l10n = _catalog.l10n;
+    // The widget localizations load these, and a background start builds no
+    // widgets.
+    await initializeDateFormatting(l10n.localeName);
+    final time = DateFormat.jm(l10n.localeName);
+    final now = clock.now();
+    int? refreshAt;
+    void refreshBy(DateTime? at) {
+      final ms = at?.millisecondsSinceEpoch;
+      if (ms == null || ms <= now.millisecondsSinceEpoch) return;
+      if (refreshAt == null || ms < refreshAt!) refreshAt = ms;
+    }
 
     var watchNext = const <Map<String, Object?>>[];
     if (configured && watchNextEnabled) {
@@ -185,37 +217,84 @@ class AndroidHomeScreenBridge {
     }
 
     var onNow = const <Map<String, Object?>>[];
-    int? refreshAt;
     if (configured && onNowEnabled) {
-      final favorites = await _catalog.favoriteChannels(maxOnNow);
-      if (fresh) await _awaitGuide(favorites);
-      final localeName = _catalog.l10n.localeName;
-      // The widget localizations load these, and a background start builds
-      // no widgets.
-      await initializeDateFormatting(localeName);
-      final time = DateFormat.jm(localeName);
-      onNow = [
-        for (final channel in favorites) _onNowItem(channel, time),
+      final (:channels, context: _) = await _liveLineup();
+      if (fresh) await _awaitGuide(channels);
+      onNow = [for (final channel in channels) _onNowItem(channel, time)];
+      for (final channel in channels) {
+        refreshBy(appState.epgService.lookupForChannel(channel)?.current.end);
+      }
+    }
+
+    var sports = const <Map<String, Object?>>[];
+    if (configured && sportsEnabled) {
+      final fixtures = await _sportsFixtures(fresh: fresh);
+      sports = [
+        for (final (fixture, channel) in fixtures)
+          _sportsItem(fixture, channel, time),
       ];
-      final now = clock.now();
-      for (final item in onNow) {
-        final end = item['endMs'] as int?;
-        if (end == null || end <= now.millisecondsSinceEpoch) continue;
-        if (refreshAt == null || end < refreshAt) refreshAt = end;
+      for (final (fixture, _) in fixtures) {
+        if (fixture.state == SportsFixtureState.scheduled) {
+          refreshBy(fixture.start);
+        }
       }
     }
 
     return {
       'watchNextEnabled': watchNextEnabled,
       'watchNext': watchNext,
-      'onNowEnabled': onNowEnabled,
-      'onNowTitle': _catalog.l10n.homeScreenOnNowChannel,
-      'onNow': onNow,
+      'channels': [
+        {
+          'id': 'on_now',
+          'title': l10n.homeScreenOnNowChannel,
+          'enabled': onNowEnabled,
+          'items': onNow,
+        },
+        {
+          'id': 'sports',
+          'title': l10n.navSports,
+          'enabled': sportsEnabled,
+          'items': sports,
+        },
+      ],
       'refreshAtMs': ?refreshAt,
     };
   }
 
-  /// Asks the server for the favorites' guide and waits, a while at most,
+  /// What the app's Home Live TV row would list: the lineup in the Live TV
+  /// screen's sort, favorites leading only when it leads with them, and the
+  /// context next/previous channel moves through.
+  Future<({List<Channel> channels, ChannelContext context})>
+  _liveLineup() async {
+    final appState = _catalog.appState;
+    final settings = appState.viewSettingsService;
+    // Fills the cache the synchronous order below reads; a background start
+    // can get here before main() has.
+    await Future.wait<Object?>([
+      settings.rememberMediaSort(),
+      settings.liveTvSortOption(),
+      settings.liveTvFavoritesFirst(),
+    ]);
+    final order = settings.liveTvBrowseOrder;
+    final query = LiveChannelQuery(
+      sort: catalogSortForChannels(order.sort),
+      favoritesFirst: order.favoritesFirst
+          ? await appState.favoritesService.all()
+          : const <int>{},
+    );
+    final repository = appState.catalogRepository;
+    final channels = await query.page(repository, 0, maxOnNow);
+    return (
+      channels: channels,
+      context: CatalogChannelContext(
+        repository: repository,
+        query: query,
+        length: await query.count(repository),
+      ),
+    );
+  }
+
+  /// Asks the server for the channels' guide and waits, a while at most,
   /// until each has a programme airing.
   Future<void> _awaitGuide(List<Channel> channels) async {
     if (channels.isEmpty) return;
@@ -244,10 +323,107 @@ class AndroidHomeScreenBridge {
       'key': 'live:${channel.id}',
       'title': programme?.title ?? channel.name,
       'description': ?description,
+      'live': true,
       'artworkUrl': ?(programme?.backdropUrl ?? programme?.iconUrl),
+      'cardLogos': [?channel.logoUrl],
       'logoUrl': ?channel.logoUrl,
       'startMs': ?programme?.start.millisecondsSinceEpoch,
       'endMs': ?programme?.end.millisecondsSinceEpoch,
+      'launch': {'kind': 'live', 'channelId': channel.id},
+    };
+  }
+
+  /// What the app's Home Sports row would list, each with the channel a
+  /// card plays. Kept a few minutes in front: leaving the app shouldn't ask
+  /// the server every time.
+  Future<List<(SportsFixture, Channel)>> _sportsFixtures({
+    required bool fresh,
+  }) async {
+    final cached = _sportsCache;
+    if (!fresh &&
+        cached != null &&
+        clock.now().difference(cached.at) < _sportsCacheAge) {
+      return cached.fixtures;
+    }
+    final appState = _catalog.appState;
+    try {
+      if (fresh) {
+        await appState.ensureServerHandshake().timeout(
+          _refreshWait,
+          onTimeout: () => false,
+        );
+      }
+      final capability = appState.sportsCapability;
+      if (capability == null) return const [];
+      final settings = appState.sportsSettings;
+      await settings.ensureLoaded();
+      final leagues = settings.enabledLeagues(capability.leagues);
+      if (leagues.isEmpty) return const [];
+      final (:from, :to) = homeSportsWindow(clock.now());
+      final service = SportsService(appState.xtreamService);
+      final fixtures = await service.fixtures(
+        capability: capability,
+        leagues: leagues,
+        from: from,
+        to: to,
+      );
+      final watchable = fixtures.where(isSportsFixtureWatchable).toList();
+      if (watchable.isEmpty) return const [];
+      final matches = await loadSportsChannelMatches(
+        service: service,
+        repository: appState.catalogRepository,
+        capability: capability,
+        leagues: leagues,
+        from: from,
+        to: to,
+      );
+      final shown = [
+        for (final fixture in rankHomeSportsFixtures(
+          watchable,
+          matches,
+          settings.followedTeamKeys,
+        ).take(maxSports))
+          (fixture, matches[fixture.key]!.first.channel),
+      ];
+      _sportsCache = (at: clock.now(), fixtures: shown);
+      return shown;
+    } on Object catch (error) {
+      debugPrint('[HomeScreen] Sports games failed: $error');
+      return cached?.fixtures ?? const [];
+    }
+  }
+
+  Map<String, Object?> _sportsItem(
+    SportsFixture fixture,
+    Channel channel,
+    DateFormat time,
+  ) {
+    final sides = fixture.displayOrder;
+    final isLive = fixture.state == SportsFixtureState.live;
+    final title =
+        fixture.name ??
+        (sides.isEmpty
+            ? fixture.league.abbreviation
+            : sides.map((side) => side.team.shortName).join(' - '));
+    final scores = [for (final side in sides) side.score];
+    final description = [
+      fixture.league.abbreviation,
+      if (isLive && scores.every((score) => score != null)) scores.join(' - '),
+      if (isLive)
+        fixture.statusDetail
+      else
+        time.format(fixture.start.toLocal()),
+      channel.name,
+    ].join(' · ');
+    final logos = [for (final side in sides) ?side.team.logoUrl];
+    return {
+      'key': 'sports:${fixture.key}',
+      'title': title,
+      'description': description,
+      'live': isLive,
+      'cardLogos': logos.isNotEmpty ? logos : [?fixture.leagueLogoUrl],
+      'logoUrl': ?channel.logoUrl,
+      'startMs': fixture.start.millisecondsSinceEpoch,
       'launch': {'kind': 'live', 'channelId': channel.id},
     };
   }
@@ -376,8 +552,8 @@ class AndroidHomeScreenBridge {
         if (channelId == null) return null;
         final channel = await _catalog.channelById(channelId);
         if (channel == null) return null;
-        final favorites = await _catalog.favoriteChannels(maxOnNow);
-        return HomeScreenChannelLaunch(channel, ListChannelContext(favorites));
+        final (channels: _, :context) = await _liveLineup();
+        return HomeScreenChannelLaunch(channel, context);
       case 'progress':
         final streamId = number('streamId');
         final contentType = ContentType.values.asNameMap()[raw['contentType']];

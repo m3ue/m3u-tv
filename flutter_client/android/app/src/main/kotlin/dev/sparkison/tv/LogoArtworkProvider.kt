@@ -173,31 +173,31 @@ class LogoArtworkProvider : ContentProvider() {
             .build()
 
         /**
-         * Draws the logo at [url] centred on a dark 16:9 card, once: home
-         * screen cards are landscape and cropped to fill, which cut wide and
-         * square logos apart. False when the logo can't be fetched.
+         * Draws [urls] (a channel's logo, or a game's two teams) side by side
+         * on a dark 16:9 card, once: home screen cards are landscape and
+         * cropped to fill, which cut wide and square logos apart. False when
+         * no logo can be fetched.
          */
-        internal fun writeCard(context: Context, key: String, url: String): Boolean {
+        internal fun writeCard(context: Context, key: String, urls: List<String>): Boolean {
             val file = cardFile(context, key)
             if (file.exists()) return true
-            val logo = download(url) ?: return false
+            val logos = urls.mapNotNull { download(it) }.filter { it.width > 0 && it.height > 0 }
+            if (logos.isEmpty()) return false
             val card = Bitmap.createBitmap(CARD_WIDTH, CARD_HEIGHT, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(card)
             canvas.drawColor(CARD_BACKGROUND)
-            if (logo.width > 0 && logo.height > 0) {
-                val boxWidth = CARD_WIDTH * 0.6f
-                val boxHeight = CARD_HEIGHT * 0.6f
+            val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+            val slotWidth = CARD_WIDTH * 0.8f / logos.size
+            val boxWidth = slotWidth * (if (logos.size == 1) 0.75f else 0.8f)
+            val boxHeight = CARD_HEIGHT * 0.6f
+            logos.forEachIndexed { index, logo ->
                 val scale = minOf(boxWidth / logo.width, boxHeight / logo.height)
                 val width = logo.width * scale
                 val height = logo.height * scale
-                val left = (CARD_WIDTH - width) / 2f
+                val centreX = CARD_WIDTH * 0.1f + slotWidth * (index + 0.5f)
+                val left = centreX - width / 2f
                 val top = (CARD_HEIGHT - height) / 2f
-                canvas.drawBitmap(
-                    logo,
-                    null,
-                    RectF(left, top, left + width, top + height),
-                    Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG),
-                )
+                canvas.drawBitmap(logo, null, RectF(left, top, left + width, top + height), paint)
             }
             val temp = File(file.parentFile, "$key.tmp")
             temp.outputStream().use { card.compress(Bitmap.CompressFormat.PNG, 100, it) }

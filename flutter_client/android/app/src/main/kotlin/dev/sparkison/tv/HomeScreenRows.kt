@@ -19,8 +19,8 @@ import androidx.tvprovider.media.tv.WatchNextProgram
  *
  * - Watch Next: the shared row every app adds to. Continue Watching entries
  *   (with the launcher's own progress bar) and Up Next episodes.
- * - "On Now": the app's own channel, the favorite live channels with what's
- *   airing on each.
+ * - The app's own channels: "On Now" (the Live TV lineup, with what's
+ *   airing on each channel) and Sports (today's games a channel carries).
  *
  * The launcher only shows what was last written here, so these are written
  * again whenever they may have changed: on leaving the app, after playback,
@@ -33,7 +33,6 @@ import androidx.tvprovider.media.tv.WatchNextProgram
  */
 internal object HomeScreenRows {
     private const val TAG = "HomeScreenRows"
-    private const val ON_NOW_CHANNEL_ID = "on_now"
     private const val PREFS = "home_screen_rows"
     private const val REMOVED_KEY = "removed_watch_next"
 
@@ -55,17 +54,24 @@ internal object HomeScreenRows {
             // No TvProvider (some OEM builds), or it refused the write.
             Log.w(TAG, "Watch Next update failed", error)
         }
-        try {
-            val onNowEnabled = payload["onNowEnabled"] == true
-            if (onNowEnabled) {
-                val title = payload["onNowTitle"] as? String ?: "On Now"
-                val items = (payload["onNow"] as? List<*>).orEmpty().filterIsInstance<Map<*, *>>()
-                syncOnNow(context, title, items, cardKeys)
-            } else {
-                deleteOnNowChannel(context)
+        val channels = (payload["channels"] as? List<*>).orEmpty().filterIsInstance<Map<*, *>>()
+        for (row in channels) {
+            val id = row["id"] as? String ?: continue
+            try {
+                val enabled = row["enabled"] == true
+                val items = (row["items"] as? List<*>).orEmpty().filterIsInstance<Map<*, *>>()
+                // An empty channel shows on the home screen as a row with
+                // nothing in it, so there's none until there is something to
+                // put in it.
+                if (enabled && items.isNotEmpty()) {
+                    syncChannel(context, id, row["title"] as? String ?: id, items, cardKeys)
+                } else {
+                    Log.i(TAG, "$id: off or nothing to show (enabled=$enabled), removing the channel")
+                    deleteChannel(context, id)
+                }
+            } catch (error: RuntimeException) {
+                Log.w(TAG, "$id update failed", error)
             }
-        } catch (error: RuntimeException) {
-            Log.w(TAG, "On Now update failed", error)
         }
         LogoArtworkProvider.pruneCards(context, cardKeys)
     }
@@ -102,6 +108,8 @@ internal object HomeScreenRows {
 
         val now = System.currentTimeMillis()
         val wanted = mutableSetOf<String>()
+        var inserted = 0
+        var updated = 0
         items.forEachIndexed { index, item ->
             val key = item["key"] as? String ?: return@forEachIndexed
             val engagement = item["engagement"] as? String ?: ""
@@ -121,14 +129,16 @@ internal object HomeScreenRows {
             }
             val program = watchNextProgram(context, item, key, engagement, engagedAt)
             if (current == null) {
-                resolver.insert(TvContractCompat.WatchNextPrograms.CONTENT_URI, program.toContentValues())
+                val uri = resolver.insert(TvContractCompat.WatchNextPrograms.CONTENT_URI, program.toContentValues())
+                if (uri == null) Log.w(TAG, "Watch Next: insert refused for $key") else inserted++
             } else {
-                resolver.update(
+                val rows = resolver.update(
                     TvContractCompat.buildWatchNextProgramUri(current.id),
                     program.toContentValues(),
                     null,
                     null,
                 )
+                if (rows < 1) Log.w(TAG, "Watch Next: update refused for $key") else updated++
             }
         }
         for ((key, program) in existing) {
@@ -136,6 +146,11 @@ internal object HomeScreenRows {
                 resolver.delete(TvContractCompat.buildWatchNextProgramUri(program.id), null, null)
             }
         }
+        Log.i(
+            TAG,
+            "Watch Next: ${items.size} sent, $inserted added, $updated updated, " +
+                "${existing.size - existing.keys.count { it in wanted }} dropped, ${removed.size} hidden by the viewer",
+        )
         // Forget removals of items no longer listed at all.
         val listed = items.mapNotNull { it["key"] as? String }.toSet()
         saveRemovedWatchNext(context, removed.filterKeys { it in listed })
@@ -203,18 +218,19 @@ internal object HomeScreenRows {
     }
 
     // -------------------------------------------------------------------------
-    // On Now
+    // The app's channels ("On Now", Sports)
     // -------------------------------------------------------------------------
 
     @SuppressLint("RestrictedApi")
-    private fun syncOnNow(
+    private fun syncChannel(
         context: Context,
+        id: String,
         title: String,
         items: List<Map<*, *>>,
         cardKeys: MutableSet<String>,
     ) {
         val resolver = context.contentResolver
-        val channelId = onNowChannelId(context, title) ?: return
+        val channelId = channelIdFor(context, id, title) ?: return
         val existing = mutableMapOf<String, PreviewProgram>()
         resolver.query(
             TvContractCompat.buildPreviewProgramsUriForChannel(channelId),
@@ -236,20 +252,24 @@ internal object HomeScreenRows {
 
         val now = System.currentTimeMillis()
         val wanted = mutableSetOf<String>()
+        var inserted = 0
+        var updated = 0
         items.forEachIndexed { index, item ->
             val key = item["key"] as? String ?: return@forEachIndexed
             if (!wanted.add(key)) return@forEachIndexed
-            val program = onNowProgram(context, channelId, item, key, items.size - index, now, cardKeys)
+            val program = previewProgram(context, channelId, item, key, items.size - index, now, cardKeys)
             val current = existing[key]
             if (current == null) {
-                resolver.insert(TvContractCompat.PreviewPrograms.CONTENT_URI, program.toContentValues())
+                val uri = resolver.insert(TvContractCompat.PreviewPrograms.CONTENT_URI, program.toContentValues())
+                if (uri == null) Log.w(TAG, "$id: insert refused for $key") else inserted++
             } else {
-                resolver.update(
+                val rows = resolver.update(
                     TvContractCompat.buildPreviewProgramUri(current.id),
                     program.toContentValues(),
                     null,
                     null,
                 )
+                if (rows < 1) Log.w(TAG, "$id: update refused for $key") else updated++
             }
         }
         for ((key, program) in existing) {
@@ -257,9 +277,10 @@ internal object HomeScreenRows {
                 resolver.delete(TvContractCompat.buildPreviewProgramUri(program.id), null, null)
             }
         }
+        Log.i(TAG, "$id: channel $channelId, ${items.size} sent, $inserted added, $updated updated")
     }
 
-    private fun onNowProgram(
+    private fun previewProgram(
         context: Context,
         channelId: Long,
         item: Map<*, *>,
@@ -272,20 +293,12 @@ internal object HomeScreenRows {
             .setChannelId(channelId)
             .setWeight(weight)
         builder.setType(TvContractCompat.PreviewPrograms.TYPE_CHANNEL)
-        builder.setLive(true)
+        builder.setLive(item["live"] == true)
         builder.setInternalProviderId(key)
         builder.setTitle(item["title"] as? String)
         (item["description"] as? String)?.let { builder.setDescription(it) }
         val artUri = (item["artworkUrl"] as? String)?.let(Uri::parse)
-            ?: (item["logoUrl"] as? String)?.let { logo ->
-                val cardKey = LogoArtworkProvider.keyFor(logo)
-                if (LogoArtworkProvider.writeCard(context, cardKey, logo)) {
-                    cardKeys += cardKey
-                    LogoArtworkProvider.cardUri(context, cardKey)
-                } else {
-                    null
-                }
-            }
+            ?: cardUri(context, (item["cardLogos"] as? List<*>).orEmpty().filterIsInstance<String>(), cardKeys)
         artUri?.let {
             builder.setPosterArtUri(it)
             builder.setPosterArtAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9)
@@ -293,8 +306,8 @@ internal object HomeScreenRows {
         (item["logoUrl"] as? String)?.let { builder.setLogoUri(Uri.parse(it)) }
         val start = (item["startMs"] as? Number)?.toLong()
         val end = (item["endMs"] as? Number)?.toLong()
+        if (start != null) builder.setStartTimeUtcMillis(start)
         if (start != null && end != null && end > start) {
-            builder.setStartTimeUtcMillis(start)
             builder.setEndTimeUtcMillis(end)
             // How far into the programme it is now; the next refresh moves it.
             builder.setDurationMillis((end - start).toInt())
@@ -304,57 +317,19 @@ internal object HomeScreenRows {
         return builder.build()
     }
 
-    /** The "On Now" channel's id, created (and shown) on first use. */
-    @SuppressLint("RestrictedApi")
-    private fun onNowChannelId(context: Context, title: String): Long? {
-        val resolver = context.contentResolver
-        var channel: androidx.tvprovider.media.tv.Channel? = null
-        resolver.query(
-            TvContractCompat.Channels.CONTENT_URI,
-            androidx.tvprovider.media.tv.Channel.PROJECTION,
-            null,
-            null,
-            null,
-        )?.use { cursor ->
-            while (cursor.moveToNext()) {
-                val found = androidx.tvprovider.media.tv.Channel.fromCursor(cursor)
-                if (found.internalProviderId == ON_NOW_CHANNEL_ID && channel == null) {
-                    channel = found
-                }
-            }
-        }
-        val appLink = Uri.parse(openAppIntent(context).toUri(Intent.URI_INTENT_SCHEME))
-        val values = androidx.tvprovider.media.tv.Channel.Builder()
-            .setType(TvContractCompat.Channels.TYPE_PREVIEW)
-            .setDisplayName(title)
-            .setAppLinkIntentUri(appLink)
-            .setInternalProviderId(ON_NOW_CHANNEL_ID)
-            .build()
-            .toContentValues()
-        channel?.let { existing ->
-            if (existing.displayName != title) {
-                resolver.update(TvContractCompat.buildChannelUri(existing.id), values, null, null)
-            }
-            return existing.id
-        }
-        val uri = resolver.insert(TvContractCompat.Channels.CONTENT_URI, values) ?: return null
-        val id = ContentUris.parseId(uri)
-        BitmapFactory.decodeResource(context.resources, R.mipmap.launcher_icon)?.let { icon ->
-            ChannelLogoUtils.storeChannelLogo(context, id, icon)
-        }
-        // The app's first channel is shown without asking the viewer.
-        try {
-            TvContractCompat.requestChannelBrowsable(context, id)
-        } catch (error: RuntimeException) {
-            Log.w(TAG, "Couldn't show the On Now channel", error)
-        }
-        return id
+    /** A card drawn from [logos] (one channel, or a game's two teams). */
+    private fun cardUri(context: Context, logos: List<String>, cardKeys: MutableSet<String>): Uri? {
+        if (logos.isEmpty()) return null
+        val cardKey = LogoArtworkProvider.keyFor(logos.joinToString("|"))
+        if (!LogoArtworkProvider.writeCard(context, cardKey, logos)) return null
+        cardKeys += cardKey
+        return LogoArtworkProvider.cardUri(context, cardKey)
     }
 
     @SuppressLint("RestrictedApi")
-    private fun deleteOnNowChannel(context: Context) {
-        val resolver = context.contentResolver
-        resolver.query(
+    private fun findChannels(context: Context, id: String): List<androidx.tvprovider.media.tv.Channel> {
+        val found = mutableListOf<androidx.tvprovider.media.tv.Channel>()
+        context.contentResolver.query(
             TvContractCompat.Channels.CONTENT_URI,
             androidx.tvprovider.media.tv.Channel.PROJECTION,
             null,
@@ -363,11 +338,49 @@ internal object HomeScreenRows {
         )?.use { cursor ->
             while (cursor.moveToNext()) {
                 val channel = androidx.tvprovider.media.tv.Channel.fromCursor(cursor)
-                if (channel.internalProviderId == ON_NOW_CHANNEL_ID) {
-                    // Takes the channel's programmes with it.
-                    resolver.delete(TvContractCompat.buildChannelUri(channel.id), null, null)
-                }
+                if (channel.internalProviderId == id) found += channel
             }
+        }
+        return found
+    }
+
+    /** The id of the app's channel [id], created (and shown) on first use. */
+    @SuppressLint("RestrictedApi")
+    private fun channelIdFor(context: Context, id: String, title: String): Long? {
+        val resolver = context.contentResolver
+        val appLink = Uri.parse(openAppIntent(context).toUri(Intent.URI_INTENT_SCHEME))
+        val values = androidx.tvprovider.media.tv.Channel.Builder()
+            .setType(TvContractCompat.Channels.TYPE_PREVIEW)
+            .setDisplayName(title)
+            .setAppLinkIntentUri(appLink)
+            .setInternalProviderId(id)
+            .build()
+            .toContentValues()
+        findChannels(context, id).firstOrNull()?.let { existing ->
+            if (existing.displayName != title) {
+                resolver.update(TvContractCompat.buildChannelUri(existing.id), values, null, null)
+            }
+            return existing.id
+        }
+        val uri = resolver.insert(TvContractCompat.Channels.CONTENT_URI, values) ?: return null
+        val channelId = ContentUris.parseId(uri)
+        BitmapFactory.decodeResource(context.resources, R.mipmap.launcher_icon)?.let { icon ->
+            ChannelLogoUtils.storeChannelLogo(context, channelId, icon)
+        }
+        // Only the app's first channel is shown without asking; the launcher
+        // lists any others for the viewer to turn on.
+        try {
+            TvContractCompat.requestChannelBrowsable(context, channelId)
+        } catch (error: RuntimeException) {
+            Log.w(TAG, "Couldn't show the $id channel", error)
+        }
+        return channelId
+    }
+
+    private fun deleteChannel(context: Context, id: String) {
+        for (channel in findChannels(context, id)) {
+            // Takes the channel's programmes with it.
+            context.contentResolver.delete(TvContractCompat.buildChannelUri(channel.id), null, null)
         }
     }
 

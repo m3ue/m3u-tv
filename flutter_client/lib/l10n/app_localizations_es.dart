@@ -519,7 +519,14 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsAndroidHomeOnNowHint =>
-      'Añade a la pantalla de inicio una fila con tus canales favoritos y lo que se emite en ellos. Se actualiza aunque la app esté cerrada.';
+      'Añade a la pantalla de inicio una fila con tus canales de TV en directo y lo que se emite en ellos, en tu orden de TV en directo. Se actualiza aunque la app esté cerrada.';
+
+  @override
+  String get settingsAndroidHomeSports => 'Canal de deportes';
+
+  @override
+  String get settingsAndroidHomeSportsHint =>
+      'Añade a la pantalla de inicio una fila con los partidos de hoy que emiten tus canales, como en la fila de Deportes del inicio.';
 
   @override
   String get settingsSectionFilters => 'Filtros';

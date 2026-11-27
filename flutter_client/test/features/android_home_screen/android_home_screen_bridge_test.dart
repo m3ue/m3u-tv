@@ -10,15 +10,51 @@ import 'package:m3u_tv/services/app_state_controller.dart';
 import 'package:m3u_tv/services/catalog_db/catalog_repository.dart';
 import 'package:m3u_tv/services/domain_models.dart';
 import 'package:m3u_tv/services/epg_service.dart';
+import 'package:m3u_tv/services/favorites_service.dart';
+import 'package:m3u_tv/services/sports_models.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
 import 'package:m3u_tv/shared/channel_context.dart';
+import 'package:m3u_tv/shared/channel_sort.dart';
 
 final _now = DateTime.utc(2026, 11, 27, 20, 15);
 
 class _FakeRepository extends Fake implements CatalogRepository {
-  _FakeRepository(this.items);
+  _FakeRepository(this.items, {this.lineup = const []});
 
   final Map<int, Object> items;
+
+  /// The live channels, in provider order.
+  final List<Channel> lineup;
+  CatalogSort? lastSort;
+  Set<int>? lastFavoritesFirst;
+
+  @override
+  Future<List<T>> pageActiveItems<T>({
+    required String kind,
+    String? categoryId,
+    String? search,
+    Set<int>? ids,
+    CatalogSort sort = CatalogSort.providerOrder,
+    Set<int> favoritesFirst = const {},
+    required int offset,
+    required int limit,
+  }) async {
+    lastSort = sort;
+    lastFavoritesFirst = favoritesFirst;
+    final ordered = [
+      ...lineup.where((c) => favoritesFirst.contains(c.id)),
+      ...lineup.where((c) => !favoritesFirst.contains(c.id)),
+    ];
+    return ordered.skip(offset).take(limit).cast<T>().toList();
+  }
+
+  @override
+  Future<int> countActiveItems({
+    required String kind,
+    String? categoryId,
+    String? search,
+    Set<int>? ids,
+  }) async => lineup.length;
 
   @override
   Future<List<T>> activeItemsByIds<T>({
@@ -46,6 +82,10 @@ class _FakeAppState extends Fake implements AppStateController {
   @override
   final ViewSettingsService viewSettingsService = ViewSettingsService();
   @override
+  final FavoritesService favoritesService = FavoritesService();
+  @override
+  SportsCapability? get sportsCapability => null;
+  @override
   bool isConfigured = true;
   @override
   bool get isBootstrapping => false;
@@ -60,6 +100,13 @@ class _FakeAppState extends Fake implements AppStateController {
   @override
   Future<void> refreshRecentlyWatched() async => refreshes++;
   @override
+  Future<bool> ensureServerHandshake() async {
+    handshakes++;
+    return true;
+  }
+
+  int handshakes = 0;
+  @override
   void ensureEpgForChannels(
     List<Channel> channels, {
     DateTime? startDate,
@@ -68,17 +115,13 @@ class _FakeAppState extends Fake implements AppStateController {
 }
 
 class _FakeCatalog extends CarCatalog {
-  _FakeCatalog(_FakeAppState super.appState, this.favorites);
+  _FakeCatalog(_FakeAppState super.appState, this.channels);
 
-  final List<Channel> favorites;
-
-  @override
-  Future<List<Channel>> favoriteChannels(int max) async =>
-      favorites.take(max).toList();
+  final List<Channel> channels;
 
   @override
   Future<Channel?> channelById(int id) async =>
-      favorites.where((c) => c.id == id).firstOrNull;
+      channels.where((c) => c.id == id).firstOrNull;
 
   @override
   AppLocalizations get l10n => lookupAppLocalizations(const Locale('en'));
@@ -169,7 +212,7 @@ void main() {
         ),
       ],
       epgService: epg,
-      catalogRepository: _FakeRepository({}),
+      catalogRepository: _FakeRepository({}, lineup: const [_news, _sport]),
     );
     bridge = AndroidHomeScreenBridge(
       _FakeCatalog(appState, const [_news, _sport]),
@@ -205,13 +248,23 @@ void main() {
     expect(episode['launch'], containsPair('seriesId', 40));
   });
 
-  test('On Now lists favorites with what is airing', () async {
+  List<Map<String, Object?>> channelItems(
+    Map<String, Object?> payload,
+    String id,
+  ) =>
+      (payload['channels']! as List<Map<String, Object?>>).firstWhere(
+            (channel) => channel['id'] == id,
+          )['items']!
+          as List<Map<String, Object?>>;
+
+  test('On Now lists the Live TV lineup with what is airing', () async {
     final payload = await clock_package.withClock(
       clock_package.Clock.fixed(_now),
       () => bridge.collect(fresh: false),
     );
-    expect(payload['onNowTitle'], 'On Now');
-    final items = payload['onNow']! as List<Map<String, Object?>>;
+    final channels = payload['channels']! as List<Map<String, Object?>>;
+    expect(channels.first['title'], 'On Now');
+    final items = channelItems(payload, 'on_now');
     expect(items, hasLength(2));
 
     final news = items[0];
@@ -219,6 +272,7 @@ void main() {
     expect(news['title'], 'Evening News');
     expect(news['description'], startsWith('News 24 · '));
     expect(news['artworkUrl'], 'http://example.test/news.jpg');
+    expect(news['live'], true);
     expect(news['launch'], {'kind': 'live', 'channelId': 7});
 
     // No guide: the channel's name, and no times.
@@ -232,14 +286,56 @@ void main() {
     );
   });
 
+  test(
+    'On Now follows the Live TV sort; favorites order, never filter',
+    () async {
+      final settings = appState.viewSettingsService;
+      await settings.setRememberMediaSort(true);
+      await settings.setLiveTvSortOption(ChannelSortOption.alphabeticalAsc);
+      await settings.setLiveTvFavoritesFirst(true);
+      await appState.favoritesService.toggle(_sport.id);
+      final repository = appState.catalogRepository as _FakeRepository;
+
+      var payload = await bridge.collect(fresh: false);
+      expect(
+        repository.lastSort,
+        catalogSortForChannels(ChannelSortOption.alphabeticalAsc),
+      );
+      expect(repository.lastFavoritesFirst, {_sport.id});
+      expect(channelItems(payload, 'on_now').map((i) => i['key']), [
+        'live:8',
+        'live:7',
+      ]);
+
+      await settings.setLiveTvFavoritesFirst(false);
+      payload = await bridge.collect(fresh: false);
+      expect(repository.lastFavoritesFirst, isEmpty);
+      expect(channelItems(payload, 'on_now').map((i) => i['key']), [
+        'live:7',
+        'live:8',
+      ]);
+    },
+  );
+
+  test('Sports is empty without the server Sports feature', () async {
+    final payload = await bridge.collect(fresh: false);
+    final sports = (payload['channels']! as List<Map<String, Object?>>)
+        .firstWhere((channel) => channel['id'] == 'sports');
+    expect(sports['enabled'], true);
+    expect(sports['items'], isEmpty);
+  });
+
   test('turned off rows are sent empty', () async {
     await appState.viewSettingsService.setAndroidHomeWatchNext(false);
     await appState.viewSettingsService.setAndroidHomeOnNow(false);
+    await appState.viewSettingsService.setAndroidHomeSports(false);
     final payload = await bridge.collect(fresh: false);
     expect(payload['watchNextEnabled'], false);
     expect(payload['watchNext'], isEmpty);
-    expect(payload['onNowEnabled'], false);
-    expect(payload['onNow'], isEmpty);
+    for (final channel in payload['channels']! as List<Map<String, Object?>>) {
+      expect(channel['enabled'], false);
+      expect(channel['items'], isEmpty);
+    }
     expect(payload.containsKey('refreshAtMs'), isFalse);
   });
 
@@ -249,6 +345,7 @@ void main() {
       await bridge.collect(fresh: true);
       expect(appState.refreshes, 1);
       expect(appState.epgRequests.single, [_news, _sport]);
+      expect(appState.handshakes, 1);
     },
   );
 
@@ -287,17 +384,15 @@ void main() {
     expect(progress.seriesId, 40);
   });
 
-  test('an On Now card plays the channel within the favorites', () async {
+  test('an On Now card plays the channel within the lineup', () async {
     final launch = await bridge.resolveLaunch({
       'kind': 'live',
       'channelId': 8,
     });
     final channelLaunch = launch! as HomeScreenChannelLaunch;
     expect(channelLaunch.channel, same(_sport));
-    expect(
-      (channelLaunch.context as ListChannelContext).channels,
-      [_news, _sport],
-    );
+    expect(channelLaunch.context, isA<CatalogChannelContext>());
+    expect(channelLaunch.context.length, 2);
     expect(
       await bridge.resolveLaunch({'kind': 'live', 'channelId': 1}),
       isNull,

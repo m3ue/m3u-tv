@@ -277,6 +277,7 @@ class ViewSettingsService extends ChangeNotifier {
   static const backgroundAudioKey = 'm3ue_tv_background_audio';
   static const androidHomeWatchNextKey = 'm3ue_tv_android_home_watch_next';
   static const androidHomeOnNowKey = 'm3ue_tv_android_home_on_now';
+  static const androidHomeSportsKey = 'm3ue_tv_android_home_sports';
   static const vodPlayerKey = 'm3ue_tv_vod_player';
   static const showPlaybackDiagnosticsKey = 'm3ue_tv_show_playback_diagnostics';
   static const defaultStartPageKey = 'm3ue_tv_default_start_page';
@@ -1040,8 +1041,8 @@ class ViewSettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Whether the app adds its "On Now" channel (favorite live channels and
-  /// what's airing on them) to the Android TV home screen.
+  /// Whether the app adds its "On Now" channel (the Live TV lineup and
+  /// what's airing on it) to the Android TV home screen.
   Future<bool> androidHomeOnNow() async {
     final raw = await _readResolved(androidHomeOnNowKey);
     return raw as bool? ?? true;
@@ -1049,6 +1050,18 @@ class ViewSettingsService extends ChangeNotifier {
 
   Future<void> setAndroidHomeOnNow(bool enabled) async {
     await _write(androidHomeOnNowKey, enabled);
+    notifyListeners();
+  }
+
+  /// Whether the app adds a Sports channel (today's games, as Home's Sports
+  /// row lists them) to the Android TV home screen.
+  Future<bool> androidHomeSports() async {
+    final raw = await _readResolved(androidHomeSportsKey);
+    return raw as bool? ?? true;
+  }
+
+  Future<void> setAndroidHomeSports(bool enabled) async {
+    await _write(androidHomeSportsKey, enabled);
     notifyListeners();
   }
 

@@ -518,7 +518,14 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsAndroidHomeOnNowHint =>
-      'Ajoute à l\'écran d\'accueil une rangée avec vos chaînes favorites et ce qu\'elles diffusent. Mise à jour même lorsque l\'app est fermée.';
+      'Ajoute à l\'écran d\'accueil une rangée avec vos chaînes TV en direct et ce qu\'elles diffusent, dans votre ordre de tri TV en direct. Mise à jour même lorsque l\'app est fermée.';
+
+  @override
+  String get settingsAndroidHomeSports => 'Chaîne Sports';
+
+  @override
+  String get settingsAndroidHomeSportsHint =>
+      'Ajoute à l\'écran d\'accueil une rangée avec les matchs du jour diffusés par vos chaînes, comme la rangée Sports de l\'accueil.';
 
   @override
   String get settingsSectionFilters => 'Filtres';

@@ -22,11 +22,12 @@ import kotlin.coroutines.resume
  * Keeps the home screen rows ([HomeScreenRows]) current while the app isn't
  * open, so they don't go stale for days until it next is: starts the app's
  * engine without an activity, as Android Auto does ([AppFlutterEngine]), asks
- * Dart for fresh rows (Continue Watching from the server, and what's airing
- * on the favorite channels), writes them, and lets the engine go.
+ * Dart for fresh rows (Continue Watching, what's airing, today's games),
+ * writes them, and lets the engine go.
  *
- * Runs every [PERIODIC_MINUTES], and also when the programme airing soonest
- * on an "On Now" channel ends, so that row moves on with the guide.
+ * Runs every [PERIODIC_MINUTES], and also when the soonest programme on the
+ * "On Now" channel ends or the next game starts, so those rows move on with
+ * the guide.
  */
 class HomeScreenRefreshWorker(
     context: Context,
@@ -82,8 +83,9 @@ class HomeScreenRefreshWorker(
         fun schedule(context: Context, payload: Map<*, *>) {
             val workManager = WorkManager.getInstance(context)
             val watchNextEnabled = payload["watchNextEnabled"] == true
-            val onNowEnabled = payload["onNowEnabled"] == true
-            if (!watchNextEnabled && !onNowEnabled) {
+            val channelsEnabled = (payload["channels"] as? List<*>).orEmpty()
+                .any { (it as? Map<*, *>)?.get("enabled") == true }
+            if (!watchNextEnabled && !channelsEnabled) {
                 workManager.cancelUniqueWork(PERIODIC_WORK)
                 workManager.cancelUniqueWork(NEXT_WORK)
                 return
@@ -96,7 +98,7 @@ class HomeScreenRefreshWorker(
                     .build(),
             )
             val refreshAt = (payload["refreshAtMs"] as? Number)?.toLong()
-            if (!onNowEnabled || refreshAt == null) {
+            if (refreshAt == null) {
                 workManager.cancelUniqueWork(NEXT_WORK)
                 return
             }
