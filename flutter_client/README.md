@@ -242,8 +242,40 @@ Things to know before submitting:
 ### Linux
 
 ```bash
-flutter build linux --release
+linux/packaging/build-linux-release.sh
 ```
+
+That's the same script CI and the release workflow run. It needs an **Ubuntu 24.04 x86_64** host with:
+
+```bash
+sudo apt-get install clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+  libwayland-dev libegl-dev libsecret-1-dev libjsoncpp-dev libx11-dev libxi-dev \
+  gsettings-desktop-schemas zstd imagemagick zsync desktop-file-utils \
+  libmujs3 liblua5.2-0 libdisplay-info1 libva-wayland2 dconf-gsettings-backend \
+  flatpak flatpak-builder
+flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install --user flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
+```
+
+It downloads the pinned libmpv from `mpv-build.lock.json` (FFmpeg, libplacebo, dav1d and libass are compiled into it), builds against it, then makes the bundle portable and cuts every package from that one tree into `build/linux-release/`:
+
+| Package | Notes |
+|---|---|
+| `m3u-tv-v<version>-linux.zip` | Portable. Unzip and run `./m3u-tv.sh` (not `m3u_tv` directly). |
+| `m3u-tv-v<version>-linux-x86_64.AppImage` | Gear Lever and AppImageUpdate find updates from GitHub Releases. For hosts without FUSE: `--appimage-extract-and-run`. |
+| `m3u-tv-v<version>-linux-amd64.deb` | Installs to `/opt/m3u-tv`, launches as `m3u-tv`. Debian 13+ / Ubuntu 24.04+. |
+| `m3u-tv-v<version>-linux-x86_64.flatpak` | `flatpak install --user <file>`. Uses the Freedesktop 25.08 runtime from Flathub. Keeps its own data under `~/.var/app/dev.sparkison.tv`. |
+
+Pass `--formats zip,appimage` (any subset of `zip,appimage,deb,flatpak`) to build fewer packages, and `--skip-build` to repackage an existing release build. `scripts/build-release.sh linux` calls it too, and only builds the Flatpak when `flatpak-builder` is installed.
+
+How the bundle stays portable:
+
+- **What ships:** `linux/packaging/bundle-libs.sh` copies every library the app and libmpv need, plus the GTK/GIO modules and GSettings schemas GTK loads at runtime.
+- **What comes from the host:** the libraries in `linux/packaging/host-libraries.txt` - glibc, the C++ runtime, GPU/VA-API/VDPAU/Vulkan, Wayland/X11, ALSA and fontconfig/freetype. These have to match the running driver, compositor and font setup, so hardware decoding uses the system's own drivers on every distro.
+- **Launcher:** `m3u-tv.sh` points the loader and GTK at the bundle. Programs the app opens, such as the browser for sign-in links, get the user's original environment back through `lib/host-launch.sh`.
+- **Checks:** `linux/packaging/check-bundle.py` fails the build if any dependency is missing, or loads from the host without being on that list, or if the Wayland video plane wasn't compiled in. It also plays a sample through the bundled libmpv. The `.deb`'s `Depends` is generated from the same check.
+
+Requirements: x86_64 with **glibc 2.39 or newer** (the build host's), plus the usual desktop graphics and audio libraries. A plain `flutter build linux --release` still works for development and uses the system libmpv.
 
 ### Windows
 

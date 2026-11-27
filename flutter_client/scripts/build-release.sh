@@ -369,9 +369,14 @@ build_macos() {
 }
 
 build_linux() {
-    require python3 "It's used to zip the bundle, same as CI."
-    flutter_build linux --release
-    zip_dir build/linux/x64/release/bundle "$OUT_DIR/m3u-tv-v$VERSION-linux.zip"
+    require python3 "It's used by the Linux packaging scripts, same as CI."
+    local prefix="$FLUTTER_CLIENT/build/libmpv-prefix"
+    local formats="zip,appimage,deb"
+    command -v flatpak-builder >/dev/null && formats="$formats,flatpak"
+    run python3 linux/packaging/fetch-libmpv.py --dest "$prefix"
+    M3U_TV_LIBMPV_PREFIX="$prefix" flutter_build linux --release
+    run linux/packaging/build-linux-release.sh --skip-build --version "$VERSION" \
+        --output "$OUT_DIR" --formats "${M3U_TV_LINUX_FORMATS:-$formats}"
 }
 
 build_windows() {

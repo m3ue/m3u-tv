@@ -1,0 +1,42 @@
+{
+  "app-id": "dev.sparkison.tv",
+  "runtime": "org.freedesktop.Platform",
+  "runtime-version": "25.08",
+  "sdk": "org.freedesktop.Sdk",
+  "command": "m3u-tv",
+  "finish-args": [
+    "--share=network",
+    "--share=ipc",
+    "--socket=wayland",
+    "--socket=fallback-x11",
+    "--socket=pulseaudio",
+    "--device=dri",
+    "--talk-name=org.freedesktop.secrets",
+    "--talk-name=org.freedesktop.ScreenSaver",
+    "--env=GTK_USE_PORTAL=1"
+  ],
+  "build-options": {
+    "strip": false,
+    "no-debuginfo": true
+  },
+  "modules": [
+    {
+      "name": "m3u-tv",
+      "buildsystem": "simple",
+      "build-commands": [
+        "cp -a bundle /app/m3u-tv",
+        "install -Dm755 m3u-tv /app/bin/m3u-tv",
+        "install -Dm644 dev.sparkison.tv.desktop /app/share/applications/dev.sparkison.tv.desktop",
+        "install -Dm644 dev.sparkison.tv.metainfo.xml /app/share/metainfo/dev.sparkison.tv.metainfo.xml",
+        "install -Dm644 dev.sparkison.tv.png /app/share/icons/hicolor/512x512/apps/dev.sparkison.tv.png"
+      ],
+      "sources": [
+        { "type": "dir", "path": "bundle", "dest": "bundle" },
+        { "type": "file", "path": "m3u-tv" },
+        { "type": "file", "path": "dev.sparkison.tv.desktop" },
+        { "type": "file", "path": "dev.sparkison.tv.metainfo.xml" },
+        { "type": "file", "path": "dev.sparkison.tv.png" }
+      ]
+    }
+  ]
+}

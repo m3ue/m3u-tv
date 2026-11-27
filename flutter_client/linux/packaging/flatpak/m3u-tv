@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /app/m3u-tv/m3u-tv.sh "$@"

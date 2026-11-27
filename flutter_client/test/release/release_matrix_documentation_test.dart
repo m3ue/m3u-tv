@@ -84,7 +84,7 @@ void main() {
       'Build APK',
       'Build iOS IPA (unsigned)',
       'Build macOS app (unsigned)',
-      'Build Linux app',
+      'Build and package Linux release',
       'Build Windows app',
     ]) {
       final step = workflowStep(releaseWorkflow, stepName);
@@ -184,7 +184,7 @@ void main() {
     expect(releaseWorkflow, contains('name: Build iOS IPA'));
     expect(releaseWorkflow, contains('name: Build tvOS IPA'));
     expect(releaseWorkflow, contains('name: Build macOS DMG'));
-    expect(releaseWorkflow, contains('name: Build Linux ZIP'));
+    expect(releaseWorkflow, contains('name: Build Linux packages'));
     expect(releaseWorkflow, contains('name: Build Windows ZIP'));
   });
 
@@ -294,9 +294,10 @@ void main() {
           (
             start: '  build-linux:',
             end: '  build-windows:',
-            checksumCommands: const [r'sha256sum "$ZIP" > "$ZIP.sha256"'],
+            // build-linux-release.sh writes every Linux package's sidecar.
+            checksumCommands: const ['linux/packaging/build-linux-release.sh'],
             uploadedAsset:
-                r'flutter_client/m3u-tv-v${{ needs.validate.outputs.version }}-linux.zip',
+                r'linux-release/m3u-tv-v${{ needs.validate.outputs.version }}-linux.zip',
           ),
           (
             start: '  build-windows:',
@@ -374,17 +375,24 @@ void main() {
       verifyStep: 'Verify non-Apple assets',
       releaseStep: 'Create or update release',
       releaseCommands: const ['gh release upload', 'gh release create'],
-      assets: const [
+      assets: [
         (
           verified: r'artifacts/android-apks/m3u-tv-v${V}-android.apk',
           uploaded: r'artifacts/android-apks/m3u-tv-v${V}-android.apk',
           published: true,
         ),
-        (
-          verified: r'artifacts/linux-zips/m3u-tv-v${V}-linux.zip',
-          uploaded: r'artifacts/linux-zips/m3u-tv-v${V}-linux.zip',
-          published: true,
-        ),
+        for (final linuxPackage in const [
+          'linux.zip',
+          'linux-x86_64.AppImage',
+          'linux-x86_64.AppImage.zsync',
+          'linux-amd64.deb',
+          'linux-x86_64.flatpak',
+        ])
+          (
+            verified: 'artifacts/linux/m3u-tv-v\${V}-$linuxPackage',
+            uploaded: 'artifacts/linux/m3u-tv-v\${V}-$linuxPackage',
+            published: true,
+          ),
         (
           verified: r'artifacts/windows-zips/m3u-tv-v${V}-windows.zip',
           uploaded: r'artifacts/windows-zips/m3u-tv-v${V}-windows.zip',
@@ -549,7 +557,7 @@ void main() {
       );
 
       expect(releaseSection, contains('name: Verify non-Apple assets'));
-      expect(releaseSection, contains('artifacts/linux-zips/m3u-tv-v'));
+      expect(releaseSection, contains('artifacts/linux/m3u-tv-v'));
       expect(releaseSection, contains('artifacts/windows-zips/m3u-tv-v'));
 
       final verifyIndex = releaseSection.indexOf(
@@ -563,7 +571,7 @@ void main() {
         releaseStepIndex,
       );
 
-      expect(verifierSection, contains('artifacts/linux-zips/m3u-tv-v'));
+      expect(verifierSection, contains('artifacts/linux/m3u-tv-v'));
       expect(verifierSection, contains('artifacts/windows-zips/m3u-tv-v'));
 
       final releaseBody = releaseSection.substring(releaseStepIndex);
@@ -573,8 +581,8 @@ void main() {
 
       expect(
         assetArray,
-        contains('linux-zip'),
-        reason: 'Linux ZIP must be published as a public release asset',
+        contains('artifacts/linux/'),
+        reason: 'Linux packages must be published as public release assets',
       );
       expect(
         assetArray,
@@ -592,7 +600,7 @@ void main() {
         releaseSection.indexOf('name: Release summary'),
       );
       expect(releaseSummary, contains('Android + Android TV'));
-      expect(releaseSummary, contains('| Linux |'));
+      expect(releaseSummary, contains('| Linux (x86_64) |'));
       expect(
         releaseSummary,
         contains('| Windows (portable, unsigned) |'),
@@ -746,51 +754,42 @@ void main() {
     final releaseWorkflow = readFile(releaseWorkflowPath);
 
     expect(linuxCmake, contains('RENAME "libmpv.so.2"'));
-    expect(releaseWorkflow, contains('name: Build Linux ZIP'));
-    expect(releaseWorkflow, contains('name: Verify Linux bundle'));
-
-    const verifyLinuxStepName = '      - name: Verify Linux bundle';
-    final verifyLinuxStepIndex = releaseWorkflow.indexOf(verifyLinuxStepName);
-    expect(verifyLinuxStepIndex, greaterThan(-1));
-    final verifyLinuxStepEnd = releaseWorkflow.indexOf(
-      '\n      - ',
-      verifyLinuxStepIndex + verifyLinuxStepName.length,
-    );
-    expect(verifyLinuxStepEnd, greaterThan(verifyLinuxStepIndex));
-    final verifyLinuxStep = releaseWorkflow.substring(
-      verifyLinuxStepIndex,
-      verifyLinuxStepEnd,
-    );
-    const runBlockMarker = '\n        run: |\n';
-    final runBlockIndex = verifyLinuxStep.indexOf(runBlockMarker);
-    expect(runBlockIndex, greaterThan(-1));
-    final verifyLinuxRunBlock = verifyLinuxStep.substring(
-      runBlockIndex + runBlockMarker.length,
-    );
-
+    expect(linuxCmake, contains('M3U_TV_LIBMPV_PREFIX'));
+    expect(releaseWorkflow, contains('name: Build Linux packages'));
     expect(
-      verifyLinuxRunBlock,
-      contains(r'test -s "$BUNDLE/lib/libmpv.so.2"'),
+      workflowStep(releaseWorkflow, 'Build and package Linux release'),
+      contains('linux/packaging/build-linux-release.sh'),
     );
-    expect(verifyLinuxRunBlock, contains(r'readelf -d "$BUNDLE/m3u_tv"'));
-    expect(releaseWorkflow, contains('python3 -m zipfile -c'));
-    expect(releaseWorkflow, contains('python3 -m zipfile -t'));
-    expect(releaseWorkflow, contains('sha256sum'));
+    expect(
+      workflowStep(releaseWorkflow, 'Verify installed Flatpak'),
+      contains('build-flatpak.py verify'),
+    );
+
+    final linuxRelease = readFile('linux/packaging/build-linux-release.sh');
+    expect(linuxRelease, contains('fetch-libmpv.py'));
+    expect(linuxRelease, contains('M3U_TV_LIBMPV_PREFIX='));
+    expect(linuxRelease, contains('is not the pinned libmpv'));
+    expect(linuxRelease, contains('bundle-libs.sh'));
+    expect(linuxRelease, contains('check-bundle.py" --probe-mpv'));
+    expect(linuxRelease, contains('python3 -m zipfile -c'));
+    expect(linuxRelease, contains('python3 -m zipfile -t'));
+    expect(linuxRelease, contains('sha256sum'));
+
+    final checkBundle = readFile('linux/packaging/check-bundle.py');
+    expect(checkBundle, contains('host-libraries.txt'));
+    expect(checkBundle, contains('resolves nowhere'));
+    expect(checkBundle, contains('libwayland-egl.so.1'));
+    final hostLibraries = readFile('linux/packaging/host-libraries.txt');
+    expect(hostLibraries, contains(r'libc\.so'));
+    expect(hostLibraries, contains('libva'));
+    expect(hostLibraries, isNot(contains('libgtk')));
+    expect(hostLibraries, isNot(contains('libav')));
+
     expect(releaseWorkflow, contains('name: Verify Windows bundle'));
     expect(releaseWorkflow, contains('Expand-Archive'));
     expect(releaseWorkflow, contains('Get-FileHash -Algorithm SHA256'));
     expect(releaseWorkflow, contains('.zip.sha256'));
     expect(releaseWorkflow, contains('.apk.sha256'));
-
-    expect(verifyLinuxRunBlock, contains('ALLOWED_SYSTEM_LIBS='));
-    expect(
-      verifyLinuxRunBlock,
-      contains(
-        'ERROR: Unexpected system dependency not in ALLOWED_SYSTEM_LIBS',
-      ),
-    );
-    expect(verifyLinuxRunBlock, contains("'libgtk-3.so.0'"));
-    expect(verifyLinuxRunBlock, contains("'libc.so.6'"));
   });
 
   test('pull request CI compiles native Linux and Windows runners', () {
@@ -825,8 +824,8 @@ void main() {
     final linuxJob = ciWorkflow.substring(linuxJobIdx, windowsJobIdx);
     final windowsJob = ciWorkflow.substring(windowsJobIdx);
 
-    // Pinned: a Linux build links against the host's glibc/GTK/ffmpeg, so
-    // ubuntu-latest moving to a newer release breaks older distros.
+    // Pinned: the bundled GTK/glib come from the build host and set the
+    // glibc floor, so ubuntu-latest moving on would drop older distros.
     expect(linuxJob, contains('runs-on: ubuntu-24.04'));
     expect(linuxJob, isNot(contains('runs-on: ubuntu-latest')));
     final releaseWorkflow = readFile(releaseWorkflowPath);
@@ -837,7 +836,8 @@ void main() {
       releaseWorkflow.indexOf('steps:', releaseLinuxIdx),
     );
     expect(releaseLinuxHeader, contains('runs-on: ubuntu-24.04'));
-    expect(linuxJob, contains('flutter build linux --release'));
+    expect(linuxJob, contains('linux/packaging/build-linux-release.sh'));
+    expect(linuxJob, isNot(contains('libmpv-dev')));
     expect(linuxJob, isNot(contains('upload-artifact')));
     expect(windowsJob, contains('runs-on: windows-latest'));
     expect(windowsJob, contains('flutter build windows --release'));

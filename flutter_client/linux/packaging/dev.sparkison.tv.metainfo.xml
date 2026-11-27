@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.sparkison.tv</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>M3U TV</name>
+  <summary>Live TV, movies and series player for M3U Editor</summary>
+  <developer id="dev.sparkison">
+    <name>sparkison</name>
+  </developer>
+  <description>
+    <p>M3U TV is the player for M3U Editor and Xtream-compatible servers. Browse live
+    channels with a full program guide, watch movies and series, and pick up where you
+    left off.</p>
+    <p>Playback uses mpv, with subtitles, multiple audio tracks and hardware video
+    decoding on supported systems.</p>
+  </description>
+  <launchable type="desktop-id">dev.sparkison.tv.desktop</launchable>
+  <url type="homepage">https://github.com/m3ue/m3u-tv</url>
+  <url type="bugtracker">https://github.com/m3ue/m3u-tv/issues</url>
+  <url type="vcs-browser">https://github.com/m3ue/m3u-tv</url>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>tv-remote</control>
+  </supports>
+</component>

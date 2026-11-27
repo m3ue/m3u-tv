@@ -4,7 +4,7 @@
 # We pin exact mpv-build commits/asset hashes in 3 places:
 #   - ios/macos/tvos Runner.xcodeproj/project.pbxproj (XCRemoteSwiftPackageReference
 #     "mpv-build" -> requirement.revision) + their two Package.resolved files
-#   - mpv-build.lock.json (android + windows tarball asset names + checksums)
+#   - mpv-build.lock.json (android, linux + windows tarball asset names + checksums)
 #   - windows/CMakeLists.txt (a hand-kept mirror of the lock's windows entry)
 #
 # mpv-build published every build before f4d61bc to one perpetually-growing
@@ -88,7 +88,7 @@ for platform in ios macos tvos; do
 done
 
 echo ""
-echo "=== Android + Windows (mpv-build.lock.json) ==="
+echo "=== Android, Linux + Windows (mpv-build.lock.json) ==="
 
 lock_file="mpv-build.lock.json"
 if [[ -f "$lock_file" ]]; then

@@ -22,6 +22,20 @@
       },
       "key": "3cbb503da1da"
     },
+    "linux": {
+      "assetBase": "https://github.com/edde746/mpv-build/releases/download/binaries-42bac6793cc8",
+      "assets": {
+        "aarch64": {
+          "asset": "libmpv-linux-4ac45772c2fc-aarch64.tar.zst",
+          "checksum": "a09af35de0e7f10131ef34f0d8ba2e4060b1cab75ecf1db6da72aa3aa1a0f6bb"
+        },
+        "x86_64": {
+          "asset": "libmpv-linux-4ac45772c2fc-x86_64.tar.zst",
+          "checksum": "d62483d76d3b0f988c2117bb1843c10f9d008954824f14775a549afe41fbda89"
+        }
+      },
+      "key": "4ac45772c2fc"
+    },
     "windows": {
       "assetBase": "https://github.com/edde746/mpv-build/releases/download/binaries-42bac6793cc8",
       "assets": {
