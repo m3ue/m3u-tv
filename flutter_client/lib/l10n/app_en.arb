@@ -305,6 +305,11 @@
   "settingsSectionLanguageRegion": "Language & Region",
   "settingsSectionLayout": "Layout",
   "settingsSectionDisplay": "Display",
+  "settingsSectionAndroidHomeScreen": "Android TV home screen",
+  "settingsAndroidHomeWatchNext": "Watch Next",
+  "settingsAndroidHomeWatchNextHint": "Show Continue Watching and Up Next in the home screen's Watch Next row, with progress bars.",
+  "settingsAndroidHomeOnNow": "On Now channel",
+  "settingsAndroidHomeOnNowHint": "Add a home screen row of your favorite channels and what's airing on them. Kept up to date while the app is closed.",
   "settingsSectionFilters": "Filters",
   "settingsSectionStreaming": "Streaming",
   "settingsSectionLiveTv": "Live TV",
@@ -622,6 +627,21 @@
     }
   },
   "homeUpNext": "Up next",
+  "homeScreenOnNowChannel": "On Now",
+  "homeScreenOnNowDescription": "{channel} · {start} - {end}",
+  "@homeScreenOnNowDescription": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      },
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
   "continueWatchingItemUnavailable": "This item is no longer available",
   "homeNoLiveTv": "No Live TV available",
   "homeFavoriteChannels": "Favorite Channels",

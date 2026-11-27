@@ -31,6 +31,11 @@ import java.util.concurrent.ConcurrentHashMap
  * other apps can't use this to fetch arbitrary URLs. The key map lives in
  * memory: after a restart the car asks for its lists again and gets fresh
  * keys.
+ *
+ * Also serves the Android TV home screen's channel cards (`cards/<key>.png`,
+ * see [HomeScreenRows]): those are drawn ahead of time, since the launcher
+ * reads them whenever it likes, the app running or not, so only a card
+ * already on disk is served.
  */
 class LogoArtworkProvider : ContentProvider() {
     override fun onCreate(): Boolean = true
@@ -40,6 +45,11 @@ class LogoArtworkProvider : ContentProvider() {
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
         val context = context ?: throw FileNotFoundException(uri.toString())
         val key = uri.lastPathSegment?.removeSuffix(".png") ?: throw FileNotFoundException(uri.toString())
+        if (uri.pathSegments.firstOrNull() == CARDS_PATH) {
+            val card = cardFile(context, key)
+            if (!card.exists()) throw FileNotFoundException(uri.toString())
+            return ParcelFileDescriptor.open(card, ParcelFileDescriptor.MODE_READ_ONLY)
+        }
         val url = logoUrls[key] ?: throw FileNotFoundException(uri.toString())
         val file = File(File(context.cacheDir, CACHE_DIR).apply { mkdirs() }, "$key.png")
         if (!file.exists()) {
@@ -51,39 +61,6 @@ class LogoArtworkProvider : ContentProvider() {
             if (!temp.renameTo(file)) temp.delete()
         }
         return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-    }
-
-    private fun download(url: String): Bitmap? {
-        return try {
-            val connection = URL(url).openConnection() as HttpURLConnection
-            connection.connectTimeout = TIMEOUT_MS
-            connection.readTimeout = TIMEOUT_MS
-            connection.instanceFollowRedirects = true
-            try {
-                if (connection.responseCode >= 400) return null
-                val bytes = connection.inputStream.use { it.readBytes() }
-                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-                var sample = 1
-                while (bounds.outWidth / (sample * 2) >= SIZE && bounds.outHeight / (sample * 2) >= SIZE) {
-                    sample *= 2
-                }
-                BitmapFactory.decodeByteArray(
-                    bytes,
-                    0,
-                    bytes.size,
-                    BitmapFactory.Options().apply { inSampleSize = sample },
-                )
-            } finally {
-                connection.disconnect()
-            }
-        } catch (error: IOException) {
-            Log.w(TAG, "Logo download failed", error)
-            null
-        } catch (error: IllegalArgumentException) {
-            Log.w(TAG, "Bad logo URL", error)
-            null
-        }
     }
 
     override fun query(
@@ -108,6 +85,11 @@ class LogoArtworkProvider : ContentProvider() {
     companion object {
         private const val TAG = "LogoArtworkProvider"
         private const val CACHE_DIR = "car_logos"
+        private const val CARDS_PATH = "cards"
+        private const val CARDS_DIR = "home_screen_cards"
+        private const val CARD_WIDTH = 640
+        private const val CARD_HEIGHT = 360
+        private const val CARD_BACKGROUND = 0xFF15171C.toInt()
         private const val SIZE = 256
         private const val TIMEOUT_MS = 10_000
 
@@ -116,12 +98,42 @@ class LogoArtworkProvider : ContentProvider() {
 
         private val logoUrls = ConcurrentHashMap<String, String>()
 
+        internal fun download(url: String): Bitmap? {
+            return try {
+                val connection = URL(url).openConnection() as HttpURLConnection
+                connection.connectTimeout = TIMEOUT_MS
+                connection.readTimeout = TIMEOUT_MS
+                connection.instanceFollowRedirects = true
+                try {
+                    if (connection.responseCode >= 400) return null
+                    val bytes = connection.inputStream.use { it.readBytes() }
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                    var sample = 1
+                    while (bounds.outWidth / (sample * 2) >= SIZE && bounds.outHeight / (sample * 2) >= SIZE) {
+                        sample *= 2
+                    }
+                    BitmapFactory.decodeByteArray(
+                        bytes,
+                        0,
+                        bytes.size,
+                        BitmapFactory.Options().apply { inSampleSize = sample },
+                    )
+                } finally {
+                    connection.disconnect()
+                }
+            } catch (error: IOException) {
+                Log.w(TAG, "Logo download failed", error)
+                null
+            } catch (error: IllegalArgumentException) {
+                Log.w(TAG, "Bad logo URL", error)
+                null
+            }
+        }
+
         /** The square version of the logo at [url], served by this provider. */
         fun uriFor(context: Context, url: String): Uri {
-            val key = MessageDigest.getInstance("SHA-256")
-                .digest(url.toByteArray())
-                .joinToString("") { "%02x".format(it) }
-                .take(32)
+            val key = keyFor(url)
             logoUrls[key] = url
             return Uri.Builder()
                 .scheme("content")
@@ -147,5 +159,63 @@ class LogoArtworkProvider : ContentProvider() {
             )
             return square
         }
+
+        /** Where the home screen card [key] is drawn ([writeCard]). */
+        internal fun cardFile(context: Context, key: String): File =
+            File(File(context.filesDir, CARDS_DIR).apply { mkdirs() }, "$key.png")
+
+        /** The `content://` URI the launcher reads card [key] from. */
+        internal fun cardUri(context: Context, key: String): Uri = Uri.Builder()
+            .scheme("content")
+            .authority("${context.packageName}.logos")
+            .appendPath(CARDS_PATH)
+            .appendPath("$key.png")
+            .build()
+
+        /**
+         * Draws the logo at [url] centred on a dark 16:9 card, once: home
+         * screen cards are landscape and cropped to fill, which cut wide and
+         * square logos apart. False when the logo can't be fetched.
+         */
+        internal fun writeCard(context: Context, key: String, url: String): Boolean {
+            val file = cardFile(context, key)
+            if (file.exists()) return true
+            val logo = download(url) ?: return false
+            val card = Bitmap.createBitmap(CARD_WIDTH, CARD_HEIGHT, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(card)
+            canvas.drawColor(CARD_BACKGROUND)
+            if (logo.width > 0 && logo.height > 0) {
+                val boxWidth = CARD_WIDTH * 0.6f
+                val boxHeight = CARD_HEIGHT * 0.6f
+                val scale = minOf(boxWidth / logo.width, boxHeight / logo.height)
+                val width = logo.width * scale
+                val height = logo.height * scale
+                val left = (CARD_WIDTH - width) / 2f
+                val top = (CARD_HEIGHT - height) / 2f
+                canvas.drawBitmap(
+                    logo,
+                    null,
+                    RectF(left, top, left + width, top + height),
+                    Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG),
+                )
+            }
+            val temp = File(file.parentFile, "$key.tmp")
+            temp.outputStream().use { card.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            if (!temp.renameTo(file)) temp.delete()
+            return file.exists()
+        }
+
+        /** Removes the drawn cards whose keys aren't in [keep]. */
+        internal fun pruneCards(context: Context, keep: Set<String>) {
+            File(context.filesDir, CARDS_DIR).listFiles()?.forEach { file ->
+                if (file.name.removeSuffix(".png") !in keep) file.delete()
+            }
+        }
+
+        /** A stable opaque key for [url]. */
+        internal fun keyFor(url: String): String = MessageDigest.getInstance("SHA-256")
+            .digest(url.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+            .take(32)
     }
 }

@@ -175,6 +175,10 @@ dependencies {
     // mpv-build native tarballs -- see android/libmpv/build.gradle.kts.
     implementation(project(":libmpv"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    // Android TV home screen: Watch Next and the "On Now" channel
+    // (HomeScreenRows), refreshed in the background (HomeScreenRefreshWorker).
+    implementation("androidx.tvprovider:tvprovider:1.0.0")
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
     testImplementation("junit:junit:4.13.2")
 
     // Workaround for the Flutter dev-dependency plugin release bug

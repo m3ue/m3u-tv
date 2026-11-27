@@ -998,6 +998,36 @@ abstract class AppLocalizations {
   /// **'Display'**
   String get settingsSectionDisplay;
 
+  /// No description provided for @settingsSectionAndroidHomeScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Android TV home screen'**
+  String get settingsSectionAndroidHomeScreen;
+
+  /// No description provided for @settingsAndroidHomeWatchNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Watch Next'**
+  String get settingsAndroidHomeWatchNext;
+
+  /// No description provided for @settingsAndroidHomeWatchNextHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Continue Watching and Up Next in the home screen\'s Watch Next row, with progress bars.'**
+  String get settingsAndroidHomeWatchNextHint;
+
+  /// No description provided for @settingsAndroidHomeOnNow.
+  ///
+  /// In en, this message translates to:
+  /// **'On Now channel'**
+  String get settingsAndroidHomeOnNow;
+
+  /// No description provided for @settingsAndroidHomeOnNowHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a home screen row of your favorite channels and what\'s airing on them. Kept up to date while the app is closed.'**
+  String get settingsAndroidHomeOnNowHint;
+
   /// No description provided for @settingsSectionFilters.
   ///
   /// In en, this message translates to:
@@ -1981,6 +2011,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Up next'**
   String get homeUpNext;
+
+  /// No description provided for @homeScreenOnNowChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'On Now'**
+  String get homeScreenOnNowChannel;
+
+  /// No description provided for @homeScreenOnNowDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'{channel} · {start} - {end}'**
+  String homeScreenOnNowDescription(String channel, String start, String end);
 
   /// No description provided for @continueWatchingItemUnavailable.
   ///

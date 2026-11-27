@@ -14,17 +14,18 @@ import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * The app's one Flutter engine, shared by [MainActivity] and
- * [CarMediaService]. Android Auto can start the app with no activity, and
- * both must see the same app state (one catalog, one set of stores), so
- * whichever starts first creates it and the other attaches.
+ * The app's one Flutter engine, shared by [MainActivity],
+ * [CarMediaService] and [HomeScreenRefreshWorker]. Android Auto and the
+ * home screen refresh can start the app with no activity, and all must see
+ * the same app state (one catalog, one set of stores), so whichever starts
+ * first creates it and the others attach.
  *
  * With no car connected nothing changes: the activity creates the engine and
  * it is destroyed with the activity, as before. While the car is connected
  * it outlives the activity (and the reverse), and goes once neither is left.
  *
  * Channels that don't need the activity live here, so they answer in either
- * case: device info, and native log lines.
+ * case: device info, native log lines, and the home screen rows.
  */
 internal object AppFlutterEngine {
     private const val TAG = "AppFlutterEngine"
@@ -33,6 +34,8 @@ internal object AppFlutterEngine {
 
     private var activityAttached = false
     private var carConnected = false
+    private var backgroundJobs = 0
+    private var homeScreenBridge: HomeScreenBridge? = null
     private var deviceInfoChannel: MethodChannel? = null
 
     /** What [obtain] picked, for the Logs & Diagnostics header. */
@@ -57,18 +60,35 @@ internal object AppFlutterEngine {
 
     fun attachCar(context: Context): FlutterEngine {
         carConnected = true
-        val engine = obtain(context)
-        // The activity starts Dart itself (with a deep link's initial
-        // route), unless the car got here first.
-        if (!engine.dartExecutor.isExecutingDart) {
-            engine.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())
-        }
-        return engine
+        return obtainRunning(context, emptyList())
     }
 
     fun detachCar() {
         carConnected = false
         releaseIfUnused()
+    }
+
+    /** For work done with no activity (the home screen refresh). Main thread. */
+    fun attachBackground(context: Context): FlutterEngine {
+        backgroundJobs += 1
+        // Tells main() nothing will be shown, so it skips the server refresh
+        // until something is (see AppStateController.deferServerRefresh).
+        return obtainRunning(context, listOf("--home-screen-refresh"))
+    }
+
+    fun detachBackground() {
+        backgroundJobs = maxOf(0, backgroundJobs - 1)
+        releaseIfUnused()
+    }
+
+    private fun obtainRunning(context: Context, dartArgs: List<String>): FlutterEngine {
+        val engine = obtain(context)
+        // The activity starts Dart itself (with a deep link's initial
+        // route), unless something else got here first.
+        if (!engine.dartExecutor.isExecutingDart) {
+            engine.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault(), dartArgs)
+        }
+        return engine
     }
 
     private fun obtain(context: Context): FlutterEngine {
@@ -90,16 +110,19 @@ internal object AppFlutterEngine {
                 }
             }
         }
+        homeScreenBridge = HomeScreenBridge(app, messenger)
         FlutterEngineCache.getInstance().put(ENGINE_ID, engine)
         return engine
     }
 
     private fun releaseIfUnused() {
-        if (activityAttached || carConnected) return
+        if (activityAttached || carConnected || backgroundJobs > 0) return
         val engine = current ?: return
         FlutterEngineCache.getInstance().remove(ENGINE_ID)
         deviceInfoChannel?.setMethodCallHandler(null)
         deviceInfoChannel = null
+        homeScreenBridge?.dispose()
+        homeScreenBridge = null
         nativeLog?.dispose()
         nativeLog = null
         engine.destroy()

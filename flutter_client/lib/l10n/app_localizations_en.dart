@@ -501,6 +501,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSectionDisplay => 'Display';
 
   @override
+  String get settingsSectionAndroidHomeScreen => 'Android TV home screen';
+
+  @override
+  String get settingsAndroidHomeWatchNext => 'Watch Next';
+
+  @override
+  String get settingsAndroidHomeWatchNextHint =>
+      'Show Continue Watching and Up Next in the home screen\'s Watch Next row, with progress bars.';
+
+  @override
+  String get settingsAndroidHomeOnNow => 'On Now channel';
+
+  @override
+  String get settingsAndroidHomeOnNowHint =>
+      'Add a home screen row of your favorite channels and what\'s airing on them. Kept up to date while the app is closed.';
+
+  @override
   String get settingsSectionFilters => 'Filters';
 
   @override
@@ -1102,6 +1119,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeUpNext => 'Up next';
+
+  @override
+  String get homeScreenOnNowChannel => 'On Now';
+
+  @override
+  String homeScreenOnNowDescription(String channel, String start, String end) {
+    return '$channel · $start - $end';
+  }
 
   @override
   String get continueWatchingItemUnavailable =>

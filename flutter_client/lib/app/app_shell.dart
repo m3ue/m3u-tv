@@ -13,6 +13,7 @@ import 'package:m3u_tv/app/navigation_sidebar.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_catalog_screen.dart';
 import 'package:m3u_tv/features/android_auto/android_auto_bridge.dart';
+import 'package:m3u_tv/features/android_home_screen/android_home_screen_bridge.dart';
 import 'package:m3u_tv/features/carplay/carplay_controller.dart';
 import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
 import 'package:m3u_tv/features/epg/epg_preview_player.dart';
@@ -301,9 +302,19 @@ class AppShellState extends ConsumerState<AppShell>
     _notificationActivationSub = _appState.notificationActivations.listen(
       _onNotificationActivation,
     );
+    // The app may have been started in the background to refresh the home
+    // screen rows; now that it's shown, refresh from the server too.
+    _appState.resumeDeferredRefresh();
     unawaited(_appState.ensureBooted());
     CarPlayController.instance?.onPlayChannel = _playCarPlayChannel;
     AndroidAutoBridge.instance?.onPlayChannel = _playCarPlayChannel;
+    // After the first frame: a card the app was started from opens the
+    // player, which needs the shell's navigator.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AndroidHomeScreenBridge.instance?.onLaunch = _openHomeScreenLaunch;
+      }
+    });
     _visibleRoutes = _mainRoutes;
     _initSidebarFocusNodes();
     WidgetsBinding.instance.addPostFrameCallback(
@@ -621,6 +632,10 @@ class AppShellState extends ConsumerState<AppShell>
       carPlay!.onPlayChannel = null;
     }
     final androidAuto = AndroidAutoBridge.instance;
+    final homeScreen = AndroidHomeScreenBridge.instance;
+    if (homeScreen?.onLaunch == _openHomeScreenLaunch) {
+      homeScreen!.onLaunch = null;
+    }
     if (androidAuto?.onPlayChannel == _playCarPlayChannel) {
       androidAuto!.onPlayChannel = null;
     }
@@ -1465,6 +1480,17 @@ class AppShellState extends ConsumerState<AppShell>
     if (_playerLiveChannel?.id == channel.id && !_playerHasFailed) return;
     _openChannel(channel);
     runFrameIfBackgrounded();
+  }
+
+  /// Opens what an Android TV home screen card was picked for.
+  void _openHomeScreenLaunch(HomeScreenLaunch launch) {
+    if (!mounted) return;
+    switch (launch) {
+      case HomeScreenChannelLaunch(:final channel, :final context):
+        _playCarPlayChannel(channel, context);
+      case HomeScreenProgressLaunch(:final progress):
+        unawaited(_openProgress(progress));
+    }
   }
 
   void _openNextChannel() => unawaited(_switchChannel(1));

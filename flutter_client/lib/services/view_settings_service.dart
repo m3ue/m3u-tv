@@ -275,6 +275,8 @@ class ViewSettingsService extends ChangeNotifier {
   static const backMinimizesPlayerKey = 'm3ue_tv_back_minimizes_player';
   static const prebufferLiveKey = 'm3ue_tv_prebuffer_live';
   static const backgroundAudioKey = 'm3ue_tv_background_audio';
+  static const androidHomeWatchNextKey = 'm3ue_tv_android_home_watch_next';
+  static const androidHomeOnNowKey = 'm3ue_tv_android_home_on_now';
   static const vodPlayerKey = 'm3ue_tv_vod_player';
   static const showPlaybackDiagnosticsKey = 'm3ue_tv_show_playback_diagnostics';
   static const defaultStartPageKey = 'm3ue_tv_default_start_page';
@@ -1023,6 +1025,30 @@ class ViewSettingsService extends ChangeNotifier {
     bool enabled,
   ) async {
     await _write(backgroundAudioKey, enabled);
+    notifyListeners();
+  }
+
+  /// Whether Continue Watching and Up Next go in the Android TV home
+  /// screen's Watch Next row (see `android_home_screen_bridge.dart`).
+  Future<bool> androidHomeWatchNext() async {
+    final raw = await _readResolved(androidHomeWatchNextKey);
+    return raw as bool? ?? true;
+  }
+
+  Future<void> setAndroidHomeWatchNext(bool enabled) async {
+    await _write(androidHomeWatchNextKey, enabled);
+    notifyListeners();
+  }
+
+  /// Whether the app adds its "On Now" channel (favorite live channels and
+  /// what's airing on them) to the Android TV home screen.
+  Future<bool> androidHomeOnNow() async {
+    final raw = await _readResolved(androidHomeOnNowKey);
+    return raw as bool? ?? true;
+  }
+
+  Future<void> setAndroidHomeOnNow(bool enabled) async {
+    await _write(androidHomeOnNowKey, enabled);
     notifyListeners();
   }
 

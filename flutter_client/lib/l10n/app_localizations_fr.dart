@@ -504,6 +504,23 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsSectionDisplay => 'Affichage';
 
   @override
+  String get settingsSectionAndroidHomeScreen => 'Écran d\'accueil Android TV';
+
+  @override
+  String get settingsAndroidHomeWatchNext => 'À regarder ensuite';
+
+  @override
+  String get settingsAndroidHomeWatchNextHint =>
+      'Affiche Reprendre la lecture et À suivre dans la rangée À regarder ensuite de l\'écran d\'accueil, avec des barres de progression.';
+
+  @override
+  String get settingsAndroidHomeOnNow => 'Chaîne En ce moment';
+
+  @override
+  String get settingsAndroidHomeOnNowHint =>
+      'Ajoute à l\'écran d\'accueil une rangée avec vos chaînes favorites et ce qu\'elles diffusent. Mise à jour même lorsque l\'app est fermée.';
+
+  @override
   String get settingsSectionFilters => 'Filtres';
 
   @override
@@ -1117,6 +1134,14 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get homeUpNext => 'À suivre';
+
+  @override
+  String get homeScreenOnNowChannel => 'En ce moment';
+
+  @override
+  String homeScreenOnNowDescription(String channel, String start, String end) {
+    return '$channel · $start - $end';
+  }
 
   @override
   String get continueWatchingItemUnavailable =>
