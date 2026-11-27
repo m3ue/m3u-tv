@@ -35,6 +35,15 @@ internal object HomeScreenRows {
     private const val TAG = "HomeScreenRows"
     private const val PREFS = "home_screen_rows"
     private const val PROGRESS_STEP_MS = 2 * 60 * 1000L
+    private val CLEARABLE_COLUMNS = listOf(
+        TvContractCompat.PreviewPrograms.COLUMN_LOGO_URI,
+        TvContractCompat.PreviewPrograms.COLUMN_POSTER_ART_URI,
+        TvContractCompat.PreviewPrograms.COLUMN_SHORT_DESCRIPTION,
+        TvContractCompat.PreviewPrograms.COLUMN_START_TIME_UTC_MILLIS,
+        TvContractCompat.PreviewPrograms.COLUMN_END_TIME_UTC_MILLIS,
+        TvContractCompat.PreviewPrograms.COLUMN_DURATION_MILLIS,
+        TvContractCompat.PreviewPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS,
+    )
     private const val REMOVED_KEY = "removed_watch_next"
 
     const val ACTION_OPEN = "dev.sparkison.tv.action.HOME_SCREEN_OPEN"
@@ -269,7 +278,7 @@ internal object HomeScreenRows {
             } else {
                 val rows = resolver.update(
                     TvContractCompat.buildPreviewProgramUri(current.id),
-                    program.toContentValues(),
+                    valuesFor(program),
                     null,
                     null,
                 )
@@ -288,6 +297,19 @@ internal object HomeScreenRows {
     }
 
     /**
+     * What an update writes: an update only changes the columns it's given,
+     * so an optional one the card no longer has (the logo badge, times) is
+     * cleared explicitly, or the old value would stay.
+     */
+    @SuppressLint("RestrictedApi")
+    private fun valuesFor(program: PreviewProgram): android.content.ContentValues =
+        program.toContentValues().apply {
+            for (column in CLEARABLE_COLUMNS) {
+                if (!containsKey(column)) putNull(column)
+            }
+        }
+
+    /**
      * Whether [next] would show differently from [current]. Rewriting a card
      * makes the launcher redraw it, and a focused card loses its channel
      * logo until it's focused again, so a card is only rewritten when
@@ -297,7 +319,7 @@ internal object HomeScreenRows {
     @SuppressLint("RestrictedApi")
     private fun changed(current: PreviewProgram, next: PreviewProgram): Boolean {
         val shown = current.toContentValues()
-        val wanted = next.toContentValues()
+        val wanted = valuesFor(next)
         val position = TvContractCompat.PreviewPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS
         for (column in wanted.keySet()) {
             if (column == position) continue
