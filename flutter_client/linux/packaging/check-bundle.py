@@ -102,6 +102,11 @@ def deb_owner(path: str) -> str:
 
 
 def probe(library: str, sample: str) -> None:
+    # The pinned libmpv leaves its C++ runtime symbols to the process that
+    # loads it rather than declaring libstdc++ as NEEDED. m3u_tv is a C++
+    # executable, so it always has the host libstdc++ loaded globally before
+    # it dlopens libmpv; load it the same way here.
+    ctypes.CDLL("libstdc++.so.6", mode=ctypes.RTLD_GLOBAL)
     mpv = ctypes.CDLL(library)
     mpv.mpv_create.restype = ctypes.c_void_p
     mpv.mpv_set_option_string.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p]
@@ -183,6 +188,8 @@ def main() -> int:
     dynamic = subprocess.run(["readelf", "-d", str(bundle / "m3u_tv")], capture_output=True, text=True).stdout
     if "[libwayland-egl.so.1]" not in dynamic:
         errors.append("m3u_tv was built without the Wayland video plane (install libwayland-dev and libegl-dev)")
+    if "[libstdc++.so.6]" not in dynamic:
+        errors.append("m3u_tv no longer links libstdc++, which the pinned libmpv relies on being loaded")
     for error in errors:
         print(f"::error::{error}", file=sys.stderr)
     if errors:
