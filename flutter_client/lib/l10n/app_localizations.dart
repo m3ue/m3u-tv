@@ -1007,13 +1007,13 @@ abstract class AppLocalizations {
   /// No description provided for @settingsAndroidHomeWatchNext.
   ///
   /// In en, this message translates to:
-  /// **'Watch Next'**
+  /// **'Continue Watching'**
   String get settingsAndroidHomeWatchNext;
 
   /// No description provided for @settingsAndroidHomeWatchNextHint.
   ///
   /// In en, this message translates to:
-  /// **'Show Continue Watching and Up Next in the home screen\'s Watch Next row, with progress bars.'**
+  /// **'Show Continue Watching, Up Next episodes included, as an M3U TV row on the home screen and in its Watch Next row, with progress bars.'**
   String get settingsAndroidHomeWatchNextHint;
 
   /// No description provided for @settingsAndroidHomeOnNow.

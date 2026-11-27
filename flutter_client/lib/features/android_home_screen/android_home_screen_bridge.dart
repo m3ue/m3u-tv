@@ -41,7 +41,8 @@ class HomeScreenProgressLaunch extends HomeScreenLaunch {
 }
 
 /// Fills the Android TV home screen rows (`HomeScreenRows.kt`) with what the
-/// app's own Home shows: Watch Next from Continue Watching and Up Next, the
+/// app's own Home shows: Continue Watching (Up Next included), both in the
+/// shared Watch Next row and as the app's own row, the
 /// "On Now" channel from the Live TV lineup (in its sort) and what's airing
 /// on each channel, and the Sports channel from today's games.
 ///
@@ -245,6 +246,12 @@ class AndroidHomeScreenBridge {
       'watchNext': watchNext,
       'channels': [
         {
+          'id': 'continue_watching',
+          'title': l10n.homeContinueWatching,
+          'enabled': watchNextEnabled,
+          'items': [for (final item in watchNext) _continueWatchingItem(item)],
+        },
+        {
           'id': 'on_now',
           'title': l10n.homeScreenOnNowChannel,
           'enabled': onNowEnabled,
@@ -260,6 +267,25 @@ class AndroidHomeScreenBridge {
       'refreshAtMs': ?refreshAt,
     };
   }
+
+  /// A Watch Next card as a card in the app's own Continue Watching row:
+  /// the same list and order as Home's Continue Watching row, Up Next
+  /// episodes included.
+  Map<String, Object?> _continueWatchingItem(Map<String, Object?> item) => {
+    'key': item['key'],
+    'title': item['title'],
+    'contentType': item['contentType'],
+    'episodeTitle': ?item['episodeTitle'],
+    'seasonNumber': ?item['seasonNumber'],
+    'episodeNumber': ?item['episodeNumber'],
+    'description': ?(item['upNext'] == true
+        ? _catalog.l10n.homeUpNext
+        : item['description']),
+    'artworkUrl': ?item['imageUrl'],
+    'positionMs': ?item['positionMs'],
+    'durationMs': ?item['durationMs'],
+    'launch': item['launch'],
+  };
 
   /// What the app's Home Live TV row would list: the lineup in the Live TV
   /// screen's sort, favorites leading only when it leads with them, and the

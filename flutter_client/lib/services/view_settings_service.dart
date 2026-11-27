@@ -1029,8 +1029,9 @@ class ViewSettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Whether Continue Watching and Up Next go in the Android TV home
-  /// screen's Watch Next row (see `android_home_screen_bridge.dart`).
+  /// Whether Continue Watching (Up Next included) goes on the Android TV
+  /// home screen, as the app's own row and in the shared Watch Next row (see
+  /// `android_home_screen_bridge.dart`).
   Future<bool> androidHomeWatchNext() async {
     final raw = await _readResolved(androidHomeWatchNextKey);
     return raw as bool? ?? true;

@@ -507,11 +507,11 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsSectionAndroidHomeScreen => 'Écran d\'accueil Android TV';
 
   @override
-  String get settingsAndroidHomeWatchNext => 'À regarder ensuite';
+  String get settingsAndroidHomeWatchNext => 'Reprendre la lecture';
 
   @override
   String get settingsAndroidHomeWatchNextHint =>
-      'Affiche Reprendre la lecture et À suivre dans la rangée À regarder ensuite de l\'écran d\'accueil, avec des barres de progression.';
+      'Affiche Reprendre la lecture, épisodes suivants compris, comme rangée M3U TV sur l\'écran d\'accueil et dans sa rangée À regarder ensuite, avec des barres de progression.';
 
   @override
   String get settingsAndroidHomeOnNow => 'Chaîne En ce moment';

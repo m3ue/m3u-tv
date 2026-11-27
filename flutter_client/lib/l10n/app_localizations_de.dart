@@ -507,11 +507,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSectionAndroidHomeScreen => 'Android TV-Startbildschirm';
 
   @override
-  String get settingsAndroidHomeWatchNext => 'Als Nächstes ansehen';
+  String get settingsAndroidHomeWatchNext => 'Weiterschauen';
 
   @override
   String get settingsAndroidHomeWatchNextHint =>
-      'Zeigt Weiterschauen und Als Nächstes in der Zeile „Als Nächstes ansehen“ des Startbildschirms an, mit Fortschrittsbalken.';
+      'Zeigt Weiterschauen, einschließlich der nächsten Folgen, als M3U TV-Zeile auf dem Startbildschirm und in dessen Zeile „Als Nächstes ansehen“, mit Fortschrittsbalken.';
 
   @override
   String get settingsAndroidHomeOnNow => 'Kanal „Jetzt läuft“';

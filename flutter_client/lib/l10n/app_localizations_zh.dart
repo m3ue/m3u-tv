@@ -497,11 +497,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSectionAndroidHomeScreen => 'Android TV 主屏幕';
 
   @override
-  String get settingsAndroidHomeWatchNext => '接下来观看';
+  String get settingsAndroidHomeWatchNext => '继续观看';
 
   @override
   String get settingsAndroidHomeWatchNextHint =>
-      '在主屏幕的“接下来观看”行中显示继续观看和即将播放，并带有进度条。';
+      '在主屏幕上以 M3U TV 行的形式显示继续观看（包括即将播放的剧集），同时显示在“接下来观看”行中，并带有进度条。';
 
   @override
   String get settingsAndroidHomeOnNow => '“正在播出”频道';

@@ -263,7 +263,10 @@ void main() {
       () => bridge.collect(fresh: false),
     );
     final channels = payload['channels']! as List<Map<String, Object?>>;
-    expect(channels.first['title'], 'On Now');
+    expect(
+      channels.firstWhere((c) => c['id'] == 'on_now')['title'],
+      'On Now',
+    );
     final items = channelItems(payload, 'on_now');
     expect(items, hasLength(2));
 
@@ -316,6 +319,25 @@ void main() {
       ]);
     },
   );
+
+  test('the Continue Watching row lists the Watch Next cards', () async {
+    final payload = await bridge.collect(fresh: false);
+    final watchNext = payload['watchNext']! as List<Map<String, Object?>>;
+    final row = channelItems(payload, 'continue_watching');
+    expect(row.map((i) => i['key']), watchNext.map((i) => i['key']));
+
+    final movie = row[0];
+    expect(movie['title'], 'A Movie');
+    expect(movie['artworkUrl'], 'http://example.test/1.jpg');
+    expect(movie['positionMs'], 600000);
+    expect(movie['durationMs'], 3600000);
+    expect(movie['launch'], watchNext[0]['launch']);
+
+    final upNext = row[1];
+    expect(upNext['description'], 'Up next');
+    expect(upNext['episodeTitle'], 'The One');
+    expect(upNext.containsKey('positionMs'), isFalse);
+  });
 
   test('Sports is empty without the server Sports feature', () async {
     final payload = await bridge.collect(fresh: false);

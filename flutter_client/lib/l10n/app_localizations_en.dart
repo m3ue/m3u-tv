@@ -504,11 +504,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSectionAndroidHomeScreen => 'Android TV home screen';
 
   @override
-  String get settingsAndroidHomeWatchNext => 'Watch Next';
+  String get settingsAndroidHomeWatchNext => 'Continue Watching';
 
   @override
   String get settingsAndroidHomeWatchNextHint =>
-      'Show Continue Watching and Up Next in the home screen\'s Watch Next row, with progress bars.';
+      'Show Continue Watching, Up Next episodes included, as an M3U TV row on the home screen and in its Watch Next row, with progress bars.';
 
   @override
   String get settingsAndroidHomeOnNow => 'On Now channel';

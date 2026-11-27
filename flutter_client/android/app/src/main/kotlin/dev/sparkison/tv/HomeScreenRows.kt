@@ -2,6 +2,7 @@ package dev.sparkison.tv
 
 import android.annotation.SuppressLint
 import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -19,8 +20,10 @@ import androidx.tvprovider.media.tv.WatchNextProgram
  *
  * - Watch Next: the shared row every app adds to. Continue Watching entries
  *   (with the launcher's own progress bar) and Up Next episodes.
- * - The app's own channels: "On Now" (the Live TV lineup, with what's
- *   airing on each channel) and Sports (today's games a channel carries).
+ * - The app's own channels: Continue Watching (the same cards as Watch
+ *   Next, as the app's Home row lists them), "On Now" (the Live TV lineup,
+ *   with what's airing on each channel) and Sports (today's games a channel
+ *   carries).
  *
  * The launcher only shows what was last written here, so these are written
  * again whenever they may have changed: on leaving the app, after playback,
@@ -120,6 +123,7 @@ internal object HomeScreenRows {
         val wanted = mutableSetOf<String>()
         var inserted = 0
         var updated = 0
+        var unchanged = 0
         items.forEachIndexed { index, item ->
             val key = item["key"] as? String ?: return@forEachIndexed
             val engagement = item["engagement"] as? String ?: ""
@@ -141,10 +145,12 @@ internal object HomeScreenRows {
             if (current == null) {
                 val uri = resolver.insert(TvContractCompat.WatchNextPrograms.CONTENT_URI, program.toContentValues())
                 if (uri == null) Log.w(TAG, "Watch Next: insert refused for $key") else inserted++
+            } else if (!changed(current.toContentValues(), clearing(program.toContentValues()), progressStep = 1)) {
+                unchanged++
             } else {
                 val rows = resolver.update(
                     TvContractCompat.buildWatchNextProgramUri(current.id),
-                    program.toContentValues(),
+                    clearing(program.toContentValues()),
                     null,
                     null,
                 )
@@ -158,7 +164,7 @@ internal object HomeScreenRows {
         }
         Log.i(
             TAG,
-            "Watch Next: ${items.size} sent, $inserted added, $updated updated, " +
+            "Watch Next: ${items.size} sent, $inserted added, $updated updated, $unchanged unchanged, " +
                 "${existing.size - existing.keys.count { it in wanted }} dropped, ${removed.size} hidden by the viewer",
         )
         // Forget removals of items no longer listed at all.
@@ -273,7 +279,7 @@ internal object HomeScreenRows {
             if (current == null) {
                 val uri = resolver.insert(TvContractCompat.PreviewPrograms.CONTENT_URI, program.toContentValues())
                 if (uri == null) Log.w(TAG, "$id: insert refused for $key") else inserted++
-            } else if (!changed(current, program)) {
+            } else if (!changed(current.toContentValues(), valuesFor(program), PROGRESS_STEP_MS)) {
                 unchanged++
             } else {
                 val rows = resolver.update(
@@ -302,31 +308,36 @@ internal object HomeScreenRows {
      * cleared explicitly, or the old value would stay.
      */
     @SuppressLint("RestrictedApi")
-    private fun valuesFor(program: PreviewProgram): android.content.ContentValues =
-        program.toContentValues().apply {
-            for (column in CLEARABLE_COLUMNS) {
-                if (!containsKey(column)) putNull(column)
-            }
+    private fun valuesFor(program: PreviewProgram): ContentValues = clearing(program.toContentValues())
+
+    private fun clearing(values: ContentValues): ContentValues = values.apply {
+        for (column in CLEARABLE_COLUMNS) {
+            if (!containsKey(column)) putNull(column)
         }
+    }
 
     /**
-     * Whether [next] would show differently from [current]. Rewriting a card
-     * makes the launcher redraw it, and a focused card loses its channel
-     * logo until it's focused again, so a card is only rewritten when
-     * something shown changed. Programme progress counts once it has moved
-     * on a little: the bar is too short to show less.
+     * Whether [wanted] would show differently from what's stored ([shown]).
+     * Rewriting a card makes the launcher redraw it, and a focused card loses
+     * its channel logo until it's focused again, so a card is only rewritten
+     * when something shown changed. Progress counts once it has moved
+     * [progressStep]: a live programme's bar is too short to show less.
      */
-    @SuppressLint("RestrictedApi")
-    private fun changed(current: PreviewProgram, next: PreviewProgram): Boolean {
-        val shown = current.toContentValues()
-        val wanted = valuesFor(next)
+    private fun changed(shown: ContentValues, wanted: ContentValues, progressStep: Long): Boolean {
         val position = TvContractCompat.PreviewPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS
         for (column in wanted.keySet()) {
             if (column == position) continue
-            if (wanted.get(column)?.toString() != shown.get(column)?.toString()) return true
+            val next = wanted.get(column)
+            val stored = shown.get(column)
+            val same = if (next is ByteArray && stored is ByteArray) {
+                next.contentEquals(stored)
+            } else {
+                next?.toString() == stored?.toString()
+            }
+            if (!same) return true
         }
         val moved = (wanted.getAsLong(position) ?: 0L) - (shown.getAsLong(position) ?: 0L)
-        return kotlin.math.abs(moved) >= PROGRESS_STEP_MS
+        return kotlin.math.abs(moved) >= progressStep
     }
 
     private fun previewProgram(
@@ -341,8 +352,17 @@ internal object HomeScreenRows {
         val builder = PreviewProgram.Builder()
             .setChannelId(channelId)
             .setWeight(weight)
-        builder.setType(TvContractCompat.PreviewPrograms.TYPE_CHANNEL)
+        builder.setType(
+            when (item["contentType"]) {
+                "vod" -> TvContractCompat.PreviewPrograms.TYPE_MOVIE
+                "episode" -> TvContractCompat.PreviewPrograms.TYPE_TV_EPISODE
+                else -> TvContractCompat.PreviewPrograms.TYPE_CHANNEL
+            },
+        )
         builder.setLive(item["live"] == true)
+        (item["episodeTitle"] as? String)?.let { builder.setEpisodeTitle(it) }
+        (item["seasonNumber"] as? Number)?.let { builder.setSeasonNumber(it.toInt()) }
+        (item["episodeNumber"] as? Number)?.let { builder.setEpisodeNumber(it.toInt()) }
         builder.setInternalProviderId(key)
         builder.setTitle(item["title"] as? String)
         (item["description"] as? String)?.let { builder.setDescription(it) }
@@ -362,6 +382,9 @@ internal object HomeScreenRows {
             builder.setDurationMillis((end - start).toInt())
             builder.setLastPlaybackPositionMillis((now - start).coerceIn(0, end - start).toInt())
         } else {
+            // A Continue Watching card's own resume point.
+            (item["durationMs"] as? Number)?.let { builder.setDurationMillis(it.toInt()) }
+            (item["positionMs"] as? Number)?.let { builder.setLastPlaybackPositionMillis(it.toInt()) }
             // The launcher draws the logo badge where a focused card's
             // progress bar goes, covering it, so only a card without one
             // gets it.

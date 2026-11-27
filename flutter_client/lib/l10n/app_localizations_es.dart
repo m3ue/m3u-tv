@@ -508,11 +508,11 @@ class AppLocalizationsEs extends AppLocalizations {
       'Pantalla de inicio de Android TV';
 
   @override
-  String get settingsAndroidHomeWatchNext => 'Ver a continuación';
+  String get settingsAndroidHomeWatchNext => 'Seguir viendo';
 
   @override
   String get settingsAndroidHomeWatchNextHint =>
-      'Muestra Seguir viendo y A continuación en la fila Ver a continuación de la pantalla de inicio, con barras de progreso.';
+      'Muestra Seguir viendo, con los próximos episodios incluidos, como una fila de M3U TV en la pantalla de inicio y en su fila Ver a continuación, con barras de progreso.';
 
   @override
   String get settingsAndroidHomeOnNow => 'Canal En emisión';
