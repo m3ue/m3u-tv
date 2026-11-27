@@ -5,11 +5,13 @@ import 'package:m3u_tv/features/series/episode_player_args.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/app_loading_indicator.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
+import 'package:m3u_tv/shared/favorite_button.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
@@ -56,6 +58,7 @@ class SeriesDetailsScreen extends StatefulWidget {
     this.onOpenRelated,
     this.onTapMember,
     this.onDeleteRecording,
+    this.favoritesService,
   });
 
   final int seriesId;
@@ -87,6 +90,9 @@ class SeriesDetailsScreen extends StatefulWidget {
   /// Deletes the DVR recording an episode came from (by uuid), offered from
   /// the long-press dialog of episodes the viewer recorded. Null hides it.
   final Future<void> Function(String uuid)? onDeleteRecording;
+
+  /// Series favorites, toggled from a Favorite button. Null hides it.
+  final FavoritesService? favoritesService;
 
   @override
   State<SeriesDetailsScreen> createState() => _SeriesDetailsScreenState();
@@ -249,6 +255,13 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
             onMarkSeason: _markSeason,
             onOpenRelated: widget.onOpenRelated,
             onTapMember: widget.onTapMember,
+            favoriteButton: switch (widget.favoritesService) {
+              final service? => FavoriteButton(
+                service: service,
+                id: widget.seriesId,
+              ),
+              null => null,
+            },
           );
         },
       ),
@@ -450,6 +463,7 @@ class _SeriesDetailsBody extends StatelessWidget {
     this.onOpenRelated,
     this.onTapMember,
     this.scrollController,
+    this.favoriteButton,
   });
 
   final SeriesInfo info;
@@ -478,6 +492,7 @@ class _SeriesDetailsBody extends StatelessWidget {
   final void Function(Episode episode)? onDeleteRecording;
   final ValueChanged<RelatedItem>? onOpenRelated;
   final ValueChanged<CastMember>? onTapMember;
+  final Widget? favoriteButton;
 
   List<int> get _seasonNumbers {
     final numbers = <int>{
@@ -724,7 +739,7 @@ class _SeriesDetailsBody extends StatelessWidget {
       fallbackPosterUrl: trimmedOrNull(info.series.coverUrl),
       meta: _seriesMetaInfo(context, target, description, plotMaxWidth),
       primaryActions: _primaryActions(context, target),
-      trailingActions: [?_trailerButton(context)],
+      trailingActions: [?_trailerButton(context), ?favoriteButton],
       richCast: info.series.richCast,
       castSemanticLabel: AppLocalizations.of(context).seriesCast,
       richRelated: info.series.related,

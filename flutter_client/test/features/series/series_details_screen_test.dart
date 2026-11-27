@@ -5,6 +5,7 @@ import 'package:m3u_tv/features/series/series_details_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/cast_member_row.dart';
 import 'package:m3u_tv/shared/dpad_ink_well.dart';
@@ -45,6 +46,7 @@ Widget _app(
   void Function(PlayerArgs)? onPlay,
   MarkEpisodeWatched? onMarkEpisodeWatched,
   Future<void> Function(String uuid)? onDeleteRecording,
+  FavoritesService? favoritesService,
 }) => MaterialApp(
   theme: ThemeData.dark(useMaterial3: true),
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -58,6 +60,7 @@ Widget _app(
     onPlay: onPlay,
     onMarkEpisodeWatched: onMarkEpisodeWatched,
     onDeleteRecording: onDeleteRecording,
+    favoritesService: favoritesService,
   ),
 );
 
@@ -95,6 +98,31 @@ Progress _prog(
 );
 
 void main() {
+  group('favorite button', () {
+    testWidgets('adds and removes the series', (tester) async {
+      final favorites = FavoritesService();
+      await tester.pumpWidget(_app(_info(), favoritesService: favorites));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Favorite'));
+      await tester.tap(find.text('Favorite'));
+      await tester.pumpAndSettle();
+      expect(await favorites.all(), {7});
+      expect(find.text('Remove favorite'), findsOneWidget);
+
+      await tester.tap(find.text('Remove favorite'));
+      await tester.pumpAndSettle();
+      expect(await favorites.all(), isEmpty);
+    });
+
+    testWidgets('is hidden without a favorites service', (tester) async {
+      await tester.pumpWidget(_app(_info()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Favorite'), findsNothing);
+    });
+  });
+
   group('trailer button', () {
     SeriesInfo trailerInfo({String? seriesTrailer, String? seasonTrailer}) =>
         SeriesInfo(

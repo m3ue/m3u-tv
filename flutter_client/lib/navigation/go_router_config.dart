@@ -286,6 +286,7 @@ class _AsyncVodDetails extends StatelessWidget {
             listenable: actions.appState,
             builder: (ctx, _) => VodDetailsScreen(
               item: item,
+              favoritesService: actions.appState.vodFavoritesService,
               xtreamService: actions.xtreamService,
               onPlay: _playOnTopLevelRoute(context, actions),
               progressList: actions.progressList,
@@ -345,6 +346,7 @@ class _AsyncSeriesDetails extends StatelessWidget {
             listenable: actions.appState,
             builder: (ctx, _) => SeriesDetailsScreen(
               seriesId: series.id,
+              favoritesService: actions.appState.seriesFavoritesService,
               seriesName: series.name,
               coverUrl: series.coverUrl,
               xtreamService: actions.xtreamService,
@@ -697,6 +699,7 @@ GoRouter createGoRouter({
                   listenable: actions.appState,
                   builder: (ctx, _) => VodDetailsScreen(
                     item: item,
+                    favoritesService: actions.appState.vodFavoritesService,
                     xtreamService: actions.xtreamService,
                     onPlay: _playOnTopLevelRoute(context, actions),
                     progressList: actions.progressList,
@@ -844,6 +847,7 @@ GoRouter createGoRouter({
                   listenable: actions.appState,
                   builder: (ctx, _) => SeriesDetailsScreen(
                     seriesId: series.id,
+                    favoritesService: actions.appState.seriesFavoritesService,
                     seriesName: series.name,
                     coverUrl: series.coverUrl,
                     xtreamService: actions.xtreamService,

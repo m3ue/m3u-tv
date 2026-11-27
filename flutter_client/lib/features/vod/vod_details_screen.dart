@@ -4,10 +4,12 @@ import 'package:intl/intl.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/app_button.dart';
 import 'package:m3u_tv/shared/dominant_backdrop_color.dart';
 import 'package:m3u_tv/shared/dvr_action_dialogs.dart';
+import 'package:m3u_tv/shared/favorite_button.dart';
 import 'package:m3u_tv/shared/formatters.dart';
 import 'package:m3u_tv/shared/item_detail_scaffold.dart';
 import 'package:m3u_tv/shared/item_meta_info.dart';
@@ -26,6 +28,7 @@ class VodDetailsScreen extends StatefulWidget {
     this.onOpenRelated,
     this.onTapMember,
     this.onDeleteRecording,
+    this.favoritesService,
   });
 
   final VodItem item;
@@ -46,6 +49,9 @@ class VodDetailsScreen extends StatefulWidget {
   /// a recording the viewer may manage (the server sends its `dvr_uuid`);
   /// null hides it.
   final Future<void> Function(String uuid)? onDeleteRecording;
+
+  /// Movie favorites, toggled from a Favorite button. Null hides it.
+  final FavoritesService? favoritesService;
 
   @override
   State<VodDetailsScreen> createState() => _VodDetailsScreenState();
@@ -119,6 +125,7 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
               onOpenRelated: widget.onOpenRelated,
               onTapMember: widget.onTapMember,
               onDeleteRecording: widget.onDeleteRecording,
+              favoritesService: widget.favoritesService,
               dominantColor: _dominantColor,
               colorMatchReady: _colorMatchResolved,
             )
@@ -137,6 +144,7 @@ class _VodDetailsScreenState extends State<VodDetailsScreen> {
                   onOpenRelated: widget.onOpenRelated,
                   onTapMember: widget.onTapMember,
                   onDeleteRecording: widget.onDeleteRecording,
+                  favoritesService: widget.favoritesService,
                   dominantColor: _dominantColor,
                   // A failed info fetch means no backdrop and no palette step
                   // will run - reveal the (surface) hero rather than holding.
@@ -158,6 +166,7 @@ class _VodDetailsBody extends StatelessWidget {
     this.onOpenRelated,
     this.onTapMember,
     this.onDeleteRecording,
+    this.favoritesService,
     this.dominantColor,
     this.colorMatchReady = false,
   });
@@ -170,6 +179,7 @@ class _VodDetailsBody extends StatelessWidget {
   final ValueChanged<RelatedItem>? onOpenRelated;
   final ValueChanged<CastMember>? onTapMember;
   final Future<void> Function(String uuid)? onDeleteRecording;
+  final FavoritesService? favoritesService;
 
   /// Passed straight to the shared body's colour-match reveal - true once the
   /// palette extraction has resolved.
@@ -242,6 +252,8 @@ class _VodDetailsBody extends StatelessWidget {
       extraActions: [
         if (details.trailerUrl case final trailerUrl?)
           TrailerButton(url: trailerUrl),
+        if (favoritesService case final service?)
+          FavoriteButton(service: service, id: item.id),
         if ((onDeleteRecording, details.dvrUuid) case (
           final delete?,
           final uuid?,

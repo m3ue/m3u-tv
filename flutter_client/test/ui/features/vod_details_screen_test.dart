@@ -5,6 +5,7 @@ import 'package:m3u_tv/features/vod/vod_details_screen.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/navigation/app_router.dart';
 import 'package:m3u_tv/services/domain_models.dart';
+import 'package:m3u_tv/services/favorites_service.dart';
 import 'package:m3u_tv/services/xtream_service.dart';
 import 'package:m3u_tv/shared/cast_member_row.dart';
 import 'package:m3u_tv/shared/cast_strip.dart';
@@ -215,6 +216,46 @@ void main() {
 
       expect(find.text('Play movie'), findsOneWidget);
       expect(find.text('Trailer'), findsOneWidget);
+    });
+
+    testWidgets('the Favorite button adds and removes the movie', (
+      tester,
+    ) async {
+      final favorites = FavoritesService();
+      await tester.pumpWidget(
+        _TestApp(
+          service: _VodDetailsXtreamService(
+            info: const VodInfo(id: 201, name: 'Big Buck Bunny'),
+          ),
+          favoritesService: favorites,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Favorite'));
+      await tester.pumpAndSettle();
+      expect(await favorites.all(), {201});
+      expect(find.text('Remove favorite'), findsOneWidget);
+
+      await tester.tap(find.text('Remove favorite'));
+      await tester.pumpAndSettle();
+      expect(await favorites.all(), isEmpty);
+      expect(find.text('Favorite'), findsOneWidget);
+    });
+
+    testWidgets('shows no Favorite button without a favorites service', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _TestApp(
+          service: _VodDetailsXtreamService(
+            info: const VodInfo(id: 201, name: 'Big Buck Bunny'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Favorite'), findsNothing);
     });
 
     testWidgets('keeps play action in app with metadata fallback', (
@@ -472,9 +513,11 @@ class _TestApp extends StatelessWidget {
     this.progressList = const <Progress>[],
     this.onPlay,
     this.onDeleteRecording,
+    this.favoritesService,
   });
 
   final XtreamService service;
+  final FavoritesService? favoritesService;
   final List<Progress> progressList;
   final void Function(PlayerArgs)? onPlay;
   final Future<void> Function(String uuid)? onDeleteRecording;
@@ -497,6 +540,7 @@ class _TestApp extends StatelessWidget {
         progressList: progressList,
         onPlay: onPlay,
         onDeleteRecording: onDeleteRecording,
+        favoritesService: favoritesService,
       ),
     );
   }
