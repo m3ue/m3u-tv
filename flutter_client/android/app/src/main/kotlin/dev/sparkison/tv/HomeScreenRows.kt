@@ -34,6 +34,7 @@ import androidx.tvprovider.media.tv.WatchNextProgram
 internal object HomeScreenRows {
     private const val TAG = "HomeScreenRows"
     private const val PREFS = "home_screen_rows"
+    private const val PROGRESS_STEP_MS = 2 * 60 * 1000L
     private const val REMOVED_KEY = "removed_watch_next"
 
     const val ACTION_OPEN = "dev.sparkison.tv.action.HOME_SCREEN_OPEN"
@@ -254,6 +255,7 @@ internal object HomeScreenRows {
         val wanted = mutableSetOf<String>()
         var inserted = 0
         var updated = 0
+        var unchanged = 0
         items.forEachIndexed { index, item ->
             val key = item["key"] as? String ?: return@forEachIndexed
             if (!wanted.add(key)) return@forEachIndexed
@@ -262,6 +264,8 @@ internal object HomeScreenRows {
             if (current == null) {
                 val uri = resolver.insert(TvContractCompat.PreviewPrograms.CONTENT_URI, program.toContentValues())
                 if (uri == null) Log.w(TAG, "$id: insert refused for $key") else inserted++
+            } else if (!changed(current, program)) {
+                unchanged++
             } else {
                 val rows = resolver.update(
                     TvContractCompat.buildPreviewProgramUri(current.id),
@@ -277,7 +281,30 @@ internal object HomeScreenRows {
                 resolver.delete(TvContractCompat.buildPreviewProgramUri(program.id), null, null)
             }
         }
-        Log.i(TAG, "$id: channel $channelId, ${items.size} sent, $inserted added, $updated updated")
+        Log.i(
+            TAG,
+            "$id: channel $channelId, ${items.size} sent, $inserted added, $updated updated, $unchanged unchanged",
+        )
+    }
+
+    /**
+     * Whether [next] would show differently from [current]. Rewriting a card
+     * makes the launcher redraw it, and a focused card loses its channel
+     * logo until it's focused again, so a card is only rewritten when
+     * something shown changed. Programme progress counts once it has moved
+     * on a little: the bar is too short to show less.
+     */
+    @SuppressLint("RestrictedApi")
+    private fun changed(current: PreviewProgram, next: PreviewProgram): Boolean {
+        val shown = current.toContentValues()
+        val wanted = next.toContentValues()
+        val position = TvContractCompat.PreviewPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS
+        for (column in wanted.keySet()) {
+            if (column == position) continue
+            if (wanted.get(column)?.toString() != shown.get(column)?.toString()) return true
+        }
+        val moved = (wanted.getAsLong(position) ?: 0L) - (shown.getAsLong(position) ?: 0L)
+        return kotlin.math.abs(moved) >= PROGRESS_STEP_MS
     }
 
     private fun previewProgram(
@@ -303,15 +330,20 @@ internal object HomeScreenRows {
             builder.setPosterArtUri(it)
             builder.setPosterArtAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9)
         }
-        (item["logoUrl"] as? String)?.let { builder.setLogoUri(Uri.parse(it)) }
         val start = (item["startMs"] as? Number)?.toLong()
         val end = (item["endMs"] as? Number)?.toLong()
         if (start != null) builder.setStartTimeUtcMillis(start)
-        if (start != null && end != null && end > start) {
+        val showsProgress = start != null && end != null && end > start
+        if (showsProgress) {
             builder.setEndTimeUtcMillis(end)
             // How far into the programme it is now; the next refresh moves it.
             builder.setDurationMillis((end - start).toInt())
             builder.setLastPlaybackPositionMillis((now - start).coerceIn(0, end - start).toInt())
+        } else {
+            // The launcher draws the logo badge where a focused card's
+            // progress bar goes, covering it, so only a card without one
+            // gets it.
+            (item["logoUrl"] as? String)?.let { builder.setLogoUri(Uri.parse(it)) }
         }
         (item["launch"] as? Map<*, *>)?.let { builder.setIntentUri(launchUri(context, it)) }
         return builder.build()
