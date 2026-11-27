@@ -453,6 +453,40 @@ void main() {
       expect(find.text('Tears of Steel'), findsOneWidget);
     });
 
+    for (final useSidebarLayout in [false, true]) {
+      testWidgets('typing in the search field keeps focus on it while results '
+          'reload (sidebar: $useSidebarLayout)', (tester) async {
+        final seeded = await _buildRepo(tester, testVodItems);
+        // A real catalog query resolves off the UI isolate, so the grid
+        // shows a placeholder frame (unmounting the first card) before the
+        // filtered rows land. The in-memory repo answers within the same
+        // pump, so add that latency back.
+        final repo = _SlowSearchCatalogRepository(seeded.database);
+        await tester.pumpWidget(
+          _TestApp(
+            catalogRepository: repo,
+            categories: testCategories,
+            useSidebarLayout: useSidebarLayout,
+          ),
+        );
+        await _settle(tester);
+
+        await tester.tap(find.byIcon(Icons.search));
+        await _settle(tester);
+        await tester.showKeyboard(find.byType(TextField));
+        await tester.enterText(find.byType(TextField), 's');
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        await _settle(tester);
+
+        final editable = tester.state<EditableTextState>(
+          find.byType(EditableText),
+        );
+        expect(editable.widget.focusNode.hasPrimaryFocus, isTrue);
+        expect(find.text('Sintel'), findsOneWidget);
+      });
+    }
+
     testWidgets('inline search composes with category filter', (tester) async {
       final repo = await _buildRepo(tester, testVodItems);
       await tester.pumpWidget(
@@ -1419,6 +1453,32 @@ class _TestApp extends StatelessWidget {
           favoritesService: favoritesService,
         ),
       ),
+    );
+  }
+}
+
+/// Delays search counts by one short timer, the way a real catalog query
+/// that runs off the UI isolate resolves a frame or more later.
+class _SlowSearchCatalogRepository extends CatalogRepository {
+  // The base constructor's parameter is private (`_db`), so no name matches.
+  // ignore: matching_super_parameters
+  _SlowSearchCatalogRepository(super.db);
+
+  @override
+  Future<int> countActiveItems({
+    required String kind,
+    String? categoryId,
+    String? search,
+    Set<int>? ids,
+  }) async {
+    if (search != null) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    return super.countActiveItems(
+      kind: kind,
+      categoryId: categoryId,
+      search: search,
+      ids: ids,
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:dpad/dpad.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/services.dart';
 import 'package:m3u_tv/shared/gradient_border_effect.dart';
 import 'package:material_ui/material_ui.dart';
@@ -172,6 +173,20 @@ class _DpadInkWellState extends State<DpadInkWell> {
     onLongTap();
   }
 
+  /// True while a text field holds focus. An item mounted then (an inline
+  /// search's results landing while the user types) must not autofocus:
+  /// its own focus scope is empty, so Flutter would pull focus off the
+  /// field and close the keyboard after the first character.
+  static bool _textFieldHasFocus() {
+    final context = FocusManager.instance.primaryFocus?.context;
+    if (context is! Element) return false;
+    // The focused widget can be on its way out of the tree this same frame,
+    // and looking up the ancestors of an inactive element asserts. In
+    // release the lookup is already safe: deactivating detaches the parent.
+    if (kDebugMode && !context.debugIsActive) return false;
+    return context.findAncestorStateOfType<EditableTextState>() != null;
+  }
+
   bool get _isInteractive =>
       widget.enabled && (widget.onTap != null || widget.onLongTap != null);
 
@@ -224,7 +239,7 @@ class _DpadInkWellState extends State<DpadInkWell> {
             child,
           );
         },
-        autofocus: widget.autofocus,
+        autofocus: widget.autofocus && !_textFieldHasFocus(),
         entry: widget.entry,
         autoScroll: widget.autoScroll,
         scrollPadding: widget.scrollPadding,
