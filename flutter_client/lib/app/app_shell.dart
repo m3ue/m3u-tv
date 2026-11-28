@@ -13,6 +13,7 @@ import 'package:m3u_tv/app/navigation_sidebar.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/features/aiostreams/aiostreams_catalog_screen.dart';
 import 'package:m3u_tv/features/android_auto/android_auto_bridge.dart';
+import 'package:m3u_tv/features/android_home_screen/android_home_screen_bridge.dart';
 import 'package:m3u_tv/features/carplay/carplay_controller.dart';
 import 'package:m3u_tv/features/dvr/dvr_recordings_screen.dart';
 import 'package:m3u_tv/features/epg/epg_preview_player.dart';
@@ -301,14 +302,33 @@ class AppShellState extends ConsumerState<AppShell>
     _notificationActivationSub = _appState.notificationActivations.listen(
       _onNotificationActivation,
     );
+    _resumeDeferredRefreshIfShown();
     unawaited(_appState.ensureBooted());
     CarPlayController.instance?.onPlayChannel = _playCarPlayChannel;
     AndroidAutoBridge.instance?.onPlayChannel = _playCarPlayChannel;
+    // After the first frame: a card the app was started from opens the
+    // player, which needs the shell's navigator.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AndroidHomeScreenBridge.instance?.onLaunch = _openHomeScreenLaunch;
+      }
+    });
     _visibleRoutes = _mainRoutes;
     _initSidebarFocusNodes();
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => unawaited(_announceAppUpdate()),
     );
+  }
+
+  /// The app may have been started in the background to refresh the home
+  /// screen rows (`AppStateController.deferServerRefresh`), which still
+  /// builds this shell (the launch splash builds the app beneath it) with no
+  /// activity. Once the app is actually in front, refresh from the server
+  /// too.
+  void _resumeDeferredRefreshIfShown() {
+    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      _appState.resumeDeferredRefresh();
+    }
   }
 
   // Settings > General already shows the update status, but only to someone
@@ -621,6 +641,10 @@ class AppShellState extends ConsumerState<AppShell>
       carPlay!.onPlayChannel = null;
     }
     final androidAuto = AndroidAutoBridge.instance;
+    final homeScreen = AndroidHomeScreenBridge.instance;
+    if (homeScreen?.onLaunch == _openHomeScreenLaunch) {
+      homeScreen!.onLaunch = null;
+    }
     if (androidAuto?.onPlayChannel == _playCarPlayChannel) {
       androidAuto!.onPlayChannel = null;
     }
@@ -633,6 +657,7 @@ class AppShellState extends ConsumerState<AppShell>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     debugPrint('[Lifecycle] ${state.name}');
+    _resumeDeferredRefreshIfShown();
     // What counts as leaving: TV/mobile need a real `paused`, since there
     // `inactive` is a system overlay (the assistant panel, a permission
     // dialog) and `resumed` can arrive at launch, where the content refresh
@@ -1467,6 +1492,20 @@ class AppShellState extends ConsumerState<AppShell>
     runFrameIfBackgrounded();
   }
 
+  /// Opens what an Android TV home screen card was picked for.
+  void _openHomeScreenLaunch(HomeScreenLaunch launch) {
+    if (!mounted) return;
+    switch (launch) {
+      case HomeScreenChannelLaunch(:final channel, :final context):
+        _playCarPlayChannel(channel, context);
+      case HomeScreenProgressLaunch(:final progress):
+        // A card picked on the home screen opens over Home while its rows
+        // are still loading, and their autofocus would take focus from a
+        // resume dialog; Android expects the card to play anyway.
+        unawaited(_openProgress(progress, playDirectly: true));
+    }
+  }
+
   void _openNextChannel() => unawaited(_switchChannel(1));
   void _openPreviousChannel() => unawaited(_switchChannel(-1));
 
@@ -1886,7 +1925,17 @@ class AppShellState extends ConsumerState<AppShell>
     if (mounted) setState(() => _fullScreenDetailDepth--);
   }
 
-  Future<void> _openProgress(Progress progress) async {
+  /// Plays a Continue Watching entry. [playDirectly] (a home screen card,
+  /// which Android expects to resume) skips the resume and Up Next choices:
+  /// a partly watched item resumes where it was left, an Up Next episode
+  /// starts.
+  Future<void> _openProgress(
+    Progress progress, {
+    bool playDirectly = false,
+  }) async {
+    final resumeAt = playDirectly && progress.positionSeconds >= 30
+        ? progress.positionSeconds.toDouble()
+        : null;
     if (progress.contentType == ContentType.vod) {
       final item = await _appState.catalogRepository.activeItemById<VodItem>(
         kind: kCatalogKindVod,
@@ -1901,6 +1950,7 @@ class AppShellState extends ConsumerState<AppShell>
               title: progress.title ?? item.name,
               type: 'vod',
               streamId: item.id,
+              startPosition: resumeAt,
               metadata: <String, Object?>{
                 'container_extension': item.containerExtension,
                 if (progress.backdropUrl != null)
@@ -1927,7 +1977,7 @@ class AppShellState extends ConsumerState<AppShell>
         id: progress.seriesId!,
       );
       if (series != null && mounted) {
-        if (progress.upNext) {
+        if (progress.upNext && !playDirectly) {
           // Nothing to resume, but the viewer may want to skip this episode:
           // marking it watched surfaces the one after it as "up next".
           final l = AppLocalizations.of(context);
@@ -1963,6 +2013,7 @@ class AppShellState extends ConsumerState<AppShell>
               streamId: progress.streamId,
               seriesId: progress.seriesId,
               seasonNumber: progress.seasonNumber,
+              startPosition: resumeAt,
               metadata: <String, Object?>{
                 if (series.tmdbId != null) 'tmdb_id': series.tmdbId,
                 if (series.year != null) 'year': series.year,

@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <!-- Keeps the Android Auto player's stream going with the screen off. -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- Android TV home screen: Watch Next and the "On Now" channel
+         (HomeScreenRows). -->
+    <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA"/>
     <uses-feature android:name="android.software.leanback" android:required="false"/>
     <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
     <uses-feature android:name="android.software.picture_in_picture" android:required="false"/>
@@ -79,6 +82,15 @@
                 <action android:name="android.media.browse.MediaBrowserService"/>
             </intent-filter>
         </service>
+        <!-- Android TV home screen: the launcher asks for the app's rows
+             after install and after clearing its data (HomeScreenReceiver). -->
+        <receiver
+            android:name=".HomeScreenReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.media.tv.action.INITIALIZE_PROGRAMS"/>
+            </intent-filter>
+        </receiver>
         <!-- Square channel logos for Android Auto's lists. Exported so the
              car can read them; serves only logos the car service has listed. -->
         <provider

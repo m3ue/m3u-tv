@@ -65,3 +65,38 @@ Map<String, List<SportsChannelMatch>> sportsChannelMatchesFrom(
       ],
   };
 }
+
+/// The day window Home's Sports row lists, in UTC: from local midnight today,
+/// [days] long.
+({DateTime from, DateTime to}) homeSportsWindow(DateTime now, {int days = 1}) {
+  final midnight = DateTime(now.year, now.month, now.day);
+  return (
+    from: midnight.toUtc(),
+    to: DateTime(midnight.year, midnight.month, midnight.day + days).toUtc(),
+  );
+}
+
+/// The games of [watchable] a channel in [matches] carries, in the order
+/// Home's Sports row (and the Android TV home screen's Sports channel) shows
+/// them: live games and [followed] teams first, then by kickoff.
+List<SportsFixture> rankHomeSportsFixtures(
+  Iterable<SportsFixture> watchable,
+  Map<String, List<SportsChannelMatch>> matches,
+  Set<String> followed,
+) {
+  int rank(SportsFixture fixture) {
+    final isFollowed = fixture.displayOrder.any(
+      (side) => followed.contains(side.team.key),
+    );
+    final isLive = fixture.state == SportsFixtureState.live;
+    return (isLive ? 0 : 2) + (isFollowed ? 0 : 1);
+  }
+
+  return watchable
+      .where((fixture) => matches[fixture.key]?.isNotEmpty ?? false)
+      .toList()
+    ..sort((a, b) {
+      final byRank = rank(a).compareTo(rank(b));
+      return byRank != 0 ? byRank : a.start.compareTo(b.start);
+    });
+}

@@ -6,6 +6,7 @@ import 'package:m3u_tv/features/settings/sections/nav_layout_page.dart';
 import 'package:m3u_tv/features/settings/settings_ui.dart';
 import 'package:m3u_tv/l10n/app_localizations.dart';
 import 'package:m3u_tv/services/view_settings_service.dart';
+import 'package:m3u_tv/shared/host_platform.dart';
 import 'package:material_ui/material_ui.dart';
 
 // ---------------------------------------------------------------------------
@@ -43,6 +44,13 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
   bool _navigationSoundEnabled = true;
   OptimizeFor _optimizeFor = OptimizeFor.quality;
   AppFontSize _fontSize = AppFontSize.normal;
+  bool _androidHomeWatchNext = true;
+  bool _androidHomeOnNow = true;
+  bool _androidHomeSports = true;
+
+  // Only Android TV has the home screen rows these fill.
+  bool get _showAndroidHomeScreen =>
+      HostPlatform.isAndroid && widget.deviceType == DeviceType.tv;
 
   // The navigation click sound only ever plays on TV/desktop (see main.dart);
   // hide the toggle where it would have no effect.
@@ -82,6 +90,9 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
         .navigationSoundEnabled();
     final optimizeFor = await widget.service.optimizeFor();
     final storedFontSize = await widget.service.fontSizeOrNull();
+    final androidHomeWatchNext = await widget.service.androidHomeWatchNext();
+    final androidHomeOnNow = await widget.service.androidHomeOnNow();
+    final androidHomeSports = await widget.service.androidHomeSports();
     final fontSize = AppFontSize.resolveDefault(
       stored: storedFontSize,
       isTv: widget.deviceType == DeviceType.tv,
@@ -100,6 +111,9 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
       _navigationSoundEnabled = navigationSoundEnabled;
       _optimizeFor = optimizeFor;
       _fontSize = fontSize;
+      _androidHomeWatchNext = androidHomeWatchNext;
+      _androidHomeOnNow = androidHomeOnNow;
+      _androidHomeSports = androidHomeSports;
     });
   }
 
@@ -437,6 +451,35 @@ class _ViewSettingsSectionState extends State<ViewSettingsSection> {
             ),
           ],
         ),
+
+        if (_showAndroidHomeScreen) ...[
+          SettingsSectionHeader(l.settingsSectionAndroidHomeScreen),
+          SettingsGroup(
+            children: [
+              SettingsSwitchRow(
+                title: l.settingsAndroidHomeWatchNext,
+                subtitle: l.settingsAndroidHomeWatchNextHint,
+                icon: Icons.play_circle_outline,
+                value: _androidHomeWatchNext,
+                onChanged: widget.service.setAndroidHomeWatchNext,
+              ),
+              SettingsSwitchRow(
+                title: l.settingsAndroidHomeOnNow,
+                subtitle: l.settingsAndroidHomeOnNowHint,
+                icon: Icons.live_tv_outlined,
+                value: _androidHomeOnNow,
+                onChanged: widget.service.setAndroidHomeOnNow,
+              ),
+              SettingsSwitchRow(
+                title: l.settingsAndroidHomeSports,
+                subtitle: l.settingsAndroidHomeSportsHint,
+                icon: Icons.stadium_outlined,
+                value: _androidHomeSports,
+                onChanged: widget.service.setAndroidHomeSports,
+              ),
+            ],
+          ),
+        ],
 
         SettingsSectionHeader(l.settingsSectionFilters),
         SettingsGroup(

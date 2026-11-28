@@ -998,6 +998,48 @@ abstract class AppLocalizations {
   /// **'Display'**
   String get settingsSectionDisplay;
 
+  /// No description provided for @settingsSectionAndroidHomeScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Android TV home screen'**
+  String get settingsSectionAndroidHomeScreen;
+
+  /// No description provided for @settingsAndroidHomeWatchNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue Watching'**
+  String get settingsAndroidHomeWatchNext;
+
+  /// No description provided for @settingsAndroidHomeWatchNextHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Continue Watching, Up Next episodes included, as an M3U TV row on the home screen and in its Watch Next row, with progress bars.'**
+  String get settingsAndroidHomeWatchNextHint;
+
+  /// No description provided for @settingsAndroidHomeOnNow.
+  ///
+  /// In en, this message translates to:
+  /// **'On Now channel'**
+  String get settingsAndroidHomeOnNow;
+
+  /// No description provided for @settingsAndroidHomeOnNowHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a home screen row of your Live TV channels and what\'s airing on them, in your Live TV sort order. Kept up to date while the app is closed.'**
+  String get settingsAndroidHomeOnNowHint;
+
+  /// No description provided for @settingsAndroidHomeSports.
+  ///
+  /// In en, this message translates to:
+  /// **'Sports channel'**
+  String get settingsAndroidHomeSports;
+
+  /// No description provided for @settingsAndroidHomeSportsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a home screen row of today\'s games that your channels carry, as Home\'s Sports row lists them.'**
+  String get settingsAndroidHomeSportsHint;
+
   /// No description provided for @settingsSectionFilters.
   ///
   /// In en, this message translates to:
@@ -1981,6 +2023,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Up next'**
   String get homeUpNext;
+
+  /// No description provided for @homeScreenOnNowChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'On Now'**
+  String get homeScreenOnNowChannel;
+
+  /// No description provided for @homeScreenOnNowDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'{channel} · {start} - {end}'**
+  String homeScreenOnNowDescription(String channel, String start, String end);
 
   /// No description provided for @continueWatchingItemUnavailable.
   ///

@@ -494,6 +494,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSectionDisplay => '显示';
 
   @override
+  String get settingsSectionAndroidHomeScreen => 'Android TV 主屏幕';
+
+  @override
+  String get settingsAndroidHomeWatchNext => '继续观看';
+
+  @override
+  String get settingsAndroidHomeWatchNextHint =>
+      '在主屏幕上以 M3U TV 行的形式显示继续观看（包括即将播放的剧集），同时显示在“接下来观看”行中，并带有进度条。';
+
+  @override
+  String get settingsAndroidHomeOnNow => '“正在播出”频道';
+
+  @override
+  String get settingsAndroidHomeOnNowHint =>
+      '在主屏幕添加一行，按你的直播电视排序显示直播频道及其正在播出的节目。应用关闭时也会保持更新。';
+
+  @override
+  String get settingsAndroidHomeSports => '体育频道';
+
+  @override
+  String get settingsAndroidHomeSportsHint =>
+      '在主屏幕添加一行，显示你的频道今天转播的比赛，与首页的体育行一致。';
+
+  @override
   String get settingsSectionFilters => '筛选';
 
   @override
@@ -1058,6 +1082,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get homeUpNext => '即将播放';
+
+  @override
+  String get homeScreenOnNowChannel => '正在播出';
+
+  @override
+  String homeScreenOnNowDescription(String channel, String start, String end) {
+    return '$channel · $start - $end';
+  }
 
   @override
   String get continueWatchingItemUnavailable => '该内容已不可用';

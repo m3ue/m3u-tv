@@ -2,6 +2,7 @@ package dev.sparkison.tv
 
 import android.app.PictureInPictureParams
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
@@ -75,6 +76,18 @@ class MainActivity : FlutterActivity() {
         // launch theme behind the (still opaque) system bars for one frame.
         applySystemUiPolicy("browsing")
         if (isTelevisionDevice()) installTextEditorProxy()
+        // Opened from a home screen card (HomeScreenRows). Not when the
+        // activity is recreated, or reopened from Recents: both hand back the
+        // card's intent, which would play it again.
+        val fromHistory = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
+        if (savedInstanceState == null && !fromHistory) {
+            HomeScreenBridge.deliverLaunch(intent)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        HomeScreenBridge.deliverLaunch(intent)
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean =

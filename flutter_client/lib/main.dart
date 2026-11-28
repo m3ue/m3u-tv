@@ -16,6 +16,7 @@ import 'package:m3u_tv/app/launch_splash.dart';
 import 'package:m3u_tv/app/system_ui_policy.dart';
 import 'package:m3u_tv/app/text_input_reporting_binding.dart';
 import 'package:m3u_tv/features/android_auto/android_auto_bridge.dart';
+import 'package:m3u_tv/features/android_home_screen/android_home_screen_bridge.dart';
 import 'package:m3u_tv/features/carplay/car_catalog.dart';
 import 'package:m3u_tv/features/carplay/carplay_controller.dart';
 import 'package:m3u_tv/navigation/go_router_config.dart';
@@ -47,7 +48,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:window_manager/window_manager.dart';
 
-Future<void> main() async {
+/// Passed by `HomeScreenRefreshWorker.kt` when it starts the app only to
+/// refresh the Android TV home screen rows.
+const _homeScreenRefreshArg = '--home-screen-refresh';
+
+Future<void> main([List<String> args = const []]) async {
   // Reports text field focus to Android so the TV keyboard keeps its input
   // session (#309) - see TextInputReportingBinding.
   TextInputReportingBinding.ensureInitialized();
@@ -83,6 +88,9 @@ Future<void> main() async {
   final systemUiPolicy = SystemUiPolicy();
   await systemUiPolicy.applyBrowsing();
   final appState = await _buildAppState();
+  if (args.contains(_homeScreenRefreshArg)) {
+    appState.deferServerRefresh = true;
+  }
   if (HostPlatform.isIOS) {
     // Before the UI: the car can open the app without a phone window.
     final carPlay = CarPlayController(appState);
@@ -94,6 +102,11 @@ Future<void> main() async {
     final androidAuto = AndroidAutoBridge(CarCatalog(appState));
     AndroidAutoBridge.instance = androidAuto;
     androidAuto.start();
+    // Likewise: the home screen refresh starts the app with no activity
+    // (HomeScreenRefreshWorker.kt) and asks this for the rows.
+    final homeScreen = AndroidHomeScreenBridge(CarCatalog(appState));
+    AndroidHomeScreenBridge.instance = homeScreen;
+    homeScreen.start();
   }
   _configureImageCache(await appState.viewSettingsService.optimizeFor());
   DesktopFullscreenService? desktopFullscreen;

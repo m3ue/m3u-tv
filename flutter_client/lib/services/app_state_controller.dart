@@ -768,6 +768,39 @@ class AppStateController extends ChangeNotifier {
 
   Future<void>? _ensureBootFuture;
 
+  /// Set before boot for a start with no UI to show (the Android TV home
+  /// screen refresh, `HomeScreenRefreshWorker.kt`): boot paints from the
+  /// cache as usual but holds the server refresh (the whole catalog, the
+  /// guide sweep, notifications) until [resumeDeferredRefresh], since that
+  /// start only reads a few rows and ends again within a minute.
+  bool deferServerRefresh = false;
+  Future<void> Function()? _deferredRefresh;
+
+  /// Runs the server refresh a [deferServerRefresh] boot held back, now that
+  /// the app is shown; later boots refresh as usual.
+  void resumeDeferredRefresh() {
+    deferServerRefresh = false;
+    final refresh = _deferredRefresh;
+    _deferredRefresh = null;
+    if (refresh != null) _runBackgroundPersistence(refresh());
+  }
+
+  /// The server handshake on its own, for a [deferServerRefresh] start that
+  /// needs what the server says it offers (Sports): the cached boot skips it
+  /// along with the rest of the refresh. True once connected.
+  Future<bool> ensureServerHandshake() async {
+    if (authNotifier.authResponse != null) return true;
+    final credentials = authNotifier.credentials;
+    if (credentials == null) return false;
+    final generation = _sourceOperationGeneration.current;
+    final connected = await authNotifier.connect(
+      credentials,
+      isCurrent: () => !_sourceOperationGeneration.isStale(generation),
+    );
+    if (connected) notifyListeners();
+    return connected;
+  }
+
   /// Boots once if no source is configured yet, sharing an in-flight boot
   /// between callers: the phone's shell and the CarPlay screens (which can
   /// start the app with no phone window, where the shell never builds).
@@ -855,13 +888,16 @@ class AppStateController extends ChangeNotifier {
         // from the server in the background.
         _isBootstrapping = false;
         notifyListeners();
-        _runBackgroundPersistence(
-          _validateCredentialsAndRefresh(
-            credentials,
-            sourceGeneration: sourceGeneration,
-            notificationGeneration: notificationGeneration,
-          ),
+        Future<void> refresh() => _validateCredentialsAndRefresh(
+          credentials,
+          sourceGeneration: sourceGeneration,
+          notificationGeneration: notificationGeneration,
         );
+        if (deferServerRefresh) {
+          _deferredRefresh = refresh;
+          return;
+        }
+        _runBackgroundPersistence(refresh());
         return;
       }
 

@@ -566,6 +566,7 @@ jobs:
             libsecret-1-dev libjsoncpp-dev libx11-dev libxi-dev \
             gsettings-desktop-schemas zstd imagemagick zsync desktop-file-utils \
             libmujs3 liblua5.2-0 libdisplay-info1 libva-wayland2 dconf-gsettings-backend \
+            libva-drm2 libva-x11-2 libpipewire-0.3-0t64 libpulse0 \
             flatpak flatpak-builder
 
       - name: Install Flatpak runtime
